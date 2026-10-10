@@ -18,6 +18,8 @@
 #include "freertos/task.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include "esp_rom_gpio.h"
+#include "soc/gpio_sig_map.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "bsp/pinout.h"
@@ -27,8 +29,8 @@
 
 static const char *TAG = "bsp_display";
 
-#define EPD_FULL_REFRESH_TIMEOUT_MS    10000
-#define EPD_PARTIAL_REFRESH_TIMEOUT_MS 3000
+#define EPD_FULL_REFRESH_TIMEOUT_MS      10000
+#define EPD_PARTIAL_REFRESH_TIMEOUT_MS   3000
 
 // SSD1681 Factory-calibrated 159-byte Partial LUT (Datasheet Figure 6-6 layout)
 static const uint8_t WF_PARTIAL_1IN54[159] = {
@@ -62,36 +64,39 @@ static const uint8_t WF_PARTIAL_1IN54[159] = {
 };
 
 static spi_device_handle_t s_spi_handle            = NULL;
+static spi_device_handle_t s_spi_read_handle       = NULL;
 static uint8_t             *s_frame_buffer         = NULL;
 static uint8_t             *s_prev_frame_buffer    = NULL;
-static uint32_t            s_partial_refresh_count = 0;
 
-static inline void epd_set_cs (uint8_t level) { gpio_set_level(BSP_PIN_EPD_CS,  level); }
-static inline void epd_set_dc (uint8_t level) { gpio_set_level(BSP_PIN_EPD_DC,  level); }
-static inline void epd_set_rst(uint8_t level) { gpio_set_level(BSP_PIN_EPD_RST, level); }
+static uint32_t s_partial_refresh_count = 0;
 
-esp_err_t bsp_display_wait_busy(uint32_t timeout_ms)
-{
-    vTaskDelay(pdMS_TO_TICKS(10));
+static inline void epd_set_cs (uint8_t level) { gpio_set_level((gpio_num_t)BSP_PIN_EPD_CS,  level); }
+static inline void epd_set_dc (uint8_t level) { gpio_set_level((gpio_num_t)BSP_PIN_EPD_DC,  level); }
+static inline void epd_set_rst(uint8_t level) { gpio_set_level((gpio_num_t)BSP_PIN_EPD_RST, level); }
+
+static inline bool display_power_enable(bool enable) { 
+	gpio_set_level((gpio_num_t)BSP_PIN_EPD_3V3_EN, enable ? 0 : 1);
+	return (gpio_get_level((gpio_num_t)BSP_PIN_EPD_3V3_EN) == 0);
+}
+
+esp_err_t bsp_display_wait_busy(uint32_t timeout_ms) {
+    // Ensure display controller has time to assert BUSY high
+    vTaskDelay(pdMS_TO_TICKS(20));
     TickType_t start_tick    = xTaskGetTickCount();
     TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
 
     while (gpio_get_level(BSP_PIN_EPD_BUSY) == 1) {
-        if ((xTaskGetTickCount() - start_tick) > timeout_ticks) {
-            ESP_LOGE(TAG, "Busy pin wait timeout (%lu ms)", (unsigned long)timeout_ms);
-            return ESP_ERR_TIMEOUT;
-        }
-        vTaskDelay(pdMS_TO_TICKS(5));
-    }
-    return ESP_OK;
+        if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
+			return ESP_ERR_TIMEOUT;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    } return ESP_OK;
 }
 
 #include "esp_memory_utils.h"
 
 static uint8_t *s_dma_bounce_buf = NULL;
 
-static void epd_send_byte(uint8_t data)
-{
+static void epd_send_byte(uint8_t data) {
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
     t.flags      = SPI_TRANS_USE_TXDATA;
@@ -100,27 +105,25 @@ static void epd_send_byte(uint8_t data)
     spi_device_polling_transmit(s_spi_handle, &t);
 }
 
-static void epd_send_cmd(uint8_t cmd)
-{
-    epd_set_dc   (0);
-    epd_set_cs   (0);
-    epd_send_byte(cmd);
-    epd_set_cs   (1);
+static void epd_send_cmd(uint8_t cmd) {
+    epd_set_dc    (0);
+    epd_set_cs    (0);
+    epd_send_byte (cmd);
+    epd_set_cs    (1);
 }
 
-static void epd_send_data(uint8_t data)
-{
-    epd_set_dc   (1);
-    epd_set_cs   (0);
-    epd_send_byte(data);
-    epd_set_cs   (1);
+static void epd_send_data(uint8_t data) {
+    epd_set_dc    (1);
+    epd_set_cs    (0);
+    epd_send_byte (data);
+    epd_set_cs    (1);
 }
 
 static void epd_write_bytes(const uint8_t *data, size_t len)
 {
     if (len == 0 || data == NULL) return;
-    epd_set_dc(1);
-    epd_set_cs(0);
+	
+    epd_set_dc(1); epd_set_cs(0);
 
     if (esp_ptr_dma_capable(data)) {
         spi_transaction_t t;
@@ -155,8 +158,7 @@ static void epd_write_bytes(const uint8_t *data, size_t len)
     epd_set_cs(1);
 }
 
-static void epd_set_windows(uint16_t x_start_byte, uint16_t y_start, uint16_t x_end_byte, uint16_t y_end)
-{
+static void epd_set_windows(uint16_t x_start_byte, uint16_t y_start, uint16_t x_end_byte, uint16_t y_end) {
     epd_send_cmd (0x44);
     epd_send_data(x_start_byte   & 0xFF);
     epd_send_data(x_end_byte     & 0xFF);
@@ -165,11 +167,10 @@ static void epd_set_windows(uint16_t x_start_byte, uint16_t y_start, uint16_t x_
     epd_send_data( y_start       & 0xFF);
     epd_send_data((y_start >> 8) & 0xFF);
     epd_send_data( y_end         & 0xFF);
-    epd_send_data((y_end >> 8)   & 0xFF);
+    epd_send_data((y_end   >> 8) & 0xFF);
 }
 
-static void epd_set_cursor(uint16_t x_start_byte, uint16_t y_start)
-{
+static void epd_set_cursor(uint16_t x_start_byte, uint16_t y_start) {
     epd_send_cmd (0x4E);
     epd_send_data(x_start_byte & 0xFF);
 
@@ -178,18 +179,12 @@ static void epd_set_cursor(uint16_t x_start_byte, uint16_t y_start)
     epd_send_data((y_start >> 8) & 0xFF);
 }
 
-static void epd_load_custom_lut(const uint8_t *lut_buffer)
-{
+static void epd_load_custom_lut(const uint8_t *lut_buffer) {
     if (lut_buffer == NULL) return;
 
-    epd_send_cmd   (0x32);
-    epd_write_bytes(lut_buffer, 153);
-
-    epd_send_cmd (0x3F);
-    epd_send_data(lut_buffer[153]);
-
-    epd_send_cmd (0x03);
-    epd_send_data(lut_buffer[154]);
+    epd_send_cmd (0x32); epd_write_bytes(lut_buffer, 153);
+    epd_send_cmd (0x3F); epd_send_data(lut_buffer[153]);
+    epd_send_cmd (0x03); epd_send_data(lut_buffer[154]);
 
     epd_send_cmd (0x04);
     epd_send_data(lut_buffer[155]);
@@ -200,40 +195,35 @@ static void epd_load_custom_lut(const uint8_t *lut_buffer)
     epd_send_data(lut_buffer[158]);
 }
 
-static void epd_apply_core_registers(bool is_wake_init)
-{
-    epd_send_cmd (0x01);
-    epd_send_data(( BSP_DISPLAY_HEIGHT - 1)       & 0xFF);
-    epd_send_data(((BSP_DISPLAY_HEIGHT - 1) >> 8) & 0xFF);
-    epd_send_data(0x00);
+static void epd_apply_core_registers(bool is_wake_init) {
+    epd_send_cmd   (0x01);
+    epd_send_data  (( BSP_DISPLAY_HEIGHT - 1)       & 0xFF);
+    epd_send_data  (((BSP_DISPLAY_HEIGHT - 1) >> 8) & 0xFF);
+    epd_send_data  (0x00);
 
-    epd_send_cmd (0x11);
-    epd_send_data(0x03); // Increment X, Increment Y
+    epd_send_cmd   (0x11);
+    epd_send_data  (0x03); // Increment X, Increment Y
 
-    epd_send_cmd (0x3C);
-    epd_send_data(0x05);
-
-    epd_send_cmd (0x18);
-    epd_send_data(0x80);
+    epd_send_cmd   (0x18);
+    epd_send_data  (0x80); // Internal temperature sensor
 
     epd_set_windows(0, 0, (BSP_DISPLAY_WIDTH / 8) - 1, BSP_DISPLAY_HEIGHT - 1);
     epd_set_cursor (0, 0);
 
-    // Initialize clock and temperature calibration from OTP (0xB1 = clock + temp + initial display settings)
-    // Note: 0x22 0xB1 with 0x20 master activation does NOT refresh the physical panel; it calibrates internal analog clocks
-    epd_send_cmd (0x22);
-    epd_send_data(0xB1);
-    epd_send_cmd (0x20); // Master Activation for Clock & Temp load
-    bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
+    epd_send_cmd   (0x3C);
+    epd_send_data  (0x05); // Border waveform for full OTP mode
 
-    if (is_wake_init) {
-        // Wake boot: Load custom partial LUT directly
-        epd_load_custom_lut(WF_PARTIAL_1IN54);
-    }
+    epd_send_cmd   (0x22);
+    epd_send_data  (0xB1);
+    epd_send_cmd   (0x20); // Master Activation for Clock & Temp load
+	
+    bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
 }
 
 esp_err_t bsp_display_init(void)
 {
+	if(display_power_enable(true) != true) return ESP_ERR_INVALID_STATE;
+	
     if (s_frame_buffer == NULL) {
         s_frame_buffer = (uint8_t *)heap_caps_malloc(BSP_DISPLAY_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
         if (s_frame_buffer == NULL) s_frame_buffer = (uint8_t *)malloc(BSP_DISPLAY_BUFFER_SIZE);
@@ -277,65 +267,65 @@ esp_err_t bsp_display_init(void)
 
         ret = spi_bus_add_device(SPI2_HOST, &devcfg, &s_spi_handle);
         if (ret != ESP_OK) return ret;
+
+        // Register half-duplex 3-wire SPI device handle for hardware sensor readout (No runtime bit-banging)
+        spi_device_interface_config_t rdevcfg = {};
+        rdevcfg.mode           = 0;
+        rdevcfg.clock_speed_hz = 2 * 1000 * 1000;
+        rdevcfg.spics_io_num   = -1;
+        rdevcfg.flags          = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_3WIRE;
+        rdevcfg.queue_size     = 1;
+
+        spi_bus_add_device(SPI2_HOST, &rdevcfg, &s_spi_read_handle);
     }
 
     // Full hardware reset pulse to cleanly wake SSD1681 from deep sleep mode 1
-    epd_set_rst(1);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    epd_set_rst(0);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    epd_set_rst(1);
-    vTaskDelay(pdMS_TO_TICKS(10));
+    epd_set_rst          (1); vTaskDelay(pdMS_TO_TICKS(10));
+    epd_set_rst          (0); vTaskDelay(pdMS_TO_TICKS(10));
+    epd_set_rst          (1); vTaskDelay(pdMS_TO_TICKS(10));
     bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
 
-    if (!is_wake) {
-        epd_send_cmd(0x12); // SW Reset only on cold boot
-        bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
-    }
+    epd_send_cmd         (0x12); // SW Reset
+    bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
 
     epd_apply_core_registers(is_wake);
 
     if (is_wake) {
-        // Pre-synchronize both SSD1681 RAM banks (0x24 New RAM and 0x26 Old RAM) with restored frame buffer
+        // Pre-synchronize SSD1681 0x26 (Old RAM) with the restored frame from before sleep for differential scan
         epd_set_windows(0, 0, (BSP_DISPLAY_WIDTH / 8) - 1, BSP_DISPLAY_HEIGHT - 1);
 
-        epd_set_cursor(0, 0);
-        epd_send_cmd(0x24);
-        epd_write_bytes(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
-
-        epd_set_cursor(0, 0);
-        epd_send_cmd(0x26);
-        epd_write_bytes(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
+        epd_set_cursor (0, 0);
+        epd_send_cmd   (0x26);
+        epd_write_bytes(s_prev_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
     }
 
     ESP_LOGI(TAG, "SSD1681 1.54-inch EPD initialized successfully (%s mode)", is_wake ? "wake" : "cold");
     return ESP_OK;
 }
 
-void bsp_display_clear(void)
-{
-    if (s_frame_buffer != NULL) {
-        memset(s_frame_buffer, 0xFF, BSP_DISPLAY_BUFFER_SIZE);
-    }
+void bsp_display_clear(void) {
+    if (s_frame_buffer != NULL) memset(s_frame_buffer, 0xFF, BSP_DISPLAY_BUFFER_SIZE);
 }
 
-void bsp_display_flush(void)
-{
+void bsp_display_flush(void) {
     if (s_frame_buffer == NULL || s_prev_frame_buffer == NULL) return;
 
     epd_set_windows(0, 0, (BSP_DISPLAY_WIDTH / 8) - 1, BSP_DISPLAY_HEIGHT - 1);
 
-    epd_set_cursor(0, 0);
-    epd_send_cmd  (0x24);
+    epd_set_cursor (0, 0);
+    epd_send_cmd   (0x24);
     epd_write_bytes(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
 
-    epd_set_cursor(0, 0);
-    epd_send_cmd  (0x26);
+    epd_set_cursor (0, 0);
+    epd_send_cmd   (0x26);
     epd_write_bytes(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
 
-    epd_send_cmd (0x22);
-    epd_send_data(0xC7);
-    epd_send_cmd (0x20);
+    epd_send_cmd (0x3C);
+    epd_send_data(0x05);
+
+    epd_send_cmd         (0x22);
+    epd_send_data        (0xC7);
+    epd_send_cmd         (0x20);
     bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
 
     memcpy(s_prev_frame_buffer, s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
@@ -343,8 +333,7 @@ void bsp_display_flush(void)
     s_partial_refresh_count = 0;
 }
 
-void bsp_display_flush_partial(void)
-{
+void bsp_display_flush_partial(void) {
     bsp_display_flush_partial_area(0, 0, BSP_DISPLAY_WIDTH - 1, BSP_DISPLAY_HEIGHT - 1);
 }
 
@@ -352,57 +341,39 @@ void bsp_display_flush_partial_area(uint16_t x_start, uint16_t y_start, uint16_t
 {
     if (s_frame_buffer == NULL || s_prev_frame_buffer == NULL) return;
 
-    x_start = std::min<uint16_t>(x_start, BSP_DISPLAY_WIDTH  - 1);
-    x_end   = std::min<uint16_t>(x_end,   BSP_DISPLAY_WIDTH  - 1);
-    y_start = std::min<uint16_t>(y_start, BSP_DISPLAY_HEIGHT - 1);
-    y_end   = std::min<uint16_t>(y_end,   BSP_DISPLAY_HEIGHT - 1);
+    // Full 200x200 window mapping ensures perfect RAM address pointer alignment without row-by-row CS toggling
+    epd_set_windows(0, 0, (BSP_DISPLAY_WIDTH / 8) - 1, BSP_DISPLAY_HEIGHT - 1);
 
-    if (x_start > x_end) std::swap(x_start, x_end);
-    if (y_start > y_end) std::swap(y_start, y_end);
+    // 1. Write New RAM (0x24) with updated frame buffer (DO NOT overwrite 0x26 in Ping-Pong mode!)
+    epd_set_cursor (0, 0);
+    epd_send_cmd   (0x24);
+    epd_write_bytes(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
 
-    uint16_t x_s_byte = x_start / 8;
-    uint16_t x_e_byte = x_end   / 8;
-    uint16_t bytes_per_line = (x_e_byte - x_s_byte) + 1;
-
-    epd_set_windows(x_s_byte, y_start, x_e_byte, y_end);
-
-    // 1. Write Old RAM (0x26)
-    epd_set_cursor(x_s_byte, y_start);
-    epd_send_cmd(0x26);
-    for (uint16_t y = y_start; y <= y_end; y++) {
-        uint32_t offset = (y * (BSP_DISPLAY_WIDTH / 8)) + x_s_byte;
-        epd_write_bytes(&s_prev_frame_buffer[offset], bytes_per_line);
-    }
-
-    // 2. Write New RAM (0x24)
-    epd_set_cursor(x_s_byte, y_start);
-    epd_send_cmd(0x24);
-    for (uint16_t y = y_start; y <= y_end; y++) {
-        uint32_t offset = (y * (BSP_DISPLAY_WIDTH / 8)) + x_s_byte;
-        epd_write_bytes(&s_frame_buffer[offset], bytes_per_line);
-    }
-
-    // 3. Load SSD1681 Partial LUT
+    // 2. Load SSD1681 Partial LUT (159-byte waveform)
     epd_load_custom_lut(WF_PARTIAL_1IN54);
 
-    // 4. Trigger Display Update (Mode 1 Display Execution)
-    epd_send_cmd (0x22);
-    epd_send_data(0xC7);
-    epd_send_cmd (0x20);
+    // 3. Configure Display Option (0x37) & Border Waveform (0x3C) for Differential Ping-Pong Scan
+    static const uint8_t disp_option[10] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00 };
+    epd_send_cmd   (0x37);
+    epd_write_bytes(disp_option, sizeof(disp_option));
+
+    epd_send_cmd (0x3C);
+    epd_send_data(0x80); // Border Floating / LUT0
+
+    // 4. Trigger Partial Display Update (0x22 0xCF + 0x20 for differential pattern display)
+    epd_send_cmd         (0x22);
+    epd_send_data        (0xCF);
+    epd_send_cmd         (0x20);
     bsp_display_wait_busy(EPD_PARTIAL_REFRESH_TIMEOUT_MS);
 
     // 5. Synchronize local frame buffer and persist to RTC slow memory
-    for (uint16_t y = y_start; y <= y_end; y++) {
-        uint32_t offset = (y * (BSP_DISPLAY_WIDTH / 8)) + x_s_byte;
-        memcpy(&s_prev_frame_buffer[offset], &s_frame_buffer[offset], bytes_per_line);
-    }
+    memcpy(s_prev_frame_buffer, s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
     bsp_rtc_mem_save_display_frame(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
 
     s_partial_refresh_count++;
 }
 
-esp_err_t bsp_display_write_frame(const uint8_t *buffer)
-{
+esp_err_t bsp_display_write_frame(const uint8_t *buffer) {
     if (buffer == NULL) return ESP_ERR_INVALID_ARG;
     if (s_frame_buffer == NULL) {
         esp_err_t ret = bsp_display_init();
@@ -412,43 +383,100 @@ esp_err_t bsp_display_write_frame(const uint8_t *buffer)
     return ESP_OK;
 }
 
-esp_err_t bsp_display_refresh(bool partial_mode)
-{
-    if (partial_mode) {
-        bsp_display_flush_partial();
-    } else {
-        bsp_display_flush();
-    }
+esp_err_t bsp_display_refresh(bool partial_mode) {
+    if (partial_mode) { bsp_display_flush_partial(); } 
+	else              { bsp_display_flush();         }
     return ESP_OK;
 }
 
-void bsp_display_deep_sleep(void)
-{
+void bsp_display_deep_sleep(void) {
+	// Display not 'ON'
+	if(display_power_enable(true) != true) return;
+	// Display SPI not initialized
+    if (s_spi_handle == NULL) return; // (in minimal hot-wake mode)
     bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
-    epd_send_cmd (0x10);
-    epd_send_data(0x01);
+    epd_send_cmd         (0x10);
+    epd_send_data        (0x01);
 }
 
-esp_err_t bsp_display_sleep(void)
-{
+esp_err_t bsp_display_sleep(void) {
     bsp_display_deep_sleep();
     return ESP_OK;
 }
 
-void bsp_display_draw_pixel(uint16_t x, uint16_t y, bsp_display_color_t color)
-{
+void bsp_display_draw_pixel(uint16_t x, uint16_t y, bsp_display_color_t color) {
     if (x >= BSP_DISPLAY_WIDTH || y >= BSP_DISPLAY_HEIGHT || s_frame_buffer == NULL) return;
     uint32_t index = y * (BSP_DISPLAY_WIDTH / 8) + (x >> 3);
-    uint8_t  bit = 7 - (x & 0x07);
+    uint8_t  bit   = 7 - (x & 0x07);
 
-    if (color == BSP_DISPLAY_COLOR_WHITE) {
-        s_frame_buffer[index] |= (1 << bit);
-    } else {
-        s_frame_buffer[index] &= ~(1 << bit);
-    }
+    if (color == BSP_DISPLAY_COLOR_WHITE) { s_frame_buffer[index] |=  (1 << bit); } // set bit (1)
+	else                                  { s_frame_buffer[index] &= ~(1 << bit); } // clr bit (0)
 }
 
-uint8_t *bsp_display_get_buffer(void)
-{
+uint8_t *bsp_display_get_buffer(void) {
     return s_frame_buffer;
 }
+
+esp_err_t bsp_display_read_temp(float *out_temp_c)
+{
+    if (out_temp_c == NULL) return ESP_ERR_INVALID_ARG;
+
+    // Return quietly if display SPI is not initialized (e.g. during headless hot-wake mode)
+    if (s_spi_handle == NULL || s_spi_read_handle == NULL) {
+        *out_temp_c = 99.9f; return ESP_ERR_NOT_SUPPORTED;
+    }
+
+    // Check if display power rail is enabled (GPIO 6 is Active-LOW: 0=ON)
+    if (gpio_get_level((gpio_num_t)BSP_PIN_EPD_3V3_EN) != 0) {
+        *out_temp_c = 99.9f; return ESP_ERR_INVALID_STATE;
+    }
+
+    // 1. Assert CS# continuously across entire Command + Data Read phases (SSD1681 4-wire SPI protocol)
+    epd_set_cs(0);
+
+    // 2. Command Phase: D/C# = 0 (Command 0x1B: Read Temperature Sensor)
+    epd_set_dc   (0);
+    epd_send_byte(0x1B);
+
+    // 3. Data Read Phase: D/C# = 1 (Hardware SPI half-duplex read of 2 bytes on SDA)
+    epd_set_dc(1);
+    spi_transaction_t t = {};
+    t.flags             = SPI_TRANS_USE_RXDATA;
+    t.rxlength          = 16; // 2 bytes = 16 bits
+    esp_err_t ret       = spi_device_polling_transmit(s_spi_read_handle, &t);
+
+    // 4. De-assert CS#
+    epd_set_cs(1);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Hardware SPI read temperature failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    uint8_t raw_bytes[2] = {t.rx_data[0], t.rx_data[1]};
+
+    // Convert raw reading: Signed 8-bit integer + fractional 0.5°C
+    int8_t temp_int   = (int8_t)raw_bytes[0];
+    float  temp_frac  = (raw_bytes[1] & 0x80) ? 0.5f : 0.0f;
+    float  glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
+
+    // Sanity range check for physical glass panel (-40°C to +85°C)
+    if (glass_temp < -40.0f || glass_temp > 85.0f || raw_bytes[0] == 0xFF || raw_bytes[0] == 0x00) {
+        // Fallback default if panel is uncalibrated / sleep
+        *out_temp_c = 99.9f;
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    *out_temp_c = glass_temp;
+    ESP_LOGD(TAG, "SSD1681 On-Glass Temp Read (Hardware SPI): %.1f °C (0x%02X 0x%02X)", glass_temp, raw_bytes[0], raw_bytes[1]);
+    return ESP_OK;
+}
+
+uint32_t bsp_display_get_partial_count(void) {
+    return s_partial_refresh_count;
+}
+
+bool bsp_display_is_busy(void) {
+    return (gpio_get_level((gpio_num_t)BSP_PIN_EPD_BUSY) == 1);
+}
+

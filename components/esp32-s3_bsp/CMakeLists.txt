@@ -6,6 +6,7 @@ set(bsp_srcs
     "src/bsp_power.c"
     "src/bsp_display.cpp"
     "src/bsp_sensors.c"
+    "src/bsp_equ_math.c"
     "src/bsp_sdcard.c"
 
     "src/bsp_audio.c"
@@ -13,10 +14,11 @@ set(bsp_srcs
     "src/bsp_nvs.c"
     "src/bsp_wifi.c"
     "src/bsp_rtc_mem.c"
-    "src/bsp_splash.c"
     "src/bsp_time.c"
     "src/bsp_prov.c"
     "src/bsp_ota.c"
+    "src/bsp_font_montserrat_14_1bpp.c"
+    "src/bsp_font_montserrat_20_1bpp.c"
 )
 
 set(bsp_requires
@@ -46,6 +48,7 @@ set(bsp_requires
     esp_mmap_assets
     esp_lv_fs
     esp_driver_tsens
+    esp_pm
 )
 
 
@@ -59,3 +62,5 @@ idf_component_register(
     INCLUDE_DIRS "include"
     REQUIRES ${bsp_requires}
 )
+
+idf_build_set_property(BOOTLOADER_EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/bootloader_components" APPEND)

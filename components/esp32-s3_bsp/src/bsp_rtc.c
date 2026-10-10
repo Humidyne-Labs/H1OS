@@ -82,18 +82,15 @@ static const char *TAG = "bsp_rtc";
 #define TIMER_MODE_TIE          (1 << 1)
 #define TIMER_MODE_TI_TP        (1 << 0)
 
-static inline uint8_t bcd_to_binary(uint8_t val)
-{
+static inline uint8_t bcd_to_binary(uint8_t val) {
     return (uint8_t)((val & 0x0F) + ((val >> 4) * 10));
 }
 
-static inline uint8_t binary_to_bcd(uint8_t val)
-{
+static inline uint8_t binary_to_bcd(uint8_t val) {
     return (uint8_t)(((val / 10) << 4) | (val % 10));
 }
 
-static bool datetime_is_valid(const bsp_rtc_datetime_t *datetime)
-{
+static bool datetime_is_valid(const bsp_rtc_datetime_t *datetime) {
     return datetime != NULL &&
            datetime->year    >= 2000 && datetime->year   <= 2099 &&
            datetime->month   >= 1    && datetime->month  <= 12   &&
@@ -118,14 +115,34 @@ esp_err_t bsp_rtc_init(void)
         return ESP_ERR_NOT_FOUND;
     }
 
-    // 4. Configure Control_1 (12.5pF Cap, STOP=0, 24h mode) & Control_2 (CLKOUT disabled)
-    const uint8_t init_ctrl[2] = { CTRL1_CAP_SEL_12_5PF, CTRL2_COF_OFF };
-    ret = bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_1, init_ctrl, sizeof(init_ctrl));
+    // 4. Configure Control_1 (12.5pF Cap, STOP=0, 24h mode)
+    uint8_t ctrl1 = 0;
+    bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_1, &ctrl1, 1);
+    ctrl1 = (ctrl1 & ~CTRL1_STOP) | CTRL1_CAP_SEL_12_5PF;
+    ret = bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_1, &ctrl1, 1);
 
-    // 5. Clear countdown timer, alarm, and interrupt flags so RTC_INT (GPIO 5) releases to HIGH
-    bsp_rtc_clear_countdown_timer();
-    bsp_rtc_clear_alarm();
-    bsp_rtc_get_and_clear_interrupts(NULL, NULL);
+    // Ensure CLKOUT is disabled (COF = 0x07) in Control_2 without clearing active interrupt enables
+    uint8_t ctrl2 = 0;
+    bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
+    ctrl2 |= CTRL2_COF_OFF;
+    bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
+
+    // 5. Check if oscillator is stopped (OS flag). If stopped, set baseline epoch to start crystal.
+    bool is_running = false;
+    bsp_rtc_is_running(&is_running);
+    if (!is_running) {
+        ESP_LOGI(TAG, "PCF85063A oscillator stopped (OS set). Setting baseline epoch to start 32.768kHz crystal...");
+        bsp_rtc_datetime_t default_dt = {
+            .year    = 2026,
+            .month   = 1,
+            .day     = 1,
+            .weekday = 4,
+            .hour    = 0,
+            .minute  = 0,
+            .second  = 0,
+        };
+        bsp_rtc_set_datetime(&default_dt);
+    }
 
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "PCF85063A RTC initialized (12.5pF crystal, 24h mode, INT pin GPIO %d)", BSP_PIN_RTC_INT);
@@ -133,13 +150,11 @@ esp_err_t bsp_rtc_init(void)
     return ret;
 }
 
-esp_err_t bsp_rtc_deinit(void)
-{
+esp_err_t bsp_rtc_deinit(void) {
     return ESP_OK;
 }
 
-esp_err_t bsp_rtc_software_reset(void)
-{
+esp_err_t bsp_rtc_software_reset(void) {
     uint8_t reset_cmd = CTRL1_SW_RESET_CMD;
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_1, &reset_cmd, 1);
 }
@@ -149,7 +164,7 @@ esp_err_t bsp_rtc_is_running(bool *is_running)
     if (is_running == NULL) return ESP_ERR_INVALID_ARG;
 
     uint8_t sec_reg = 0;
-    esp_err_t ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIME, &sec_reg, 1);
+    esp_err_t   ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIME, &sec_reg, 1);
     if (ret != ESP_OK) return ret;
 
     // Bit 7 is OS (Oscillator Stop): 1 = stopped / power loss, 0 = integrity guaranteed
@@ -163,7 +178,7 @@ esp_err_t bsp_rtc_get_datetime(bsp_rtc_datetime_t *datetime)
 
     // Read all 7 date/time registers in one atomic burst to prevent carry/rollover errors
     uint8_t regs[7] = {0};
-    esp_err_t ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIME, regs, sizeof(regs));
+    esp_err_t   ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIME, regs, sizeof(regs));
     if (ret != ESP_OK) return ret;
 
     if (regs[0] & 0x80) {
@@ -213,14 +228,11 @@ esp_err_t bsp_rtc_set_datetime(const bsp_rtc_datetime_t *datetime)
     return ret;
 }
 
-esp_err_t bsp_rtc_set_offset(int8_t offset, bsp_rtc_offset_mode_t mode)
-{
+esp_err_t bsp_rtc_set_offset(int8_t offset, bsp_rtc_offset_mode_t mode) {
     if (offset < -64 || offset > 63) return ESP_ERR_INVALID_ARG;
 
-    uint8_t val = (uint8_t)offset & 0x7F;
-    if (mode == BSP_RTC_OFFSET_MODE_4_MIN) {
-        val |= 0x80;
-    }
+    uint8_t val  = (uint8_t)offset & 0x7F;
+	        val |= (mode == BSP_RTC_OFFSET_MODE_4_MIN) ? 0x80 : 0x00;
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_OFFSET, &val, 1);
 }
 
@@ -240,15 +252,12 @@ esp_err_t bsp_rtc_set_alarm(const bsp_rtc_alarm_t *alarm)
     esp_err_t ret = bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_ALARM_SEC, alarm_regs, sizeof(alarm_regs));
     if (ret != ESP_OK) return ret;
 
-    // Read-modify-write Control_2: enable AIE (bit 7), clear AF (bit 6 = 0), keep COF disabled
-    uint8_t ctrl2 = 0;
-    bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
-    ctrl2 = (ctrl2 & ~CTRL2_AF) | CTRL2_AIE | CTRL2_COF_OFF;
+    // Configure Control_2: enable AIE (bit 7), clear AF (bit 6 = 0), disable MI/HMI/TF, keep COF disabled (0x07)
+    uint8_t ctrl2 = CTRL2_AIE | CTRL2_COF_OFF;
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
 }
 
-esp_err_t bsp_rtc_clear_alarm(void)
-{
+esp_err_t bsp_rtc_clear_alarm(void) {
     uint8_t disabled[5] = {0x80, 0x80, 0x80, 0x80, 0x80};
     bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_ALARM_SEC, disabled, sizeof(disabled));
 
@@ -258,7 +267,12 @@ esp_err_t bsp_rtc_clear_alarm(void)
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
 }
 
-esp_err_t bsp_rtc_set_countdown_timer(uint8_t seconds)
+#define TIMER_MODE_TCF_4096HZ   (0 << 3)
+#define TIMER_MODE_TCF_64HZ     (1 << 3)
+#define TIMER_MODE_TCF_1HZ      (2 << 3)
+#define TIMER_MODE_TCF_1_60HZ   (3 << 3)
+
+esp_err_t bsp_rtc_set_countdown_timer(uint32_t seconds)
 {
     if (seconds == 0) return ESP_ERR_INVALID_ARG;
 
@@ -272,16 +286,26 @@ esp_err_t bsp_rtc_set_countdown_timer(uint8_t seconds)
     ctrl2 = (ctrl2 & ~(CTRL2_TF | CTRL2_AF)) | CTRL2_COF_OFF;
     bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
 
-    // 3. Set timer countdown value
-    bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_VAL, &seconds, 1);
+    // 3. Select 1Hz clock (seconds) or 1/60Hz clock (minutes)
+    uint8_t timer_val = 0;
+    if (seconds <= 255) {
+        timer_val = (uint8_t)seconds;
+        mode = TIMER_MODE_TCF_1HZ | TIMER_MODE_TE | TIMER_MODE_TIE;
+        ESP_LOGI(TAG, "Armed PCF85063A Countdown Timer: %u seconds (1Hz mode)", timer_val);
+    } else {
+        uint32_t mins = (seconds + 59) / 60;
+        if (mins > 255) mins = 255;
+        timer_val = (uint8_t)mins;
+        mode = TIMER_MODE_TCF_1_60HZ | TIMER_MODE_TE | TIMER_MODE_TIE;
+        ESP_LOGI(TAG, "Armed PCF85063A Countdown Timer: %u minutes (1/60Hz mode)", timer_val);
+    }
 
-    // 4. Configure 1Hz source, enable timer (TE=1), enable INT (TIE=1), level mode (TI_TP=0)
-    mode = TIMER_MODE_TCF_1HZ | TIMER_MODE_TE | TIMER_MODE_TIE;
+    // 4. Set timer value and start countdown
+    bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_VAL, &timer_val, 1);
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_MOD, &mode, 1);
 }
 
-esp_err_t bsp_rtc_clear_countdown_timer(void)
-{
+esp_err_t bsp_rtc_clear_countdown_timer(void) {
     uint8_t mode = 0x00;
     bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_MOD, &mode, 1);
 
@@ -289,6 +313,35 @@ esp_err_t bsp_rtc_clear_countdown_timer(void)
     bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
     ctrl2 = (ctrl2 & ~(CTRL2_TF | CTRL2_AF)) | CTRL2_COF_OFF;
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_CONTROL_2, &ctrl2, 1);
+}
+
+esp_err_t bsp_rtc_get_remaining_countdown_timer(uint32_t *remaining_sec)
+{
+    if (remaining_sec == NULL) return ESP_ERR_INVALID_ARG;
+
+    uint8_t mode = 0;
+    esp_err_t ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_MOD, &mode, 1);
+    if (ret != ESP_OK) return ret;
+
+    // Check if Timer is enabled (TE bit 0)
+    if ((mode & TIMER_MODE_TE) == 0) {
+        *remaining_sec = 0;
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    uint8_t val = 0;
+    ret = bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_TIMER_VAL, &val, 1);
+    if (ret != ESP_OK) return ret;
+
+    // Check clock source (TCF bits 4:3)
+    uint8_t tcf = mode & (3 << 3);
+    if (tcf == TIMER_MODE_TCF_1_60HZ) {
+        *remaining_sec = (uint32_t)val * 60;
+    } else {
+        *remaining_sec = (uint32_t)val;
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t bsp_rtc_get_and_clear_interrupts(bool *alarm_flag, bool *timer_flag)
@@ -345,9 +398,8 @@ esp_err_t bsp_rtc_start_oscillator(void)
     return ret;
 }
 
-esp_err_t bsp_rtc_enable_wakeup(bool deep_sleep)
-{
-    gpio_pullup_en((gpio_num_t)BSP_PIN_RTC_INT);
+esp_err_t bsp_rtc_enable_wakeup(bool deep_sleep) {
+    gpio_pullup_en   ((gpio_num_t)BSP_PIN_RTC_INT);
     gpio_pulldown_dis((gpio_num_t)BSP_PIN_RTC_INT);
 
     if (deep_sleep) {
@@ -358,13 +410,11 @@ esp_err_t bsp_rtc_enable_wakeup(bool deep_sleep)
     }
 }
 
-esp_err_t bsp_rtc_ram_read(uint8_t *val)
-{
+esp_err_t bsp_rtc_ram_read(uint8_t *val) {
     if (val == NULL) return ESP_ERR_INVALID_ARG;
     return bsp_i2c_read_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_RAM_BYTE, val, 1);
 }
 
-esp_err_t bsp_rtc_ram_write(uint8_t val)
-{
+esp_err_t bsp_rtc_ram_write(uint8_t val) {
     return bsp_i2c_write_reg(BSP_I2C_ADDR_PCF85063, BSP_RTC_REG_RAM_BYTE, &val, 1);
 }

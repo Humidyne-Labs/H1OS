@@ -88,6 +88,49 @@ bool bsp_lvgl_lock_isr(void);
  */
 void bsp_lvgl_set_first_flush_mode(bool full_refresh);
 
+/**
+ * @brief Create and render a high-contrast 1-bit QR Code widget on an LVGL screen or object
+ *
+ * Encodes the given payload string into an LVGL 9 QR code widget, centered and styled
+ * for 1-bit monochrome e-paper displays. Automatically acquires the LVGL reentrant mutex lock.
+ *
+ * @param[in] parent Parent LVGL container or screen (e.g. lv_screen_active())
+ * @param[in] size Target size in pixels (e.g. 180)
+ * @param[in] payload String content to encode in the QR code
+ * @return lv_obj_t* Pointer to the created QR code widget, or NULL on error
+ * @details Memory ownership: managed by LVGL. Behavior: Blocking. Thread safety: thread-safe guarantees.
+ */
+lv_obj_t *bsp_lvgl_create_qr_code(lv_obj_t *parent, int32_t size, const char *payload);
+
+/**
+ * @brief High-contrast 1-bit monochrome (1-bpp) fonts for electrophoretic displays (EPD)
+ *
+ * True bilevel 1-bit bitmap glyphs without anti-aliasing or alpha quantization.
+ * Eliminates stroke erosion and pixel thinning when rendering inverted white text
+ * on solid black backgrounds.
+ */
+extern const lv_font_t bsp_font_montserrat_14_1bpp;
+extern const lv_font_t bsp_font_montserrat_20_1bpp;
+
+/**
+ * @brief Create a high-contrast container card styled for 1-bit monochrome EPD
+ *
+ * @param[in] parent Parent object
+ * @param[in] w Width in pixels (aligned to multiples of 8 for optimal bit-blit performance)
+ * @param[in] h Height in pixels
+ * @param[in] inverted If true, solid black background with white text; if false, white background with black text
+ * @return lv_obj_t* Pointer to created card container
+ */
+lv_obj_t *bsp_lvgl_create_card(lv_obj_t *parent, int32_t w, int32_t h, bool inverted);
+
+/**
+ * @brief Toggle inversion state of a card container
+ *
+ * @param[in] card Pointer to container created with bsp_lvgl_create_card()
+ * @param[in] inverted If true, set solid black bg with white text; if false, white bg with black text
+ */
+void bsp_lvgl_set_card_inverted(lv_obj_t *card, bool inverted);
+
 #ifdef __cplusplus
 }
 #endif

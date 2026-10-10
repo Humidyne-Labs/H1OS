@@ -26,8 +26,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "esp_err.h"
-#include "lvgl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,47 +85,6 @@ void bsp_prov_stop(void);
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 esp_err_t bsp_prov_get_qr_payload(const char *pop, char *dest, size_t max_len);
-
-/**
- * @brief Calculate optimal QR code canvas size for a given payload and constraints
- *
- * Calculates the smallest QR version required for the payload string, then multiplies by
- * an integer scale factor (pixels per module) to compute an exact whole-factor canvas size.
- * This guarantees 1:1, 2:2, 3:3, etc. integer pixel scaling without fractional distortion.
- *
- * @param[in] pop Proof-of-Possession PIN (or NULL)
- * @param[in] max_boundary Maximum display boundary size in pixels (pass <= 0 for default 180)
- * @param[in] min_scale Minimum allowed pixels per QR module (pass <= 0 for default 3)
- * @return int32_t Optimal whole-factor canvas pixel size
- */
-int32_t bsp_prov_calc_qr_code_size(const char *pop, int32_t max_boundary, int32_t min_scale);
-
-/**
- * @brief Generate raw 1-bit packed monochrome bitmap byte array for QR payload
- *
- * @param[in] pop Proof-of-Possession PIN (or NULL)
- * @param[in] max_boundary Target bounding dimension in pixels
- * @param[in] min_scale Minimum integer scale factor
- * @param[out] out_buf Destination buffer for 1-bit packed bitmap
- * @param[in] out_buf_size Size of out_buf in bytes
- * @param[out] out_size Output width/height in pixels
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t bsp_prov_get_qr_raw_bits(const char *pop, int32_t max_boundary, int32_t min_scale,
-                                   uint8_t *out_buf, size_t out_buf_size, int32_t *out_size);
-
-/**
- * @brief Render Provisioning QR Code directly on LVGL Screen / Canvas
- *
- * Renders a high-contrast 1-bit QR code centered on screen, automatically snapped to an exact whole-factor scale.
- *
- * @param[out] parent Parent LVGL object (e.g. lv_screen_active())
- * @param[in] size Dimension in pixels or max boundary (pass <= 0 for auto 180px max)
- * @param[in] pop Proof-of-Possession PIN (or NULL)
- * @return lv_obj_t* Pointer to created QR code widget or NULL
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-lv_obj_t *bsp_prov_render_qr_code(lv_obj_t *parent, int32_t size, const char *pop);
 
 #ifdef __cplusplus
 }

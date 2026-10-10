@@ -40,25 +40,7 @@ void app_main(void)
     ESP_ERROR_CHECK(bsp_rtc_mem_read_scratchpad(read_buffer, sizeof(read_buffer)));
     ESP_LOGI(TAG, "Scratchpad content read: '%s'", (char *)read_buffer);
 
-    // 4. Verify 5000-byte EPD Frame Buffer Persistence
-    uint8_t tx_frame[5000];
-    uint8_t rx_frame[5000];
-
-    for (int i = 0; i < 5000; i++) {
-        tx_frame[i] = (uint8_t)(i & 0xFF);
-    }
-
-    ESP_LOGI(TAG, "Saving 5000-byte frame to RTC Slow Memory...");
-    ESP_ERROR_CHECK(bsp_rtc_mem_save_display_frame(tx_frame, 5000));
-
-    if (bsp_rtc_mem_has_display_frame()) {
-        ESP_LOGI(TAG, "RTC Memory reports valid display frame exists.");
-    }
-
-    ESP_LOGI(TAG, "Loading 5000-byte frame back from RTC Slow Memory...");
-    ESP_ERROR_CHECK(bsp_rtc_mem_load_display_frame(rx_frame, 5000));
-
-    // 5. Configure and Verify Next Initialization Mode
+    // 4. Configure and Verify Next Initialization Mode
     bsp_init_mode_t target_mode = BSP_INIT_MODE_FAST;
     ESP_LOGI(TAG, "Setting next init mode to: %d (FAST)", (int)target_mode);
     bsp_rtc_mem_set_next_init_mode(target_mode);

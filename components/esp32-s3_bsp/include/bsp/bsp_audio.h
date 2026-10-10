@@ -113,17 +113,6 @@ esp_err_t bsp_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms, float volu
 esp_err_t bsp_audio_play_chime(bsp_chime_type_t type);
 
 /**
- * @brief Register Built-in Chimes with the System Notification Dispatcher
- *
- * Automatically connects all bsp_chime_type_t event types to bsp_audio_play_chime(),
- * enabling out-of-the-box acoustic feedback on boot, wake, sleep, shutdown, alarms, and UI clicks.
- *
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_audio_register_default_chimes(void);
-
-/**
  * @brief Stop Active Audio Playback and Mute Amplifier
  *
  * @return esp_err_t ESP_OK on success

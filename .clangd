@@ -1,0 +1,12 @@
+CompileFlags:
+  Add:
+    - -Wno-unknown-attributes
+    - -Wno-macro-redefined
+  Remove:
+    - -fno-tree-switch-conversion
+
+Diagnostics:
+  UnusedIncludes: Strict
+  ClangTidy:
+    Remove:
+      - modernize*

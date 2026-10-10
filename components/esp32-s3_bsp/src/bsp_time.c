@@ -27,11 +27,10 @@ static const char *TAG = "bsp_time";
 
 static esp_timer_handle_t s_periodic_sync_timer = NULL;
 
-esp_err_t bsp_time_set_timezone(const char *tz_str)
-{
-    if (tz_str == NULL || strlen(tz_str) == 0) {
-        tz_str = "UTC";
-    }
+esp_err_t bsp_time_set_timezone(const char *tz_str) {
+    if (tz_str == NULL || strlen(tz_str) == 0) 
+		tz_str = "UTC";
+	
     setenv("TZ", tz_str, 1);
     tzset();
     ESP_LOGI(TAG, "System timezone set to: %s", tz_str);
@@ -130,9 +129,7 @@ esp_err_t bsp_time_sntp_sync(uint32_t timeout_ms)
 
 esp_err_t bsp_time_get_formatted(bsp_time_format_t fmt, char *dest, size_t max_len)
 {
-    if (dest == NULL || max_len < 16) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    if (dest == NULL || max_len < 16) return ESP_ERR_INVALID_ARG;
 
     time_t now;
     struct tm timeinfo;
@@ -161,9 +158,7 @@ esp_err_t bsp_time_get_formatted(bsp_time_format_t fmt, char *dest, size_t max_l
 
 esp_err_t bsp_time_get_date_formatted(bsp_date_format_t fmt, char *dest, size_t max_len)
 {
-    if (dest == NULL || max_len < 16) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    if (dest == NULL || max_len < 16) return ESP_ERR_INVALID_ARG;
 
     time_t now;
     struct tm timeinfo;
@@ -187,34 +182,25 @@ esp_err_t bsp_time_get_date_formatted(bsp_date_format_t fmt, char *dest, size_t 
     return ESP_OK;
 }
 
-esp_err_t bsp_time_get_date_str(char *dest, size_t max_len)
-{
+esp_err_t bsp_time_get_date_str(char *dest, size_t max_len) {
     return bsp_time_get_date_formatted(BSP_DATE_FMT_MM_DD_YY, dest, max_len);
 }
 
-esp_err_t bsp_time_get_dow_str(char *dest, size_t max_len)
-{
+esp_err_t bsp_time_get_dow_str(char *dest, size_t max_len) {
     return bsp_time_get_date_formatted(BSP_DATE_FMT_DOW, dest, max_len);
 }
 
-esp_err_t bsp_time_get_date_dow_str(char *dest, size_t max_len)
-{
+esp_err_t bsp_time_get_date_dow_str(char *dest, size_t max_len) {
     return bsp_time_get_date_formatted(BSP_DATE_FMT_MM_DD_YY_DOW, dest, max_len);
 }
 
-static void periodic_sync_timer_cb(void *arg)
-{
+static void periodic_sync_timer_cb(void *arg) {
     ESP_LOGI(TAG, "Periodic SNTP 24h timer triggered");
-    if (bsp_wifi_is_connected()) {
-        bsp_time_sntp_sync(8000);
-    }
+    if (bsp_wifi_is_connected()) bsp_time_sntp_sync(8000);
 }
 
-esp_err_t bsp_time_start_periodic_sync(uint32_t interval_sec)
-{
-    if (interval_sec == 0) {
-        interval_sec = 86400; // Default: 24 Hours
-    }
+esp_err_t bsp_time_start_periodic_sync(uint32_t interval_sec) {
+    if (interval_sec == 0) interval_sec = 86400; // Default: 24 Hours
 
     if (s_periodic_sync_timer != NULL) {
         esp_timer_stop(s_periodic_sync_timer);
@@ -232,8 +218,7 @@ esp_err_t bsp_time_start_periodic_sync(uint32_t interval_sec)
     return esp_timer_start_periodic(s_periodic_sync_timer, (uint64_t)interval_sec * 1000000ULL);
 }
 
-void bsp_time_stop_periodic_sync(void)
-{
+void bsp_time_stop_periodic_sync(void) {
     if (s_periodic_sync_timer != NULL) {
         esp_timer_stop(s_periodic_sync_timer);
         esp_timer_delete(s_periodic_sync_timer);

@@ -91,10 +91,10 @@ static void on_power_long_press(bsp_button_t btn, bsp_button_event_t evt, void *
     bsp_power_off();
 }
 
-static void on_cold_boot(void *user_data)
+static void on_boot(void *user_data)
 {
     (void)user_data;
-    ESP_LOGI(TAG, "Lifecycle Callback: Cold Boot initialized.");
+    ESP_LOGI(TAG, "Lifecycle Callback: Boot initialized.");
 
     bsp_button_register_cb(BSP_BUTTON_POWER, BSP_BUTTON_EVENT_SINGLE_CLICK, on_power_click, NULL);
     bsp_button_register_cb(BSP_BUTTON_POWER, BSP_BUTTON_EVENT_LONG_PRESS, on_power_long_press, NULL);
@@ -130,10 +130,10 @@ static void on_wake(const bsp_wake_context_t *ctx, void *user_data)
              (int)ctx->wake_cause, (unsigned long)ctx->boot_count);
 }
 
-static void on_shutdown(void *user_data)
+static void on_power_off(void *user_data)
 {
     (void)user_data;
-    ESP_LOGI(TAG, "Lifecycle Callback: System shutting down.");
+    ESP_LOGI(TAG, "Lifecycle Callback: System powering off.");
 }
 
 extern "C" void app_main(void)
@@ -141,11 +141,11 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Starting Humid1 OS Production Boilerplate v1.0.0...");
 
     bsp_app_lifecycle_t lifecycle = {
-        .on_cold_boot    = on_cold_boot,
-        .on_wake         = on_wake,
-        .on_before_sleep = NULL,
-        .on_shutdown     = on_shutdown,
-        .user_data       = NULL,
+        .on_boot      = on_boot,
+        .on_wake      = on_wake,
+        .on_sleep     = NULL,
+        .on_power_off = on_power_off,
+        .user_data    = NULL,
     };
 
     ESP_ERROR_CHECK(bsp_app_start(&lifecycle));

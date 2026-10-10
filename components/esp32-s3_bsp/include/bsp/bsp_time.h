@@ -117,36 +117,6 @@ esp_err_t bsp_time_get_formatted(bsp_time_format_t fmt, char *dest, size_t max_l
 esp_err_t bsp_time_get_date_formatted(bsp_date_format_t fmt, char *dest, size_t max_len);
 
 /**
- * @brief Format Current Date String as "MM/DD/YY" (e.g. "09/26/26")
- *
- * @param[out] dest Destination string buffer
- * @param[in] max_len Buffer size (minimum 16 bytes recommended)
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_time_get_date_str(char *dest, size_t max_len);
-
-/**
- * @brief Format Current Day-of-Week String as "DayOfWeek" (e.g. "Saturday")
- *
- * @param[out] dest Destination string buffer
- * @param[in] max_len Buffer size (minimum 16 bytes recommended)
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_time_get_dow_str(char *dest, size_t max_len);
-
-/**
- * @brief Format Current Date and Day-of-Week String as "MM/DD/YY DayOfWeek" (e.g. "09/26/26 Saturday")
- *
- * @param[out] dest Destination string buffer
- * @param[in] max_len Buffer size (minimum 24 bytes recommended)
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_time_get_date_dow_str(char *dest, size_t max_len);
-
-/**
  * @brief Start Background Periodic SNTP Synchronization Timer (e.g., every 24 hours)
  *
  * @param[in] interval_sec Synchronization interval in seconds (Default: 86400 / 24h)

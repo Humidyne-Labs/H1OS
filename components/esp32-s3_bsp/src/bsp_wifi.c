@@ -47,9 +47,9 @@ static bool               s_is_connected      = false;
  * Preserved across Deep Sleep cycles in RTC Slow/Fast memory.
  */
 typedef struct {
-    uint32_t magic; ///< magic value
+    uint32_t magic;    ///< magic value
     uint8_t  bssid[6]; ///< bssid[6] value
-    uint8_t  channel; ///< channel value
+    uint8_t  channel;  ///< channel value
     char     ssid[33]; ///< ssid[33] value
 } rtc_wifi_cache_t;
 

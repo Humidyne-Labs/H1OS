@@ -36,9 +36,15 @@ extern "C" {
  * @brief Initialization Modes for Dynamic Hardware Configuration
  */
 typedef enum {
-    BSP_INIT_MODE_FULL = 0, ///< Cold boot / all subsystems & LVGL initialized
-    BSP_INIT_MODE_FAST = 1, ///< Wake boot / fast display refresh (no clearing)
+    BSP_INIT_MODE_BOOT     = 0, ///< Boot initialization: all hardware subsystems & LVGL initialized
+    BSP_INIT_MODE_WAKE     = 1, ///< Wake initialization: fast display refresh retaining existing framebuffers
+    BSP_INIT_MODE_SUB_EXEC = 2, ///< Sub-execution initialization: scaled-back runtime (I2C + sensor only)
 } bsp_init_mode_t;
+
+/* Backward-compatibility aliases */
+#define BSP_INIT_MODE_FULL    BSP_INIT_MODE_BOOT
+#define BSP_INIT_MODE_FAST    BSP_INIT_MODE_WAKE
+#define BSP_INIT_MODE_MINIMAL BSP_INIT_MODE_SUB_EXEC
 
 /**
  * @brief Sleep Execution Modes

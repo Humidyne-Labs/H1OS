@@ -27,8 +27,11 @@
 #include "bsp/bsp_power.h"
 #include "bsp/bsp_i2c.h"
 #include "bsp/bsp_sensors.h"
+#include "bsp/bsp_equ_math.h"
+#include "bsp/bsp_env_telemetry.h"
 #include "bsp/bsp_rtc.h"
 #include "bsp/bsp_button.h"
+#include "bsp/bsp_splash.h"
 #include "bsp/bsp_audio.h"
 #include "bsp/bsp_sdcard.h"
 #include "bsp/bsp_display.h"
@@ -36,7 +39,6 @@
 #include "bsp/bsp_nvs.h"
 #include "bsp/bsp_wifi.h"
 #include "bsp/bsp_rtc_mem.h"
-#include "bsp/bsp_splash.h"
 #include "bsp/bsp_time.h"
 #include "bsp/bsp_prov.h"
 #include "bsp/bsp_ota.h"
@@ -47,6 +49,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief Converted BSP EPD Font Macro
+ */
+#define MONTSERRAT_14 &bsp_font_montserrat_14_1bpp
+#define MONTSERRAT_20 &bsp_font_montserrat_20_1bpp
 
 /**
  * @brief Modular Hardware Initialization Configuration
@@ -177,35 +185,86 @@ typedef struct {
 } bsp_wake_context_t;
 
 /**
- * @brief Callback executed on cold boot (Power-On Reset, Brownout, Software Restart, etc.)
+ * @brief UI Splash Screen Callback Signature
+ * @param[in] type Splash event type
+ * @param[in] user_data Custom application context pointer
  */
-typedef void (*bsp_cold_boot_cb_t)(void *user_data);
+typedef void (*bsp_splash_cb_t)(bsp_splash_type_t type, void *user_data);
 
 /**
- * @brief Callback executed on resume from Deep Sleep or Light Sleep
+ * @brief Audio Chime Callback Signature
+ * @param[in] type Chime event type
+ * @param[in] user_data Custom application context pointer
+ */
+typedef void (*bsp_chime_cb_t)(bsp_chime_type_t type, void *user_data);
+
+/**
+ * @brief Pre-execution callback executed at earliest boot phase before peripheral subsystem init
+ * @param[in] btn_mask Bitmask of depressed buttons at boot time
+ * @param[in] user_data Custom application context pointer
+ */
+typedef void (*bsp_pxe_cb_t)(bsp_button_mask_t btn_mask, void *user_data);
+
+/**
+ * @brief Callback executed on boot (POR, hardware reset, software restart)
+ */
+typedef void (*bsp_boot_cb_t)(void *user_data);
+#define bsp_cold_boot_cb_t bsp_boot_cb_t
+
+/**
+ * @brief Callback executed on resume from sleep (Deep Sleep or Light Sleep)
  */
 typedef void (*bsp_wake_cb_t)(const bsp_wake_context_t *ctx, void *user_data);
 
 /**
- * @brief Callback executed right before entering Deep or Light Sleep (for app cleanup / display badge)
+ * @brief Callback executed right before entering sleep (for app cleanup / display badge)
  */
-typedef void (*bsp_before_sleep_cb_t)(bsp_sleep_mode_t mode, uint32_t duration_sec, void *user_data);
+typedef void (*bsp_sleep_cb_t)(bsp_sleep_mode_t mode, uint32_t duration_sec, void *user_data);
+#define bsp_before_sleep_cb_t bsp_sleep_cb_t
 
 /**
- * @brief Callback executed immediately prior to system power off / clean shutdown
+ * @brief Callback executed immediately prior to system power off
  */
-typedef void (*bsp_shutdown_cb_t)(void *user_data);
+typedef void (*bsp_power_off_cb_t)(void *user_data);
+#define bsp_shutdown_cb_t bsp_power_off_cb_t
 
 /**
  * @brief Comprehensive Application Lifecycle Configuration
  */
 typedef struct {
-    bsp_cold_boot_cb_t    on_cold_boot;    ///< Handler for initial cold boot
-    bsp_wake_cb_t         on_wake;         ///< Handler for sleep wake events
-    bsp_before_sleep_cb_t on_before_sleep; ///< Hook called immediately prior to sleep entry
-    bsp_shutdown_cb_t     on_shutdown;     ///< Hook called immediately prior to power off
-    void                  *user_data;      ///< Custom application context pointer
+    /* Core Lifecycle Execution */
+    bsp_pxe_cb_t          on_pxe;              ///< Handler for pre-execution boot checks (button holding)
+    bsp_boot_cb_t         on_boot;             ///< Handler for initial boot
+    bsp_wake_cb_t         on_wake;             ///< Handler for sleep wake events
+    bsp_sleep_cb_t        on_sleep;            ///< Hook called immediately prior to sleep entry
+    bsp_power_off_cb_t    on_power_off;        ///< Hook called immediately prior to power off
+
+    /* Visual Splash Screen Callbacks */
+    bsp_splash_cb_t       on_boot_splash;      ///< Render boot splash UI
+    bsp_splash_cb_t       on_wake_splash;      ///< Render wake splash UI
+    bsp_splash_cb_t       on_sleep_splash;     ///< Render sleep badge / UI
+    bsp_splash_cb_t       on_power_off_splash; ///< Render power-off screen
+
+    /* Audio Chime Configuration */
+    bsp_chime_cb_t        on_chime;            ///< Custom chime callback (overrides hardware synthesizer if set)
+    uint8_t               default_chime_mask;  ///< Bitmask of default hardware chimes to play if on_chime == NULL
+
+    /* Background Sub-Execution Configuration */
+    //bool                  enable_sub_execution;      ///< Enable autonomous background sensor sampling while main app sleeps
+    uint32_t              sub_execution_interval_sec;  ///< Sub-execution cadence in seconds (default: 0s | OFF)
+
+    void                  *user_data;                  ///< Custom application context pointer passed to all callbacks
 } bsp_app_lifecycle_t;
+
+/**
+ * @brief Early Base IO and Power Latch Initialization (Phase 1)
+ *
+ * Releases RTC pad holds, drives BAT_CTRL (GPIO 17) HIGH immediately to secure board power,
+ * and pre-configures input pull-ups on BOOT and POWER buttons for early PXE detection.
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_io_early_init(void);
 
 /**
  * @brief Start Unified BSP Application Engine with Lifecycle Hooks
@@ -218,6 +277,24 @@ typedef struct {
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle);
+
+/**
+ * @brief Manually trigger a UI Splash screen event defined in the active lifecycle
+ *
+ * @param[in] type Splash event type to trigger (BOOT, WAKE, SLEEP, SHUTDOWN)
+ * @return esp_err_t ESP_OK if handler executed, ESP_ERR_NOT_FOUND if no handler configured
+ */
+esp_err_t bsp_trigger_splash(bsp_splash_type_t type);
+
+/**
+ * @brief Manually trigger an Audio Chime event defined in the active lifecycle
+ *
+ * Executes custom on_chime callback if configured, or plays default synthesized tone if enabled in default_chime_mask.
+ *
+ * @param[in] type Chime event type to trigger (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM, NOTIFY, EVENT)
+ * @return esp_err_t ESP_OK if chime played/dispatched, ESP_ERR_NOT_FOUND if disabled
+ */
+esp_err_t bsp_trigger_chime(bsp_chime_type_t type);
 
 /**
  * @brief Single Unified Sleep Entry Point
@@ -234,21 +311,21 @@ esp_err_t bsp_sleep(const bsp_sleep_config_t *config);
 /**
  * @brief Helper Macro for Deep Sleep Entry
  */
-#define bsp_sleep_deep(sec) bsp_sleep(&(bsp_sleep_config_t){\
-    .mode           = BSP_SLEEP_MODE_DEEP,\
-    .duration_sec   = (sec),\
-    .wake_sources   = BSP_WAKE_SRC_ALL,\
-    .next_init_mode = BSP_INIT_MODE_FAST\
+#define bsp_sleep_deep(sec) bsp_sleep(&(bsp_sleep_config_t){ \
+    .mode           = BSP_SLEEP_MODE_DEEP,                   \
+    .duration_sec   = (sec),                                 \
+    .wake_sources   = BSP_WAKE_SRC_ALL,                      \
+    .next_init_mode = BSP_INIT_MODE_WAKE                     \
 })
 
 /**
  * @brief Helper Macro for Light Sleep Entry
  */
-#define bsp_sleep_light(sec) bsp_sleep(&(bsp_sleep_config_t){\
-    .mode           = BSP_SLEEP_MODE_LIGHT,\
-    .duration_sec   = (sec),\
-    .wake_sources   = BSP_WAKE_SRC_ALL,\
-    .next_init_mode = BSP_INIT_MODE_FAST\
+#define bsp_sleep_light(sec) bsp_sleep(&(bsp_sleep_config_t){ \
+    .mode           = BSP_SLEEP_MODE_LIGHT,                   \
+    .duration_sec   = (sec),                                  \
+    .wake_sources   = BSP_WAKE_SRC_ALL,                       \
+    .next_init_mode = BSP_INIT_MODE_WAKE                      \
 })
 
 /**
@@ -302,13 +379,10 @@ esp_err_t bsp_lifecycle_load_state(void *out_data, size_t len);
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 void bsp_system_shutdown(void);
-void bsp_lifecycle_power_off(void);
-void bsp_lifecycle_invoke_shutdown(void);
 
 /**
  * @brief Legacy Deep Sleep Alias (Maps to bsp_sleep_deep)
  */
-#define bsp_lifecycle_enter_sleep(cfg) bsp_sleep(cfg)
 void bsp_system_deep_sleep(uint32_t sleep_sec);
 
 /**

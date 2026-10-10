@@ -124,12 +124,13 @@ esp_err_t bsp_rtc_set_alarm(const bsp_rtc_alarm_t *alarm);
 esp_err_t bsp_rtc_clear_alarm(void);
 
 /**
- * @brief Configure the PCF85063A 1Hz periodic countdown timer.
- * @param[in] seconds Countdown value (1 to 255 seconds).
+ * @brief Configure the PCF85063A hardware countdown timer.
+ * Automatically selects 1Hz resolution (<= 255 seconds) or 1/60Hz resolution (> 255 seconds / minutes).
+ * @param[in] seconds Countdown value in seconds (1 to 15,300 seconds / up to 255 minutes).
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  * @return esp_err_t ESP_OK on success, or appropriate ESP error code.
  */
-esp_err_t bsp_rtc_set_countdown_timer(uint8_t seconds);
+esp_err_t bsp_rtc_set_countdown_timer(uint32_t seconds);
 
 /**
  * @brief Disable the countdown timer.
@@ -137,6 +138,13 @@ esp_err_t bsp_rtc_set_countdown_timer(uint8_t seconds);
  * @return esp_err_t ESP_OK on success, or appropriate ESP error code.
  */
 esp_err_t bsp_rtc_clear_countdown_timer(void);
+
+/**
+ * @brief Get remaining seconds on the PCF85063A hardware countdown timer.
+ * @param[out] remaining_sec Remaining time in seconds.
+ * @return esp_err_t ESP_OK on success, ESP_ERR_INVALID_STATE if timer disabled, or I2C error.
+ */
+esp_err_t bsp_rtc_get_remaining_countdown_timer(uint32_t *remaining_sec);
 
 /**
  * @brief Read and clear interrupt flags (AF / TF) while preserving control registers.

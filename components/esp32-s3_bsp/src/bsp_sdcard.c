@@ -75,8 +75,7 @@ esp_err_t bsp_sdcard_mount(void)
     return ESP_OK;
 }
 
-esp_err_t bsp_sdcard_unmount(void)
-{
+esp_err_t bsp_sdcard_unmount(void) {
     if (s_sd_card == NULL) return ESP_OK;
 
     esp_err_t ret = esp_vfs_fat_sdcard_unmount(BSP_SDCARD_MOUNT_POINT, s_sd_card);
@@ -87,13 +86,11 @@ esp_err_t bsp_sdcard_unmount(void)
     return ret;
 }
 
-float bsp_sdcard_get_capacity_gb(void)
-{
+float bsp_sdcard_get_capacity_gb(void) {
     if (s_sd_card == NULL) return 0.0f;
     return (float)(s_sd_card->csd.capacity) / 2048.0f / 1024.0f;
 }
 
-bool bsp_sdcard_is_mounted(void)
-{
+bool bsp_sdcard_is_mounted(void) {
     return (s_sd_card != NULL);
 }

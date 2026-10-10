@@ -143,6 +143,51 @@ esp_err_t bsp_display_sleep(void);
  */
 esp_err_t bsp_display_wait_busy(uint32_t timeout_ms);
 
+/**
+ * @brief Read SSD1681 On-Glass Internal Temperature Sensor (Command 0x1B)
+ *
+ * Interrogates the embedded temperature sensor on the SSD1681 display silicon/glass.
+ * Provides on-panel substrate temperature reading unaffected by Main MCU heating.
+ *
+ * @param[out] out_temp_c Pointer to float to receive temperature in degrees Celsius
+ * @return esp_err_t ESP_OK on success, or ESP_ERR_INVALID_ARG / ESP_FAIL on communication error
+ * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
+ */
+esp_err_t bsp_display_read_temp(float *out_temp_c);
+
+/**
+ * @brief Retrieve consecutive partial refresh count since last full OTP refresh
+ * @return uint32_t Count of partial refreshes executed
+ */
+uint32_t bsp_display_get_partial_count(void);
+
+/**
+ * @brief Check if display BUSY pin is currently asserted (panel actively drawing)
+ * @return bool true if BUSY pin is active high, false if idle
+ */
+bool bsp_display_is_busy(void);
+
+/**
+ * @brief Save dual-plane SSD1681 display framebuffers (0x24 and 0x26) to dedicated flash partition
+ *
+ * Saves the current new frame, previous frame, and partial refresh counter to the
+ * dedicated 16KB flash partition 'epd_frame' for zero-flicker wake boot persistence.
+ *
+ * @return esp_err_t ESP_OK on success, or ESP_ERR_NOT_FOUND if partition is missing
+ * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
+ */
+esp_err_t bsp_display_save_state(void);
+
+/**
+ * @brief Restore dual-plane SSD1681 display framebuffers (0x24 and 0x26) from flash partition
+ *
+ * Restores the persistent display state and counter from the 'epd_frame' partition.
+ *
+ * @return esp_err_t ESP_OK on success, or ESP_ERR_NOT_FOUND if no valid frame exists
+ * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
+ */
+esp_err_t bsp_display_restore_state(void);
+
 #ifdef __cplusplus
 }
 #endif

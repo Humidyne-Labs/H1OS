@@ -120,20 +120,17 @@ static bool              s_low_power_mode   = false;
 static esp_err_t audio_play_tone_raw(uint32_t freq_hz, uint32_t duration_ms, float volume_pct, bool auto_standby);
 static void bsp_audio_pa_ctrl_enable(bool enable);
 
-static esp_err_t bsp_codec_write_reg(uint8_t reg, uint8_t val)
-{
+static esp_err_t bsp_codec_write_reg(uint8_t reg, uint8_t val) {
     uint8_t write_buf[2] = { reg, val };
     return bsp_i2c_write(ES8311_I2C_ADDR, write_buf, sizeof(write_buf));
 }
 
-static esp_err_t bsp_codec_read_reg(uint8_t reg, uint8_t *val)
-{
+static esp_err_t bsp_codec_read_reg(uint8_t reg, uint8_t *val) {
     if (val == NULL) return ESP_ERR_INVALID_ARG;
     return bsp_i2c_read_reg(ES8311_I2C_ADDR, reg, val, 1);
 }
 
-static void _audio_codec_debug_reg_dump(void)
-{
+__attribute__((unused)) static void _audio_codec_debug_reg_dump(void) {
     uint8_t r00 = 0, r01 = 0, r02 = 0, r03 = 0, r04 = 0, r06 = 0, r08 = 0, r09 = 0, r0D = 0, r12 = 0, r31 = 0, r32 = 0, r44 = 0;
     bsp_codec_read_reg(0x00, &r00); bsp_codec_read_reg(0x01, &r01); bsp_codec_read_reg(0x02, &r02);
     bsp_codec_read_reg(0x03, &r03); bsp_codec_read_reg(0x04, &r04); bsp_codec_read_reg(0x06, &r06);
@@ -144,15 +141,13 @@ static void _audio_codec_debug_reg_dump(void)
              r00, r01, r02, r03, r04, r06, r08, r09, r0D, r12, r31, r32, r44);
 }
 
-void bsp_audio_power_enable(bool enable)
-{
+void bsp_audio_power_enable(bool enable) {
     /* Active-LOW power rail pin: 0 = Power ON, 1 = Power OFF.
      * Note: BSP_PIN_PA_EN rail should remain ON (0) during normal operation to prevent I2C bus clamping. */
     gpio_set_level((gpio_num_t)BSP_PIN_PA_EN, enable ? 0 : 1);
 }
 
-static void bsp_audio_pa_ctrl_enable(bool enable)
-{
+static void bsp_audio_pa_ctrl_enable(bool enable) {
     /* Active-HIGH NS4168 PA control pin: 1 = Amp ENABLED, 0 = Amp MUTED/SHUTDOWN */
     gpio_set_level((gpio_num_t)BSP_PIN_PA_CTRL, enable ? 1 : 0);
 }
@@ -227,12 +222,8 @@ esp_err_t bsp_audio_init_dac_only(void)
 
 esp_err_t bsp_audio_init(void)
 {
-    if (s_audio_inited && !s_audio_in_standby) {
-        return ESP_OK;
-    }
-    if (s_audio_in_standby) {
-        return bsp_audio_resume();
-    }
+    if (s_audio_inited && !s_audio_in_standby) return ESP_OK;
+    if (s_audio_in_standby)                    return bsp_audio_resume();
 
     /* 1. Ensure GPIO direction is configured and pad holds released */
     gpio_hold_dis((gpio_num_t)BSP_PIN_PA_EN);
@@ -355,8 +346,7 @@ esp_err_t bsp_audio_set_volume(float volume)
     return bsp_codec_write_reg(ES8311_REG_DAC_VOL, reg_val);
 }
 
-esp_err_t bsp_audio_mute(bool enable_mute)
-{
+esp_err_t bsp_audio_mute(bool enable_mute) {
     if (!s_audio_inited) return ESP_ERR_INVALID_STATE;
 
     if (enable_mute) {
@@ -410,8 +400,7 @@ esp_err_t bsp_audio_power_down(void)
     return ESP_OK;
 }
 
-esp_err_t bsp_audio_standby(void)
-{
+esp_err_t bsp_audio_standby(void) {
     return bsp_audio_power_down();
 }
 
@@ -440,8 +429,7 @@ esp_err_t bsp_audio_resume(void)
     return ESP_OK;
 }
 
-esp_err_t bsp_audio_stop(void)
-{
+esp_err_t bsp_audio_stop(void) {
     if (!s_audio_inited) return ESP_OK;
     return bsp_audio_power_down();
 }
@@ -479,11 +467,8 @@ static esp_err_t audio_play_tone_raw(uint32_t freq_hz, uint32_t duration_ms, flo
     }
 
     bsp_audio_set_volume(volume_pct);
-    if (volume_pct > 0.0f) {
-        bsp_audio_mute(false);
-    } else {
-        bsp_audio_mute(true);
-    }
+    if (volume_pct > 0.0f) { bsp_audio_mute(false); } 
+    else                   { bsp_audio_mute(true);  }
 
     const uint32_t sample_rate    = 16000;
     const uint32_t total_samples  = (sample_rate * duration_ms) / 1000;
@@ -531,8 +516,7 @@ static esp_err_t audio_play_tone_raw(uint32_t freq_hz, uint32_t duration_ms, flo
     return ESP_OK;
 }
 
-esp_err_t bsp_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms, float volume_pct)
-{
+esp_err_t bsp_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms, float volume_pct) {
     return audio_play_tone_raw(freq_hz, duration_ms, volume_pct, true);
 }
 
@@ -541,24 +525,24 @@ esp_err_t bsp_audio_play_chime(bsp_chime_type_t type)
     esp_err_t ret = ESP_OK;
     switch (type) {
         case BSP_CHIME_BOOT:
-            audio_play_tone_raw(523,   90, 70.0f, false);
-            audio_play_tone_raw(659,   90, 75.0f, false);
-            audio_play_tone_raw(784,   90, 80.0f, false);
+            audio_play_tone_raw( 523,  90, 70.0f, false);
+            audio_play_tone_raw( 659,  90, 75.0f, false);
+            audio_play_tone_raw( 784,  90, 80.0f, false);
             audio_play_tone_raw(1046, 200, 85.0f, false);
             break;
 
         case BSP_CHIME_WAKE:
-            audio_play_tone_raw(784,   80, 65.0f, false);
+            audio_play_tone_raw( 784,  80, 65.0f, false);
             audio_play_tone_raw(1046, 150, 75.0f, false);
             break;
 
         case BSP_CHIME_SLEEP:
             audio_play_tone_raw(1046, 120, 70.0f, false);
-            audio_play_tone_raw(784,  120, 65.0f, false);
-            audio_play_tone_raw(659,  220, 55.0f, false);
+            audio_play_tone_raw( 784, 120, 65.0f, false);
+            audio_play_tone_raw( 659, 220, 55.0f, false);
             break;
 
-        case BSP_CHIME_SHUTDOWN:
+        case BSP_CHIME_POWER_OFF:
             audio_play_tone_raw(784, 140, 70.0f, false);
             audio_play_tone_raw(659, 140, 65.0f, false);
             audio_play_tone_raw(523, 280, 60.0f, false);
@@ -567,7 +551,7 @@ esp_err_t bsp_audio_play_chime(bsp_chime_type_t type)
         case BSP_CHIME_ALARM:
             for (int i = 0; i < 2; i++) {
                 audio_play_tone_raw(1760, 100, 90.0f, false);
-                audio_play_tone_raw(880,  100, 90.0f, false);
+                audio_play_tone_raw( 880, 100, 90.0f, false);
             }
             break;
 
@@ -587,26 +571,8 @@ esp_err_t bsp_audio_play_chime(bsp_chime_type_t type)
 
     if (ret == ESP_OK) {
         /* Flush trailing pipeline and place codec into low-power standby */
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(250));
         bsp_audio_stop();
-    }
-    return ret;
-}
-
-static void bsp_audio_chime_wrapper_cb(bsp_chime_type_t type, void *user_data)
-{
-    (void)user_data;
-    bsp_audio_play_chime(type);
-}
-
-esp_err_t bsp_audio_register_default_chimes(void)
-{
-    esp_err_t ret = ESP_OK;
-    for (int i = 0; i < (int)BSP_CHIME_MAX; i++) {
-        esp_err_t err = bsp_register_chime_cb((bsp_chime_type_t)i, bsp_audio_chime_wrapper_cb, NULL);
-        if (err != ESP_OK) {
-            ret = err;
-        }
     }
     return ret;
 }
@@ -630,6 +596,7 @@ esp_err_t bsp_audio_deinit(void)
 
     s_audio_inited     = false;
     s_audio_in_standby = false;
+	
     ESP_LOGI(TAG, "Audio subsystem resources deallocated");
     return ESP_OK;
 }

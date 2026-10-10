@@ -1,0 +1,40 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development Profile",
+      "description": "Builds using the dev configuration into build_dev/",
+      "generator": "Ninja",
+      "binaryDir": "build_dev",
+      "cacheVariables": {
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.dev"
+      }
+    },
+    {
+      "name": "prod",
+      "displayName": "Production Profile",
+      "description": "Builds using the prod configuration into build_prod/",
+      "generator": "Ninja",
+      "binaryDir": "build_prod",
+      "cacheVariables": {
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.prod"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI Profile",
+      "description": "Builds using the ci configuration into build_ci/",
+      "generator": "Ninja",
+      "binaryDir": "build_ci",
+      "cacheVariables": {
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.ci"
+      }
+    }
+  ]
+}

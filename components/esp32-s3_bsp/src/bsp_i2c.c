@@ -93,22 +93,14 @@ esp_err_t bsp_i2c_init(void)
         }
     }
 
-    // 1. Un-hold deep sleep pad latches on SDA and SCL
-    //gpio_hold_dis((gpio_num_t)BSP_PIN_I2C_SDA);
-    //gpio_hold_dis((gpio_num_t)BSP_PIN_I2C_SCL);
-
-    // 2. Reset GPIO driver reservations so i2c_master can claim GPIO 47 and 48 without conflict warnings
-    //gpio_reset_pin((gpio_num_t)BSP_PIN_I2C_SDA);
-    //gpio_reset_pin((gpio_num_t)BSP_PIN_I2C_SCL);
-
     // 3. Attach ESP-IDF master bus driver (configures open-drain mode natively)
     i2c_master_bus_config_t bus_config = {
-        .i2c_port                     = I2C_NUM_0,
-        .sda_io_num                   = (gpio_num_t)BSP_PIN_I2C_SDA,
-        .scl_io_num                   = (gpio_num_t)BSP_PIN_I2C_SCL,
-        .clk_source                   = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt            = 7,
-        .flags.enable_internal_pullup = false, // uses external 4.7k pullup pair
+        .i2c_port                      = I2C_NUM_0,
+        .sda_io_num                    = (gpio_num_t)BSP_PIN_I2C_SDA,
+        .scl_io_num                    = (gpio_num_t)BSP_PIN_I2C_SCL,
+        .clk_source                    = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt             = 7,
+        .flags.enable_internal_pullup  = false, // uses external 4.7k pullup pair
     };
 
     esp_err_t ret = i2c_new_master_bus(&bus_config, &s_i2c_bus_handle);
@@ -118,8 +110,7 @@ esp_err_t bsp_i2c_init(void)
     }
 
     s_dev_cache_count = 0;
-    ESP_LOGI(TAG, "Shared I2C master bus quietly initialized (SDA: %d, SCL: %d @ 400kHz)",
-             BSP_PIN_I2C_SDA, BSP_PIN_I2C_SCL);
+    ESP_LOGI(TAG, "Shared I2C master bus initialized (SDA: %d, SCL: %d @ 400kHz)", BSP_PIN_I2C_SDA, BSP_PIN_I2C_SCL);
     return ESP_OK;
 }
 
@@ -140,7 +131,7 @@ esp_err_t bsp_i2c_deinit(void)
     }
     s_dev_cache_count = 0;
 
-    esp_err_t ret = i2c_del_master_bus(s_i2c_bus_handle);
+    esp_err_t ret    = i2c_del_master_bus(s_i2c_bus_handle);
     s_i2c_bus_handle = NULL;
 
     if (s_i2c_mutex) {
@@ -153,9 +144,7 @@ esp_err_t bsp_i2c_deinit(void)
 
 i2c_master_bus_handle_t bsp_i2c_get_handle(void)
 {
-    if (s_i2c_bus_handle == NULL) {
-        bsp_i2c_init();
-    }
+    if (s_i2c_bus_handle == NULL) bsp_i2c_init();
     return s_i2c_bus_handle;
 }
 
@@ -216,15 +205,22 @@ esp_err_t bsp_i2c_write_reg(uint8_t addr, uint8_t reg, const uint8_t *data, size
         if (err != ESP_OK) return err;
     }
 
-    uint8_t *buf = (uint8_t *)malloc(len + 1);
-    if (!buf) return ESP_ERR_NO_MEM;
+    uint8_t stack_buf[32];
+    uint8_t *buf = stack_buf;
+    if (len + 1 > sizeof(stack_buf)) {
+        buf = (uint8_t *)malloc(len + 1);
+        if (!buf) return ESP_ERR_NO_MEM;
+    }
+
     buf[0] = reg;
     if (data && len > 0) {
         memcpy(&buf[1], data, len);
     }
 
     esp_err_t ret = bsp_i2c_write(addr, buf, len + 1);
-    free(buf);
+    if (buf != stack_buf) {
+        free(buf);
+    }
     return ret;
 }
 

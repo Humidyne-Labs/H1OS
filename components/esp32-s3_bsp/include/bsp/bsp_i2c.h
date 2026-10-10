@@ -5,7 +5,7 @@
  * Hardware Target:
  *  - SDA: GPIO 47, SCL: GPIO 48
  *  - Clock Speed: 400 kHz (I2C Fast Mode)
- *  - Connected Slaves: SHTC3 (0x70), PCF85063A (0x51), FT6336 (0x38), ES8311 (0x18)
+ *  - Connected Slaves: SHTC3 (0x70), PCF85063A (0x51), ES8311 (0x18)
  *
  * Concurrency Model:
  *  - Uses FreeRTOS recursive mutex guarding to allow safe concurrent access across multiple tasks.

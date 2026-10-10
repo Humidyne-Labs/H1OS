@@ -40,6 +40,9 @@
 extern "C" {
 #endif
 
+#define BSP_SLEEP_MIN_DURATION_SEC    1        ///< Minimum allowable sleep duration: 1 second (Hardware 1Hz prescaler)
+#define BSP_SLEEP_MAX_DURATION_SEC    15300    ///< Maximum allowable sleep duration: 255 minutes (15,300 seconds / 4.25 hours)
+
 /**
  * @brief System shutdown / power-off callback function pointer
  */
@@ -59,20 +62,22 @@ typedef enum {
  * @brief Unified Sleep Configuration
  */
 typedef struct {
-    bsp_sleep_mode_t       mode;           ///< Target sleep mode (Light or Deep)
-    uint32_t               duration_sec;   ///< Sleep duration in seconds (0 for indefinite / button only)
-    bsp_wake_source_mask_t wake_sources;   ///< Bitmask of enabled wake triggers
-    bsp_init_mode_t        next_init_mode; ///< Hardware initialization mode to perform on wake
+    bsp_sleep_mode_t       mode;                   ///< Target sleep mode (Light or Deep)
+    uint32_t               duration_sec;           ///< Sleep duration in seconds for internal timer (e.g. 60s)
+    uint32_t               rtc_alarm_duration_sec; ///< Duration for external PCF85063A alarm in seconds (0 = uses duration_sec)
+    bsp_wake_source_mask_t wake_sources;           ///< Bitmask of enabled wake triggers
+    bsp_init_mode_t        next_init_mode;         ///< Hardware initialization mode to perform on wake
 } bsp_sleep_config_t;
 
 /**
  * @brief Default Deep Sleep Configuration Macro
  */
 #define BSP_SLEEP_CONFIG_DEFAULT() { \
-    .mode           = BSP_SLEEP_MODE_DEEP, \
-    .duration_sec   = 0, \
-    .wake_sources   = BSP_WAKE_SRC_ALL, \
-    .next_init_mode = BSP_INIT_MODE_FAST \
+    .mode                   = BSP_SLEEP_MODE_DEEP, \
+    .duration_sec           = 0, \
+    .rtc_alarm_duration_sec = 0, \
+    .wake_sources           = BSP_WAKE_SRC_ALL, \
+    .next_init_mode         = BSP_INIT_MODE_WAKE \
 }
 
 /**
@@ -85,22 +90,6 @@ typedef struct {
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 esp_err_t bsp_power_init(void);
-
-/**
- * @brief Assert Power Latch (GPIO 17 HIGH) to keep LDO active
- *
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_power_hold(void);
-
-/**
- * @brief Release Power Latch (GPIO 17 LOW) to shut off battery power
- *
- * @return esp_err_t ESP_OK on success
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- */
-esp_err_t bsp_power_release(void);
 
 /**
  * @brief Register custom shutdown callback hook
@@ -181,7 +170,7 @@ bool bsp_battery_is_low(uint8_t threshold_pct);
  * @brief Low-Level Sleep Execution Driver (Light or Deep Sleep)
  *
  * Configures hardware wake sources, enables RTC GPIO hold, and executes esp_light_sleep_start()
- * or esp_deep_sleep_start(). Applications should call bsp_lifecycle_enter_sleep() instead.
+ * or esp_deep_sleep_start(). Applications should call bsp_sleep() instead.
  *
  * @param[in] config Sleep configuration parameters
  * @return esp_err_t ESP_OK (returns upon wake if Light Sleep)
@@ -212,6 +201,79 @@ esp_sleep_wakeup_cause_t bsp_get_wakeup_cause(void);
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 bsp_init_mode_t bsp_get_recommended_init_mode(void);
+
+/**
+ * @brief Initialize Dynamic Frequency Scaling (DFS) and Power Management
+ *
+ * Configures the CPU operating range (80 MHz quiet baseline to 240 MHz max performance ceiling).
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_pm_init(void);
+
+/**
+ * @brief Acquire Power Domain Full (PD_FULL) Performance Lock (Scale frequency to 240 MHz)
+ *
+ * Accelerates Xtensa cores to 240 MHz for compute-heavy workloads (LVGL rendering, font blitting, SPI transfers).
+ */
+void bsp_pm_pd_full_acquire(void);
+
+/**
+ * @brief Release Power Domain Full (PD_FULL) Performance Lock (Drop frequency back to 80 MHz baseline)
+ *
+ * Drops core frequency back down to 80 MHz to eliminate thermal buildup on PCB.
+ */
+void bsp_pm_pd_full_release(void);
+
+/**
+ * @brief Check if Power Domain Full (PD_FULL) Lock (240 MHz scaling lock) is currently active
+ *
+ * @return true if PD_FULL mode is active, false if system is operating at baseline frequency
+ */
+bool bsp_pm_is_pd_full_active(void);
+
+/* Backward-compatibility aliases */
+#define bsp_pm_turbo_acquire   bsp_pm_pd_full_acquire
+#define bsp_pm_turbo_release   bsp_pm_pd_full_release
+#define bsp_pm_is_turbo_active bsp_pm_is_pd_full_active
+
+/**
+ * @brief Force Set the BAT_CTRL Main LDO Power Hold Latch State
+ *
+ * Controls the GPIO 17 main LDO hold gate with RTC pad latching.
+ *
+ * @param[in] enable true to assert latch (1/ON) and hold, false to unlatch and drop power hold
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_power_set_latch(bool enable);
+
+/**
+ * @brief Force Set the EPD & Sensor 3.3V Power Rail State
+ *
+ * Controls the GPIO 6 power gate with RTC pad latching (Active-LOW: 0=ON, 1=OFF).
+ *
+ * @param[in] enable true to power ON the 3.3V rail (drive LOW), false to power OFF (drive HIGH)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_power_set_epd_rail(bool enable);
+
+/**
+ * @brief Force Set the Audio Power Domain Rail State
+ *
+ * Controls the GPIO 42 power gate with digital pad latching (Active-LOW: 0=ON, 1=OFF).
+ *
+ * @param[in] enable true to power ON the audio domain (drive LOW), false to power OFF (drive HIGH)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_power_set_pa_rail(bool enable);
+
+/**
+ * @brief Reboot the MCU directly into the ESP32-S3 ROM Download Bootloader
+ *
+ * Sets the hardware RTC_CNTL_FORCE_DOWNLOAD_BOOT register flag and restarts,
+ * allowing instant USB flashing/recovery without power cycling.
+ */
+void bsp_system_reboot_to_bootloader(void);
 
 #ifdef __cplusplus
 }

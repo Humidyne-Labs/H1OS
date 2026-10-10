@@ -20,12 +20,11 @@
 static const char *TAG = "bsp_rtc_mem";
 
 RTC_DATA_ATTR static bsp_rtc_state_t s_rtc_state;
-RTC_FAST_ATTR static uint8_t         s_rtc_frame_buffer[5000];
-RTC_FAST_ATTR static bool            s_rtc_frame_valid = false;
+RTC_DATA_ATTR static uint8_t         s_rtc_frame_buffer[5000];
+RTC_DATA_ATTR static bool            s_rtc_frame_valid = false;
 static bool                          s_boot_counted    = false;
 
-esp_err_t bsp_rtc_mem_init(void)
-{
+esp_err_t bsp_rtc_mem_init(void) {
     if (s_rtc_state.magic != BSP_RTC_MEM_MAGIC) {
         ESP_LOGI(TAG, "RTC Slow Memory uninitialized or invalid (magic 0x%08lX); re-initializing",
                  (unsigned long)s_rtc_state.magic);
@@ -40,28 +39,23 @@ esp_err_t bsp_rtc_mem_init(void)
     return ESP_OK;
 }
 
-bsp_rtc_state_t *bsp_rtc_mem_get_state(void)
-{
+bsp_rtc_state_t *bsp_rtc_mem_get_state(void) {
     return &s_rtc_state;
 }
 
-uint32_t bsp_rtc_mem_get_boot_count(void)
-{
+uint32_t bsp_rtc_mem_get_boot_count(void) {
     return s_rtc_state.boot_count;
 }
 
-void bsp_rtc_mem_set_next_init_mode(bsp_init_mode_t mode)
-{
+void bsp_rtc_mem_set_next_init_mode(bsp_init_mode_t mode) {
     s_rtc_state.next_init_mode = (uint8_t)mode;
 }
 
-bsp_init_mode_t bsp_rtc_mem_get_next_init_mode(void)
-{
+bsp_init_mode_t bsp_rtc_mem_get_next_init_mode(void) {
     return (bsp_init_mode_t)s_rtc_state.next_init_mode;
 }
 
-esp_err_t bsp_rtc_mem_read_scratchpad(uint8_t *dest, size_t len)
-{
+esp_err_t bsp_rtc_mem_read_scratchpad(uint8_t *dest, size_t len) {
     if (dest == NULL || len == 0 || len > sizeof(s_rtc_state.scratchpad)) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -69,12 +63,10 @@ esp_err_t bsp_rtc_mem_read_scratchpad(uint8_t *dest, size_t len)
     return ESP_OK;
 }
 
-esp_err_t bsp_rtc_mem_write_scratchpad(const uint8_t *src, size_t len)
-{
+esp_err_t bsp_rtc_mem_write_scratchpad(const uint8_t *src, size_t len) {
     if (src == NULL || len == 0 || len > sizeof(s_rtc_state.scratchpad)) {
         return ESP_ERR_INVALID_ARG;
-    }
-    memcpy(s_rtc_state.scratchpad, src, len);
+    } memcpy(s_rtc_state.scratchpad, src, len);
     return ESP_OK;
 }
 
@@ -102,8 +94,7 @@ bool bsp_rtc_mem_has_display_frame(void)
     return s_rtc_frame_valid;
 }
 
-void bsp_rtc_mem_reset(void)
-{
+void bsp_rtc_mem_reset(void) {
     memset(&s_rtc_state, 0, sizeof(bsp_rtc_state_t));
     s_rtc_state.magic          = BSP_RTC_MEM_MAGIC;
     s_rtc_state.boot_count     = 1;

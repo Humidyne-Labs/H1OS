@@ -1,9 +1,9 @@
 /**
  * @file main.c
- * @brief Standalone Reference Example for System Splash & Audio Chime Callbacks
+ * @brief Standalone Reference Example for Declarative Splash Screens & Audio Chimes
  *
- * Demonstrates how to register, inspect, trigger, and unregister UI splash
- * screens and audio chime notification events using the BSP Splash Framework.
+ * Demonstrates declarative UI splash screens and audio chime configuration
+ * passed directly through bsp_app_lifecycle_t to bsp_app_start().
  *
  * SPDX-License-Identifier: MIT
  */
@@ -13,74 +13,54 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include "bsp/bsp_splash.h"
+#include "bsp/bsp.h"
 
 static const char *TAG = "splash_example";
 
-static void on_splash_event(bsp_splash_type_t type, void *user_data)
+static void on_boot_splash_cb(bsp_splash_type_t type, void *user_data)
 {
-    const char *context = (const char *)user_data;
-    ESP_LOGI(TAG, "[UI] Splash Callback Triggered -> Type: %d, Context: %s",
-             (int)type, context ? context : "N/A");
+    ESP_LOGI(TAG, "[UI] >>> Boot Splash Handler Executed! (Type: %d, Context: %s)",
+             (int)type, (const char *)user_data);
 }
 
-static void on_chime_event(bsp_chime_type_t type, void *user_data)
+static void on_sleep_splash_cb(bsp_splash_type_t type, void *user_data)
 {
-    const char *context = (const char *)user_data;
-    ESP_LOGI(TAG, "[AUDIO] Chime Callback Triggered -> Type: %d, Context: %s",
-             (int)type, context ? context : "N/A");
+    ESP_LOGI(TAG, "[UI] >>> Pre-Sleep Splash Handler Executed! (Type: %d, Context: %s)",
+             (int)type, (const char *)user_data);
+}
+
+static void on_custom_chime_cb(bsp_chime_type_t type, void *user_data)
+{
+    ESP_LOGI(TAG, "[AUDIO] >>> Custom Chime Dispatcher: Event %d", (int)type);
+}
+
+static void on_boot_cb(void *user_data)
+{
+    ESP_LOGI(TAG, "Lifecycle: on_boot reached. Boot splash has already fired!");
+
+    // Test manual trigger of a notification chime
+    ESP_LOGI(TAG, "Triggering notification chime via bsp_trigger_chime()...");
+    bsp_trigger_chime(BSP_CHIME_NOTIFY);
+
+    // Test manual trigger of sleep splash
+    ESP_LOGI(TAG, "Triggering sleep splash via bsp_trigger_splash()...");
+    bsp_trigger_splash(BSP_SPLASH_SLEEP);
 }
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Starting BSP Splash & Chime Framework Example...");
+    ESP_LOGI(TAG, "Starting Declarative Splash & Chime Lifecycle Example...");
 
-    // 1. Register Splash Screen Callbacks
-    ESP_ERROR_CHECK(bsp_register_splash_cb(BSP_SPLASH_BOOT, on_splash_event, (void *)"Cold Boot UI"));
-    ESP_ERROR_CHECK(bsp_register_splash_cb(BSP_SPLASH_SLEEP, on_splash_event, (void *)"Pre-Sleep UI"));
+    bsp_app_lifecycle_t lifecycle = {
+        .on_boot            = on_boot_cb,
+        .on_boot_splash     = on_boot_splash_cb,
+        .on_sleep_splash    = on_sleep_splash_cb,
+        .on_chime           = on_custom_chime_cb,
+        .default_chime_mask = BSP_CHIME_MASK_BOOT | BSP_CHIME_MASK_SLEEP | BSP_CHIME_MASK_NOTIFY,
+        .user_data          = (void *)"AppContext",
+    };
 
-    // 2. Register Audio Chime Callbacks
-    ESP_ERROR_CHECK(bsp_register_chime_cb(BSP_CHIME_BOOT, on_chime_event, (void *)"Boot Melody"));
-    ESP_ERROR_CHECK(bsp_register_chime_cb(BSP_CHIME_NOTIFY, on_chime_event, (void *)"Notification Chirp"));
+    ESP_ERROR_CHECK(bsp_app_start(&lifecycle));
 
-    // 3. Verify Registration Status
-    if (bsp_has_splash_cb(BSP_SPLASH_BOOT)) {
-        ESP_LOGI(TAG, "Verified: BSP_SPLASH_BOOT callback is registered.");
-    }
-    if (bsp_has_chime_cb(BSP_CHIME_NOTIFY)) {
-        ESP_LOGI(TAG, "Verified: BSP_CHIME_NOTIFY callback is registered.");
-    }
-
-    // 4. Trigger Events
-    ESP_LOGI(TAG, "Triggering Cold Boot UI Splash...");
-    ESP_ERROR_CHECK(bsp_trigger_splash(BSP_SPLASH_BOOT));
-
-    ESP_LOGI(TAG, "Triggering Boot Chime...");
-    ESP_ERROR_CHECK(bsp_trigger_chime(BSP_CHIME_BOOT));
-
-    ESP_LOGI(TAG, "Triggering Notification Chime...");
-    ESP_ERROR_CHECK(bsp_trigger_chime(BSP_CHIME_NOTIFY));
-
-    // 5. Test Handling for Unregistered Events
-    esp_err_t err = bsp_trigger_splash(BSP_SPLASH_WAKE);
-    if (err == ESP_ERR_NOT_FOUND) {
-        ESP_LOGI(TAG, "BSP_SPLASH_WAKE correctly reported as not registered.");
-    }
-
-    // 6. Trigger Pre-Sleep Splash
-    ESP_LOGI(TAG, "Triggering Sleep UI Splash...");
-    ESP_ERROR_CHECK(bsp_trigger_splash(BSP_SPLASH_SLEEP));
-
-    // 7. Cleanup & Unregister Callbacks
-    ESP_ERROR_CHECK(bsp_unregister_splash_cb(BSP_SPLASH_BOOT));
-    ESP_ERROR_CHECK(bsp_unregister_splash_cb(BSP_SPLASH_SLEEP));
-    ESP_ERROR_CHECK(bsp_unregister_chime_cb(BSP_CHIME_BOOT));
-    ESP_ERROR_CHECK(bsp_unregister_chime_cb(BSP_CHIME_NOTIFY));
-
-    // 8. Confirm Unregistration
-    if (!bsp_has_splash_cb(BSP_SPLASH_BOOT)) {
-        ESP_LOGI(TAG, "BSP_SPLASH_BOOT successfully unregistered.");
-    }
-
-    ESP_LOGI(TAG, "BSP Splash & Chime Framework Example Finished Successfully.");
-}
+    ESP_LOGI(TAG, "Declarative Splash & Chime Lifecycle Example Complete.");
+}

@@ -53,143 +53,6 @@
 
 static const char *TAG = "test_suite";
 
-/**
- * @brief Standalone Thermal Compensation Continuous Loop Test Switch
- * Set to 1 to run infinite thermal telemetry logging on startup. Set to 0 for standard test suite execution.
- */
-#define ENABLE_THERMAL_LOOP_TEST         0
-
-/**
- * @brief Standalone Deep Sleep Heat-Soak Verification Switch
- * Set to 1 to run deep sleep cycles reading Temp (°F), RH (%), Vbat (V) & displaying on screen.
- */
-#define ENABLE_DEEP_SLEEP_HEAT_SOAK_TEST 1
-#define DEEP_SLEEP_SOAK_INTERVAL_SEC     60
-
-
-static void run_thermal_comp_loop_test(void)
-{
-    ESP_LOGI(TAG, "==========================================================================================");
-    ESP_LOGI(TAG, "  STARTING STANDALONE SHTC3 DIRECT TELEMETRY LOOP TEST");
-    ESP_LOGI(TAG, "==========================================================================================");
-
-    uint32_t iteration = 0;
-
-    while (1) {
-        bsp_shtc3_data_t data = {0};
-        if (bsp_shtc3_read(&data) == ESP_OK && data.valid) {
-            ESP_LOGI(TAG, "[#%04lu] SHTC3: %5.2f deg C (%5.2f deg F, %6.2f K) | RH: %5.2f%% | DewPoint: %5.2f deg C | AbsHum: %5.2f g/m3",
-                     (unsigned long)++iteration,
-                     data.temperature_c, data.temperature_f, data.temperature_k,
-                     data.humidity_percent, data.dew_point_c, data.absolute_humidity_g);
-        } else {
-            ESP_LOGE(TAG, "[#%04lu] Telemetry read error", (unsigned long)++iteration);
-        }
-        bsp_delay_ms(1000);
-    }
-}
-
-static void run_deep_sleep_heat_soak_test(void)
-{
-    ESP_LOGI(TAG, "==========================================================================================");
-    ESP_LOGI(TAG, "  STARTING STANDALONE DEEP SLEEP HEAT-SOAK TEST LOOP");
-    ESP_LOGI(TAG, "==========================================================================================");
-
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    uint32_t cycle = rtc_st ? (rtc_st->deep_sleep_count + 1) : 1;
-
-    // 1. Read battery voltage
-    uint32_t vbat_mv = 0;
-    bsp_battery_get_voltage(&vbat_mv, NULL);
-    float vbat_v = (float)vbat_mv / 1000.0f;
-    uint8_t batt_pct = bsp_battery_get_percentage();
-
-    // 2. Read direct SHTC3 environmental telemetry
-    bsp_shtc3_data_t shtc_data = {0};
-    esp_err_t ret = bsp_shtc3_read(&shtc_data);
-
-    float temp_f     = 0.0f;
-    float temp_c     = 0.0f;
-    float rh_pct     = 0.0f;
-    float dew_f      = 0.0f;
-
-    if (ret == ESP_OK && shtc_data.valid) {
-        temp_f     = shtc_data.temperature_f;
-        temp_c     = shtc_data.temperature_c;
-        rh_pct     = shtc_data.humidity_percent;
-        dew_f      = shtc_data.dew_point_f;
-    } else {
-        ESP_LOGE(TAG, "[HEAT SOAK #%04lu] SHTC3 read error: %s", (unsigned long)cycle, bsp_err_to_name(ret));
-    }
-
-    ESP_LOGI(TAG, "[HEAT SOAK #%04lu] SHTC3: %.2f deg F (%.2f deg C) | RH: %.2f %% | DewPoint: %.2f deg F | Vbat: %.3f V (%lu mV, %u%%)",
-             (unsigned long)cycle, temp_f, temp_c, rh_pct, dew_f, vbat_v, (unsigned long)vbat_mv, batt_pct);
-
-    // 3. Render clean readout on E-Paper display
-    bsp_lvgl_lock();
-    lv_obj_t *scr = lv_screen_active();
-    lv_obj_clean(scr);
-    lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
-
-    // Header Title
-    lv_obj_t *title = lv_label_create(scr);
-    lv_label_set_text_fmt(title, "HEAT SOAK CYCLE #%lu", (unsigned long)cycle);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 4);
-
-    // Line Separator
-    static lv_point_precise_t line_pts[] = {{8, 22}, {192, 22}};
-    lv_obj_t *line = lv_line_create(scr);
-    lv_line_set_points(line, line_pts, 2);
-    lv_obj_set_style_line_width(line, 1, 0);
-    lv_obj_set_style_line_color(line, lv_color_black(), 0);
-
-    // Temperature (°F)
-    lv_obj_t *lbl_temp = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_temp, "TEMP: %.1f deg F", temp_f);
-    lv_obj_set_style_text_font(lbl_temp, &lv_font_montserrat_14, 0);
-    lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 10, 32);
-
-    // Temperature (°C) & Dew Point Detail Line
-    lv_obj_t *lbl_det = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_det, "%.1f C | Dew: %.1f F", temp_c, dew_f);
-    lv_obj_set_style_text_font(lbl_det, &lv_font_montserrat_14, 0);
-    lv_obj_align(lbl_det, LV_ALIGN_TOP_LEFT, 10, 52);
-
-    // Relative Humidity (%)
-    lv_obj_t *lbl_rh = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_rh, "RH:   %.1f %%", rh_pct);
-    lv_obj_set_style_text_font(lbl_rh, &lv_font_montserrat_14, 0);
-    lv_obj_align(lbl_rh, LV_ALIGN_TOP_LEFT, 10, 78);
-
-    // Battery Voltage (V)
-    lv_obj_t *lbl_vbat = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_vbat, "VBAT: %.3f V (%lu mV)", vbat_v, (unsigned long)vbat_mv);
-    lv_obj_set_style_text_font(lbl_vbat, &lv_font_montserrat_14, 0);
-    lv_obj_align(lbl_vbat, LV_ALIGN_TOP_LEFT, 10, 104);
-
-    // Sleep Footer
-    lv_obj_t *lbl_footer = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_footer, "Deep Sleep: %ds timer", DEEP_SLEEP_SOAK_INTERVAL_SEC);
-    lv_obj_set_style_text_font(lbl_footer, &lv_font_montserrat_14, 0);
-    lv_obj_align(lbl_footer, LV_ALIGN_TOP_LEFT, 10, 134);
-
-    bsp_lvgl_unlock();
-
-    // 4. Delay briefly for display frame update completion
-    bsp_delay_ms(1500);
-
-    // 5. Enter Deep Sleep
-    bsp_sleep_config_t sleep_cfg = {
-        .mode           = BSP_SLEEP_MODE_DEEP,
-        .duration_sec   = DEEP_SLEEP_SOAK_INTERVAL_SEC,
-        .wake_sources   = BSP_WAKE_SRC_TIMER | BSP_WAKE_SRC_BUTTONS,
-        .next_init_mode = BSP_INIT_MODE_FAST,
-    };
-    bsp_lifecycle_enter_sleep(&sleep_cfg);
-}
-
-
 #pragma pack(push, 1)
 typedef struct {
     uint8_t  magic[4];      /*!< Magic number: "MMAP"                                */
@@ -594,7 +457,7 @@ static void button_event_handler(bsp_button_t btn, bsp_button_event_t event, voi
     }
 }
 
-static void app_on_cold_boot(void *user_data);
+static void app_on_boot(void *user_data);
 static void app_on_wake(const bsp_wake_context_t *ctx, void *user_data);
 
 static void setup_test_buttons(bool enable_long_press)
@@ -613,13 +476,6 @@ static void app_on_wake(const bsp_wake_context_t *ctx, void *user_data)
     s_current_stage          = stage;
     ESP_LOGI(TAG, ">>> [LIFECYCLE WAKE] Processing Stage %d (Wake Cause: %d, Mode: %d, Boot Count: %lu) <<<",
              (int)stage, (int)ctx->wake_cause, (int)ctx->init_mode, (unsigned long)ctx->boot_count);
-
-
-#if ENABLE_DEEP_SLEEP_HEAT_SOAK_TEST
-    run_deep_sleep_heat_soak_test();
-    return;
-#endif
-
 
     // ========================================================================
     // WAKE HANDLER 1: WAKING FROM DEEP SLEEP TEST 1 (Timer -> FAST Mode)
@@ -713,14 +569,9 @@ static void app_on_wake(const bsp_wake_context_t *ctx, void *user_data)
     }
 }
 
-static void app_on_cold_boot(void *user_data)
+static void app_on_boot(void *user_data)
 {
-#if ENABLE_THERMAL_LOOP_TEST
-    run_thermal_comp_loop_test(); //spoiler, dosen't help the sensor readings ANY!
-    return;
-#endif
-
-    ESP_LOGI(TAG, ">>> [COLD BOOT] Initializing Subsystems (FULL Mode) <<<");
+    ESP_LOGI(TAG, ">>> [BOOT] Initializing Subsystems (BOOT Profile) <<<");
     esp_err_t ret = ESP_OK;
 
     test_ui_render_screen("System Self-Test\nExecuting Tests 1-14...",
@@ -978,7 +829,7 @@ static void app_on_cold_boot(void *user_data)
     lv_obj_t *scr = lv_screen_active();
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
-    lv_obj_t *qr = bsp_prov_render_qr_code(scr, 180, "HumidOS-1.0.0-OK");
+    lv_obj_t *qr = bsp_lvgl_create_qr_code(scr, 180, "HumidOS-1.0.0-OK");
     if (qr) lv_obj_center(qr);
     bsp_lvgl_unlock();
 
@@ -1009,11 +860,11 @@ void app_main(void)
     ESP_LOGI(TAG, "==================================================");
 
     bsp_app_lifecycle_t lifecycle = {
-        .on_cold_boot    = app_on_cold_boot,
-        .on_wake         = app_on_wake,
-        .on_before_sleep = NULL,
-        .on_shutdown     = NULL,
-        .user_data       = NULL,
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_sleep     = NULL,
+        .on_power_off = NULL,
+        .user_data    = NULL,
     };
 
     bsp_app_start(&lifecycle);
