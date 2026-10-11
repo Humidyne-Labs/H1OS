@@ -52,7 +52,8 @@ int main(void)
         uint32_t v_bat_mv = (v_div_mv * 2) + cal_offset;
         last_vbat_mv = v_bat_mv;
 
-        if (v_bat_mv < vbat_critical_mv) {
+        /* Zero-Volt Cable Guard: if v_bat_mv < 100mV, powered exclusively by USB VBUS without battery */
+        if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
             /* Brownout tripwire triggered! Wake CPU immediately to show emergency screen & latch off */
             dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
             ulp_riscv_wakeup_main_processor();
@@ -60,14 +61,43 @@ int main(void)
         }
     }
 
-    /* 3. Button Debounce Check (GPIO 0: BOOT0, GPIO 18: BAT_KEY) */
+    /* 3. Button Check (GPIO 0: BOOT0, GPIO 18: BAT_KEY) */
+    /* Wake-on-Release Rule: Wake Xtensa strictly when the button transitions back HIGH */
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
     int pwr_btn = ulp_riscv_gpio_get_level(GPIO_NUM_18);
 
     if (boot_btn == 0 || pwr_btn == 0) {
-        boot_btn_events++;
-        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-        ulp_riscv_wakeup_main_processor();
+        /* Button is held down. Track hold duration and wait for release. */
+        uint32_t hold_ms = 0;
+        while (hold_ms < 2600) {
+            ulp_riscv_delay_cycles(10 * ULP_RISCV_CYCLES_PER_MS); /* 10ms poll while depressed */
+            hold_ms += 10;
+            boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
+            pwr_btn = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+            if (boot_btn != 0 && pwr_btn != 0) {
+                /* Clean release detected! */
+                break;
+            }
+        }
+
+        if (hold_ms >= 2500) {
+            if (boot_btn == 0) {
+                /* BOOT held > 2.5s: Prime ROM Bootloader jump */
+                dispatch_reason = 4; /* ULP_DISPATCH_BOOTLOADER_JUMP */
+            } else {
+                /* POWER held > 2.5s: Prime Power Off */
+                dispatch_reason = 5; /* ULP_DISPATCH_POWER_OFF */
+            }
+            ulp_riscv_wakeup_main_processor();
+            return 0;
+        } else if (hold_ms >= 30) {
+            /* Valid short tap released between 30ms and 2500ms -> Wake Flow B with clean released state */
+            boot_btn_events++;
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            ulp_riscv_wakeup_main_processor();
+            return 0;
+        }
+        /* Pulse < 30ms discarded as glitch */
         return 0;
     }
 
