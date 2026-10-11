@@ -48,7 +48,7 @@ set(bsp_requires
 
 idf_component_register(
     SRCS ${h1os_srcs}
-    INCLUDE_DIRS "include"
+    INCLUDE_DIRS "include" "include/h1os"
     REQUIRES ${bsp_requires}
 )
 

@@ -18,6 +18,7 @@
 #include "hal_io.h"
 #include "hal_types.h"
 #include "h1os_lvgl.h"
+#include "display/lv_display_private.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "h1os_lvgl";
@@ -49,10 +50,11 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_RELEASED;
     data->key   = 0;
 
-    if (hal_io_button_is_pressed(HAL_PIN_BUTTON_BOOT)) {
+    hal_btn_mask_t btns = hal_io_read_buttons();
+    if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_NEXT;
-    } else if (hal_io_button_is_pressed(HAL_PIN_BUTTON_POWER)) {
+    } else if (btns & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_ENTER;
     }
@@ -222,7 +224,15 @@ esp_err_t h1os_lvgl_stop(void)
 bool h1os_lvgl_has_pending_tasks(void)
 {
     if (s_lv_display == NULL) return false;
-    return lv_display_is_refr_executing(s_lv_display);
+    /* Check if display refresh timer is actively scheduled / running */
+    lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
+    if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
+        /* Timer is active; check if any screen layer or area is dirty */
+        if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void h1os_lvgl_port_task(void *pvParameters)

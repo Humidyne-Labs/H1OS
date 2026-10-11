@@ -96,6 +96,6 @@ void h1os_shutdown(void)
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
-    // Commit frame, wait busy, release latch
-    hal_io_release_power_latch();
+    // Release battery LDO power latch (GPIO 17 driven LOW, hold disabled)
+    hal_io_lock_power_latch(false);
 }

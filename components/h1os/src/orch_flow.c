@@ -204,7 +204,10 @@ esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec)
     if (sleep_sec > 0) {
         sub_rtc_arm_countdown(sleep_sec);
     }
-    // Enter deep sleep via power manager
-    return sub_power_enter_deep_sleep(sleep_sec);
+    // Enter deep sleep via power manager with buttons and RTC INT wake sources
+    uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
+                         (1ULL << HAL_PIN_BUTTON_POWER) |
+                         (1ULL << HAL_PIN_RTC_INT);
+    return sub_power_enter_deep_sleep(sleep_sec, wake_mask);
 }
 
