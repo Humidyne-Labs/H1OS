@@ -13,7 +13,7 @@
 
 #include "bsp/bsp_button.h"
 #include "bsp/bsp_power.h"
-#include "bsp/pinout.h"
+#include "bsp/hal_types.h"
 #include "bsp/bsp.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -174,8 +174,8 @@ esp_err_t bsp_button_init(const bsp_button_config_t *config)
     }
 
     memset(s_buttons, 0, sizeof(s_buttons));
-    s_buttons[BSP_BUTTON_BOOT].gpio  = BSP_PIN_BUTTON_BOOT;
-    s_buttons[BSP_BUTTON_POWER].gpio = BSP_PIN_BUTTON_POWER;
+    s_buttons[BSP_BUTTON_BOOT].gpio  = HAL_PIN_BUTTON_BOOT;
+    s_buttons[BSP_BUTTON_POWER].gpio = HAL_PIN_BUTTON_POWER;
 
     for (int i = 0; i < BSP_BUTTON_COUNT; i++) {
         bsp_button_t btn = (bsp_button_t)i;
@@ -207,7 +207,7 @@ esp_err_t bsp_button_init(const bsp_button_config_t *config)
 
     s_inited = true;
     ESP_LOGI(TAG, "Buttons initialized (BOOT GPIO%d, POWER GPIO%d)",
-             BSP_PIN_BUTTON_BOOT, BSP_PIN_BUTTON_POWER);
+             HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER);
     return ESP_OK;
 }
 
@@ -237,8 +237,8 @@ esp_err_t bsp_button_wait_for_click(bsp_button_t button, uint32_t timeout_ms)
     if (button >= BSP_BUTTON_COUNT) return ESP_ERR_INVALID_ARG;
 
     gpio_num_t gpio = (button == BSP_BUTTON_BOOT) ?
-                      (gpio_num_t)BSP_PIN_BUTTON_BOOT :
-                      (gpio_num_t)BSP_PIN_BUTTON_POWER;
+                      (gpio_num_t)HAL_PIN_BUTTON_BOOT :
+                      (gpio_num_t)HAL_PIN_BUTTON_POWER;
 
     int64_t start_us   = esp_timer_get_time();
     int64_t timeout_us = (timeout_ms > 0) ? ((int64_t)timeout_ms * 1000LL) : -1LL;

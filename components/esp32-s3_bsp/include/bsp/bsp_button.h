@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "bsp/pinout.h"
+#include "bsp/hal_types.h"
 #include "bsp/bsp_power.h"
 
 #ifdef __cplusplus

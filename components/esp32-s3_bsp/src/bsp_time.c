@@ -19,7 +19,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "bsp/bsp_rtc.h"
+#include "bsp/sub_rtc.h"
 #include "bsp/bsp_time.h"
 #include "bsp/bsp_wifi.h"
 
@@ -44,20 +44,11 @@ esp_err_t bsp_time_sync_system_to_rtc(void)
     time(&now);
     localtime_r(&now, &timeinfo);
 
-    bsp_rtc_datetime_t rtc_dt = {
-        .year    = (uint16_t)(timeinfo.tm_year + 1900),
-        .month   = (uint8_t)(timeinfo.tm_mon + 1),
-        .day     = (uint8_t)timeinfo.tm_mday,
-        .weekday = (uint8_t)timeinfo.tm_wday,
-        .hour    = (uint8_t)timeinfo.tm_hour,
-        .minute  = (uint8_t)timeinfo.tm_min,
-        .second  = (uint8_t)timeinfo.tm_sec,
-    };
-
-    esp_err_t ret = bsp_rtc_set_datetime(&rtc_dt);
+    esp_err_t ret = sub_rtc_set_time(&timeinfo);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Synchronized PCF85063A RTC from POSIX clock: %04d-%02d-%02d %02d:%02d:%02d",
-                 rtc_dt.year, rtc_dt.month, rtc_dt.day, rtc_dt.hour, rtc_dt.minute, rtc_dt.second);
+                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     } else {
         ESP_LOGE(TAG, "Failed to write PCF85063A RTC: %s", esp_err_to_name(ret));
     }
@@ -66,23 +57,12 @@ esp_err_t bsp_time_sync_system_to_rtc(void)
 
 esp_err_t bsp_time_sync_rtc_to_system(void)
 {
-    bsp_rtc_datetime_t rtc_dt;
-    esp_err_t ret = bsp_rtc_get_datetime(&rtc_dt);
+    struct tm tm_target;
+    esp_err_t ret = sub_rtc_get_time(&tm_target);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read PCF85063A RTC: %s", esp_err_to_name(ret));
         return ret;
     }
-
-    struct tm tm_target = {
-        .tm_sec   = rtc_dt.second,
-        .tm_min   = rtc_dt.minute,
-        .tm_hour  = rtc_dt.hour,
-        .tm_mday  = rtc_dt.day,
-        .tm_mon   = rtc_dt.month - 1,
-        .tm_year  = rtc_dt.year  - 1900,
-        .tm_wday  = rtc_dt.weekday,
-        .tm_isdst = -1,
-    };
 
     time_t t = mktime(&tm_target);
     if (t == (time_t)-1) {
@@ -93,7 +73,8 @@ esp_err_t bsp_time_sync_rtc_to_system(void)
     struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
     settimeofday(&tv, NULL);
     ESP_LOGI(TAG, "Synchronized ESP32 system clock from PCF85063A RTC: %04d-%02d-%02d %02d:%02d:%02d",
-             rtc_dt.year, rtc_dt.month, rtc_dt.day, rtc_dt.hour, rtc_dt.minute, rtc_dt.second);
+             tm_target.tm_year + 1900, tm_target.tm_mon + 1, tm_target.tm_mday,
+             tm_target.tm_hour, tm_target.tm_min, tm_target.tm_sec);
     return ESP_OK;
 }
 

@@ -17,7 +17,7 @@
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
 #include "esp_log.h"
-#include "bsp/pinout.h"
+#include "bsp/hal_types.h"
 #include "bsp/bsp_sdcard.h"
 
 static const char *TAG = "bsp_sdcard";
@@ -43,9 +43,9 @@ esp_err_t bsp_sdcard_mount(void)
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;
-    slot_config.clk   = BSP_PIN_SD_CLK;
-    slot_config.cmd   = BSP_PIN_SD_MOSI;
-    slot_config.d0    = BSP_PIN_SD_MISO;
+    slot_config.clk   = HAL_PIN_SD_CLK;
+    slot_config.cmd   = HAL_PIN_SD_MOSI;
+    slot_config.d0    = HAL_PIN_SD_MISO;
     slot_config.cd    = SDMMC_SLOT_NO_CD; // No hardware Card Detect pin connected, shame on waveshare
     slot_config.wp    = SDMMC_SLOT_NO_WP; // more shame, shame.... shame shame....... shame!
 

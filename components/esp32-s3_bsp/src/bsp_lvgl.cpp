@@ -20,7 +20,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
-#include "bsp/bsp_display.h"
+#include "bsp/sub_display.h"
 #include "bsp/bsp_lvgl.h"
 #include "bsp/bsp.h"
 #include "sdkconfig.h"
@@ -78,7 +78,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     }
 
     const uint8_t *src_buf  = px_map + LVGL_I1_PALETTE_SIZE;
-    uint8_t       *dest_buf = bsp_display_get_buffer();
+    uint8_t       *dest_buf = sub_display_get_framebuffer();
 
     uint16_t area_w     = (area->x2 - area->x1 + 1);
     uint16_t area_h     = (area->y2 - area->y1 + 1);
@@ -91,7 +91,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
         for (uint16_t y = 0; y < area_h; y++) {
             uint16_t      dst_y      = area->y1 + y;
-            uint32_t      dst_offset = (dst_y * (BSP_DISPLAY_WIDTH / 8)) + start_byte_x;
+            uint32_t      dst_offset = (dst_y * (EPD_WIDTH / 8)) + start_byte_x;
             const uint8_t *src       = src_buf + (y * src_stride);
             uint8_t       *dst       = dest_buf + dst_offset;
 
@@ -108,7 +108,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
                 memcpy(dst, src, bytes_per_line);
             }
         }
-    } else {
+    } else if (dest_buf != NULL) {
         // Pixel fallback for unaligned fractional bounding boxes
         for (uint16_t y = 0; y < area_h; y++) {
             const uint8_t *src_line = src_buf + (y * src_stride);
@@ -116,22 +116,28 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
             for (uint16_t x = 0; x < area_w; x++) {
                 uint8_t bit_val = (src_line[x >> 3] >> (7 - (x & 0x07))) & 0x01;
-                bsp_display_draw_pixel(area->x1 + x, dst_y, (bit_val != 0) ?
-									                        BSP_DISPLAY_COLOR_WHITE : 
-															BSP_DISPLAY_COLOR_BLACK
-                );
+                uint16_t px = area->x1 + x;
+                if (px < EPD_WIDTH && dst_y < EPD_HEIGHT) {
+                    uint32_t byte_idx = (dst_y * (EPD_WIDTH / 8)) + (px / 8);
+                    uint8_t bit_mask = 1 << (7 - (px % 8));
+                    if (bit_val) {
+                        dest_buf[byte_idx] |= bit_mask;
+                    } else {
+                        dest_buf[byte_idx] &= ~bit_mask;
+                    }
+                }
             }
         }
     }
 
     // When all batched redraw areas are rendered, trigger hardware update
     if (lv_display_flush_is_last(disp)) {
-        if (s_first_boot_flush || bsp_display_get_partial_count() >= PARTIAL_REFRESH_LIMIT) {
+        if (s_first_boot_flush) {
 			// Full OTP update on cold boot, shutdown, or anti-ghosting threshold
-            bsp_display_flush(); s_first_boot_flush = false;
+            sub_display_refresh_full(); s_first_boot_flush = false;
         } else {
 			// Fast, flicker-free partial update on wake
-            bsp_display_flush_partial(); 
+            sub_display_refresh_partial(); 
         }
     }
 
@@ -142,7 +148,7 @@ esp_err_t bsp_lvgl_init(void)
 {
     if (s_lv_display != NULL) return ESP_OK;
 
-    esp_err_t ret = bsp_display_init();
+    esp_err_t ret = sub_display_init(false);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize display hardware: %s", bsp_err_to_name(ret));
         return ret;
@@ -154,7 +160,7 @@ esp_err_t bsp_lvgl_init(void)
 #endif
     lv_tick_set_cb(lvgl_tick_get_cb);
 
-    s_lv_display = lv_display_create(BSP_DISPLAY_WIDTH, BSP_DISPLAY_HEIGHT);
+    s_lv_display = lv_display_create(EPD_WIDTH, EPD_HEIGHT);
     if (s_lv_display == NULL) {
         ESP_LOGE(TAG, "Failed to create LVGL display");
         return ESP_FAIL;
@@ -164,7 +170,7 @@ esp_err_t bsp_lvgl_init(void)
 
     // Allocate 64-byte aligned partial render buffer (40 lines) using stride math
     uint32_t buffer_lines = 40;
-    uint32_t stride       = lv_draw_buf_width_to_stride(BSP_DISPLAY_WIDTH, LV_COLOR_FORMAT_I1);
+    uint32_t stride       = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
     size_t   buf_size     = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
     uint8_t  *buf1        = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (buf1 == NULL) {

@@ -26,7 +26,18 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_rom_sys.h"
-#include "bsp/pinout.h"
+#include "bsp/hal_types.h"
+#include "bsp/hal_io.h"
+#include "bsp/hal_i2c.h"
+#include "bsp/sub_power.h"
+#include "bsp/sub_sensor.h"
+#include "bsp/sub_rtc.h"
+#include "bsp/sub_display.h"
+#include "bsp/sub_audio.h"
+#include "bsp/orch_state.h"
+#include "bsp/orch_flow.h"
+#include "bsp/orch_display_sync.h"
+#include "bsp/orch_math.h"
 #include "bsp/bsp.h"
 
 static const char *TAG = "bsp_common";
@@ -95,9 +106,9 @@ esp_err_t bsp_get_diagnostics(bsp_diag_info_t *diag)
 
     diag->battery_mv             = batt_mv;
     diag->battery_percentage     = (int8_t)bsp_battery_get_percentage();
-    diag->power_rail_good        = (gpio_get_level((gpio_num_t)BSP_PIN_POWER_HOLD) == 1);
-    diag->i2c_bus_healthy        = (bsp_i2c_probe(BSP_I2C_ADDR_SHTC3) == ESP_OK);
-    diag->display_ready          = (bsp_display_get_buffer() != NULL);
+    diag->power_rail_good        = (gpio_get_level((gpio_num_t)HAL_PIN_POWER_HOLD) == 1);
+    diag->i2c_bus_healthy        = (hal_i2c_probe(HAL_I2C_ADDR_SHTC3) == ESP_OK);
+    diag->display_ready          = (sub_display_get_framebuffer() != NULL);
     diag->wifi_connected         = bsp_wifi_is_connected();
 
     int rssi                     = 0;
@@ -137,36 +148,36 @@ esp_err_t bsp_io_early_init(void)
     if (s_early_inited) return ESP_OK;
 
     // 1. Release pad holds for Tactile Buttons and RTC Interrupt lines only.
-    // Note: BSP_PIN_POWER_HOLD (GPIO 17) is locked HIGH by hardware RTC pad hold
+    // Note: HAL_PIN_POWER_HOLD (GPIO 17) is locked HIGH by hardware RTC pad hold
     // in the 2nd-stage bootloader and remains held across all operating cycles.
-    rtc_gpio_hold_dis(BSP_PIN_BUTTON_BOOT);
-    rtc_gpio_deinit(BSP_PIN_BUTTON_BOOT);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_BUTTON_BOOT);
+    rtc_gpio_hold_dis(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_BUTTON_BOOT);
 
-    rtc_gpio_hold_dis(BSP_PIN_BUTTON_POWER);
-    rtc_gpio_deinit(BSP_PIN_BUTTON_POWER);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_BUTTON_POWER);
+    rtc_gpio_hold_dis(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_BUTTON_POWER);
 
-    rtc_gpio_hold_dis(BSP_PIN_RTC_INT);
-    rtc_gpio_deinit(BSP_PIN_RTC_INT);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_RTC_INT);
+    rtc_gpio_hold_dis(HAL_PIN_RTC_INT);
+    rtc_gpio_deinit(HAL_PIN_RTC_INT);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_RTC_INT);
 
     // 2. Ensure BAT_CTRL (GPIO 17) power latch is actively driven HIGH with sleep isolation disabled
-    gpio_set_direction((gpio_num_t)BSP_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
-    gpio_set_level((gpio_num_t)BSP_PIN_POWER_HOLD, 1);
-    gpio_sleep_sel_dis((gpio_num_t)BSP_PIN_POWER_HOLD);
-    rtc_gpio_init(BSP_PIN_POWER_HOLD);
+    gpio_set_direction((gpio_num_t)HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)HAL_PIN_POWER_HOLD, 1);
+    gpio_sleep_sel_dis((gpio_num_t)HAL_PIN_POWER_HOLD);
+    rtc_gpio_init(HAL_PIN_POWER_HOLD);
 
-    rtc_gpio_set_direction(BSP_PIN_POWER_HOLD, RTC_GPIO_MODE_OUTPUT_ONLY);
-    rtc_gpio_set_level(BSP_PIN_POWER_HOLD, 1);
-    rtc_gpio_hold_en(BSP_PIN_POWER_HOLD);
-    gpio_hold_en((gpio_num_t)BSP_PIN_POWER_HOLD);
+    rtc_gpio_set_direction(HAL_PIN_POWER_HOLD, RTC_GPIO_MODE_OUTPUT_ONLY);
+    rtc_gpio_set_level(HAL_PIN_POWER_HOLD, 1);
+    rtc_gpio_hold_en(HAL_PIN_POWER_HOLD);
+    gpio_hold_en((gpio_num_t)HAL_PIN_POWER_HOLD);
 
     // 3. Configure Input Pins (BOOT, POWER, RTC INT) with internal pull-ups enabled
     gpio_config_t btn_cfg = {
-        .pin_bit_mask = (1ULL << BSP_PIN_BUTTON_BOOT) |
-                        (1ULL << BSP_PIN_BUTTON_POWER) |
-                        (1ULL << BSP_PIN_RTC_INT),
+        .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
+                        (1ULL << HAL_PIN_BUTTON_POWER) |
+                        (1ULL << HAL_PIN_RTC_INT),
 
         .mode         = GPIO_MODE_INPUT,
         .pull_up_en   = GPIO_PULLUP_ENABLE,
@@ -191,40 +202,40 @@ esp_err_t bsp_init_io(void)
     bsp_io_early_init();
 
     // 1. Release RTC IOs and pad holds for Display rails, CS, DC, RST
-    rtc_gpio_hold_dis(BSP_PIN_EPD_3V3_EN);
-    rtc_gpio_deinit(BSP_PIN_EPD_3V3_EN);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_EPD_3V3_EN);
+    rtc_gpio_hold_dis(HAL_PIN_EPD_3V3_EN);
+    rtc_gpio_deinit(HAL_PIN_EPD_3V3_EN);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_EPD_3V3_EN);
 
-    rtc_gpio_hold_dis(BSP_PIN_EPD_RST);
-    rtc_gpio_deinit(BSP_PIN_EPD_RST);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_EPD_RST);
+    rtc_gpio_hold_dis(HAL_PIN_EPD_RST);
+    rtc_gpio_deinit(HAL_PIN_EPD_RST);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_EPD_RST);
 
-    rtc_gpio_hold_dis(BSP_PIN_EPD_CS);
-    rtc_gpio_deinit(BSP_PIN_EPD_CS);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_EPD_CS);
+    rtc_gpio_hold_dis(HAL_PIN_EPD_CS);
+    rtc_gpio_deinit(HAL_PIN_EPD_CS);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_EPD_CS);
 
-    rtc_gpio_hold_dis(BSP_PIN_EPD_DC);
-    rtc_gpio_deinit(BSP_PIN_EPD_DC);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_EPD_DC);
+    rtc_gpio_hold_dis(HAL_PIN_EPD_DC);
+    rtc_gpio_deinit(HAL_PIN_EPD_DC);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_EPD_DC);
 
     // 2. Pre-set output latch register levels FIRST to guarantee drive state
-    gpio_set_level((gpio_num_t)BSP_PIN_EPD_3V3_EN, 0);  // EPD & Sensor 3.3V Power Rail ON (Active LOW: 0=ON, 1=OFF)
-    gpio_set_level((gpio_num_t)BSP_PIN_PA_EN,      0);  // Audio Power Domain ON (Active LOW: 0=ON) to prevent I2C clamping!
-    gpio_set_level((gpio_num_t)BSP_PIN_PA_CTRL,    0);  // NS4168 Amp Muted/Standby by default (Active HIGH)
-    gpio_set_level((gpio_num_t)BSP_PIN_LED_STATUS, 1);  // User Status LED OFF (Open-Drain Active LOW: 1=OFF, 0=ON)
-    gpio_set_level((gpio_num_t)BSP_PIN_EPD_CS,     1);  // Display SPI CS Deselected (HIGH)
-    gpio_set_level((gpio_num_t)BSP_PIN_EPD_DC,     1);  // Display Data/Command line default HIGH
-    gpio_set_level((gpio_num_t)BSP_PIN_EPD_RST,    1);  // Display out of reset (HIGH)
+    gpio_set_level((gpio_num_t)HAL_PIN_EPD_3V3_EN, 0);  // EPD & Sensor 3.3V Power Rail ON (Active LOW: 0=ON, 1=OFF)
+    gpio_set_level((gpio_num_t)HAL_PIN_PA_EN,      0);  // Audio Power Domain ON (Active LOW: 0=ON) to prevent I2C clamping!
+    gpio_set_level((gpio_num_t)HAL_PIN_PA_CTRL,    0);  // NS4168 Amp Muted/Standby by default (Active HIGH)
+    gpio_set_level((gpio_num_t)HAL_PIN_STATUS_LED, 1);  // User Status LED OFF (Open-Drain Active LOW: 1=OFF, 0=ON)
+    gpio_set_level((gpio_num_t)HAL_PIN_EPD_CS,     1);  // Display SPI CS Deselected (HIGH)
+    gpio_set_level((gpio_num_t)HAL_PIN_EPD_DC,     1);  // Display Data/Command line default HIGH
+    gpio_set_level((gpio_num_t)HAL_PIN_EPD_RST,    1);  // Display out of reset (HIGH)
 
     // 3. Configure all standard digital OUTPUT pins to actively drive output states
     gpio_config_t out_cfg = {
-        .pin_bit_mask = (1ULL << BSP_PIN_PA_EN)      |
-                        (1ULL << BSP_PIN_PA_CTRL)    |
-                        (1ULL << BSP_PIN_LED_STATUS) |
-                        (1ULL << BSP_PIN_EPD_3V3_EN) |
-                        (1ULL << BSP_PIN_EPD_RST)    |
-                        (1ULL << BSP_PIN_EPD_DC)     |
-                        (1ULL << BSP_PIN_EPD_CS),
+        .pin_bit_mask = (1ULL << HAL_PIN_PA_EN)      |
+                        (1ULL << HAL_PIN_PA_CTRL)    |
+                        (1ULL << HAL_PIN_STATUS_LED) |
+                        (1ULL << HAL_PIN_EPD_3V3_EN) |
+                        (1ULL << HAL_PIN_EPD_RST)    |
+                        (1ULL << HAL_PIN_EPD_DC)     |
+                        (1ULL << HAL_PIN_EPD_CS),
 
         .mode         = GPIO_MODE_INPUT_OUTPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
@@ -237,20 +248,20 @@ esp_err_t bsp_init_io(void)
         return ret;
     }
 
-    gpio_hold_dis((gpio_num_t)BSP_PIN_PA_EN);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_PA_CTRL);
-    gpio_hold_dis((gpio_num_t)BSP_PIN_EPD_DC);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_PA_EN);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_PA_CTRL);
+    gpio_hold_dis((gpio_num_t)HAL_PIN_EPD_DC);
 
     // Disable automatic sleep pin isolation on critical control lines
-    gpio_sleep_sel_dis((gpio_num_t)BSP_PIN_EPD_3V3_EN);
-    gpio_sleep_sel_dis((gpio_num_t)BSP_PIN_PA_EN);
-    gpio_sleep_sel_dis((gpio_num_t)BSP_PIN_PA_CTRL);
+    gpio_sleep_sel_dis((gpio_num_t)HAL_PIN_EPD_3V3_EN);
+    gpio_sleep_sel_dis((gpio_num_t)HAL_PIN_PA_EN);
+    gpio_sleep_sel_dis((gpio_num_t)HAL_PIN_PA_CTRL);
     gpio_sleep_sel_dis((gpio_num_t)GPIO_NUM_43);         // Console UART TX
     gpio_sleep_sel_dis((gpio_num_t)GPIO_NUM_44);         // Console UART RX
 
     // 4. Configure floating INPUT pins (EPD Busy line)
     gpio_config_t in_float_cfg = {
-        .pin_bit_mask = (1ULL << BSP_PIN_EPD_BUSY),
+        .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
         .mode         = GPIO_MODE_INPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -313,7 +324,7 @@ esp_err_t bsp_board_init_with_config(const bsp_config_t *config)
     }
 
     if (cfg.init_i2c) {
-        ret = bsp_i2c_init();
+        ret = hal_i2c_init();
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to initialize shared I2C bus: %s", esp_err_to_name(ret));
             return ret;
@@ -321,7 +332,7 @@ esp_err_t bsp_board_init_with_config(const bsp_config_t *config)
     }
 
     if (cfg.init_rtc) {
-        ret = bsp_rtc_init();
+        ret = sub_rtc_init();
         if (ret == ESP_OK) {
             bsp_time_sync_rtc_to_system();
         } else {
@@ -330,20 +341,16 @@ esp_err_t bsp_board_init_with_config(const bsp_config_t *config)
     }
 
     if (cfg.init_sensors) {
-        ret = bsp_shtc3_init();
+        ret = sub_sensor_init();
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "Sensors initialization returned: %s", esp_err_to_name(ret));
-        }
-        ret = init_tsens_driver(); // Attempt to initialize internal TSENS driver for die temperature monitoring
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "TSENS driver initialization returned: %s", esp_err_to_name(ret));
         }
     }
 
     if (cfg.init_audio) {
-        ret = bsp_audio_init();
+        ret = sub_audio_init();
         if (ret == ESP_OK) {
-            bsp_audio_stop();
+            sub_audio_standby();
         } else {
             ESP_LOGW(TAG, "Audio codec init returned: %s", esp_err_to_name(ret));
         }
@@ -364,7 +371,7 @@ esp_err_t bsp_board_init_with_config(const bsp_config_t *config)
             return ret;
         }
     } else if (cfg.init_display) {
-        ret = bsp_display_init();
+        ret = sub_display_init(false);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to init display: %s", esp_err_to_name(ret));
             return ret;
@@ -382,8 +389,6 @@ esp_err_t bsp_board_init_with_config(const bsp_config_t *config)
 
 esp_err_t bsp_init_mode(bsp_init_mode_t mode)
 {
-    bsp_rtc_mem_init();
-
     // Configure first flush mode: fast wake boots use partial refresh without screen blanking
     if (mode == BSP_INIT_MODE_FAST) {
         bsp_lvgl_set_first_flush_mode(false);
@@ -407,11 +412,6 @@ esp_err_t bsp_init_mode(bsp_init_mode_t mode)
         .start_lvgl   = need_display,
     };
 
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    if (rtc_st && rtc_st->magic == BSP_RTC_MEM_MAGIC) {
-        rtc_st->last_init_mode = (uint8_t)mode;
-    }
-
     ESP_LOGI(TAG, "Executing Dynamic Init Profile: %s",
              (mode == BSP_INIT_MODE_BOOT)     ? "BOOT" :
              (mode == BSP_INIT_MODE_SUB_EXEC) ? "SUB_EXEC" : "WAKE");
@@ -434,7 +434,7 @@ esp_err_t bsp_generate_unambiguous_key(char *buf, size_t len, const char *charse
 }
 
 esp_err_t bsp_board_init(void) {
-    bsp_rtc_mem_init();
+    orch_state_get();
     bsp_init_mode_t rec_mode = bsp_get_recommended_init_mode();
     return bsp_init_mode(rec_mode);
 }
@@ -452,43 +452,45 @@ esp_err_t bsp_lifecycle_get_context(bsp_wake_context_t *ctx) {
 }
 
 esp_err_t bsp_lifecycle_set_stage(uint8_t stage) {
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    if (rtc_st == NULL || rtc_st->magic != BSP_RTC_MEM_MAGIC) {
+    orch_persisted_state_t *st = orch_state_get();
+    if (st == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-    rtc_st->scratchpad[0] = stage;
+    st->app_stage = stage;
     s_current_context.app_stage = stage;
     return ESP_OK;
 }
 
 uint8_t bsp_lifecycle_get_stage(void) {
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    if (rtc_st && rtc_st->magic == BSP_RTC_MEM_MAGIC) {
-        return rtc_st->scratchpad[0];
-    } return 0;
+    orch_persisted_state_t *st = orch_state_get();
+    if (st != NULL) {
+        return st->app_stage;
+    }
+    return 0;
 }
 
 esp_err_t bsp_lifecycle_save_state(const void *data, size_t len) {
-    if (data == NULL || len == 0 || len > 31) {
+    if (data == NULL || len == 0 || len > 32) {
         return ESP_ERR_INVALID_ARG;
     }
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    if (rtc_st == NULL || rtc_st->magic != BSP_RTC_MEM_MAGIC) {
+    orch_persisted_state_t *st = orch_state_get();
+    if (st == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-    memcpy(&rtc_st->scratchpad[1], data, len);
+    memcpy(st->scratchpad, data, len);
+    st->scratchpad_len = (uint8_t)len;
     return ESP_OK;
 }
 
 esp_err_t bsp_lifecycle_load_state(void *out_data, size_t len) {
-    if (out_data == NULL || len == 0 || len > 31) {
+    if (out_data == NULL || len == 0 || len > 32) {
         return ESP_ERR_INVALID_ARG;
     }
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
-    if (rtc_st == NULL || rtc_st->magic != BSP_RTC_MEM_MAGIC) {
+    orch_persisted_state_t *st = orch_state_get();
+    if (st == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-    memcpy(out_data, &rtc_st->scratchpad[1], len);
+    memcpy(out_data, st->scratchpad, len);
     return ESP_OK;
 }
 
@@ -518,7 +520,20 @@ esp_err_t bsp_trigger_chime(bsp_chime_type_t type) {
         return ESP_OK;
     } else if (s_active_lifecycle.default_chime_mask & (1 << type)) {
         ESP_LOGD(TAG, "Triggering default hardware synthesized chime (%d)...", (int)type);
-        return bsp_audio_play_chime(type);
+        switch (type) {
+            case BSP_CHIME_BOOT:
+                return sub_audio_play_tone(1500, 100);
+            case BSP_CHIME_WAKE:
+                return sub_audio_play_tone(1200, 80);
+            case BSP_CHIME_SLEEP:
+                return sub_audio_play_tone(800, 100);
+            case BSP_CHIME_POWER_OFF:
+                return sub_audio_play_tone(500, 150);
+            case BSP_CHIME_ALARM:
+                return sub_audio_play_tone(2000, 200);
+            default:
+                return sub_audio_play_tone(1000, 100);
+        }
     }
     return ESP_ERR_NOT_FOUND;
 }
@@ -531,32 +546,47 @@ esp_err_t bsp_app_shutdown(void) {
     bsp_power_off(); return ESP_OK;
 }
 
-static esp_err_t bsp_sub_execution_init(void) {
-    // Initialize I2C Master Bus for SHTC3 and PCF85063A
-    esp_err_t ret = bsp_i2c_init();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Sub-execution I2C init failed: %s", esp_err_to_name(ret));
-        return ret;
-    }
-    return ESP_OK;
-}
-
-static void bsp_sub_execution_deinit(void) {
-    // Fully tear down I2C bus to return I2C hardware to clean POR state
-    bsp_i2c_deinit();
-}
-
 esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
 {
     if (lifecycle != NULL) s_active_lifecycle = *lifecycle;
 
-    // 4. Initialize RTC Slow Memory persistence engine
-    bsp_rtc_mem_init();
-    bsp_rtc_state_t *rtc_st = bsp_rtc_mem_get_state();
+    // 1. Initialize Layer 1 Base IO & lock power latch
+    hal_io_early_init();
+
+    // 2. Initialize Layer 3 RTC Slow Memory state engine
+    orch_persisted_state_t *st = orch_state_get();
+
+    uint32_t interval = s_active_lifecycle.sub_execution_interval_sec;
+    if (interval != 0) {
+        st->sample_interval_sec = interval;
+    }
+
+    // 3. Register Power-Off and Sleep Hooks with BSP Power Subsystem
+    if (s_active_lifecycle.on_power_off != NULL) {
+        bsp_power_register_shutdown_cb(s_active_lifecycle.on_power_off, s_active_lifecycle.user_data);
+    }
+    if (s_active_lifecycle.on_sleep != NULL) {
+        bsp_power_register_sleep_cb(s_active_lifecycle.on_sleep, s_active_lifecycle.user_data);
+    }
+
+    // 4. Determine Execution Flow via Orchestrator
+    orch_flow_type_t flow = orch_flow_determine_wakeup();
+    if (flow == ORCH_FLOW_CRITICAL_OFF) {
+        ESP_LOGW(TAG, "Critical battery voltage detected -> system power off");
+        bsp_power_off();
+        return ESP_OK;
+    }
+
+    if (flow == ORCH_FLOW_A_SPRINT) {
+        ESP_LOGI(TAG, ">>> Flow A: Autonomous Background Sensor Sprint (<4ms Cadence)");
+        orch_flow_execute_sub_sprint();
+        // If orch_flow_execute_sub_sprint returned, a Zero-Hour collision promoted it to Flow B!
+        flow = ORCH_FLOW_B_MAIN_WAKE;
+    }
 
     esp_reset_reason_t       reset_reason = bsp_get_reset_reason();
-    esp_sleep_wakeup_cause_t wake_cause   = bsp_get_wakeup_cause();
-    bsp_init_mode_t          init_mode    = bsp_get_recommended_init_mode();
+    esp_sleep_wakeup_cause_t wake_cause   = esp_sleep_get_wakeup_causes();
+    bsp_init_mode_t          init_mode    = (flow == ORCH_FLOW_COLD_BOOT) ? BSP_INIT_MODE_BOOT : BSP_INIT_MODE_WAKE;
 
     // 5. Populate structured Wake Context
     memset(&s_current_context, 0, sizeof(s_current_context));
@@ -564,173 +594,71 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
     s_current_context.wake_cause         = wake_cause;
     s_current_context.init_mode          = init_mode;
     s_current_context.user_data          = s_active_lifecycle.user_data;
-
-    if (rtc_st && rtc_st->magic == BSP_RTC_MEM_MAGIC) {
-        s_current_context.boot_count         = rtc_st->boot_count;
-        s_current_context.deep_sleep_count   = rtc_st->deep_sleep_count;
-        s_current_context.light_sleep_count  = rtc_st->light_sleep_count;
-        s_current_context.sleep_duration_sec = rtc_st->last_sleep_duration_sec;
-        s_current_context.app_stage          = rtc_st->scratchpad[0];
-    }
+    s_current_context.boot_count         = st->boot_count;
+    s_current_context.deep_sleep_count   = st->wake_count;
+    s_current_context.sleep_duration_sec = st->sample_interval_sec;
 
     if (wake_cause == ESP_SLEEP_WAKEUP_EXT1) {
         uint64_t ext1_mask = esp_sleep_get_ext1_wakeup_status();
         s_current_context.ext1_wakeup_pins = ext1_mask;
-        if (ext1_mask & (1ULL << BSP_PIN_BUTTON_BOOT)) {
+        if (ext1_mask & (1ULL << HAL_PIN_BUTTON_BOOT)) {
             s_current_context.woke_from_button = true;
             s_current_context.wake_button      = BSP_BUTTON_BOOT;
-        } else if (ext1_mask & (1ULL << BSP_PIN_BUTTON_POWER)) {
+        } else if (ext1_mask & (1ULL << HAL_PIN_BUTTON_POWER)) {
             s_current_context.woke_from_button = true;
             s_current_context.wake_button      = BSP_BUTTON_POWER;
         }
     }
 
     s_context_valid = true;
-    
-    uint32_t interval = s_active_lifecycle.sub_execution_interval_sec;
-    if(interval != 0) {
-        ESP_LOGI(TAG, "Sub-Execution Interval: %lus", (unsigned long)interval);
-        bsp_sensors_arm_sub_execution(interval);
-    }
-
-    // 7. Autonomous Sub-Execution Sensor Sampling & Clean Deinit Engine
-    if (reset_reason == ESP_RST_DEEPSLEEP) 
-    {
-        if (wake_cause == ESP_SLEEP_WAKEUP_TIMER) 
-        {
-            if (bsp_sensors_is_sub_execution_armed()) 
-            {
-                int64_t sub_start_us = esp_timer_get_time();
-                ESP_LOGI(TAG, ">>> Flow A: Autonomous Background Sub-Execution (<10ms Cadence)");
-
-                // Build up: Bring up I2C
-                bsp_sub_execution_init();
-
-                // Perform fast raw SHTC3 acquisition, integer gating & window clean mask update
-                esp_err_t sample_err = bsp_sensors_sample_raw(false);
-
-                uint32_t sample_count = bsp_sensors_get_sample_count();
-                uint32_t sub_ms = (uint32_t)((esp_timer_get_time() - sub_start_us) / 1000);
-                if (sample_err == ESP_OK) {
-                    ESP_LOGI(TAG, ">>> Flow A: Background Sub-Execution Complete (%lums, SMP: %lu, Gate: OK)",
-                             (unsigned long)sub_ms, (unsigned long)sample_count);
-                } else {
-                    ESP_LOGW(TAG, ">>> Flow A: Background Sub-Execution Failed (%s)", esp_err_to_name(sample_err));
-                }
-
-                // Zero-Hour Check: Check if external RTC countdown timer or alarm expired over I2C
-                bool alarm_fired = false, timer_fired = false;
-                bsp_rtc_get_and_clear_interrupts(&alarm_fired, &timer_fired);
-
-                // Zero-Hour Conflict Avoidance: Check remaining countdown timer seconds
-                uint32_t sub_interval      = bsp_sensors_get_sub_execution_interval();
-                uint32_t rtc_remaining_sec = 0;
-                esp_err_t rtc_rem_err      = bsp_rtc_get_remaining_countdown_timer(&rtc_remaining_sec);
-
-                // Clean up: Tear down sub-execution resources back to clean POR state
-                bsp_sub_execution_deinit();
-
-                // Zero-Hour Handoff / Collision: If external timer expired, promote cleanly to Flow B
-                if (alarm_fired || timer_fired) 
-                {
-                    ESP_LOGI(TAG, ">>> Zero-Hour Collision / Handoff: External RTC timer expired! Promoting to Flow B (Main App Wake).");
-                    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
-
-                    init_mode  = BSP_INIT_MODE_WAKE;
-                    wake_cause = ESP_SLEEP_WAKEUP_EXT1;
-                    s_current_context.wake_cause       = wake_cause;
-                    s_current_context.init_mode        = init_mode;
-                    s_current_context.ext1_wakeup_pins = (1ULL << BSP_PIN_RTC_INT);
-                    // Disarm sub-execution while main application runs
-                    bsp_sensors_disarm_sub_execution();
-                    // Fall through cleanly to initialize Flow B hardware profile and dispatch on_wake()
-                } else {
-                    // Check if external RTC timer will expire before or at next sub-execution tick
-                    uint32_t timer_wake_sec = sub_interval;
-                    uint32_t wake_sources = BSP_WAKE_SRC_TIMER | BSP_WAKE_SRC_EXTERNAL_RTC | BSP_WAKE_SRC_BUTTONS;
-
-                    if (rtc_rem_err == ESP_OK && rtc_remaining_sec <= sub_interval) {
-                        // Conflict detected: Main app wakes soon! Do NOT rearm internal timer.
-                        // Sleep directly for external RTC interrupt to avoid waking MCU twice.
-                        ESP_LOGI(TAG, ">>> Zero-Hour Guard: RTC alarm due in %lus (<= %lus sub-interval). Suppressing timer rearm; sleeping for RTC INT.",
-                                 (unsigned long)rtc_remaining_sec, (unsigned long)sub_interval);
-                        timer_wake_sec = 0;
-                        wake_sources = BSP_WAKE_SRC_EXTERNAL_RTC | BSP_WAKE_SRC_BUTTONS;
-                    }
-
-                    // Pure Flow A cycle: return immediately to deep sleep (<10ms total on-time)
-                    bsp_sleep_config_t sleep_cfg = {
-                        .mode                   = BSP_SLEEP_MODE_DEEP,
-                        .duration_sec           = timer_wake_sec,
-                        .rtc_alarm_duration_sec = 0, // 0 retains existing external PCF85063A countdown timer undisturbed
-                        .wake_sources           = wake_sources,
-                        .next_init_mode         = BSP_INIT_MODE_SUB_EXEC,
-                    };
-                    bsp_enter_sleep(&sleep_cfg);
-                    return ESP_OK;
-                }
-            } else {
-                ESP_LOGI(TAG, ">>> Timer wake detected with sub-execution disarmed. Proceeding to normal on_wake().");
-            }
-        } else if (wake_cause == ESP_SLEEP_WAKEUP_EXT1) {
-            // Flow B woke from external RTC countdown timer or button press:
-            // 1. Invalidate Flow A's internal sleep timer immediately
-            esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
-
-            // 2. Main application woke: disarm sub-execution so sub-exec does NOT run while main app is active
-            bsp_sensors_disarm_sub_execution();
-        }
-    }
 
     ESP_LOGI(TAG, "==================================================");
-    ESP_LOGI(TAG, "  BSP Application Engine: %s (Count: %lu)",          (reset_reason == ESP_RST_DEEPSLEEP) ? "Wake" : "Boot", (unsigned long)s_current_context.boot_count);
-    ESP_LOGI(TAG, "  Reset: %d, Cause: %d, Mode: %d, Stage: %u",       (int)reset_reason, (int)wake_cause, (int)init_mode, s_current_context.app_stage);
+    ESP_LOGI(TAG, "  BSP Application Engine: %s (Count: %lu)",
+             (flow == ORCH_FLOW_COLD_BOOT) ? "Boot" : "Wake", (unsigned long)s_current_context.boot_count);
+    ESP_LOGI(TAG, "  Reset: %d, Cause: %d, Mode: %d, Flow: %d",
+             (int)reset_reason, (int)wake_cause, (int)init_mode, (int)flow);
     ESP_LOGI(TAG, "==================================================");
 
-    // 1. Phase 1 Early Base IO: Power Latch Lock & Button Pull-Ups
-    bsp_io_early_init();
-
-    // 2. Register Power-Off and Sleep Hooks with BSP Power Subsystem
-    if (s_active_lifecycle.on_power_off != NULL) {
-        bsp_power_register_shutdown_cb(s_active_lifecycle.on_power_off, s_active_lifecycle.user_data);
-    }
-    if (s_active_lifecycle.on_sleep != NULL) {
-        bsp_power_register_sleep_cb(s_active_lifecycle.on_sleep, s_active_lifecycle.user_data);
-    }    
-
-    // 3. Pre-Execution (PXE) Lifecycle Hook Dispatch
+    // 6. Pre-Execution (PXE) Lifecycle Hook Dispatch
     if (s_active_lifecycle.on_pxe != NULL) {
         bsp_button_mask_t btn_mask = BSP_BUTTON_MASK_NONE;
-        // Sample button states after early pull-up stabilization 
-        if (gpio_get_level((gpio_num_t)BSP_PIN_BUTTON_BOOT)  == 0) btn_mask |= BSP_BUTTON_MASK_BOOT;
-        if (gpio_get_level((gpio_num_t)BSP_PIN_BUTTON_POWER) == 0) btn_mask |= BSP_BUTTON_MASK_POWER;
+        if (gpio_get_level((gpio_num_t)HAL_PIN_BUTTON_BOOT)  == 0) btn_mask |= BSP_BUTTON_MASK_BOOT;
+        if (gpio_get_level((gpio_num_t)HAL_PIN_BUTTON_POWER) == 0) btn_mask |= BSP_BUTTON_MASK_POWER;
 
         ESP_LOGI(TAG, "Invoking registered on_pxe callback (Button mask: 0x%02X)...", (unsigned)btn_mask);
         s_active_lifecycle.on_pxe(btn_mask, s_active_lifecycle.user_data);
-    } else {
-        ESP_LOGD(TAG, "No on_pxe callback registered; proceeding with normal startup");
     }
-    
-    // 4. Initialize hardware profile
+
+    // 7. Initialize hardware profile
     esp_err_t ret = bsp_init_mode(init_mode);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize hardware profile (%d): %s", (int)init_mode, bsp_err_to_name(ret));
         return ret;
     }
 
-    // 5. Dispatch to application lifecycle callbacks, splash & chimes
-    if ((reset_reason == ESP_RST_POWERON) || (reset_reason == ESP_RST_SW) || (reset_reason == ESP_RST_USB)) {
-        // Boot: trigger boot splash & chime hooks if registered
+    // 8. Dispatch to application lifecycle callbacks, splash & chimes
+    if (flow == ORCH_FLOW_B_MAIN_WAKE || reset_reason == ESP_RST_DEEPSLEEP) {
+        // Restore framebuffer from flash partition if dirty state was previously saved
+        orch_display_sync_restore_to_framebuffer();
+
+        bsp_trigger_splash(BSP_SPLASH_WAKE);
+        bsp_trigger_chime(BSP_CHIME_WAKE);
+
+        if (s_active_lifecycle.on_wake != NULL) {
+            s_active_lifecycle.on_wake(&s_current_context, s_active_lifecycle.user_data);
+        } else {
+            ESP_LOGW(TAG, "No on_wake callback registered; system idle");
+        }
+    } else {
+        // Cold Boot
         bsp_trigger_splash(BSP_SPLASH_BOOT);
-        bsp_trigger_chime (BSP_CHIME_BOOT);
+        bsp_trigger_chime(BSP_CHIME_BOOT);
 
         if (s_active_lifecycle.on_boot != NULL) {
             s_active_lifecycle.on_boot(s_active_lifecycle.user_data);
         } else {
             ESP_LOGW(TAG, "No on_boot callback registered; system idle");
         }
-    } else {
-        bsp_power_off(); //reset to clean state on odd reset reasons.
     }
 
     return ESP_OK;
@@ -756,6 +684,46 @@ esp_err_t bsp_get_device_name(char *buf, size_t max_len) {
 
     snprintf(buf, max_len, "HumidOS-%02X%02X", mac[4], mac[5]);
     return ESP_OK;
+}
+
+esp_err_t bsp_app_get_telemetry(bsp_app_telemetry_t *out_telemetry)
+{
+    if (out_telemetry == NULL) return ESP_ERR_INVALID_ARG;
+    memset(out_telemetry, 0, sizeof(*out_telemetry));
+
+    float temp_c = 25.0f, rh_pct = 50.0f, dew_c = 10.0f;
+    esp_err_t err = orch_flow_query_telemetry(&temp_c, &rh_pct, &dew_c);
+
+    out_telemetry->ambient_temp_c      = temp_c;
+    out_telemetry->ambient_temp_f      = (temp_c * 1.8f) + 32.0f;
+    out_telemetry->ambient_rh_pct      = rh_pct;
+    out_telemetry->dew_point_c         = dew_c;
+    out_telemetry->dew_point_f         = (dew_c * 1.8f) + 32.0f;
+
+    float vp = orch_math_calc_vapor_pressure(temp_c, rh_pct);
+    out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(vp, temp_c);
+
+    orch_tri_node_sample_t sample;
+    if (orch_state_get_latest_sample(&sample)) {
+        out_telemetry->raw_shtc3_temp_c     = (float)sample.shtc3_temp_centi_c / 100.0f;
+        out_telemetry->mcu_die_temp_c      = (float)sample.mcu_tsens_centi_c / 100.0f;
+        out_telemetry->epd_glass_temp_c    = (float)sample.epd_glass_centi_c / 100.0f;
+        out_telemetry->is_thermally_settled = (sample.quality_flags & 0x02) != 0;
+    } else {
+        out_telemetry->raw_shtc3_temp_c     = temp_c;
+        sub_sensor_read_mcu_die_temp(&out_telemetry->mcu_die_temp_c);
+        out_telemetry->epd_glass_temp_c    = temp_c;
+        out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
+    }
+
+    uint16_t vbat_mv = 0;
+    uint8_t  vbat_pct = 0;
+    sub_power_read_battery(&vbat_mv, &vbat_pct);
+    out_telemetry->battery_mv      = vbat_mv;
+    out_telemetry->battery_percent = vbat_pct;
+    out_telemetry->sample_count    = orch_state_get()->total_samples;
+
+    return err;
 }
 
 void bsp_delay_ms(uint32_t ms) {

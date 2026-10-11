@@ -23,28 +23,36 @@
 
 #include "bsp/bsp_version.h"
 #include "bsp/bsp_err.h"
-#include "bsp/pinout.h"
 #include "bsp/bsp_power.h"
-#include "bsp/bsp_i2c.h"
-#include "bsp/bsp_sensors.h"
-#include "bsp/bsp_equ_math.h"
-#include "bsp/bsp_env_telemetry.h"
-#include "bsp/bsp_rtc.h"
 #include "bsp/bsp_button.h"
 #include "bsp/bsp_splash.h"
-#include "bsp/bsp_audio.h"
 #include "bsp/bsp_sdcard.h"
-#include "bsp/bsp_display.h"
 #include "bsp/bsp_lvgl.h"
 #include "bsp/bsp_nvs.h"
 #include "bsp/bsp_wifi.h"
-#include "bsp/bsp_rtc_mem.h"
 #include "bsp/bsp_time.h"
 #include "bsp/bsp_prov.h"
 #include "bsp/bsp_ota.h"
 #if CONFIG_BSP_ENABLE_THINGSBOARD
 #include "bsp/bsp_tb.h"
 #endif
+
+/* --- Clean-Slate 4-Layer Modular Architecture Headers --- */
+#include "bsp/hal_types.h"
+#include "bsp/hal_io.h"
+#include "bsp/hal_i2c.h"
+#include "bsp/hal_spi.h"
+#include "bsp/hal_flash.h"
+#include "bsp/sub_sensor.h"
+#include "bsp/sub_rtc.h"
+#include "bsp/sub_power.h"
+#include "bsp/sub_audio.h"
+#include "bsp/sub_display.h"
+#include "bsp/orch_state.h"
+#include "bsp/orch_math.h"
+#include "bsp/orch_flow.h"
+#include "bsp/orch_display_sync.h"
+#include "bsp/orch_wake_stub.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -373,6 +381,41 @@ esp_err_t bsp_lifecycle_save_state(const void *data, size_t len);
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 esp_err_t bsp_lifecycle_load_state(void *out_data, size_t len);
+
+/**
+ * @brief Unified Class-E Environmental Telemetry & Multi-Node Diagnostic Structure
+ */
+typedef struct {
+    /* 1. Smoothed Ambient Readings (EWMA) */
+    float    ambient_temp_c;          ///< Ambient Temperature in Celsius (°C)
+    float    ambient_temp_f;          ///< Ambient Temperature in Fahrenheit (°F)
+    float    ambient_rh_pct;          ///< Ambient Relative Humidity (% RH)
+    float    dew_point_c;             ///< Invariant Dew Point in Celsius (°C)
+    float    dew_point_f;             ///< Invariant Dew Point in Fahrenheit (°F)
+    float    absolute_humidity_g;     ///< Invariant Absolute Humidity (g/m³)
+
+    /* 2. Multi-Node Diagnostics */
+    float    raw_shtc3_temp_c;        ///< Raw uncompensated PCB SHTC3 reading (°C)
+    float    mcu_die_temp_c;          ///< ESP32-S3 internal TSENS die temperature (°C)
+    float    epd_glass_temp_c;        ///< SSD1681 glass thermistor readout (°C)
+
+    /* 3. Quality & Stability Metrics */
+    bool     is_thermally_settled;    ///< True if system is in thermal equilibrium
+    uint32_t sample_count;            ///< Monotonic count of committed telemetry samples
+    uint32_t battery_mv;              ///< Calibrated battery voltage (mV)
+    uint8_t  battery_percent;         ///< Battery charge level (0 - 100%)
+} bsp_app_telemetry_t;
+
+/**
+ * @brief Unified Application Telemetry Ingestion API
+ *
+ * Transparently retrieves psychrometrically reconstructed ambient readings,
+ * shielded against self-heating by the Layer 3 Thermal Lockout MUX.
+ *
+ * @param[out] out_telemetry Destination pointer populated with telemetry metrics.
+ * @return esp_err_t ESP_OK on success.
+ */
+esp_err_t bsp_app_get_telemetry(bsp_app_telemetry_t *out_telemetry);
 
 /**
  * @brief Perform Clean System Shutdown

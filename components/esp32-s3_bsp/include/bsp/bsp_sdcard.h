@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "bsp/pinout.h"
+#include "bsp/hal_types.h"
 
 #ifdef __cplusplus
 extern "C" {

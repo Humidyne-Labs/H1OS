@@ -319,7 +319,7 @@ The `bsp_tb` subsystem connects to ThingsBoard cloud or on-premise instances ove
 | Project | Location | Description |
 |---|---|---|
 | **Peripherals Test Suite** | [`examples/Peripherals_Test_Suite`](examples/Peripherals_Test_Suite) | Complete 15-test automated verification suite covering all hardware peripherals, staged sleep tests, and interactive button triggers. |
-| **Unified Environmental Demo**| [`examples/Unified_Environmental_Demo`](examples/Unified_Environmental_Demo) | Complete production hygrometer application featuring background sub-executions, tri-node psychrometrics, and low-power deep sleep cycles. |
+| **OSDemo (Environmental Monitor)**| [`examples/OSDemo`](examples/OSDemo) | Complete production hygrometer application featuring background sub-executions, tri-node psychrometrics, and low-power deep sleep cycles. |
 | **Boilerplate Application** | [`examples/boilerplate`](examples/boilerplate) | Minimal starter template for new production firmware projects. |
 | **Splash & Chime Sample** | [`examples/bsp_samples/bsp_splash_example`](examples/bsp_samples/bsp_splash_example) | Demonstrates declarative splash screen and acoustic chime configurations. |
 

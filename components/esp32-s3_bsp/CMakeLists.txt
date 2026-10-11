@@ -1,19 +1,25 @@
 set(bsp_srcs
     "src/bsp_common.c"
-    "src/bsp_i2c.c"
-    "src/bsp_rtc.c"
     "src/bsp_button.c"
     "src/bsp_power.c"
-    "src/bsp_display.cpp"
-    "src/bsp_sensors.c"
-    "src/bsp_equ_math.c"
     "src/bsp_sdcard.c"
-
-    "src/bsp_audio.c"
+    "src/hal_io.c"
+    "src/hal_i2c.c"
+    "src/hal_spi.c"
+    "src/hal_flash.c"
+    "src/sub_sensor.c"
+    "src/sub_rtc.c"
+    "src/sub_power.c"
+    "src/sub_audio.c"
+    "src/sub_display.cpp"
+    "src/orch_state.c"
+    "src/orch_math.c"
+    "src/orch_flow.c"
+    "src/orch_display_sync.c"
+    "src/orch_wake_stub.c"
     "src/bsp_lvgl.cpp"
     "src/bsp_nvs.c"
     "src/bsp_wifi.c"
-    "src/bsp_rtc_mem.c"
     "src/bsp_time.c"
     "src/bsp_prov.c"
     "src/bsp_ota.c"
@@ -51,8 +57,9 @@ set(bsp_requires
     esp_pm
     esp_partition
     spi_flash
+    esp_hw_support
+    ulp
 )
-
 
 if(CONFIG_BSP_ENABLE_THINGSBOARD)
     list(APPEND bsp_srcs "src/bsp_tb.c")
@@ -66,3 +73,10 @@ idf_component_register(
 )
 
 idf_build_set_property(BOOTLOADER_EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/bootloader_components" APPEND)
+
+if(CONFIG_ULP_COPROC_ENABLED)
+    set(ulp_app_name "ulp_${COMPONENT_NAME}")
+    set(ulp_sources "ulp/main.c")
+    set(ulp_exp_dep_srcs "src/hal_io.c")
+    ulp_embed_binary(${ulp_app_name} "${ulp_sources}" "${ulp_exp_dep_srcs}" TYPE "riscv")
+endif()

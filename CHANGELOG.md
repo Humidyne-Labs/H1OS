@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.0.0-alpha] - 2026-10-10
+
+### 🚀 Added
+- **Clean-Slate 4-Layer Unidirectional Architecture**:
+  - **Layer 1: HAL** (`hal_types.h`, `hal_io.c/.h`, `hal_i2c.c/.h`, `hal_spi.c/.h`, `hal_flash.c/.h`): Fixed-width types, RTC pad holds, thread-safe mutexed I2C Driver V2 on GPIO 47/48, 20 MHz DMA SPI Master, sector-aligned raw partition read/write for `epd_frame` (16 KB).
+  - **Layer 2: Hardware Subsystem Managers** (`sub_display.cpp/.h`, `sub_sensor.c/.h`, `sub_rtc.c/.h`, `sub_power.c/.h`, `sub_audio.c/.h`): SSD1681 dual-RAM Ping-Pong buffer (0x24/0x26), partial waveform LUT (0x32), GPIO 8 BUSY semaphore ISR synchronization, glass thermistor read (0x1B), SHTC3 NIST physical read with CRC-8, MCU TSENS silicon temperature, PCF85063A POSIX timekeeping & countdown timer, 12 dB attenuated battery ADC with 16-sample trimmed outlier filtering, ES8311 software standby (<1.0 µA @ Reg 0x0D).
+  - **Layer 3: System Pipeline & Orchestrator** (`orch_state.c/.h`, `orch_math.c/.h`, `orch_flow.c/.h`, `orch_display_sync.c/.h`): RTC Slow SRAM state (<512 B), 32-slot Tri-Node ring buffer, August-Roche-Magnus invariant psychrometric equations, continuous recursive EWMA filter, Flow A/B arbiter with Zero-Hour collision hand-off, Thermal Lockout MUX, deferred dirty flash frame sync engine.
+  - **Layer 3: ULP-RISC-V Coprocessor Hardware Sentinel** (`ulp/main.c`, `ulp/CMakeLists.txt`): Coprocessor firmware running autonomously in RTC Slow SRAM for battery ADC tripwire (`ADC1_CH3`), hardware RTC arbitration (`GPIO 5`), and button debounce (`GPIO 0/18`), embedded via `ulp_embed_binary()`.
+  - **Layer 3: RTC Fast Memory Deep Sleep Wake Stub** (`orch_wake_stub.c/.h`): `RTC_IRAM_ATTR` wake stub running directly from RTC Fast Memory (<3ms execution) on deep sleep timer wake, executing register-level bit-bang I2C sensor sampling without powering flash cache or booting FreeRTOS.
+  - **Layer 4: Application Lifecycle API** (`bsp.h`, `bsp_common.c`): `bsp_app_start()`, `bsp_app_sleep()`, `bsp_app_shutdown()`, and unified getter `bsp_app_get_telemetry()`.
+- **Thick 14pt Montserrat Font** (`bsp_font_montserrat_14_1bpp.c`):
+  - Re-rasterized using `npx lv_font_conv` from `Montserrat-Bold.ttf` with fast-kern tables and FontAwesome icons, resolving thin 1-pixel stroke illegibility on 200x200 monochrome e-paper.
+
+### 🛠️ Fixed & Refactored
+- **Keep All Gates Open Policy Enforced**:
+  - Permanently asserted `BAT_CTRL` (`GPIO 17` = 1) and `EPD_3V3_EN` (`GPIO 6` = 0) with RTC pad holds during sleep.
+  - Audio Domain `PA_EN` (`GPIO 42` = 0) kept held LOW across sleep to prevent ES8311 ESD protection diodes from forward-biasing and clamping shared I2C bus (`GPIO 47/48`) to ~0.7V. ES8311 enters software standby (<1.0 µA) without hard power cut.
+- **Deep Sleep Wake Lifecycle Dispatch**:
+  - Fixed legacy bug in `bsp_app_start()` where `ESP_RST_DEEPSLEEP` fell into `bsp_power_off()`; now correctly restores dirty frame buffer and dispatches `on_wake()`.
+- **Legacy Code Purged (Component Cleansing)**:
+  - Completely purged 16 obsolete legacy duplicate source and header files from `components/esp32-s3_bsp/`:
+    `bsp_sensors.c/.h`, `bsp_equ_math.c/.h`, `bsp_env_telemetry.h`, `bsp_rtc.c/.h`, `bsp_rtc_mem.c/.h`, `bsp_i2c.c/.h`, `bsp_display.cpp/.h`, `bsp_audio.c/.h`, `pinout.h`.
+  - Decoupled and rewired remaining higher-level modules (`bsp_common.c`, `bsp_power.c`, `bsp_button.c`, `bsp_sdcard.c`, `bsp_time.c`, `bsp_lvgl.cpp`) to Layer 1 HAL primitives (`hal_types.h`, `hal_io.h`, `hal_i2c.h`), Layer 2 Subsystems (`sub_sensor`, `sub_rtc`, `sub_display`, `sub_power`, `sub_audio`), and Layer 3 Orchestrators (`orch_state`, `orch_flow`, `orch_display_sync`).
+  - Preserved historical code in `legacy_reference/` as an immutable reference backup.
+- **OSDemo Revamped & Migrated**:
+  - Migrated demo application from `examples/Unified_Environmental_Demo` to `examples/OSDemo` with `project(osdemo)`.
+  - Rewrote `examples/OSDemo/main/main.c` to consume telemetry exclusively through Layer 4 `bsp_app_get_telemetry(&telem)`.
+  - Replaced legacy display wait routines and button pin definitions with clean Layer 2 `sub_display_wait_busy()` and Layer 1 `HAL_PIN_*` constants.
+  - Successfully compiled and linked `osdemo.elf` with Ninja under ESP-IDF v6.1 dev profile (`build_dev/`).
+- **Low-Level Peripheral Verification & Register Truth Audit**:
+  - Created `docs/perf_and_drivers/` with 8 comprehensive physical hardware specifications documenting every IC's init, deinit, runtime, sleep, and register parameters.
+  - **PCF85063A (`sub_rtc.c`)**: Corrected countdown timer clock frequency prescaler (`TCF`) bit shifting into bits `[4:3]` (`(2 << 3)` for 1Hz and `(3 << 3)` for 1/60Hz); removed incorrect `TIE` bitmask from `Control_2` (bit 2 is `COF[2]`); added 12.5pF crystal capacitance selection (`CTRL1_CAP_SEL_12_5PF`) in `Control_1`.
+  - **SSD1681 (`sub_display.cpp` & `hal_spi.c`)**: Properly split factory 159-byte partial LUT across registers `0x32` (153B), `0x3F` (1B), `0x03` (1B), `0x04` (3B), and `0x2C` (1B); configured display option `0x37` and border waveform `0x3C` (`0x80`); used differential refresh sequence `0xCF`; added 2 MHz 3-wire half-duplex SPI device handle and continuous CS hold for on-glass thermistor readout (`0x1B`).
+  - **ES8311 & NS4168 (`sub_audio.c`)**: Implemented complete 22-register reference clock tree and analog bias initialization; enforced `PA_EN` (`GPIO 42` = 0) and muted `PA_CTRL` (`GPIO 46` = 0); ported 15-register zero-heat deep standby sequence (<1.0 µA); documented I2S root clock `PLL_160M` dependency and verified that ESP-IDF's automatic `ESP_PM_APB_FREQ_MAX` lock prevents DFS pitch drops and sample rate stretching during active tone streaming.
+  - **Power & Battery (`sub_power.c` & `hal_io.c`)**: Aligned 13-point LiPo OCV lookup table with calibrated hardware reference; enforced RTC peripheral power domain retention (`ESP_PD_DOMAIN_RTC_PERIPH`) across deep sleep to lock `BAT_CTRL` latch (`GPIO 17` = 1).
+  - **Hardware Pull-Up Alignment**: Formally documented external 100 kΩ pull-ups on `GPIO 0` (BOOT) and `GPIO 18` (POWER) in `docs/perf_and_drivers/07_tactile_buttons_and_led.md` and `hal_io.c`; verified external 4.7 kΩ pull-ups on `GPIO 47/48` (I2C) with internal pull-ups disabled in `hal_i2c.c`.
+
+---
+
 ## [1.3.1] - 2026-10-09
 
 ### 🛠️ Fixed & Refactored

@@ -33,8 +33,7 @@
 #include "esp_err.h"
 #include "esp_system.h"
 #include "esp_sleep.h"
-#include "bsp/pinout.h"
-#include "bsp/bsp_rtc_mem.h"
+#include "bsp/hal_types.h"
 
 #ifdef __cplusplus
 extern "C" {
