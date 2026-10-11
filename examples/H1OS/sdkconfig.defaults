@@ -1,27 +1,48 @@
 # =========================================================================
 # Target Hardware: ESP32-S3-PICO-1-N8R8 (8MB Flash QIO, 8MB PSRAM Octal OPI)
 # Target Board: Waveshare ESP32-S3-Touch-ePaper-1.54 V2
+# Role: H1OS Class-E Luxury Environmental Telemetry Instrument
 # =========================================================================
 
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=80
 
-# Power Management & Dynamic Frequency Scaling (DFS: 80 MHz baseline <-> 240 MHz turbo)
+# =========================================================================
+# Ultra Low Power (ULP) Coprocessor & RTC Memory Configuration
+# =========================================================================
+CONFIG_ULP_COPROC_ENABLED=y
+CONFIG_ULP_COPROC_TYPE_RISCV=y
+CONFIG_ULP_COPROC_RESERVE_MEM=4096
+
+# =========================================================================
+# Power Management & Sleep Power Domains (PD)
+# =========================================================================
 CONFIG_PM_ENABLE=y
 CONFIG_PM_DFS_INIT_AUTO=n
+CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP=y
+CONFIG_PM_ESP_SLEEP_POWER_DOWN_CPU=y
+CONFIG_PM_POWER_DOWN_TAGMEM_IN_LIGHT_SLEEP=y
+CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n
+CONFIG_RTC_CLK_SRC_INT_RC=y
 
+# =========================================================================
+# Radio & Network Stripping (Zero RF Emission, Zero Protocol Overhead)
+# =========================================================================
+CONFIG_BT_ENABLED=n
+CONFIG_ESP_WIFI_ENABLED=n
+
+# =========================================================================
+# Compiler & Performance Optimization
+# =========================================================================
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1
 CONFIG_LV_OS_FREERTOS=y
 
-# Board Support Package (BSP) Feature Toggles
-CONFIG_BSP_AUDIO_DEFAULT_VOLUME=0
-CONFIG_BSP_ENABLE_THINGSBOARD=n
-CONFIG_BSP_BATTERY_CORRECTION_FACTOR_MV=74
-
+# =========================================================================
 # LVGL v9 Graphics Engine (Debloated 1-Bit Monochrome SSD1681 Optimization)
+# =========================================================================
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_COLOR_DEPTH_1=y
 CONFIG_LV_COLOR_DEPTH=1
@@ -68,13 +89,17 @@ CONFIG_LV_USE_FLEX=y
 CONFIG_LV_USE_GRID=n
 CONFIG_LV_USE_OBSERVER=n
 
+# =========================================================================
 # SPI Flash Configuration (8MB Quad SPI @ 80MHz)
+# =========================================================================
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
+# =========================================================================
 # PSRAM Configuration (8MB Octal SPI @ 80MHz)
+# =========================================================================
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
@@ -83,18 +108,16 @@ CONFIG_SPIRAM_RODATA=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
 
-# RTC Memory Partitioning (Zero ULP overhead)
-CONFIG_ULP_COPROC_ENABLED=n
-
+# =========================================================================
 # Custom Dual-Slot OTA Partition Table
+# =========================================================================
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
+# =========================================================================
 # Dual-Core Task Affinity
+# =========================================================================
 CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
-
-# Radio Power Management (Zero RF emission for Class-E Luxury Instrument)
-CONFIG_BT_ENABLED=n
