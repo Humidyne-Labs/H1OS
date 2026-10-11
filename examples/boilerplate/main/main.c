@@ -1,0 +1,173 @@
+/**
+ * @file main.c
+ * @brief H1OS Turnkey Starter Application Boilerplate
+ *
+ * Minimal clean-slate boilerplate project for firmware engineers building custom
+ * applications atop the H1OS Class-E Environmental Telemetry Operating System.
+ *
+ * Target: Waveshare ESP32-S3 ePaper 1.54" V2 (200x200 Monochrome EPD)
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include "esp_log.h"
+#include "h1os/h1os.h"
+#include "h1os/h1os_lvgl.h"
+#include "lvgl.h"
+
+static const char *TAG = "boilerplate_app";
+
+/* Persistent Application State in RTC Slow Memory */
+typedef struct {
+    uint32_t boot_epoch_sec;
+    uint32_t cycle_counter;
+} app_state_t;
+
+RTC_DATA_ATTR static app_state_t s_app_state = {0};
+
+/* =========================================================================
+ * UI Presentation (Single Clean LVGL v9 Monochrome Card)
+ * Geometry: 200x200 px (188 DPI), 1-bit packed typography (14pt & 20pt)
+ * ========================================================================= */
+static void render_starter_screen(const h1os_telemetry_t *telem)
+{
+    h1os_lvgl_lock(100);
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_clean(scr);
+    lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
+
+    // 1. Header Bar: Title (left), Cycle count (right)
+    lv_obj_t *header = lv_label_create(scr);
+    lv_label_set_text(header, "H1OS STARTER");
+    lv_obj_set_style_text_font(header, H1OS_FONT_14, 0);
+    lv_obj_align(header, LV_ALIGN_TOP_LEFT, 6, 4);
+
+    lv_obj_t *lbl_cycle = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_cycle, "#%lu", (unsigned long)s_app_state.cycle_counter);
+    lv_obj_set_style_text_font(lbl_cycle, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_cycle, LV_ALIGN_TOP_RIGHT, -6, 4);
+
+    // Divider Line (Y = 22, X: 4 to 196)
+    static lv_point_precise_t div_pts[] = {{4, 22}, {196, 22}};
+    lv_obj_t *div = lv_line_create(scr);
+    lv_line_set_points(div, div_pts, 2);
+    lv_obj_set_style_line_width(div, 1, 0);
+    lv_obj_set_style_line_color(div, lv_color_black(), 0);
+
+    // 2. Hero Environmental Readings (20pt Bold Numbers)
+    lv_obj_t *lbl_temp = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_temp, "%.1f°F", telem->ambient_temp_f);
+    lv_obj_set_style_text_font(lbl_temp, H1OS_FONT_20, 0);
+    lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 6, 32);
+
+    lv_obj_t *lbl_rh = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_rh, "%.1f%%", telem->ambient_rh_pct);
+    lv_obj_set_style_text_font(lbl_rh, H1OS_FONT_20, 0);
+    lv_obj_align(lbl_rh, LV_ALIGN_TOP_RIGHT, -6, 32);
+
+    lv_obj_t *lbl_metric = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_metric, "(%.1f°C ambient)", telem->ambient_temp_c);
+    lv_obj_set_style_text_font(lbl_metric, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_metric, LV_ALIGN_TOP_LEFT, 6, 58);
+
+    // 3. System Metrics Block
+    lv_obj_t *lbl_dew = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", telem->dew_point_f);
+    lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 84);
+
+    lv_obj_t *lbl_pwr = lv_label_create(scr);
+    if (telem->is_usb_powered) {
+        lv_label_set_text(lbl_pwr, "Power:      USB CABLE");
+    } else {
+        lv_label_set_text_fmt(lbl_pwr, "Battery:    %.2fV (%u%%)",
+                              (float)telem->battery_mv / 1000.0f, telem->battery_percent);
+    }
+    lv_obj_set_style_text_font(lbl_pwr, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_pwr, LV_ALIGN_TOP_LEFT, 6, 108);
+
+    // 4. Status Bar
+    lv_obj_t *lbl_status = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_status, "Status:     %s",
+                          telem->is_thermally_settled ? "SETTLED" : "SETTLING");
+    lv_obj_set_style_text_font(lbl_status, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_status, LV_ALIGN_TOP_LEFT, 6, 132);
+
+    // 5. Footer Bar
+    lv_obj_t *lbl_foot = lv_label_create(scr);
+    lv_label_set_text(lbl_foot, "H1OS v2.0 READY");
+    lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
+
+    lv_refr_now(NULL);
+    h1os_lvgl_unlock();
+}
+
+static void update_display(void)
+{
+    h1os_telemetry_t telem = {0};
+    h1os_get_telemetry(&telem);
+    render_starter_screen(&telem);
+}
+
+/* =========================================================================
+ * Application Lifecycle Handlers
+ * ========================================================================= */
+static void app_on_boot(void *user_data)
+{
+    ESP_LOGI(TAG, "Application booted cleanly from power-on reset");
+    s_app_state.cycle_counter = 1;
+    s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
+    update_display();
+}
+
+static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
+{
+    s_app_state.cycle_counter++;
+    ESP_LOGI(TAG, "Application resumed from sleep (Cycle #%lu)",
+             (unsigned long)s_app_state.cycle_counter);
+    update_display();
+}
+
+static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
+{
+    ESP_LOGI(TAG, "System entering deep sleep for %lu seconds", (unsigned long)sleep_sec);
+}
+
+static void app_on_shutdown(void *user_data)
+{
+    ESP_LOGI(TAG, "System shutting down");
+}
+
+/* =========================================================================
+ * Main Entry Point
+ * ========================================================================= */
+void app_main(void)
+{
+    ESP_LOGI(TAG, "Starting H1OS Application Boilerplate");
+
+    h1os_lifecycle_t lifecycle = {
+        .on_boot                    = app_on_boot,
+        .on_wake                    = app_on_wake,
+        .on_pre_sleep               = app_on_pre_sleep,
+        .on_shutdown                = app_on_shutdown,
+        .presentation = {
+            .on_splash              = NULL,
+            .on_chime               = NULL,
+            .chime_mask             = 0,
+        },
+        .session = {
+            .inactivity_timeout_sec = 30,
+            .enable_dfs_80mhz       = true,
+        },
+        .user_data                  = NULL,
+    };
+
+    esp_err_t ret = h1os_start(&lifecycle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start H1OS: %s", esp_err_to_name(ret));
+    }
+}
