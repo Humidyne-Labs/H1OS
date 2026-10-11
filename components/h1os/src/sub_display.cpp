@@ -98,21 +98,15 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     /* 1. Init SPI and GPIO */
     hal_spi_init();
 
-    /* 2. Configure RST and BUSY pins */
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << HAL_PIN_EPD_RST),
-        .mode = GPIO_MODE_OUTPUT,
+    /* 2. Configure BUSY interrupt pin (RST is handled by hal_spi_init) */
+    gpio_config_t busy_conf = {
+        .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
+        .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_NEGEDGE, /* High -> Low when idle */
     };
-    gpio_config(&io_conf);
-
-    io_conf.pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY);
-    io_conf.mode = GPIO_MODE_INPUT,
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    io_conf.intr_type = GPIO_INTR_NEGEDGE; /* High -> Low when idle */
-    gpio_config(&io_conf);
+    gpio_config(&busy_conf);
 
     if (s_busy_sem == NULL) {
         s_busy_sem = xSemaphoreCreateBinary();

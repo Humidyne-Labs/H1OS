@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "hal_io.h"
+#include "hal_i2c.h"
 #include "sub_nvs.h"
 #include "sub_sensor.h"
 #include "sub_display.h"
@@ -70,7 +71,10 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 1. Initialize Base Hardware I/O & Release Boot Pad Holds
     hal_io_early_init();
 
-    // 2. Initialize Persistent Storage Subsystem
+    // 2. Initialize Shared I2C Master Bus (Sensors, RTC, Audio Codec)
+    hal_i2c_init();
+
+    // 3. Initialize Persistent Storage Subsystem
     sub_nvs_init();
 
     // 3. Inspect Flow Arbiter (Flow A Wake Stub vs Flow B Interactive UI)

@@ -74,8 +74,13 @@ esp_err_t hal_i2c_deinit(void)
 
 esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t write_len, uint32_t timeout_ms)
 {
-    if (!s_is_inited || !s_bus_handle || !write_data || write_len == 0) {
-        return ESP_ERR_INVALID_STATE;
+    if (!s_is_inited) {
+        esp_err_t init_ret = hal_i2c_init();
+        if (init_ret != ESP_OK) return init_ret;
+    }
+
+    if (!s_bus_handle || !write_data || write_len == 0) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     if (xSemaphoreTakeRecursive(s_i2c_mutex, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
@@ -101,8 +106,13 @@ esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t writ
 
 esp_err_t hal_i2c_read(uint8_t dev_addr, uint8_t *read_data, size_t read_len, uint32_t timeout_ms)
 {
-    if (!s_is_inited || !s_bus_handle || !read_data || read_len == 0) {
-        return ESP_ERR_INVALID_STATE;
+    if (!s_is_inited) {
+        esp_err_t init_ret = hal_i2c_init();
+        if (init_ret != ESP_OK) return init_ret;
+    }
+
+    if (!s_bus_handle || !read_data || read_len == 0) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     if (xSemaphoreTakeRecursive(s_i2c_mutex, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
@@ -131,8 +141,13 @@ esp_err_t hal_i2c_write_read(uint8_t dev_addr,
                              uint8_t *read_data, size_t read_len,
                              uint32_t timeout_ms)
 {
-    if (!s_is_inited || !s_bus_handle || !write_data || write_len == 0 || !read_data || read_len == 0) {
-        return ESP_ERR_INVALID_STATE;
+    if (!s_is_inited) {
+        esp_err_t init_ret = hal_i2c_init();
+        if (init_ret != ESP_OK) return init_ret;
+    }
+
+    if (!s_bus_handle || !write_data || write_len == 0 || !read_data || read_len == 0) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     if (xSemaphoreTakeRecursive(s_i2c_mutex, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
@@ -158,7 +173,12 @@ esp_err_t hal_i2c_write_read(uint8_t dev_addr,
 
 esp_err_t hal_i2c_probe(uint8_t dev_addr)
 {
-    if (!s_is_inited || !s_bus_handle) {
+    if (!s_is_inited) {
+        esp_err_t init_ret = hal_i2c_init();
+        if (init_ret != ESP_OK) return init_ret;
+    }
+
+    if (!s_bus_handle) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -171,4 +191,5 @@ esp_err_t hal_i2c_probe(uint8_t dev_addr)
     xSemaphoreGiveRecursive(s_i2c_mutex);
     return ret;
 }
+
 

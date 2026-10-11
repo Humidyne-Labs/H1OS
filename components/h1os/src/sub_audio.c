@@ -99,20 +99,12 @@ esp_err_t sub_audio_init(void)
 {
     if (s_audio_inited) return ESP_OK;
 
-    /* 1. Configure Power Rail (GPIO 42: Active LOW: 0 = Power ON) & PA CTRL (GPIO 46: 0 = Mute) */
-    gpio_config_t pa_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_PA_EN) | (1ULL << HAL_PIN_PA_CTRL),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&pa_cfg);
+    /* 1. Ensure Power Rail (GPIO 42: 0 = Power ON) & PA CTRL (GPIO 46: 0 = Mute) are at correct levels */
     gpio_set_level(HAL_PIN_PA_EN, 0);   /* Rail MUST stay ON (0) to prevent I2C clamping */
     gpio_set_level(HAL_PIN_PA_CTRL, 0); /* Keep amplifier muted initially */
     vTaskDelay(pdMS_TO_TICKS(15));
 
-    /* 2. Configure I2S TX Channel (16-bit 16kHz Philips Master) */
+    /* 2. Configure I2S TX Channel (16-bit 16kHz Philips Master with MCLK) */
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
@@ -124,7 +116,7 @@ esp_err_t sub_audio_init(void)
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(16000),
         .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
         .gpio_cfg = {
-            .mclk = I2S_GPIO_UNUSED,
+            .mclk = HAL_PIN_I2S_MCLK,
             .bclk = HAL_PIN_I2S_SCLK,
             .ws   = HAL_PIN_I2S_LRCK,
             .dout = HAL_PIN_I2S_DSDIN,
@@ -144,11 +136,18 @@ esp_err_t sub_audio_init(void)
         return err;
     }
 
-    /* 3. Initialize complete 22-register ES8311 clock tree and DAC */
+    /* 3. Enable I2S channel to supply MCLK/BCLK during codec register setup */
+    i2s_channel_enable(s_tx_chan);
+    vTaskDelay(pdMS_TO_TICKS(5));
+
+    /* 4. Initialize complete 22-register ES8311 clock tree and DAC */
     err = es8311_init_dac_registers();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     }
+
+    /* 5. Park in zero-heat standby until audio playback is requested */
+    sub_audio_standby();
 
     s_audio_inited = true;
     return ESP_OK;

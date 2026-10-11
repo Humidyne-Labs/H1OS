@@ -96,8 +96,7 @@ static lv_obj_t* create_page_base(const char *title, const char *page_str)
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
-    // Bind hardware keypad listener to active screen
-    lv_obj_add_event_cb(scr, keypad_event_cb, LV_EVENT_KEY, NULL);
+    // Bind hardware keypad listener to active screen cleanly (prevent duplicate callbacks)
     lv_group_t *def_grp = lv_group_get_default();
     if (def_grp == NULL) {
         def_grp = lv_group_create();
@@ -107,7 +106,11 @@ static lv_obj_t* create_page_base(const char *title, const char *page_str)
             lv_indev_set_group(indev, def_grp);
         }
     }
+    lv_obj_remove_event_cb(scr, keypad_event_cb);
+    lv_obj_add_event_cb(scr, keypad_event_cb, LV_EVENT_KEY, NULL);
+    lv_group_remove_obj(scr);
     lv_group_add_obj(def_grp, scr);
+    lv_group_focus_obj(scr);
 
     // 1. Header Title: Left-aligned at (X: 6, Y: 4)
     lv_obj_t *lbl_title = lv_label_create(scr);
@@ -437,14 +440,14 @@ static void update_active_display(void)
 static void keypad_event_cb(lv_event_t *e)
 {
     uint32_t key = lv_event_get_key(e);
-    if (key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
+    if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT || key == LV_KEY_ENTER) {
         // Synthesize short haptic confirmation tick (2400 Hz for 15ms)
         sub_audio_play_tone(2400, 15);
 
-        // Cycle page 0 -> 1 -> 2 -> 3 -> 0
+        // Single step: Cycle page 0 -> 1 -> 2 -> 3 -> 0
         s_app_state.active_page = (s_app_state.active_page + 1) % NUM_PAGES;
-        ESP_LOGI(TAG, "Keypad event: Navigating to page %u/%u",
-                 s_app_state.active_page + 1, NUM_PAGES);
+        ESP_LOGI(TAG, "Keypad event (key %lu): Navigating to page %u/%u",
+                 (unsigned long)key, s_app_state.active_page + 1, NUM_PAGES);
         update_active_display();
     }
 }
