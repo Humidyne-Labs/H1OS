@@ -14,7 +14,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 | **IO3** | `LED_GREEN` | User Status Indicator | Digital Output | **Open-Drain, Active LOW** (0 = ON, 1 = OFF) | `1` (OFF) | Cathode connected to IO3; drive 0 to illuminate |
 | **IO4** | `BAT_ADC` | Power Management | Analog Input | ADC1 Channel 3 | Linear 0-3.1V sensing | Measured via 1:2 divider (100kΩ / 100kΩ; VBAT = VADC * 2.0) |
 | **IO5** | `RTC_INT` | PCF85063A RTC | Digital Input | **Active LOW**, Open-Drain | `INPUT_PULLUP` enabled | PCF85063A INT is open-drain; PCB has NO pull-up $\rightarrow$ internal pull-up mandatory |
-| **IO6** | `EPD3V3_EN` | 1.54″ e-Paper Display | Digital Output | **Active LOW** (0 = ON, 1 = OFF) | `0` (Power ON) | Gate control for EPD 3.3V power rail; drive 1 + `gpio_hold_en` in sleep |
+| **IO6** | `EPD3V3_EN` | 1.54″ e-Paper Display | Digital Output | **Active LOW** (0 = ON, 1 = OFF) | `0` (Power ON) | Gate control for EPD 3.3V power rail; held LOW (`0`) via RTC pad hold in sleep to keep display RAM energized (SSD1681 Deep Sleep Mode 1 @ 1µA) and eliminate inrush current |
 | **IO7** | `IO7` | Expansion / Unused | GPIO | Floating | Tristate | Available GPIO |
 | **IO8** | `EPD_BUSY` | 1.54″ e-Paper Display | Digital Input | **Active HIGH** (1 = Busy, 0 = Ready) | Floating Input | Monitored during SSD1681 LUT execution and refreshes |
 | **IO9** | `EPD_RST` | 1.54″ e-Paper Display | Digital Output | **Active LOW** (0 = Reset, 1 = Run) | `1` (Not in reset) | SSD1681 display controller hardware reset |
