@@ -5,11 +5,7 @@ idf_component_register(
     INCLUDE_DIRS 
         "."
     REQUIRES 
-        esp32-s3_bsp
-        esp_driver_gpio
-        esp_timer
+        h1os
         freertos
-        log
-        nvs_flash
         lvgl
 )

@@ -1,0 +1,62 @@
+set(h1os_srcs
+    "src/hal_io.c"
+    "src/hal_i2c.c"
+    "src/hal_spi.c"
+    "src/hal_flash.c"
+    "src/sub_sensor.c"
+    "src/sub_rtc.c"
+    "src/sub_power.c"
+    "src/sub_audio.c"
+    "src/sub_display.cpp"
+    "src/sub_sdcard.c"
+    "src/sub_nvs.c"
+    "src/orch_state.c"
+    "src/orch_math.c"
+    "src/orch_flow.c"
+    "src/orch_display_sync.c"
+    "src/orch_wake_stub.c"
+    "src/h1os_lifecycle.c"
+    "src/h1os_lvgl.cpp"
+    "src/h1os_time.c"
+    "src/h1os_font_montserrat_14_1bpp.c"
+    "src/h1os_font_montserrat_20_1bpp.c"
+)
+
+set(bsp_requires
+    esp_driver_gpio
+    esp_driver_i2c
+    esp_driver_i2s
+    esp_driver_spi
+    esp_driver_sdmmc
+    sdmmc
+    esp_adc
+    esp_timer
+    nvs_flash
+    fatfs
+    log
+    freertos
+    lvgl
+    esp_mmap_assets
+    esp_lv_fs
+    esp_driver_tsens
+    esp_pm
+    esp_partition
+    spi_flash
+    esp_hw_support
+    ulp
+)
+
+idf_component_register(
+    SRCS ${h1os_srcs}
+    INCLUDE_DIRS "include"
+    REQUIRES ${bsp_requires}
+)
+
+idf_build_set_property(BOOTLOADER_EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/bootloader_components" APPEND)
+
+if(CONFIG_ULP_COPROC_ENABLED)
+    set(ulp_app_name "ulp_${COMPONENT_NAME}")
+    set(ulp_sources "ulp/main.c")
+    set(ulp_exp_dep_srcs "src/hal_io.c")
+    ulp_embed_binary(${ulp_app_name} "${ulp_sources}" "${ulp_exp_dep_srcs}" TYPE "riscv")
+endif()
