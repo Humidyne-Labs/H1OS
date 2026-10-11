@@ -72,6 +72,8 @@ static bool                      s_led_state           = false;
 static bool                      s_power_inited        = false;
 static bsp_power_off_cb_t        s_shutdown_cb         = NULL;
 static void                      *s_shutdown_user_data = NULL;
+static bsp_power_sleep_cb_t      s_sleep_cb            = NULL;
+static void                      *s_sleep_user_data    = NULL;
 
 // Standard 3.7V Li-ion/LiPo discharge curve (rested OCV) sorted ascending
 static const battery_lut_point_t s_battery_ocv_lut[] = {
@@ -147,48 +149,64 @@ esp_err_t bsp_power_unregister_shutdown_cb(void) {
     return ESP_OK;
 }
 
+esp_err_t bsp_power_register_sleep_cb(bsp_power_sleep_cb_t cb, void *user_data) {
+    s_sleep_cb        = cb;
+    s_sleep_user_data = user_data;
+    return ESP_OK;
+}
+
+esp_err_t bsp_power_unregister_sleep_cb(void) {
+    s_sleep_cb        = NULL;
+    s_sleep_user_data = NULL;
+    return ESP_OK;
+}
+
 void bsp_power_off(void)
 {
     ESP_LOGI(TAG, "Executing complete system power-off sequence...");
 
-    // 1. Trigger power-off splash screen and acoustic chime if registered
-    bsp_trigger_splash(BSP_SPLASH_POWER_OFF);
-    bsp_trigger_chime (BSP_CHIME_POWER_OFF);
-
-    // 3. Run user power-off callback if registered
+    // 1. Run user power-off lifecycle hook if registered
     if (s_shutdown_cb != NULL) {
         ESP_LOGI(TAG, "Invoking registered power-off callback...");
         s_shutdown_cb(s_shutdown_user_data);
     }
 
-    // 4. Wait 3 seconds to guarantee physical E-Paper OTP refresh completes fully on the glass
-    bsp_delay_ms(3000);
+    // 2. Trigger power-off visual splash screen and acoustic chime if registered
+    bsp_trigger_splash(BSP_SPLASH_POWER_OFF);
+    bsp_trigger_chime (BSP_CHIME_POWER_OFF);
 
-    // 5. Reset RTC slow memory state to guarantee a pristine cold boot profile on subsequent power up
-    bsp_rtc_mem_reset();
+    // 3. Wait for physical E-Paper refresh to complete latching on the glass (if splash was drawn)
+    bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
+    bsp_delay_ms(3500);
 
-    // 6. Stop button timers/polling immediately so no further button events fire
+    // 4. Commit final displayed frame to 'epd_frame' flash partition before power cut
+    bsp_display_sync_partition_frame();
+
+    // 5. Stop button timers/polling immediately so no further button events fire
     bsp_button_stop();
 
-    // 7. Stop LVGL rendering background task
+    // 6. Stop LVGL rendering background task
     bsp_lvgl_stop();
 
-    // 8. Put display into deep sleep and disable display power rail
+    // 7. Put display into deep sleep and disable display power rail
     bsp_display_deep_sleep();
 
-    // 9. Mute and power off audio subsystem
+    // 8. Mute and power off audio subsystem
     bsp_audio_deinit();
 
-    // 8. Turn off status LED
+    // 9. Turn off status LED
     bsp_led_set(false);
 
-    // 9. Disconnect Wi-Fi
+    // 10. Disconnect Wi-Fi
     bsp_wifi_disconnect();
 
-    // 10. Clear any active RTC alarms and timers so external RTC does not wake the device while powered down
+    // 11. Clear any active RTC alarms and timers so external RTC does not wake the device while powered down
     bsp_rtc_clear_countdown_timer();
     bsp_rtc_clear_alarm();
     bsp_rtc_get_and_clear_interrupts(NULL, NULL);
+
+    // 12. Reset RTC slow memory state to guarantee a pristine cold boot profile on subsequent power up
+    bsp_rtc_mem_reset();
 
     // 11. Wait until user has completely released the power button with stable debounce
     int stable_high_count = 0;
@@ -450,16 +468,34 @@ esp_err_t bsp_enter_sleep(const bsp_sleep_config_t *config)
         }
     }
 
-    // 1. Turn off Status LED
+    // Headless sub-execution bypasses UI, splashes, and flash sync (<10ms budget)
+    if (cfg.next_init_mode != BSP_INIT_MODE_SUB_EXEC) {
+        // 1. Invoke registered user pre-sleep lifecycle hook
+        if (s_sleep_cb != NULL) {
+            s_sleep_cb(cfg.mode, cfg.duration_sec, s_sleep_user_data);
+        }
+
+        // 2. Trigger visual sleep splash screen and acoustic chime if registered
+        bsp_trigger_splash(BSP_SPLASH_SLEEP);
+        bsp_trigger_chime (BSP_CHIME_SLEEP);
+
+        // 3. Wait for physical E-Paper refresh to complete latching on the glass (if splash was drawn)
+        bsp_display_wait_busy(EPD_PARTIAL_REFRESH_TIMEOUT_MS);
+
+        // 4. Synchronize dirty display framebuffer to 'epd_frame' flash partition before sleeping
+        bsp_display_sync_partition_frame();
+    }
+
+    // 5. Turn off Status LED
     bsp_led_set(false);
 
-    // 2. Disconnect Wi-Fi
+    // 6. Disconnect Wi-Fi
     bsp_wifi_disconnect();
 
-    // 3. Put SSD1681 e-Paper into ultra-low power deep sleep mode (<1 uA)
+    // 7. Put SSD1681 e-Paper into ultra-low power deep sleep mode (<1 uA)
     bsp_display_deep_sleep();
 
-    // 4. Mute Audio Power Amp without cutting codec power rail (prevents I2C bus clamping!)
+    // 8. Mute Audio Power Amp without cutting codec power rail (prevents I2C bus clamping!)
     bsp_audio_standby();
 
     // 6. Configure Wakeup Triggers

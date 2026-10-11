@@ -462,7 +462,7 @@ static esp_err_t audio_play_tone_raw(uint32_t freq_hz, uint32_t duration_ms, flo
     if (ret != ESP_OK) return ret;
 
     if (s_audio_in_standby) {
-        ret = bsp_audio_resume();
+        ret = bsp_audio_resume(); vTaskDelay(pdMS_TO_TICKS(100));
         if (ret != ESP_OK) return ret;
     }
 

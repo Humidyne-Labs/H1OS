@@ -523,27 +523,12 @@ esp_err_t bsp_trigger_chime(bsp_chime_type_t type) {
     return ESP_ERR_NOT_FOUND;
 }
 
-esp_err_t bsp_sleep(const bsp_sleep_config_t *config) {
-    bsp_sleep_config_t cfg = (config != NULL) ? *config : (bsp_sleep_config_t)BSP_SLEEP_CONFIG_DEFAULT();
-
-    // Trigger visual/audio stand-down cues via lifecycle configuration
-    bsp_trigger_splash(BSP_SPLASH_SLEEP);
-    bsp_trigger_chime (BSP_CHIME_SLEEP);
-
-    if (s_active_lifecycle.on_sleep != NULL) {
-        ESP_LOGD(TAG, "Invoking registered on_sleep lifecycle hook...");
-        s_active_lifecycle.on_sleep(cfg.mode, cfg.duration_sec, s_active_lifecycle.user_data);
-    }
-
-    return bsp_enter_sleep(&cfg);
+esp_err_t bsp_app_sleep(const bsp_sleep_config_t *config) {
+    return bsp_enter_sleep(config);
 }
 
-void bsp_system_shutdown(void) {
-    bsp_power_off();
-}
-
-void bsp_system_deep_sleep(uint32_t sleep_sec) {
-    bsp_sleep_deep(sleep_sec);
+esp_err_t bsp_app_shutdown(void) {
+    bsp_power_off(); return ESP_OK;
 }
 
 static esp_err_t bsp_sub_execution_init(void) {
@@ -601,13 +586,6 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
     }
 
     s_context_valid = true;
-
-    // 6. Check Lifecycle Declarative Sub-Execution Configuration
-    //if (s_active_lifecycle.enable_sub_execution) {
-    /*
-    uint32_t interval = (s_active_lifecycle.sub_execution_interval_sec > 0) ?
-                         s_active_lifecycle.sub_execution_interval_sec      : 60;
-    */
     
     uint32_t interval = s_active_lifecycle.sub_execution_interval_sec;
     if(interval != 0) {
@@ -688,7 +666,7 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
                         .wake_sources           = wake_sources,
                         .next_init_mode         = BSP_INIT_MODE_SUB_EXEC,
                     };
-                    bsp_sleep(&sleep_cfg);
+                    bsp_enter_sleep(&sleep_cfg);
                     return ESP_OK;
                 }
             } else {
@@ -712,7 +690,15 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
     // 1. Phase 1 Early Base IO: Power Latch Lock & Button Pull-Ups
     bsp_io_early_init();
 
-    // 2. Pre-Execution (PXE) Lifecycle Hook Dispatch
+    // 2. Register Power-Off and Sleep Hooks with BSP Power Subsystem
+    if (s_active_lifecycle.on_power_off != NULL) {
+        bsp_power_register_shutdown_cb(s_active_lifecycle.on_power_off, s_active_lifecycle.user_data);
+    }
+    if (s_active_lifecycle.on_sleep != NULL) {
+        bsp_power_register_sleep_cb(s_active_lifecycle.on_sleep, s_active_lifecycle.user_data);
+    }    
+
+    // 3. Pre-Execution (PXE) Lifecycle Hook Dispatch
     if (s_active_lifecycle.on_pxe != NULL) {
         bsp_button_mask_t btn_mask = BSP_BUTTON_MASK_NONE;
         // Sample button states after early pull-up stabilization 
@@ -725,11 +711,6 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
         ESP_LOGD(TAG, "No on_pxe callback registered; proceeding with normal startup");
     }
     
-    // 3. Register Power-Off Hook with BSP Power Subsystem
-    if (s_active_lifecycle.on_power_off != NULL) {
-        bsp_power_register_shutdown_cb(s_active_lifecycle.on_power_off, s_active_lifecycle.user_data);
-    }
-
     // 4. Initialize hardware profile
     esp_err_t ret = bsp_init_mode(init_mode);
     if (ret != ESP_OK) {
@@ -738,22 +719,7 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
     }
 
     // 5. Dispatch to application lifecycle callbacks, splash & chimes
-    if (reset_reason == ESP_RST_DEEPSLEEP)
-    {
-        // Automatically clear PCF85063A countdown timer and alarm flags in BSP
-        bsp_rtc_clear_countdown_timer();
-        bsp_rtc_get_and_clear_interrupts(NULL, NULL);
-
-        // Trigger wake splash & chime hooks if registered
-        bsp_trigger_splash(BSP_SPLASH_WAKE);
-        bsp_trigger_chime (BSP_CHIME_WAKE);
-
-        if (s_active_lifecycle.on_wake != NULL) {
-            s_active_lifecycle.on_wake(&s_current_context, s_active_lifecycle.user_data);
-        } else {
-            ESP_LOGW(TAG, "No on_wake callback registered; system idle");
-        }
-    } else {
+    if ((reset_reason == ESP_RST_POWERON) || (reset_reason == ESP_RST_SW) || (reset_reason == ESP_RST_USB)) {
         // Boot: trigger boot splash & chime hooks if registered
         bsp_trigger_splash(BSP_SPLASH_BOOT);
         bsp_trigger_chime (BSP_CHIME_BOOT);
@@ -763,6 +729,8 @@ esp_err_t bsp_app_start(const bsp_app_lifecycle_t *lifecycle)
         } else {
             ESP_LOGW(TAG, "No on_boot callback registered; system idle");
         }
+    } else {
+        bsp_power_off(); //reset to clean state on odd reset reasons.
     }
 
     return ESP_OK;

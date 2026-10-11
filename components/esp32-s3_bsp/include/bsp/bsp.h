@@ -297,21 +297,21 @@ esp_err_t bsp_trigger_splash(bsp_splash_type_t type);
 esp_err_t bsp_trigger_chime(bsp_chime_type_t type);
 
 /**
- * @brief Single Unified Sleep Entry Point
+ * @brief Single Unified Application Sleep Entry Point (Matches bsp_app_start)
  *
  * Dispatches before_sleep hook, triggers optional sleep splash/chime, powers down peripherals,
- * arms wake sources, sets RTC pad holds, and enters hardware light or deep sleep.
+ * syncs dirty frame to 'epd_frame' flash partition, arms wake sources, and enters hardware light or deep sleep.
  *
  * @param[in] config Sleep configuration (mode, duration, wake sources, next init mode)
  * @return esp_err_t ESP_OK on success
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
-esp_err_t bsp_sleep(const bsp_sleep_config_t *config);
+esp_err_t bsp_app_sleep(const bsp_sleep_config_t *config);
 
 /**
  * @brief Helper Macro for Deep Sleep Entry
  */
-#define bsp_sleep_deep(sec) bsp_sleep(&(bsp_sleep_config_t){ \
+#define bsp_sleep_deep(sec) bsp_app_sleep(&(bsp_sleep_config_t){ \
     .mode           = BSP_SLEEP_MODE_DEEP,                   \
     .duration_sec   = (sec),                                 \
     .wake_sources   = BSP_WAKE_SRC_ALL,                      \
@@ -321,7 +321,7 @@ esp_err_t bsp_sleep(const bsp_sleep_config_t *config);
 /**
  * @brief Helper Macro for Light Sleep Entry
  */
-#define bsp_sleep_light(sec) bsp_sleep(&(bsp_sleep_config_t){ \
+#define bsp_sleep_light(sec) bsp_app_sleep(&(bsp_sleep_config_t){ \
     .mode           = BSP_SLEEP_MODE_LIGHT,                   \
     .duration_sec   = (sec),                                  \
     .wake_sources   = BSP_WAKE_SRC_ALL,                       \
@@ -375,15 +375,10 @@ esp_err_t bsp_lifecycle_save_state(const void *data, size_t len);
 esp_err_t bsp_lifecycle_load_state(void *out_data, size_t len);
 
 /**
- * @brief Perform Clean System Shutdown (Deprecates bsp_system_shutdown / bsp_lifecycle_power_off)
+ * @brief Perform Clean System Shutdown
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
-void bsp_system_shutdown(void);
-
-/**
- * @brief Legacy Deep Sleep Alias (Maps to bsp_sleep_deep)
- */
-void bsp_system_deep_sleep(uint32_t sleep_sec);
+esp_err_t bsp_app_shutdown(void);
 
 /**
  * @brief Generic Millisecond Delay Helper

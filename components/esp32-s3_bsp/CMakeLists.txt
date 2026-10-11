@@ -49,6 +49,8 @@ set(bsp_requires
     esp_lv_fs
     esp_driver_tsens
     esp_pm
+    esp_partition
+    spi_flash
 )
 
 

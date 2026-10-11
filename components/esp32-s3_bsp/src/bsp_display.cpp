@@ -29,9 +29,6 @@
 
 static const char *TAG = "bsp_display";
 
-#define EPD_FULL_REFRESH_TIMEOUT_MS      10000
-#define EPD_PARTIAL_REFRESH_TIMEOUT_MS   3000
-
 // SSD1681 Factory-calibrated 159-byte Partial LUT (Datasheet Figure 6-6 layout)
 static const uint8_t WF_PARTIAL_1IN54[159] = {
     // 000..011: LUT0 (Black -> Black)
@@ -69,6 +66,7 @@ static uint8_t             *s_frame_buffer         = NULL;
 static uint8_t             *s_prev_frame_buffer    = NULL;
 
 static uint32_t s_partial_refresh_count = 0;
+static bool     s_frame_dirty           = false;
 
 static inline void epd_set_cs (uint8_t level) { gpio_set_level((gpio_num_t)BSP_PIN_EPD_CS,  level); }
 static inline void epd_set_dc (uint8_t level) { gpio_set_level((gpio_num_t)BSP_PIN_EPD_DC,  level); }
@@ -240,7 +238,7 @@ esp_err_t bsp_display_init(void)
     if (is_wake) {
         bsp_rtc_mem_load_display_frame(s_prev_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
         memcpy(s_frame_buffer, s_prev_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
-        ESP_LOGI(TAG, "Restored previous EPD frame from RTC Slow Memory");
+        ESP_LOGI(TAG, "Restored previous EPD frame (5000B) from 'epd_frame' flash partition");
     } else {
         memset(s_frame_buffer,      0xFF, BSP_DISPLAY_BUFFER_SIZE);
         memset(s_prev_frame_buffer, 0xFF, BSP_DISPLAY_BUFFER_SIZE);
@@ -329,7 +327,7 @@ void bsp_display_flush(void) {
     bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
 
     memcpy(s_prev_frame_buffer, s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
-    bsp_rtc_mem_save_display_frame(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
+    s_frame_dirty = true;
     s_partial_refresh_count = 0;
 }
 
@@ -366,11 +364,25 @@ void bsp_display_flush_partial_area(uint16_t x_start, uint16_t y_start, uint16_t
     epd_send_cmd         (0x20);
     bsp_display_wait_busy(EPD_PARTIAL_REFRESH_TIMEOUT_MS);
 
-    // 5. Synchronize local frame buffer and persist to RTC slow memory
+    // 5. Synchronize local frame buffer and mark dirty for deferred flash sync
     memcpy(s_prev_frame_buffer, s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
-    bsp_rtc_mem_save_display_frame(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
+    s_frame_dirty = true;
 
     s_partial_refresh_count++;
+}
+
+esp_err_t bsp_display_sync_partition_frame(void)
+{
+    if (!s_frame_dirty || s_frame_buffer == NULL) {
+        return ESP_OK; // Clean frame; skip flash write to preserve write endurance
+    }
+
+    ESP_LOGI(TAG, "Syncing dirty 1-bit EPD frame to 'epd_frame' flash partition before power-down/sleep...");
+    esp_err_t err = bsp_rtc_mem_save_display_frame(s_frame_buffer, BSP_DISPLAY_BUFFER_SIZE);
+    if (err == ESP_OK) {
+        s_frame_dirty = false;
+    }
+    return err;
 }
 
 esp_err_t bsp_display_write_frame(const uint8_t *buffer) {
@@ -397,11 +409,6 @@ void bsp_display_deep_sleep(void) {
     bsp_display_wait_busy(EPD_FULL_REFRESH_TIMEOUT_MS);
     epd_send_cmd         (0x10);
     epd_send_data        (0x01);
-}
-
-esp_err_t bsp_display_sleep(void) {
-    bsp_display_deep_sleep();
-    return ESP_OK;
 }
 
 void bsp_display_draw_pixel(uint16_t x, uint16_t y, bsp_display_color_t color) {

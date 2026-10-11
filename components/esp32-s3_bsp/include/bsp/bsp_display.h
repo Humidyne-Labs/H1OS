@@ -30,6 +30,9 @@
 extern "C" {
 #endif
 
+#define EPD_FULL_REFRESH_TIMEOUT_MS      10000
+#define EPD_PARTIAL_REFRESH_TIMEOUT_MS   3000
+
 /**
  * @brief Monochrome Pixel Colors
  */
@@ -108,6 +111,16 @@ void bsp_display_flush_partial_area(uint16_t x_start, uint16_t y_start, uint16_t
 esp_err_t bsp_display_write_frame(const uint8_t *buffer);
 
 /**
+ * @brief Synchronize dirty 1-bit EPD frame to "epd_frame" Flash Partition
+ *
+ * Flushes the current in-memory framebuffer to the dedicated flash partition if marked dirty.
+ * Automatically called on system sleep and power-down hooks to avoid flash write spam during active UI interaction.
+ *
+ * @return esp_err_t ESP_OK on success, or flash write error
+ */
+esp_err_t bsp_display_sync_partition_frame(void);
+
+/**
  * @brief Trigger Physical e-Paper Waveform Refresh Cycle
  *
  * @param[in] partial_mode true for fast partial refresh (~0.3s), false for full LUT refresh (~1.5s)
@@ -121,13 +134,6 @@ esp_err_t bsp_display_refresh(bool partial_mode);
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 void bsp_display_deep_sleep(void);
-
-/**
- * @brief Alias for bsp_display_deep_sleep
- * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
- * @return esp_err_t ESP_OK on success, or appropriate ESP error code.
- */
-esp_err_t bsp_display_sleep(void);
 
 /**
  * @brief Wait until E-Paper BUSY hardware signal goes inactive (Low)

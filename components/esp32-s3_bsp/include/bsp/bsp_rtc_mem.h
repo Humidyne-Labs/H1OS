@@ -132,7 +132,13 @@ esp_err_t bsp_rtc_mem_read_scratchpad(uint8_t *dest, size_t len);
 esp_err_t bsp_rtc_mem_write_scratchpad(const uint8_t *src, size_t len);
 
 /**
- * @brief Save 200x200 1-bit EPD frame buffer to RTC Slow Memory for partial refresh persistence
+ * @brief RTC State Flags Bitmask
+ */
+#define BSP_RTC_FLAG_NONE               (0)
+#define BSP_RTC_FLAG_EPD_FRAME_VALID    (1 << 0) ///< Indicates a valid 1-bit EPD frame is saved in "epd_frame" partition
+
+/**
+ * @brief Save 200x200 1-bit EPD frame buffer to "epd_frame" Flash Partition
  *
  * @param[in] frame Pointer to 5000-byte frame buffer
  * @param[in] len Size of buffer in bytes
@@ -142,7 +148,7 @@ esp_err_t bsp_rtc_mem_write_scratchpad(const uint8_t *src, size_t len);
 esp_err_t bsp_rtc_mem_save_display_frame(const uint8_t *frame, size_t len);
 
 /**
- * @brief Load 200x200 1-bit EPD frame buffer from RTC Slow Memory
+ * @brief Load 200x200 1-bit EPD frame buffer from "epd_frame" Flash Partition
  *
  * @param[out] dest Destination buffer (5000 bytes)
  * @param[in] len Size of buffer in bytes
@@ -152,12 +158,21 @@ esp_err_t bsp_rtc_mem_save_display_frame(const uint8_t *frame, size_t len);
 esp_err_t bsp_rtc_mem_load_display_frame(uint8_t *dest, size_t len);
 
 /**
- * @brief Check if a valid display frame is stored in RTC Slow Memory
+ * @brief Check if a valid display frame is stored in Flash Partition
  *
- * @return true if valid frame exists
+ * Checks RTC Slow Memory state flag BSP_RTC_FLAG_EPD_FRAME_VALID.
+ *
+ * @return true if valid frame exists in flash partition
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 bool bsp_rtc_mem_has_display_frame(void);
+
+/**
+ * @brief Set display frame validity state flag in RTC Slow Memory
+ *
+ * @param[in] valid true if frame is valid in flash partition, false otherwise
+ */
+void bsp_rtc_mem_set_display_frame_valid(bool valid);
 
 /**
  * @brief Reset RTC memory structure to defaults

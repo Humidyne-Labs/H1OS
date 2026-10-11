@@ -112,6 +112,35 @@ esp_err_t bsp_power_register_shutdown_cb(bsp_power_off_cb_t cb, void *user_data)
 esp_err_t bsp_power_unregister_shutdown_cb(void);
 
 /**
+ * @brief Sleep Hook Callback Signature
+ *
+ * @param[in] mode Sleep mode (Light or Deep)
+ * @param[in] duration_sec Requested sleep duration in seconds
+ * @param[in] user_data Context pointer
+ */
+typedef void (*bsp_power_sleep_cb_t)(bsp_sleep_mode_t mode, uint32_t duration_sec, void *user_data);
+
+/**
+ * @brief Register custom sleep callback hook
+ *
+ * Invoked inside bsp_enter_sleep() right before power isolation and deep/light sleep entry.
+ *
+ * @param[in] cb Callback function
+ * @param[in] user_data Custom user data pointer
+ * @return esp_err_t ESP_OK on success
+ * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
+ */
+esp_err_t bsp_power_register_sleep_cb(bsp_power_sleep_cb_t cb, void *user_data);
+
+/**
+ * @brief Unregister sleep callback hook
+ *
+ * @return esp_err_t ESP_OK on success
+ * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
+ */
+esp_err_t bsp_power_unregister_sleep_cb(void);
+
+/**
  * @brief Turn board completely off
  *
  * Executes shutdown splash & chimes, lifecycle on_shutdown hooks, stops background tasks,

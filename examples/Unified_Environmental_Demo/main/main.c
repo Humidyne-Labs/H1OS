@@ -67,6 +67,12 @@ RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {
     .active_page        = 0,
 };
 
+static inline void _EPD_HELPER(uint32_t delay_time) {
+    bsp_display_wait_busy(delay_time); // Wait for physical E-Paper controller to release BUSY line
+    bsp_delay_ms(delay_time);          // Manual settling delay once display is free to guarantee complete electrophoretic particle latching on glass
+    return;
+}
+
 /* --- Forward Declarations --- */
 static void render_page_environmental(const bsp_shtc3_data_t *data, uint32_t vbat_mv, uint8_t batt_pct, uint32_t sample_count);
 static void render_page_system_health(const bsp_shtc3_data_t *data, uint32_t vbat_mv, uint8_t batt_pct, uint32_t sample_count);
@@ -185,6 +191,8 @@ static void render_page_environmental(const bsp_shtc3_data_t *data, uint32_t vba
     // Force LVGL to render all widgets synchronously into the display buffer
     lv_refr_now(NULL);
     bsp_lvgl_unlock();
+
+    //_EPD_HELPER(5000);
 }
 
 static void render_page_system_health(const bsp_shtc3_data_t *data, uint32_t vbat_mv, uint8_t batt_pct, uint32_t sample_count)
@@ -307,6 +315,8 @@ static void render_page_system_health(const bsp_shtc3_data_t *data, uint32_t vba
     // Force LVGL to render all widgets synchronously into the display buffer
     lv_refr_now(NULL);
     bsp_lvgl_unlock();
+
+    //_EPD_HELPER(5000);
 }
 
 static void render_active_dashboard(const bsp_shtc3_data_t *sensor_data, uint32_t vbat_mv, uint8_t batt_pct, uint32_t sample_count)
@@ -351,11 +361,71 @@ static void render_shutdown_ui(const char *title_str, const char *sub_str)
     lv_refr_now(NULL);
     bsp_lvgl_unlock();
 
-    // Wait for physical E-Paper controller to release BUSY line
-    bsp_display_wait_busy(5000);
+    //_EPD_HELPER(5000);
+}
 
-    // Manual settling delay once display is free to guarantee complete electrophoretic particle latching on glass
-    bsp_delay_ms(3500);
+static void render_notice_ui(const char *title_str, const char *msg_str)
+{
+    uint32_t vbat_mv = 0;
+    bsp_battery_get_voltage(&vbat_mv, NULL);
+    uint8_t batt_pct = bsp_battery_get_percentage();
+
+    bsp_lvgl_lock();
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_clean(scr);
+    lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
+    lv_obj_invalidate(scr);
+
+    // 1. Header Bar: HUMIDYNE LABS
+    lv_obj_t *header = lv_label_create(scr);
+    lv_label_set_text(header, "HUMIDYNE LABS");
+    lv_obj_set_style_text_font(header, MONTSERRAT_14, 0);
+    lv_obj_align(header, LV_ALIGN_TOP_LEFT, 6, 4);
+
+    // Header Divider Line (y=20)
+    static lv_point_precise_t line1_pts[] = {{4, 20}, {196, 20}};
+    lv_obj_t *line1 = lv_line_create(scr);
+    lv_line_set_points(line1, line1_pts, 2);
+    lv_obj_set_style_line_width(line1, 1, 0);
+    lv_obj_set_style_line_color(line1, lv_color_black(), 0);
+
+    // 2. Primary Title
+    lv_obj_t *title = lv_label_create(scr);
+    lv_label_set_text(title, title_str ? title_str : "NO SAMPLES");
+    lv_obj_set_style_text_font(title, MONTSERRAT_20, 0);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -25);
+
+    // 3. Message Body
+    lv_obj_t *msg = lv_label_create(scr);
+    lv_label_set_text(msg, msg_str ? msg_str : "Settling sensors...\nWarming / settling gate");
+    lv_obj_set_style_text_font(msg, MONTSERRAT_14, 0);
+    lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(msg, LV_ALIGN_CENTER, 0, 25);
+
+    // 4. Divider Line 3 (y=146)
+    static lv_point_precise_t line3_pts[] = {{4, 146}, {196, 146}};
+    lv_obj_t *line3 = lv_line_create(scr);
+    lv_line_set_points(line3, line3_pts, 2);
+    lv_obj_set_style_line_width(line3, 1, 0);
+    lv_obj_set_style_line_color(line3, lv_color_black(), 0);
+
+    // 5. Footer: Battery & Cycle Status (y=178)
+    lv_obj_t *lbl_foot_l = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_foot_l, "%u%% (%.2fV)", batt_pct, (float)vbat_mv / 1000.0f);
+    lv_obj_set_style_text_font(lbl_foot_l, MONTSERRAT_14, 0);
+    lv_obj_align(lbl_foot_l, LV_ALIGN_TOP_LEFT, 6, 178);
+
+    lv_obj_t *lbl_foot_r = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_foot_r, "Cycle #%lu", (unsigned long)s_app_state.cycle_counter);
+    lv_obj_set_style_text_font(lbl_foot_r, MONTSERRAT_14, 0);
+    lv_obj_align(lbl_foot_r, LV_ALIGN_TOP_RIGHT, -6, 178);
+
+    // Synchronous render to e-paper display
+    lv_refr_now(NULL);
+    bsp_lvgl_unlock();
+
+    //_EPD_HELPER(5000);
 }
 
 /* =========================================================================
@@ -388,7 +458,7 @@ static void on_power_button_click(bsp_button_t btn, bsp_button_event_t event, vo
 {
     if (event == BSP_BUTTON_EVENT_LONG_PRESS) {
         ESP_LOGI(TAG, "POWER button long press: Triggering clean system power off");
-        bsp_power_off();
+        bsp_app_shutdown();
     }
 }
 
@@ -426,18 +496,30 @@ static void execute_environmental_monitor_cycle(void)
         // 2. Critical Battery Guard: Auto power off if <= 10%
         if (batt_pct <= CRITICAL_BATTERY_SHUTDOWN_PCT || vbat_mv < 3400) {
             ESP_LOGW(TAG, "Battery depleted (<= %d%%). Executing graceful shutdown...", CRITICAL_BATTERY_SHUTDOWN_PCT);
-            //render_shutdown_ui("BATTERY CRITICAL", "SoC <= 10%\nSystem Powering Off");
-            bsp_power_off();
+            bsp_app_shutdown();
             return;
         }
 
         // 3. Evaluate Class-E Environmental Telemetry & Psychrometrics
         // Step B: Check if clean settled samples were captured in sub-execution
         if (!bsp_sensors_has_clean_samples()) {
-            ESP_LOGW(TAG, "No settled samples in RTC ring buffer yet; performing fallback cold sample...");
-            //bsp_sensors_sample_raw(false);
-            // Note: Cold sample is not performed here to avoid blocking the main loop; instead, we rely on the next cycle to capture clean samples.
-            // Render a warning on the display, informing the use of a warm/hot PCB.
+            ESP_LOGW(TAG, "No settled samples in RTC ring buffer yet; displaying notice on screen...");
+            bsp_pm_pd_full_acquire();
+            render_notice_ui("SETTLING...", "Thermal settling active\nCapturing cold sample in 60s");
+            bsp_pm_pd_full_release();
+
+#if CONFIG_ENABLE_DEV_CONTINUOUS_MODE
+            vTaskDelay(pdMS_TO_TICKS(SENSOR_SAMPLE_INTERVAL_SEC * 1000));
+#else
+            bsp_sleep_config_t sleep_cfg = {
+                .mode                   = BSP_SLEEP_MODE_DEEP,
+                .duration_sec           = SENSOR_SAMPLE_INTERVAL_SEC,
+                .rtc_alarm_duration_sec = s_app_state.sleep_interval_sec,
+                .wake_sources           = BSP_WAKE_SRC_TIMER | BSP_WAKE_SRC_EXTERNAL_RTC | BSP_WAKE_SRC_BUTTONS,
+                .next_init_mode         = BSP_INIT_MODE_MINIMAL,
+            };
+            bsp_app_sleep(&sleep_cfg);
+#endif
             return;
         }
 
@@ -488,7 +570,7 @@ static void execute_environmental_monitor_cycle(void)
             vTaskDelay(pdMS_TO_TICKS(50));
             if ((xTaskGetTickCount() - hold_start) > pdMS_TO_TICKS(1800)) {
                 ESP_LOGW(TAG, "POWER button held during active wake cycle: triggering system power off");
-                bsp_power_off();
+                bsp_app_shutdown();
                 return;
             }
         }
@@ -507,7 +589,7 @@ static void execute_environmental_monitor_cycle(void)
             .wake_sources           = BSP_WAKE_SRC_TIMER | BSP_WAKE_SRC_EXTERNAL_RTC | BSP_WAKE_SRC_BUTTONS,
             .next_init_mode         = BSP_INIT_MODE_MINIMAL,
         };
-        bsp_sleep(&sleep_cfg);
+        bsp_app_sleep(&sleep_cfg);
         break;
 #endif
     }
@@ -534,7 +616,7 @@ static void app_on_pxe(bsp_button_mask_t btn_mask, void *user_data)
             ESP_LOGI(TAG, "Lifecycle PXE: BOOT0 tap detected (%d ms) -> Toggled to Screen %u", held_ms, s_app_state.active_page + 1);
         }
     }
-
+/*
     if (btn_mask & BSP_BUTTON_MASK_POWER) {
         int held_ms = 0;
         while (gpio_get_level((gpio_num_t)BSP_PIN_BUTTON_POWER) == 0) {
@@ -542,11 +624,12 @@ static void app_on_pxe(bsp_button_mask_t btn_mask, void *user_data)
             held_ms += 25;
             if (held_ms >= 1200) {
                 ESP_LOGW(TAG, "Lifecycle PXE: POWER held for %d ms -> Triggering clean system power off", held_ms);
-                bsp_power_off();
+                bsp_app_shutdown();
                 return;
             }
         }
     }
+*/        
 }
 
 static void app_on_boot(void *user_data)
@@ -587,7 +670,6 @@ static void app_on_power_off(void *user_data)
     // Cleanly wipe application and BSP RTC Slow memory state so next power-up starts fresh as boot
     memset(&s_app_state, 0, sizeof(s_app_state));
     s_app_state.sleep_interval_sec = DEFAULT_DEEP_SLEEP_SEC;
-    bsp_rtc_mem_reset();
 }
 
 /* =========================================================================
@@ -603,7 +685,6 @@ void app_main(void)
         .on_power_off               = app_on_power_off,
         .on_power_off_splash        = app_on_power_off_splash,
         .default_chime_mask         = BSP_CHIME_MASK_BOOT | BSP_CHIME_MASK_POWER_OFF | BSP_CHIME_MASK_ALARM,
-        //.enable_sub_execution       = true,
         .sub_execution_interval_sec = SENSOR_SAMPLE_INTERVAL_SEC,
         .user_data                  = NULL,
     };
