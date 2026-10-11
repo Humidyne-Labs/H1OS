@@ -51,7 +51,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     } else if (s_app_lifecycle.on_wake) {
         h1os_wake_context_t ctx = {
             .reset_reason = esp_reset_reason(),
-            .wake_cause = esp_sleep_get_wakeup_cause(),
+            .wakeup_causes = esp_sleep_get_wakeup_causes(),
             .user_data = s_app_lifecycle.user_data
         };
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);

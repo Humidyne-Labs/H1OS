@@ -185,8 +185,8 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     if (s_app_state.boot_epoch_sec > 0 && now >= (time_t)s_app_state.boot_epoch_sec) {
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
-    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Cause: %d)",
-             (unsigned long)s_app_state.cycle_counter, (int)ctx->wake_cause);
+    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx)",
+             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes);
     update_active_display();
 }
 

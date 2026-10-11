@@ -23,10 +23,10 @@ static int64_t s_lockout_until_us = 0;
 
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
-    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_causes();
+    uint32_t causes = esp_sleep_get_wakeup_causes();
     orch_persisted_state_t *st = orch_state_get();
 
-    if (cause == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
         /* Cold boot / Power On Reset */
         st->boot_count++;
         ESP_LOGI(TAG, "Cold boot detected. Boot count: %lu", (unsigned long)st->boot_count);
@@ -36,7 +36,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     st->wake_count++;
 
     /* Check ULP Sentinel dispatch reason */
-    if (cause == ESP_SLEEP_WAKEUP_ULP) {
+    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
         if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN) {
             return ORCH_FLOW_CRITICAL_OFF;
         }
@@ -47,12 +47,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     }
 
     /* Internal timer wake -> Flow A Headless Sensor Sprint */
-    if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
         return ORCH_FLOW_A_SPRINT;
     }
 
     /* Button or External RTC (EXT1) wake -> Flow B Main Wake */
-    if (cause == ESP_SLEEP_WAKEUP_EXT1) {
+    if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 

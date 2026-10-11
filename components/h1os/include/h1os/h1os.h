@@ -43,7 +43,7 @@ extern "C" {
  * ========================================================================= */
 typedef struct {
     esp_reset_reason_t       reset_reason;
-    esp_sleep_wakeup_cause_t wake_cause;
+    uint32_t                 wakeup_causes;      ///< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes)
     uint32_t                 boot_count;
     uint32_t                 deep_sleep_count;
     bool                     woke_from_button;
