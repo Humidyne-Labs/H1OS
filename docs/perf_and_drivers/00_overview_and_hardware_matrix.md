@@ -66,3 +66,19 @@ graph TD
 ```
 
 Every peripheral has a single Layer 1 HAL gateway and an isolated Layer 2 Subsystem controller. Higher layers NEVER talk to GPIO or bus handles directly.
+
+---
+
+## 4. Documentation Directory & Reference Index
+
+| Spec # | Document | Scope & Physical Subsystem |
+|---|---|---|
+| `00` | [`00_overview_and_hardware_matrix.md`](00_overview_and_hardware_matrix.md) | Master pinout, bus topology, power sequencing, and architecture map. |
+| `01` | [`01_shtc3_temp_humidity.md`](01_shtc3_temp_humidity.md) | Sensirion SHTC3 Relative Humidity & Temperature Sensor. |
+| `02` | [`02_pcf85063a_rtc.md`](02_pcf85063a_rtc.md) | NXP PCF85063A Ultra-Low Power Calendar RTC & Countdown Timer. |
+| `03` | [`03_es8311_ns4168_audio.md`](03_es8311_ns4168_audio.md) | Everest Semi ES8311 Codec & NS4168 Class-D Mono Power Amplifier. |
+| `04` | [`04_ssd1681_epaper_display.md`](04_ssd1681_epaper_display.md) | Solomon Systech SSD1681 1.54" 200×200 E-Paper Display Controller. |
+| `05` | [`05_power_latch_and_battery_adc.md`](05_power_latch_and_battery_adc.md) | Power Latch (`BAT_CTRL`), 12 dB Battery ADC & LiPo OCV Curve. |
+| `06` | [`06_microsd_fatfs.md`](06_microsd_fatfs.md) | MicroSD Storage Slot & 1-Bit SDMMC Mode FATFS File System. |
+| `07` | [`07_tactile_buttons_and_led.md`](07_tactile_buttons_and_led.md) | Tactile Pushbuttons (`BOOT`, `POWER`), 100k Pull-ups & Status LED. |
+| `08` | [`08_hardware_errata_and_pcb_rev_guide.md`](08_hardware_errata_and_pcb_rev_guide.md) | Hardware Errata, Silicon Nuances & PCB Rev B Redesign Guidelines. |

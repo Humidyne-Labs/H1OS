@@ -52,12 +52,6 @@ menu "ESP32-S3 ePaper Board Support Package"
                 or for sub-second sleep precision.
     endchoice
 
-    config BSP_ENABLE_THINGSBOARD
-        bool "Enable ThingsBoard IoT Telemetry & MQTT Client (bsp_tb)"
-        default n
-        help
-            Enable ThingsBoard client module (bsp_tb.c/h) and MQTT dependency.
-            Disabled by default to minimize binary size and memory footprint.
 
     config BSP_THERMAL_COMPENSATION_DEFAULT
         bool "Enable Dynamic MCU Thermal & Humidity Compensation by Default"

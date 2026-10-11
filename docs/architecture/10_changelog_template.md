@@ -1,46 +1,50 @@
-# Clean-Slate BSP: Change Log Template
+# H1OS Change Log
 
-All notable changes to the Clean-Slate ESP32-S3 BSP will be documented in this file.
+All notable changes to the H1OS Operating System for the Waveshare ESP32-S3 ePaper 1.54" V2 will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [2.0.0-dev] - Clean-Slate Architecture Revision
 
 ### Added
-- **11-Document Architecture Suite (`docs/architecture/`):** Complete two-tier documentation system separating public developer manuals from private silicon engineering specifications (`00_documentation_system.md` through `10_changelog_template.md`).
-- **ULP-RISC-V Hardware Sentinel (`05_layer3_ulp_sentinel.md`):** Autonomous RTC-domain coprocessor firmware managing battery ADC tripwire (`GPIO 4` / `ADC1_CH3`), hardware button debounce (`GPIO 0 & 18`), and real-time Zero-Hour wake arbitration via `GPIO 5` (`RTC_INT`).
-- **Class-E Psychrometric Invariant Engine:** Thermodynamic reconstruction of ambient relative humidity and dew point using the August-Roche-Magnus vapor pressure invariant ($e$) and dynamic sliding ambient floor ($T_{\text{amb\_floor}} = \min(T_{\text{die}})$) with zero artificial polynomial curves.
-- **Tri-Node Sensing Architecture:** Cross-referenced substrate thermal gradient tracking using SHTC3 die, internal MCU TSENS, and SSD1681 on-glass thermistor (`SPI Cmd 0x1B`).
-- **Unified Single Binary & RTC Wake Stub:** Flow A executes as an ultra-fast `<4ms` RTC Wake Stub (`esp_wake_stub`) on Core 0 at 80 MHz, bypassing the 2nd-stage bootloader, flash cache, and FreeRTOS during periodic sensor logging.
-- **Parasitic Leakage Isolation Protocol:** Hardware pad holding of `GPIO 11 (EPD_CS)` and `GPIO 9 (EPD_RST)` HIGH, Class-D audio amp power cut (`GPIO 42 PA_EN = 1`, `GPIO 46 PA_CTRL = 0`), and PCF85063A `CLKOUT` disable (`COF=111`).
-- **Keep All Gates Open Policy:** Permanently energizes and latches the 3.3V power rails (`GPIO 17 BAT_CTRL = 1`, `GPIO 6 EPD_3V3_EN = 0`), relying on native sub-microamp IC sleep modes (Total quiescent draw: ~9 µA) to eliminate I2C bus clamping and RTC POR state loss.
-- **Deferred Flash Frame Persistence:** Clean 16KB raw SPI flash partition (`epd_frame`) with dirty-tracking (`s_dirty`) that commits framebuffers strictly upon sleep or shutdown.
+- **11-Document Canonical Architecture Suite (`docs/architecture/`):** Complete two-tier documentation system separating public developer manuals from private silicon engineering specifications (`00_documentation_system.md` through `10_changelog_template.md`).
+- **Four Canonical Construction Stages:** Established strict development order: Stage 1 (The Bones) $\rightarrow$ Stage 2 (Housekeeping & Purge) $\rightarrow$ Stage 3 (The Muscle) $\rightarrow$ Stage 4 (The Vanity).
+- **Reactive ULP-RISC-V Bouncer (`05_layer3_ulp_sentinel.md`):** Purely event-driven coprocessor sentinel operating strictly while Xtensa is in deep sleep. Wakes on periodic timer or external interrupts on `GPIO 5` (PCF85063A Alarm), `GPIO 0/18` (Buttons), and `GPIO 4` (Battery ADC). Classifies short tap vs $>2.5\text{s}$ hold for ROM bootloader jump and power cut.
+- **Zero-Hour Conflict Arbitration:** Real-time suppression of sub-execution timer when external RTC alarm is imminent, eliminating rapid back-to-back wakes.
+- **Application Gating Protocol:** Hardware ownership is mutually exclusive: ULP is dormant when Flow B interactive session is active.
+- **Interactive Flow B Session (30s):** Active user session with 80 MHz DFS power droop between clicks, resetting 30s inactivity timer on input before coordinating a 7-step stand-down to deep sleep.
+- **Zero-Volt Cable Guard:** Intelligent battery ADC evaluation allowing continuous operation when running via USB cable ($V_{\text{bat}} \approx 0\text{mV}$) with `BAT_CTRL` asserted.
+- **Bootloader Power Latch Hand-off:** Early power latching (`BAT_CTRL` GPIO 17) initiated in `h1os_boot_hook` (2nd-stage bootloader), with HAL and subsystem layers exposing only safe release wrappers.
+- **Minimal SD Card Manager (`sub_sdcard`):** Streamlined subsystem limited to file I/O, format, and capacity checking.
+- **Unified Public API (`h1os.h`):** Declarative configuration (`h1os_app_config_t`), lifecycle hooks (`on_wake`, `on_sleep`, `on_power_off`), and telemetry getters.
+- **Public Errata Call to Action (`HARDWARE_ERRATA_AND_PCB_REV_GUIDE.md`):** Direct hardware documentation placed at repository root for PCB engineering visibility.
 
 ### Changed
-- Re-indexed internal architectural documentation into a canonical 11-file suite numbered `00` through `10`.
+- Rebranded entire codebase, namespace, types, and macros from `bsp_*` to `h1os_*`.
+- Shifted button management during active wake from bespoke `sub_button` driver to native LVGL v9 keypad indev (`LV_INDEV_TYPE_KEYPAD`) querying stateless HAL pin readers.
 - Standardized physical I2C pinout to `GPIO 47 (SDA)` and `GPIO 48 (SCL)` per verified hardware schematics.
-- Refactored sensor ingestion into two distinct modules: pure physical I2C acquisition (`sub_sensor`) and pure psychrometric evaluation (`orch_math`).
-- Renamed application sleep entry point to `bsp_app_sleep()` to match `bsp_app_start()`.
-- Standardized stand-down sequence across both sleep and shutdown: `on_hook` -> `splash` -> `chime` -> `wait_busy` -> `sync_frame` -> `sleep/shutdown`.
+- Refactored sensor ingestion into pure physical I2C acquisition (`sub_sensor`) and pure psychrometric evaluation (`orch_math`).
+- Standardized 7-step hardware stand-down sequence across both sleep and shutdown: `on_hook` $\rightarrow$ `splash` $\rightarrow$ `chime` $\rightarrow$ `wait_busy` $\rightarrow$ `sync_frame` $\rightarrow$ `sleep/shutdown`.
+- Deferred SPI Flash framebuffer writes to sleep and shutdown transitions only, eliminating flash wear during active rendering.
 
 ### Fixed
-- Fixed circular include errors between audio, splash, and base BSP headers by moving common types to Layer 1 `hal_types.h`.
+- Fixed circular include errors between audio, splash, and base headers by consolidating base types into Layer 1 `hal_types.h`.
 - Fixed callback slot collision where internal display shutdown hooks were overwritten by user lifecycle callbacks.
-- Fixed RTC Slow Memory exhaustion by moving the 5,000-byte E-Paper framebuffer out of RTC RAM and into SPI Flash.
-- Fixed SPI Flash write spamming during active LVGL screen rendering.
-- Fixed ES8311 unpowered bus clamping by maintaining 3.3V rail and using software power-down (Reg `0x0D`).
+- Fixed RTC Slow Memory exhaustion by moving the 5,000-byte E-Paper framebuffer out of RTC RAM and into dedicated SPI Flash (`epd_frame`, 16KB).
+- Fixed ES8311 unpowered bus clamping by maintaining 3.3V rail and using software register `0x0D` power-down (<1.0 µA).
 - Fixed Zero-Hour timer race conditions via ULP hardware arbitration on `GPIO 5` (`RTC_INT`).
 
-### Deprecated
-- Deprecated monolithic `bsp_common.c` and `bsp_sleep()` wrappers in favor of Layer 3 Orchestrator and Layer 4 `bsp_app_sleep()`.
+### Deprecated / Removed
+- Deprecated legacy scaffolding files: `bsp_common.c`, `bsp_power.c`, `bsp_button.c`, and monolithic `bsp_sleep()` wrappers.
+- Removed obsolete `on_pxe` lifecycle hook in favor of standard Flow B interactive wake.
 - Deprecated synthetic thermal divider calibration code (`bsp_sensor_cal.c/.h`) in favor of Class-E thermodynamic invariant reconstruction.
 
 ---
 
 ## Versioning Guidelines
-- **MAJOR (x.0.0)**: Breaking changes to public Layer 4 API (`bsp.h`, `bsp_app_config_t`).
+- **MAJOR (x.0.0)**: Breaking changes to public Layer 4 API (`h1os.h`, `h1os_app_config_t`).
 - **MINOR (0.x.0)**: New peripheral features, additional telemetry metrics, or backward-compatible API additions.
 - **PATCH (0.0.x)**: Bug fixes, timing optimizations in sub-execution, or hardware calibration tweaks.

@@ -47,12 +47,14 @@ def find_font_sources(repo_root: Path):
     candidates_ttf = [
         repo_root.parent / "assets" / "tool_harness" / "lvgl-9.6.0" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
         repo_root / "examples" / "Peripherals_Test_Suite" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
+        repo_root / "examples" / "H1OS" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
         repo_root / "examples" / "OSDemo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
         repo_root / "examples" / "Unified_Environmental_Demo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
     ]
     candidates_fa = [
         repo_root.parent / "assets" / "tool_harness" / "lvgl-9.6.0" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
         repo_root / "examples" / "Peripherals_Test_Suite" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
+        repo_root / "examples" / "H1OS" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
         repo_root / "examples" / "OSDemo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
         repo_root / "examples" / "Unified_Environmental_Demo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
     ]

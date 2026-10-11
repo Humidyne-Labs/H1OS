@@ -1,15 +1,14 @@
-# Layer 4: User Application Lifecycle API Specification
+# Layer 4: Application Lifecycle API & Services Specification
 
 ## 1. Overview
-Layer 4 is the top-level user-facing interface (`bsp.h`). It provides an intuitive, declarative application framework that isolates application developers from low-level register juggling, FreeRTOS synchronization, and deep sleep state transitions.
-
-> **Key Design Tenet:** All user interaction with the BSP happens through **declarative lifecycle configuration** and **three high-level lifecycle functions** (`bsp_app_start`, `bsp_app_sleep`, `bsp_app_shutdown`).
+Layer 4 is the top-level public interface of H1OS (`h1os.h`). It isolates developers from low-level register manipulation, coprocessor details, and power sequencing by exposing:
+1. **Declarative Lifecycle Engine:** `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, and `h1os_get_telemetry()`.
+2. **Interactive UI Session Engine:** LVGL v9 display driver port, keypad indev binding, 80 MHz DFS idle power droop, and 30-second inactivity stand-down.
+3. **System Time Services:** POSIX clock bridge, timezone formatting, and pluggable external SNTP sync callbacks.
 
 ---
 
 ## 2. Declarative Application Lifecycle Configuration
-
-The application configures its behavior through `bsp_app_config_t`:
 
 ```c
 #pragma once
@@ -24,121 +23,107 @@ typedef struct {
     esp_reset_reason_t       reset_reason;
     esp_sleep_wakeup_cause_t wake_cause;
     uint32_t                 boot_count;
-    uint32_t                 wake_count;
+    uint32_t                 deep_sleep_count;
     bool                     woke_from_button;
-    uint8_t                  wake_button_num;
-    uint32_t                 last_sleep_sec;
+    uint8_t                  wake_button;
+    uint32_t                 sleep_duration_sec;
     void                     *user_data;
-} bsp_app_wake_context_t;
+} h1os_wake_context_t;
 
 /**
  * @brief Presentation splash screen types
  */
 typedef enum {
-    BSP_SPLASH_BOOT = 0,
-    BSP_SPLASH_WAKE,
-    BSP_SPLASH_SLEEP,
-    BSP_SPLASH_SHUTDOWN,
-    BSP_SPLASH_MAX
-} bsp_splash_type_t;
+    H1OS_SPLASH_BOOT = 0,
+    H1OS_SPLASH_WAKE,
+    H1OS_SPLASH_SLEEP,
+    H1OS_SPLASH_SHUTDOWN,
+    H1OS_SPLASH_MAX
+} h1os_splash_type_t;
 
 /**
  * @brief Hardware acoustic chime types
  */
 typedef enum {
-    BSP_CHIME_BOOT = 0,
-    BSP_CHIME_WAKE,
-    BSP_CHIME_SLEEP,
-    BSP_CHIME_SHUTDOWN,
-    BSP_CHIME_ALARM,
-    BSP_CHIME_MAX
-} bsp_chime_type_t;
+    H1OS_CHIME_BOOT = 0,
+    H1OS_CHIME_WAKE,
+    H1OS_CHIME_SLEEP,
+    H1OS_CHIME_SHUTDOWN,
+    H1OS_CHIME_ALARM,
+    H1OS_CHIME_MAX
+} h1os_chime_type_t;
 
-/**
- * @brief Callback Signatures
- */
-typedef void (*bsp_app_boot_cb_t)     (void *user_data);
-typedef void (*bsp_app_wake_cb_t)     (const bsp_app_wake_context_t *ctx, void *user_data);
-typedef void (*bsp_app_pre_sleep_cb_t)(uint32_t sleep_sec, void *user_data);
-typedef void (*bsp_app_shutdown_cb_t) (void *user_data);
-typedef void (*bsp_app_splash_cb_t)   (bsp_splash_type_t type, void *user_data);
-typedef void (*bsp_app_chime_cb_t)    (bsp_chime_type_t type, void *user_data);
+typedef void (*h1os_boot_cb_t)     (void *user_data);
+typedef void (*h1os_wake_cb_t)     (const h1os_wake_context_t *ctx, void *user_data);
+typedef void (*h1os_pre_sleep_cb_t)(uint32_t sleep_sec, void *user_data);
+typedef void (*h1os_shutdown_cb_t) (void *user_data);
+typedef void (*h1os_splash_cb_t)   (h1os_splash_type_t type, void *user_data);
+typedef void (*h1os_chime_cb_t)    (h1os_chime_type_t type, void *user_data);
 
 /**
  * @brief Master Application Lifecycle Configuration
  */
 typedef struct {
-    /* 1. Core Execution Hooks */
-    bsp_app_boot_cb_t      on_boot;       ///< Executed on cold power-on / hardware reset
-    bsp_app_wake_cb_t      on_wake;       ///< Executed on wake from deep sleep (Timer / RTC / Button)
-    bsp_app_pre_sleep_cb_t on_pre_sleep;  ///< Executed immediately prior to sleep entry
-    bsp_app_shutdown_cb_t  on_shutdown;   ///< Executed immediately prior to battery cut
+    /* Core Execution Hooks */
+    h1os_boot_cb_t      on_boot;       ///< Cold boot / power-on reset hook
+    h1os_wake_cb_t      on_wake;       ///< Interactive wake hook (Timer / RTC Alarm / Button Tap)
+    h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to deep sleep stand-down
+    h1os_shutdown_cb_t  on_shutdown;   ///< Hook executed immediately prior to battery cut
 
-    /* 2. Autonomous Background Sub-Execution */
+    /* Presentation Cues */
     struct {
-        bool     enabled;                 ///< Enable headless SHTC3 sensor acquisition during sleep
-        uint32_t interval_sec;            ///< Sub-execution sampling cadence (default: 60s)
-    } sub_execution;
-
-    /* 3. Audio & Visual Presentation Cues */
-    struct {
-        bsp_app_splash_cb_t on_splash;    ///< Custom splash screen rendering callback
-        bsp_app_chime_cb_t  on_chime;     ///< Custom chime callback (overrides hardware synthesizer)
-        uint8_t             chime_mask;   ///< Default hardware synthesized beeps to play
+        h1os_splash_cb_t on_splash;    ///< Custom splash rendering callback
+        h1os_chime_cb_t  on_chime;     ///< Custom chime callback
+        uint8_t          chime_mask;   ///< Hardware synthesized chime bitmask
     } presentation;
 
-    void *user_data;                      ///< User context passed to all registered callbacks
-} bsp_app_config_t;
+    /* Interactive Session Parameters */
+    struct {
+        uint32_t inactivity_timeout_sec; ///< Inactivity stand-down timer (default: 30s)
+        bool     enable_dfs_80mhz;       ///< Enable 80 MHz power droop while waiting for input (default: true)
+    } session;
+
+    void *user_data;
+} h1os_lifecycle_t;
 ```
 
 ---
 
 ## 3. Core Lifecycle Control APIs
 
-### 3.1 `bsp_app_start()`
-Entry point for the application, typically called from `app_main()`:
+### 3.1 `h1os_start()`
+Entry point for the application, called from `app_main()`:
 ```c
-esp_err_t bsp_app_start(const bsp_app_config_t *config);
+esp_err_t h1os_start(const h1os_lifecycle_t *config);
 ```
-- Initializes base hardware latch, inspects wake source.
-- If deep sleep timer wake & sub-execution armed: executes **Flow A** (<10ms) and returns directly to sleep without invoking `app_main()` logic.
-- If main wake / boot: executes **Flow B**, restores display state, disarms sub-execution, and dispatches to `on_boot` or `on_wake`.
+- Initializes base HAL and releases RTC pad holds.
+- Inspects ULP dispatch reason:
+  - If `DISPATCH_BOOTLOADER_JUMP`: Jumps straight to ROM Download Bootloader.
+  - If `DISPATCH_POWER_OFF`: Cuts power latch immediately.
+  - If `DISPATCH_MAIN_WAKE` / Boot:
+    - Launches Flow B interactive session.
+    - Sets 240 MHz turbo for initial render.
+    - Binds physical buttons to LVGL `lv_indev` (Keypad).
+    - Dispatches to user `on_boot` or `on_wake`.
+    - Manages the 30-second inactivity stand-down loop with 80 MHz DFS idle power droop.
 
----
-
-### 3.2 `bsp_app_sleep()`
-Single unified entry point for sleep:
+### 3.2 `h1os_sleep()`
+Explicit command to enter deep sleep:
 ```c
-esp_err_t bsp_app_sleep(uint32_t sleep_sec);
+esp_err_t h1os_sleep(uint32_t sleep_sec);
 ```
-- Executes the deterministic stand-down sequence:
-  1. Calls user `on_pre_sleep()`.
-  2. Calls `on_splash(BSP_SPLASH_SLEEP)`.
-  3. Plays sleep chime.
-  4. Waits for E-Paper panel to complete particle latching.
-  5. Commits dirty frame to `epd_frame` partition.
-  6. Configures wake sources (External RTC alarm for `sleep_sec`, internal sub-exec timer).
-  7. Arms sub-execution in RTC memory if enabled.
-  8. Enters deep sleep.
+- Executes the deterministic 7-step stand-down sequence via Layer 3 `orch_flow`.
 
----
-
-### 3.3 `bsp_app_shutdown()`
-Executes an orderly board power cut:
+### 3.3 `h1os_shutdown()`
+Orderly power cut:
 ```c
-void bsp_app_shutdown(void);
+void h1os_shutdown(void);
 ```
-- Calls user `on_shutdown()`.
-- Renders `BSP_SPLASH_SHUTDOWN`.
-- Commits final frame to flash.
-- Resets RTC Slow Memory to pristine state.
-- Drops power latch (`BAT_CTRL` = 0).
+- Calls `on_shutdown()`, commits final frame, resets RTC memory, and releases `GPIO 17 (BAT_CTRL)`.
 
 ---
 
 ## 4. Telemetry Consumption API
-
-Instead of forcing users to assemble readings from three different sensors and math functions, Layer 4 provides a single, unified getter:
 
 ```c
 typedef struct {
@@ -158,45 +143,38 @@ typedef struct {
     // Quality & Stability Metrics
     bool     is_thermally_settled;
     uint32_t sample_count;
-    uint32_t battery_mv;
+    uint16_t battery_mv;
     uint8_t  battery_percent;
-} bsp_app_telemetry_t;
+    bool     is_usb_powered;
+} h1os_telemetry_t;
 
-esp_err_t bsp_app_get_telemetry(bsp_app_telemetry_t *out_telemetry);
+esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry);
 ```
+- **Thermal Lockout MUX:** If the CPU is awake and running hot, `h1os_get_telemetry()` automatically serves pristine cold baseline values from RTC memory, preventing PCB self-heating from corrupting displayed data.
 
 ---
 
-## 5. Typical `app_main()` Example Implementation
+## 5. UI Engine: `h1os_lvgl.cpp/.h` (LVGL v9 Port)
 
-```c
-#include "bsp.h"
+- **Monochrome Buffer:** Allocates 40-line partial render buffer in internal SRAM with 1-bit monochrome palette (Index 0 = Black, Index 1 = White).
+- **Keypad Input Device (`lv_indev`):**
+  - Samples `hal_io_button_is_pressed()`.
+  - Sets `indev->long_press_time = 1500`.
+  - Dispatches `LV_EVENT_CLICKED` on BOOT to switch between Screen 1 (Env) and Screen 2 (Health).
+  - Resets the 30-second inactivity timer on every click.
+- **Dynamic Frequency Scaling (DFS) Power Droop:**
+  - Maintains 80 MHz baseline between user clicks.
+  - Automatically raises CPU to 240 MHz during LVGL display flushes.
+- **Mutex Safety:** Provides `h1os_lvgl_lock()` and `h1os_lvgl_unlock()` around FreeRTOS tasks.
 
-static void my_on_boot(void *user_data) {
-    ESP_LOGI("APP", "Cold boot initialized!");
-}
+---
 
-static void my_on_wake(const bsp_app_wake_context_t *ctx, void *user_data) {
-    ESP_LOGI("APP", "Woke from sleep! Cause: %d, Cycles: %lu", ctx->wake_cause, ctx->wake_count);
-    
-    bsp_app_telemetry_t telem;
-    if (bsp_app_get_telemetry(&telem) == ESP_OK) {
-        // Render UI with telem data...
-    }
-    
-    // Sleep for 10 minutes; sub-execution samples every 60s in background
-    bsp_app_sleep(600);
-}
+## 6. Time Services: `h1os_time.c/.h`
 
-void app_main(void) {
-    bsp_app_config_t config = {
-        .on_boot = my_on_boot,
-        .on_wake = my_on_wake,
-        .sub_execution = {
-            .enabled      = true,
-            .interval_sec = 60,
-        },
-    };
-    bsp_app_start(&config);
-}
-```
+- Bridges PCF85063A hardware RTC time into the POSIX system clock via `settimeofday()`.
+- Provides timezone formatting (`TZ="EST5EDT,M3.2.0,M11.1.0"`).
+- Implements a pluggable external SNTP sync callback:
+  ```c
+  typedef void (*h1os_time_sync_cb_t)(struct tm *out_time, void *user_data);
+  esp_err_t h1os_time_register_sync_cb(h1os_time_sync_cb_t cb, void *user_data);
+  ```

@@ -27,10 +27,10 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "bsp/bsp.h"
+#include "h1os/h1os.h"
 #include "lvgl.h"
 
-static const char *TAG = "unified_demo";
+static const char *TAG = "h1os_main";
 
 /* --- Configuration Constants --- */
 #define SENSOR_SAMPLE_INTERVAL_SEC      60       /* 60-second headless sub execution period       */
@@ -559,6 +559,8 @@ static void app_on_power_off(void *user_data)
  * ========================================================================= */
 void app_main(void)
 {
+    ESP_LOGI(TAG, "Starting %s (%s v%s)", H1OS_NAME, H1OS_SUBTITLE, H1OS_VERSION_STRING);
+
     bsp_app_lifecycle_t lifecycle = {
         .on_pxe                     = app_on_pxe,
         .on_boot                    = app_on_boot,

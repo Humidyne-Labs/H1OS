@@ -33,7 +33,6 @@
 #include "driver/rtc_io.h"
 #include "bsp/hal_types.h"
 #include "bsp/sub_rtc.h"
-#include "bsp/bsp_wifi.h"
 #include "bsp/bsp_power.h"
 #include "bsp/bsp_splash.h"
 #include "bsp/bsp_lvgl.h"
@@ -127,10 +126,7 @@ void bsp_power_off(void)
     // 9. Turn off status LED
     bsp_led_set(false);
 
-    // 10. Disconnect Wi-Fi
-    bsp_wifi_disconnect();
-
-    // 11. Clear any active RTC alarms and timers so external RTC does not wake the device while powered down
+    // 10. Clear any active RTC alarms and timers so external RTC does not wake the device while powered down
     sub_rtc_cancel_countdown();
     sub_rtc_get_and_clear_interrupts(NULL, NULL);
 
@@ -331,10 +327,7 @@ esp_err_t bsp_enter_sleep(const bsp_sleep_config_t *config)
     // 5. Turn off Status LED
     bsp_led_set(false);
 
-    // 6. Disconnect Wi-Fi
-    bsp_wifi_disconnect();
-
-    // 7. Put SSD1681 e-Paper into ultra-low power deep sleep mode (<1 uA)
+    // 6. Put SSD1681 e-Paper into ultra-low power deep sleep mode (<1 uA)
     sub_display_enter_deep_sleep();
 
     // 8. Mute Audio Power Amp without cutting codec power rail (prevents I2C bus clamping!)

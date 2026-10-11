@@ -30,11 +30,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     `bsp_sensors.c/.h`, `bsp_equ_math.c/.h`, `bsp_env_telemetry.h`, `bsp_rtc.c/.h`, `bsp_rtc_mem.c/.h`, `bsp_i2c.c/.h`, `bsp_display.cpp/.h`, `bsp_audio.c/.h`, `pinout.h`.
   - Decoupled and rewired remaining higher-level modules (`bsp_common.c`, `bsp_power.c`, `bsp_button.c`, `bsp_sdcard.c`, `bsp_time.c`, `bsp_lvgl.cpp`) to Layer 1 HAL primitives (`hal_types.h`, `hal_io.h`, `hal_i2c.h`), Layer 2 Subsystems (`sub_sensor`, `sub_rtc`, `sub_display`, `sub_power`, `sub_audio`), and Layer 3 Orchestrators (`orch_state`, `orch_flow`, `orch_display_sync`).
   - Preserved historical code in `legacy_reference/` as an immutable reference backup.
-- **OSDemo Revamped & Migrated**:
-  - Migrated demo application from `examples/Unified_Environmental_Demo` to `examples/OSDemo` with `project(osdemo)`.
-  - Rewrote `examples/OSDemo/main/main.c` to consume telemetry exclusively through Layer 4 `bsp_app_get_telemetry(&telem)`.
-  - Replaced legacy display wait routines and button pin definitions with clean Layer 2 `sub_display_wait_busy()` and Layer 1 `HAL_PIN_*` constants.
-  - Successfully compiled and linked `osdemo.elf` with Ninja under ESP-IDF v6.1 dev profile (`build_dev/`).
+- **H1OS Transition & Architecture Elevation**:
+  - Formally rebranded platform to **H1OS** (Class-E Environmental Operating System) under Semantic Versioning `1.0.0-alpha`.
+  - Introduced primary master umbrella header [`h1os/h1os.h`](components/esp32-s3_bsp/include/h1os/h1os.h) exposing declarative lifecycle entry points (`h1os_start()`, `h1os_get_telemetry()`, `h1os_sleep()`, `h1os_shutdown()`).
+  - Migrated flagship demonstration application to `examples/H1OS` with `project(h1os)`.
+  - Rewrote `examples/H1OS/main/main.c` to consume telemetry exclusively through `bsp_app_get_telemetry(&telem)` and log H1OS startup branding.
+  - Successfully compiled and linked `h1os.elf` with Ninja under ESP-IDF v6.1 dev profile (`build_dev/`).
 - **Low-Level Peripheral Verification & Register Truth Audit**:
   - Created `docs/perf_and_drivers/` with 8 comprehensive physical hardware specifications documenting every IC's init, deinit, runtime, sleep, and register parameters.
   - **PCF85063A (`sub_rtc.c`)**: Corrected countdown timer clock frequency prescaler (`TCF`) bit shifting into bits `[4:3]` (`(2 << 3)` for 1Hz and `(3 << 3)` for 1/60Hz); removed incorrect `TIE` bitmask from `Control_2` (bit 2 is `COF[2]`); added 12.5pF crystal capacitance selection (`CTRL1_CAP_SEL_12_5PF`) in `Control_1`.

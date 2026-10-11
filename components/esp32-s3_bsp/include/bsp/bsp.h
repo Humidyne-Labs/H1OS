@@ -29,13 +29,7 @@
 #include "bsp/bsp_sdcard.h"
 #include "bsp/bsp_lvgl.h"
 #include "bsp/bsp_nvs.h"
-#include "bsp/bsp_wifi.h"
 #include "bsp/bsp_time.h"
-#include "bsp/bsp_prov.h"
-#include "bsp/bsp_ota.h"
-#if CONFIG_BSP_ENABLE_THINGSBOARD
-#include "bsp/bsp_tb.h"
-#endif
 
 /* --- Clean-Slate 4-Layer Modular Architecture Headers --- */
 #include "bsp/hal_types.h"

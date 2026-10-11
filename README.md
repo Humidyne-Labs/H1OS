@@ -1,13 +1,13 @@
-# ESP32-S3 ePaper 1.54" Board Support Package (BSP)
+# H1OS: Class-E Environmental Operating System
 
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.1%20|%20v5.3%20|%20v6.1-blue.svg)](https://idf.espressif.com/)
 [![Target](https://img.shields.io/badge/Hardware-Waveshare%20ESP32--S3--ePaper--1.54%20V2-green.svg)](https://www.waveshare.com)
 [![Graphics](https://img.shields.io/badge/LVGL-v9.6.0-orange.svg)](https://lvgl.io/)
-[![Version](https://img.shields.io/badge/SemVer-1.3.1-brightgreen.svg)](components/esp32-s3_bsp/include/bsp/bsp_version.h)
+[![Version](https://img.shields.io/badge/H1OS-v1.0.0--alpha-brightgreen.svg)](components/esp32-s3_bsp/include/h1os/h1os.h)
 [![Docs](https://img.shields.io/badge/Docs-User%20Guide-blue.svg)](docs/bsp_user_guide.md)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-Production-grade Board Support Package, event-driven application lifecycle framework, and peripheral driver architecture for the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32-S3-PICO-1-N8R8**). Engineered as a reference platform for **Class-E Environmental Telemetry & Hygrometer** nodes under **ESP-IDF v5.1+, v5.3+, and v6.1**.
+Production-grade, event-driven ambient operating system and peripheral architecture turning the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32-S3-PICO-1-N8R8**) into an **instrument-grade Class-E hygrometer and luxury environmental telemetry appliance** under **ESP-IDF v5.1+, v5.3+, and v6.1**.
 
 > 📘 **Looking for the developer reference manual?** See the full **[BSP Developer Reference Manual](docs/bsp_user_guide.md)**.
 
@@ -319,7 +319,7 @@ The `bsp_tb` subsystem connects to ThingsBoard cloud or on-premise instances ove
 | Project | Location | Description |
 |---|---|---|
 | **Peripherals Test Suite** | [`examples/Peripherals_Test_Suite`](examples/Peripherals_Test_Suite) | Complete 15-test automated verification suite covering all hardware peripherals, staged sleep tests, and interactive button triggers. |
-| **OSDemo (Environmental Monitor)**| [`examples/OSDemo`](examples/OSDemo) | Complete production hygrometer application featuring background sub-executions, tri-node psychrometrics, and low-power deep sleep cycles. |
+| **H1OS Instrument Station**| [`examples/H1OS`](examples/H1OS) | Flagship Class-E luxury hygrometer and telemetry instrument application featuring ULP-RISC-V sentinel, fast RTC wake stubs, and bi-stable electrophoretic UI. |
 | **Boilerplate Application** | [`examples/boilerplate`](examples/boilerplate) | Minimal starter template for new production firmware projects. |
 | **Splash & Chime Sample** | [`examples/bsp_samples/bsp_splash_example`](examples/bsp_samples/bsp_splash_example) | Demonstrates declarative splash screen and acoustic chime configurations. |
 

@@ -67,13 +67,34 @@ typedef enum {
 esp_err_t bsp_time_set_timezone(const char *tz_str);
 
 /**
- * @brief Perform SNTP Network Time Synchronization
+ * @brief User Callback for External Network / Remote Time Synchronization
  *
- * Connects to NTP server (pool.ntp.org), sets ESP32 system clock,
- * and synchronizes the external PCF85063A RTC hardware registers.
+ * If registered, bsp_time_sntp_sync() delegates to this callback.
+ * The callback should acquire time (e.g. SNTP, GPS, LTE, BLE) and return ESP_OK.
+ * Upon ESP_OK, bsp_time automatically syncs the updated system time into the PCF85063A RTC.
  *
- * @param[in] timeout_ms Maximum time to wait for NTP response
+ * @param timeout_ms Maximum allowed sync duration in ms
+ * @param user_data User context pointer
+ */
+typedef esp_err_t (*bsp_time_sync_cb_t)(uint32_t timeout_ms, void *user_data);
+
+/**
+ * @brief Register External Time Synchronization Callback
+ *
+ * @param cb Callback function pointer
+ * @param user_data User context pointer
  * @return esp_err_t ESP_OK on success
+ */
+esp_err_t bsp_time_register_sync_cb(bsp_time_sync_cb_t cb, void *user_data);
+
+/**
+ * @brief Perform Network / External Time Synchronization
+ *
+ * Invokes the registered time sync callback (if set) and synchronizes the
+ * external PCF85063A RTC hardware registers upon success.
+ *
+ * @param[in] timeout_ms Maximum time to wait for time response
+ * @return esp_err_t ESP_OK on success, ESP_ERR_NOT_SUPPORTED if no callback registered
  * @details Memory ownership: none. Behavior: Blocking. Thread safety: no thread safety guarantees.
  */
 esp_err_t bsp_time_sntp_sync(uint32_t timeout_ms);

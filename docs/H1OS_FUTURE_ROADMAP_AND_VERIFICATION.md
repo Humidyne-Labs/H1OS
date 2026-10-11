@@ -27,16 +27,16 @@ Unlike typical hobbyist IoT firmware that polls continuously and suffers from el
 
 ---
 
-## 2. Strategic Decision Points for Future Discussion
+## 2. Platform Architecture Alignment (H1OS Adopted)
 
-When resuming development, the following strategic decisions are queued for alignment:
+The platform has formally transitioned to **H1OS**:
 
-| Topic | Options | Trade-offs & Analysis | Recommended Default |
-|---|---|---|---|
-| **Component Directory Structure** | **Option A:** Keep `components/esp32-s3_bsp`<br>**Option B:** Rename to `components/h1os` | Option A retains plug-and-play compatibility with Espressif Component Registry conventions (`esp-bsp`). Option B fully embraces the standalone OS identity. | **Hybrid:** Keep folder as `components/esp32-s3_bsp` for registry, provide top-level `#include "h1os/h1os.h"` header. |
-| **Flagship Demo Name** | **Option A:** `examples/OSDemo`<br>**Option B:** `examples/H1OS`<br>**Option C:** `examples/H1OS_Station` | `examples/H1OS` immediately communicates that this is the primary luxury instrument application running on H1OS. | **`examples/H1OS`** |
-| **Master Header Transition** | **Option A:** Expose `h1os/h1os.h` with `H1OS_APP_MAIN()`<br>**Option B:** Keep `bsp/bsp.h` | Exposing `h1os.h` creates a modern, declarative API while keeping `bsp/bsp.h` as a transitional alias for existing tests. | **Option A** |
-| **Component Registry Publication** | **Option A:** Publish to Espressif Component Registry as `h1os`<br>**Option B:** Keep private / GitHub-only | Publishing establishes H1OS as the premier e-paper telemetry framework in the ESP32 ecosystem. | **Publish as `h1os` v1.0.0** |
+| Architecture Domain | Established Standard | Implementation Details |
+|---|---|---|
+| **Component Directory Structure** | **Hybrid / Registry-Aligned** | Retains `components/esp32-s3_bsp` for seamless upstream Espressif Component Registry compatibility, while exposing `#include "h1os/h1os.h"` as the primary master executive API. |
+| **Flagship Instrument Demo** | **`examples/H1OS`** | Located at [`examples/H1OS`](../examples/H1OS) (`project(h1os)`), showcasing the Class-E luxury hygrometer dashboard. |
+| **Master Header** | **`h1os/h1os.h`** | High-level declarative umbrella header ([`include/h1os/h1os.h`](../components/esp32-s3_bsp/include/h1os/h1os.h)) providing `h1os_start()`, `h1os_get_telemetry()`, `h1os_sleep()`, and `h1os_shutdown()`. |
+| **Version Alignment** | **v1.0.0-alpha** | SemVer `1.0.0-alpha` representing the clean-slate 4-layer architecture. |
 
 ---
 
@@ -60,6 +60,7 @@ Every driver in the H1OS repository has been verified against the physical IC re
 │ MicroSD FATFS       │ bsp_sdcard.c     │ 06_microsd_fatfs         │ PASS (1-bit SDMMC) │
 │ Tactile Buttons/LED │ bsp_button.c     │ 07_tactile_buttons_led   │ PASS (100k pullup) │
 │ Bus HAL (I2C/SPI)   │ hal_i2c, hal_spi │ 00_overview_matrix       │ PASS (4.7k, 20MHz) │
+│ Hardware Errata/PCB │ (Hardware Rev B) │ 08_hardware_errata_guide │ DOCUMENTED (E1-E8) │
 └─────────────────────┴──────────────────┴──────────────────────────┴────────────────────┘
 ```
 

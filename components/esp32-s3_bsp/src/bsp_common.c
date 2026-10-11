@@ -109,11 +109,8 @@ esp_err_t bsp_get_diagnostics(bsp_diag_info_t *diag)
     diag->power_rail_good        = (gpio_get_level((gpio_num_t)HAL_PIN_POWER_HOLD) == 1);
     diag->i2c_bus_healthy        = (hal_i2c_probe(HAL_I2C_ADDR_SHTC3) == ESP_OK);
     diag->display_ready          = (sub_display_get_framebuffer() != NULL);
-    diag->wifi_connected         = bsp_wifi_is_connected();
-
-    int rssi                     = 0;
-    bsp_wifi_get_rssi(&rssi);
-    diag->wifi_rssi              = (int8_t)rssi;
+    diag->wifi_connected         = false;
+    diag->wifi_rssi              = 0;
 
     return ESP_OK;
 }

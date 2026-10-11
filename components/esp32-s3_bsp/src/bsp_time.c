@@ -15,16 +15,16 @@
 #include <string.h>
 #include <sys/time.h>
 #include "esp_log.h"
-#include "esp_sntp.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "bsp/sub_rtc.h"
 #include "bsp/bsp_time.h"
-#include "bsp/bsp_wifi.h"
 
 static const char *TAG = "bsp_time";
 
+static bsp_time_sync_cb_t s_sync_cb        = NULL;
+static void              *s_sync_user_data = NULL;
 static esp_timer_handle_t s_periodic_sync_timer = NULL;
 
 esp_err_t bsp_time_set_timezone(const char *tz_str) {
@@ -78,34 +78,30 @@ esp_err_t bsp_time_sync_rtc_to_system(void)
     return ESP_OK;
 }
 
+esp_err_t bsp_time_register_sync_cb(bsp_time_sync_cb_t cb, void *user_data)
+{
+    s_sync_cb        = cb;
+    s_sync_user_data = user_data;
+    ESP_LOGI(TAG, "External time synchronization callback registered");
+    return ESP_OK;
+}
+
 esp_err_t bsp_time_sntp_sync(uint32_t timeout_ms)
 {
-    if (!bsp_wifi_is_connected()) {
-        ESP_LOGW(TAG, "Cannot sync SNTP: Wi-Fi is not connected");
-        return ESP_ERR_INVALID_STATE;
+    if (s_sync_cb == NULL) {
+        ESP_LOGD(TAG, "No external time sync callback registered; running on PCF85063A RTC");
+        return ESP_ERR_NOT_SUPPORTED;
     }
 
-    ESP_LOGI(TAG, "Initializing SNTP client (pool.ntp.org)...");
-    esp_sntp_stop();
-    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, "pool.ntp.org");
-    esp_sntp_setservername(1, "time.google.com");
-    esp_sntp_init();
-
-    TickType_t start_tick    = xTaskGetTickCount();
-    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms > 0 ? timeout_ms : 10000);
-
-    while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
-        if ((xTaskGetTickCount() - start_tick) > timeout_ticks) {
-            ESP_LOGW(TAG, "SNTP time synchronization timed out (%lu ms)", (unsigned long)timeout_ms);
-            return ESP_ERR_TIMEOUT;
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
+    ESP_LOGI(TAG, "Invoking external time sync callback (timeout: %lu ms)...", (unsigned long)timeout_ms);
+    esp_err_t err = s_sync_cb(timeout_ms, s_sync_user_data);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "External time sync successful; writing to PCF85063A RTC hardware");
+        bsp_time_sync_system_to_rtc();
+    } else {
+        ESP_LOGW(TAG, "External time sync callback failed: %s", esp_err_to_name(err));
     }
-
-    ESP_LOGI(TAG, "SNTP time synchronization successful");
-    bsp_time_sync_system_to_rtc();
-    return ESP_OK;
+    return err;
 }
 
 esp_err_t bsp_time_get_formatted(bsp_time_format_t fmt, char *dest, size_t max_len)
@@ -176,8 +172,8 @@ esp_err_t bsp_time_get_date_dow_str(char *dest, size_t max_len) {
 }
 
 static void periodic_sync_timer_cb(void *arg) {
-    ESP_LOGI(TAG, "Periodic SNTP 24h timer triggered");
-    if (bsp_wifi_is_connected()) bsp_time_sntp_sync(8000);
+    ESP_LOGI(TAG, "Periodic time sync timer triggered");
+    bsp_time_sntp_sync(8000);
 }
 
 esp_err_t bsp_time_start_periodic_sync(uint32_t interval_sec) {

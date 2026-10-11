@@ -19,10 +19,7 @@ set(bsp_srcs
     "src/orch_wake_stub.c"
     "src/bsp_lvgl.cpp"
     "src/bsp_nvs.c"
-    "src/bsp_wifi.c"
     "src/bsp_time.c"
-    "src/bsp_prov.c"
-    "src/bsp_ota.c"
     "src/bsp_font_montserrat_14_1bpp.c"
     "src/bsp_font_montserrat_20_1bpp.c"
 )
@@ -40,16 +37,6 @@ set(bsp_requires
     fatfs
     log
     freertos
-    esp_wifi
-    esp_netif
-    esp_event
-    network_provisioning
-    bt
-    protocomm
-    app_update
-    esp_https_ota
-    mbedtls
-    esp-tls
     lvgl
     esp_mmap_assets
     esp_lv_fs
@@ -60,11 +47,6 @@ set(bsp_requires
     esp_hw_support
     ulp
 )
-
-if(CONFIG_BSP_ENABLE_THINGSBOARD)
-    list(APPEND bsp_srcs "src/bsp_tb.c")
-    list(APPEND bsp_requires mqtt cjson)
-endif()
 
 idf_component_register(
     SRCS ${bsp_srcs}

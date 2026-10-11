@@ -10,7 +10,7 @@
     "clangd.arguments": [
       "--background-index",
       "--query-driver=**",
-      "--compile-commands-dir=c:\\Users\\Matt\\Documents\\GitHub\\esp32-s3_bsp\\examples\\OSDemo\\build_dev"
+      "--compile-commands-dir=c:\\Users\\Matt\\Documents\\GitHub\\esp32-s3_bsp\\examples\\H1OS\\build_dev"
     ],
     "idf.flashType": "UART",
     "idf.port": "COM3"
