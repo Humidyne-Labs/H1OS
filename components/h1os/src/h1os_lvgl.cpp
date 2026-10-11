@@ -19,6 +19,7 @@
 #include "hal_types.h"
 #include "h1os_lvgl.h"
 #include "h1os.h"
+#include "orch_display_sync.h"
 #include "display/lv_display_private.h"
 #include "sdkconfig.h"
 
@@ -125,6 +126,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     }
 
     if (lv_display_flush_is_last(disp)) {
+        orch_display_sync_mark_dirty();
         if (s_first_boot_flush) {
             sub_display_refresh_full();
             s_first_boot_flush = false;

@@ -14,6 +14,7 @@
 #include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "esp_timer.h"
 #include <string.h>
 
 static const char *TAG = "sub_display";
@@ -237,6 +238,8 @@ static void epd_load_custom_lut(const uint8_t *lut_buffer)
 
 esp_err_t sub_display_refresh_partial(void)
 {
+    int64_t t_start = esp_timer_get_time();
+
     /* 1. Write New Frame to RAM 0x24 (DO NOT overwrite 0x26 in differential mode!) */
     set_ram_counters();
     hal_spi_write_cmd(0x24);
@@ -265,6 +268,9 @@ esp_err_t sub_display_refresh_partial(void)
 
     /* 5. Sync shadow buffer */
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
+
+    int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
+    ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", t_elapsed_ms);
 
     return ESP_OK;
 }

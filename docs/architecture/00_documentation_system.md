@@ -36,7 +36,8 @@ h1os/ (Repository Root)
 │       ├── 07_flowchart_state_machine.md <-- Doc 07: Mermaid Execution State Flowcharts
 │       ├── 08_lessons_learned_and_rationale.md <-- Doc 08: Post-Mortem & Scaffolding Purge
 │       ├── 09_todo_roadmap.md         <-- Doc 09: Canonical Phased Construction Plan
-│       └── 10_changelog_template.md   <-- Doc 10: SemVer Release & ABI Tracking
+│       ├── 10_changelog_template.md   <-- Doc 10: SemVer Release & ABI Tracking
+│       └── 11_class_e_hardware_benchmarking.md <-- Doc 11: Benchmarking & Silicon Metrics
 ```
 
 ---

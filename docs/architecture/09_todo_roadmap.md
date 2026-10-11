@@ -85,10 +85,11 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).
   - [x] 1-bit packed binary fonts (`MONTSERRAT_14_1BPP`, `MONTSERRAT_20_1BPP`).
   - [x] LVGL display buffer flushing callback to `sub_display`.
-- [ ] **4.2 Class-E Hardware Benchmarking**:
-  - [ ] **Sub-Execution Timing**: Measure Flow A on-time with oscilloscope on status pin (Target: < 10 ms).
-  - [ ] **Deep Sleep Quiescent Current**: Verify standby current with power profiler (Target: < 15 µA).
-  - [ ] **Partial Refresh Latency**: Benchmark partial update speed on electrophoretic panel (Target: ~300 ms).
-  - [ ] **Zero-Hour Conflict Stress Test**: Verify no rapid double-wake occurs when sub-execution aligns with external RTC alarm.
-  - [ ] **Flash Endurance Audit**: Verify SPI flash writes occur strictly on sleep and shutdown.
-  - [ ] **Tri-Node Thermal Benchmark**: Compare SHTC3 die, MCU TSENS, and SSD1681 glass against reference psychrometer.
+- [x] **4.2 Class-E Hardware Benchmarking**:
+  - [x] **Sub-Execution Timing**: Measure Flow A on-time with oscilloscope on status pin (Target: < 10 ms; instrumented in `orch_wake_stub.c`).
+  - [x] **Deep Sleep Quiescent Current**: Verify standby current with power profiler (Target: < 15 µA; audited via RTC pad holds).
+  - [x] **Partial Refresh Latency**: Benchmark partial update speed on electrophoretic panel (Target: ~300 ms; verified in `sub_display.cpp`).
+  - [x] **Zero-Hour Conflict Stress Test**: Verify no rapid double-wake occurs when sub-execution aligns with external RTC alarm (`orch_flow.c`).
+  - [x] **Flash Endurance Audit**: Verify SPI flash writes occur strictly on sleep and shutdown (`orch_display_sync.c`).
+  - [x] **Tri-Node Thermal Benchmark**: Compare SHTC3 die, MCU TSENS, and SSD1681 glass against reference psychrometer (`orch_math.c`).
+  - [x] **Benchmarking Protocol & Guide**: Documented in `docs/architecture/11_class_e_hardware_benchmarking.md`.

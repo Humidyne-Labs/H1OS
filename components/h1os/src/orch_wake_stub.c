@@ -156,10 +156,15 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 /* Master RTC Wake Stub Entry Point */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
+    /* Pull GPIO 3 LOW (pulse start for oscilloscope measurement) */
+    REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
+    REG_WRITE(GPIO_ENABLE_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
+
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
     /* 1. Only timer wakeups are processed by the ultra-fast sensor stub */
     if (cause != ESP_SLEEP_WAKEUP_TIMER) {
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -168,6 +173,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* GPIO 5 is Active LOW */
     if ((REG_READ(GPIO_IN_REG) & (1UL << HAL_PIN_RTC_INT)) == 0) {
         /* External RTC alarm triggered! Promote cleanly to Flow B full UI wake */
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -176,6 +182,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     i2c_start();
     if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
         i2c_stop();
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -225,6 +232,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* 7. Verify CRC8 */
     if (shtc3_crc8(&rx[0], 2) != rx[2] || shtc3_crc8(&rx[3], 2) != rx[5]) {
         /* Checksum mismatch: boot normally so main app can handle diagnostic error */
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -256,6 +264,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* 10. Rearm sleep timer and re-enter deep sleep immediately */
     uint32_t sleep_sec = st->sample_interval_sec;
     if (sleep_sec == 0) sleep_sec = 60;
+
+    /* Turn off status pin pulse right before re-entering sleep */
+    REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
 
     esp_wake_stub_set_wakeup_time((uint64_t)sleep_sec * 1000000ULL);
     esp_wake_stub_sleep(&bsp_wake_stub);
