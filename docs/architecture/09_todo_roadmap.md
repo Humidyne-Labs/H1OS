@@ -33,21 +33,21 @@ Development follows the **Four Canonical Stages of Construction**:
 
 ## Stage 2: Housekeeping & Scaffolding Purge
 
-- [ ] **2.1 Component & Namespace Rebranding**:
-  - [ ] Rename `components/esp32-s3_bsp/` directory to `components/h1os/`.
-  - [ ] Rename bootloader hook component from `bsp_boot_hook` to `h1os_boot_hook`.
-  - [ ] Update root `CMakeLists.txt` and `components/h1os/CMakeLists.txt` to register component as `h1os`.
-  - [ ] Strip demo application CMake to strictly require: `REQUIRES h1os freertos lvgl`.
-- [ ] **2.2 Scaffolding & Obsolete Code Purge**:
-  - [ ] Delete legacy scaffolding: `bsp_common.c`, `bsp_power.c`, `bsp_button.c`, and obsolete headers.
-  - [ ] Migrate `bsp_sdcard.c` to minimal `sub_sdcard.c/.h` (file I/O, format, capacity checking).
-  - [ ] Migrate `bsp_time.c` to Layer 4 `h1os_time.c/.h`.
-  - [ ] Migrate `bsp_lvgl.cpp` to Layer 4 `h1os_lvgl.c/.h` with `LV_INDEV_TYPE_KEYPAD` binding.
-  - [ ] Implement `sub_nvs.c/.h` for non-volatile configuration storage.
-- [ ] **2.3 Bone Stubbing & Header Wiring**:
-  - [ ] Ensure all Layer 1 (`hal_*`) and Layer 2 (`sub_*`) headers declare clean functional contracts.
-  - [ ] Stub drivers with null/placeholder implementations to achieve clean compile-level verification before driver muscle is written.
-  - [ ] Update `examples/H1OS/main/main.c` to include `<h1os.h>` and register `h1os_app_config_t`.
+- [x] **2.1 Component & Namespace Rebranding**:
+  - [x] Rename `components/esp32-s3_bsp/` directory to `components/h1os/`.
+  - [x] Rename bootloader hook component from `bsp_boot_hook` to `h1os_boot_hook`.
+  - [x] Update root `CMakeLists.txt` and `components/h1os/CMakeLists.txt` to register component as `h1os`.
+  - [x] Strip demo application CMake to strictly require: `REQUIRES h1os freertos lvgl`.
+- [x] **2.2 Scaffolding & Obsolete Code Purge**:
+  - [x] Delete legacy scaffolding: `bsp_common.c`, `bsp_power.c`, `bsp_button.c`, and obsolete headers.
+  - [x] Migrate `bsp_sdcard.c` to minimal `sub_sdcard.c/.h` (file I/O, format, capacity checking).
+  - [x] Migrate `bsp_time.c` to Layer 4 `h1os_time.c/.h`.
+  - [x] Migrate `bsp_lvgl.cpp` to Layer 4 `h1os_lvgl.c/.h` with `LV_INDEV_TYPE_KEYPAD` binding.
+  - [x] Implement `sub_nvs.c/.h` for non-volatile configuration storage.
+- [x] **2.3 Bone Stubbing & Header Wiring**:
+  - [x] Ensure all Layer 1 (`hal_*`) and Layer 2 (`sub_*`) headers declare clean functional contracts.
+  - [x] Stub drivers with null/placeholder implementations to achieve clean compile-level verification before driver muscle is written.
+  - [x] Update `examples/H1OS/main/main.c` to include `<h1os.h>` and register `h1os_app_config_t`.
 
 ---
 
