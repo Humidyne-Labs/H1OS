@@ -23,9 +23,10 @@ extern "C" {
 
 typedef enum {
     ORCH_FLOW_COLD_BOOT = 0,
-    ORCH_FLOW_A_SPRINT,     /* Headless <8ms sensor sprint */
-    ORCH_FLOW_B_MAIN_WAKE,   /* Full UI wake / Button wake / RTC timer expiry */
-    ORCH_FLOW_CRITICAL_OFF   /* Low battery shutdown */
+    ORCH_FLOW_A_SPRINT,         /* Headless <8ms sensor sprint */
+    ORCH_FLOW_B_MAIN_WAKE,       /* Full UI wake / Button wake / RTC timer expiry */
+    ORCH_FLOW_BOOTLOADER_JUMP,   /* ROM bootloader download mode */
+    ORCH_FLOW_CRITICAL_OFF       /* Low battery shutdown or power cut */
 } orch_flow_type_t;
 
 /**

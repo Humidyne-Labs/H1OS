@@ -152,6 +152,11 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry);
 esp_err_t h1os_sleep(uint32_t sleep_sec);
 
 /**
+ * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
+ */
+void h1os_reset_session_timer(void);
+
+/**
  * @brief Orderly system shutdown and physical battery power cut.
  */
 void h1os_shutdown(void);

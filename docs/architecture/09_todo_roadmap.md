@@ -53,38 +53,38 @@ Development follows the **Four Canonical Stages of Construction**:
 
 ## Stage 3: The Muscle (Hardware Drivers & Verification)
 
-- [ ] **3.1 Layer 1 HAL Concrete Implementation**:
-  - [ ] `hal_io.c`: GPIO latching (`BAT_CTRL` GPIO 17), EPD rail control (`GPIO 6`), stateless button readers (`GPIO 0, 18`), pad hold management.
-  - [ ] `hal_i2c.c`: Mutex-protected master bus driver on GPIO 47/48 with bus recovery clock pulsing.
-  - [ ] `hal_spi.c`: DMA-backed 20MHz SPI Master bus for SSD1681 display updates and 2MHz half-duplex sensor read.
-  - [ ] `hal_flash.c`: Sector-aligned erase/read/write for `epd_frame` partition (16KB) with bounds checking.
-- [ ] **3.2 Layer 2 Subsystems Concrete Implementation**:
-  - [ ] `sub_display.cpp`: SSD1681 dual-RAM Ping-Pong buffer (0x24/0x26), 159-byte partial LUT, GPIO 8 ISR semaphore, on-glass temperature (0x1B).
-  - [ ] `sub_sensor.c`: SHTC3 physical acquisition (`Wake` -> `Read` -> `Sleep`) and ESP32-S3 internal TSENS die temperature.
-  - [ ] `sub_rtc.c`: PCF85063A POSIX timekeeping, clock calibration, countdown timer on GPIO 5, remaining duration query.
-  - [ ] `sub_power.c`: ADC1_CH3 calibrated battery sampling, LiPo OCV lookup, Zero-Volt Cable Guard logic, deep sleep EXT1 wake config.
-  - [ ] `sub_audio.c`: ES8311 22-register clock tree, chime synthesizer, and register 0x0D standby power-down.
-  - [ ] `sub_sdcard.c`: Basic SD SPI/MMC initialization, file I/O, format, and capacity checking.
-  - [ ] `sub_nvs.c`: NVS open, read/write blob, and commit routines.
-- [ ] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
-  - [ ] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
-  - [ ] `orch_math.c`: Integer slope delta gating, Class-E psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
-  - [ ] `orch_flow.c`: Flow A <10ms sprint, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 7-step stand-down.
-  - [ ] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
-- [ ] **3.4 Layer 3 ULP-RISC-V Coprocessor Firmware**:
-  - [ ] Implement event-driven reactive ULP Bouncer in RTC domain.
-  - [ ] GPIO 5 PCF85063A alarm wake handler.
-  - [ ] GPIO 0/18 button tap/hold classifier ($>2.5\text{s}$ bootloader priming / power cut).
-  - [ ] GPIO 4 ADC battery tripwire with zero-volt USB bypass.
+- [x] **3.1 Layer 1 HAL Concrete Implementation**:
+  - [x] `hal_io.c`: GPIO latching (`BAT_CTRL` GPIO 17), EPD rail control (`GPIO 6`), stateless button readers (`GPIO 0, 18`), pad hold management.
+  - [x] `hal_i2c.c`: Mutex-protected master bus driver on GPIO 47/48 with bus recovery clock pulsing.
+  - [x] `hal_spi.c`: DMA-backed 20MHz SPI Master bus for SSD1681 display updates and 2MHz half-duplex sensor read.
+  - [x] `hal_flash.c`: Sector-aligned erase/read/write for `epd_frame` partition (16KB) with bounds checking.
+- [x] **3.2 Layer 2 Subsystems Concrete Implementation**:
+  - [x] `sub_display.cpp`: SSD1681 dual-RAM Ping-Pong buffer (0x24/0x26), 159-byte partial LUT, GPIO 8 ISR semaphore, on-glass temperature (0x1B).
+  - [x] `sub_sensor.c`: SHTC3 physical acquisition (`Wake` -> `Read` -> `Sleep`) and ESP32-S3 internal TSENS die temperature.
+  - [x] `sub_rtc.c`: PCF85063A POSIX timekeeping, clock calibration, countdown timer on GPIO 5, remaining duration query.
+  - [x] `sub_power.c`: ADC1_CH3 calibrated battery sampling, LiPo OCV lookup, Zero-Volt Cable Guard logic, deep sleep EXT1 wake config.
+  - [x] `sub_audio.c`: ES8311 22-register clock tree, chime synthesizer, and register 0x0D standby power-down.
+  - [x] `sub_sdcard.c`: Basic SD SPI/MMC initialization, file I/O, format, and capacity checking.
+  - [x] `sub_nvs.c`: NVS open, read/write blob, and commit routines.
+- [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
+  - [x] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
+  - [x] `orch_math.c`: Integer slope delta gating, Class-E psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
+  - [x] `orch_flow.c`: Flow A <10ms sprint, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 7-step stand-down.
+  - [x] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
+- [x] **3.4 Layer 3 ULP-RISC-V Coprocessor Firmware**:
+  - [x] Implement event-driven reactive ULP Bouncer in RTC domain.
+  - [x] GPIO 5 PCF85063A alarm wake handler.
+  - [x] GPIO 0/18 button tap/hold classifier ($>2.5\text{s}$ bootloader priming / power cut).
+  - [x] GPIO 4 ADC battery tripwire with zero-volt USB bypass.
 
 ---
 
 ## Stage 4: The Vanity (LVGL 9 UI Polish & Benchmarking)
 
-- [ ] **4.1 LVGL 9 UI Integration**:
-  - [ ] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).
-  - [ ] 1-bit packed binary fonts (`MONTSERRAT_14_1BPP`, `MONTSERRAT_20_1BPP`).
-  - [ ] LVGL display buffer flushing callback to `sub_display`.
+- [x] **4.1 LVGL 9 UI Integration**:
+  - [x] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).
+  - [x] 1-bit packed binary fonts (`MONTSERRAT_14_1BPP`, `MONTSERRAT_20_1BPP`).
+  - [x] LVGL display buffer flushing callback to `sub_display`.
 - [ ] **4.2 Class-E Hardware Benchmarking**:
   - [ ] **Sub-Execution Timing**: Measure Flow A on-time with oscilloscope on status pin (Target: < 10 ms).
   - [ ] **Deep Sleep Quiescent Current**: Verify standby current with power profiler (Target: < 15 µA).

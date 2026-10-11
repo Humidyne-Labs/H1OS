@@ -28,6 +28,7 @@ uint32_t vbat_critical_mv = 3250; /* Critical tripwire (< 3.25V) */
 
 /* Button State Tracking */
 uint32_t boot_btn_events = 0;
+uint32_t last_wake_btn = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 
 int main(void)
 {
@@ -38,6 +39,7 @@ int main(void)
     int rtc_int_level = ulp_riscv_gpio_get_level(GPIO_NUM_5);
     if (rtc_int_level == 0) {
         /* Alarm expired! Prompt main core straight into Full UI Refresh */
+        last_wake_btn = 0; /* Woken by external RTC */
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         ulp_riscv_wakeup_main_processor();
         return 0;
@@ -93,6 +95,7 @@ int main(void)
         } else if (hold_ms >= 30) {
             /* Valid short tap released between 30ms and 2500ms -> Wake Flow B with clean released state */
             boot_btn_events++;
+            last_wake_btn = (boot_btn == 0) ? 1 : 2;
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
             ulp_riscv_wakeup_main_processor();
             return 0;

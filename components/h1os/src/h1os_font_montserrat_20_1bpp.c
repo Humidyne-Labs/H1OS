@@ -1595,7 +1595,7 @@ lv_font_t bsp_font_montserrat_20_1bpp = {
     .user_data = NULL,
 };
 
-
+const lv_font_t h1os_font_montserrat_20_1bpp = bsp_font_montserrat_20_1bpp;
 
 #endif /*#if BSP_FONT_MONTSERRAT_20_1BPP*/
 

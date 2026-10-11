@@ -26,6 +26,10 @@ static const char *TAG = "orch_flow";
 
 static int64_t s_lockout_until_us = 0;
 
+#if CONFIG_ULP_COPROC_ENABLED
+#include "ulp_h1os.h"
+#endif
+
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
     uint32_t causes = esp_sleep_get_wakeup_causes();
@@ -42,8 +46,15 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     /* Check ULP Sentinel dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-        if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN) {
+#if CONFIG_ULP_COPROC_ENABLED
+        st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
+#endif
+        if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN ||
+            st->ulp_dispatch_reason == ULP_DISPATCH_POWER_OFF) {
             return ORCH_FLOW_CRITICAL_OFF;
+        }
+        if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
+            return ORCH_FLOW_BOOTLOADER_JUMP;
         }
         if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SPRINT) {
             return ORCH_FLOW_A_SPRINT;

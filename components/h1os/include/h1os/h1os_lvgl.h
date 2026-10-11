@@ -46,6 +46,20 @@ void h1os_lvgl_unlock(void);
  */
 bool h1os_lvgl_has_pending_tasks(void);
 
+/**
+ * @brief Retrieve the LVGL keypad input device handle.
+ */
+lv_indev_t* h1os_lvgl_get_indev(void);
+
+/* =========================================================================
+ * 1-Bit Packed Binary Typography (Montserrat)
+ * ========================================================================= */
+extern const lv_font_t h1os_font_montserrat_14_1bpp;
+extern const lv_font_t h1os_font_montserrat_20_1bpp;
+
+#define H1OS_FONT_14 (&h1os_font_montserrat_14_1bpp)
+#define H1OS_FONT_20 (&h1os_font_montserrat_20_1bpp)
+
 #ifdef __cplusplus
 }
 #endif

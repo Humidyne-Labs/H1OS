@@ -41,10 +41,22 @@ RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {0};
 static void render_page_environmental(const h1os_telemetry_t *telem);
 static void render_page_system_health(const h1os_telemetry_t *telem);
 static void update_active_display(void);
+static void keypad_event_cb(lv_event_t *e);
 
 /* =========================================================================
- * UI Rendering (200x200 Monochrome E-Paper with LVGL v9)
+ * UI Rendering (200x200 Monochrome E-Paper with LVGL v9 & Montserrat Typography)
  * ========================================================================= */
+static void keypad_event_cb(lv_event_t *e)
+{
+    uint32_t key = lv_event_get_key(e);
+    if (key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
+        /* Toggle active page */
+        s_app_state.active_page = (s_app_state.active_page == 0) ? 1 : 0;
+        ESP_LOGI(TAG, "Keypad event: switched to screen %u", s_app_state.active_page + 1);
+        update_active_display();
+    }
+}
+
 static void render_page_environmental(const h1os_telemetry_t *telem)
 {
     h1os_lvgl_lock(100);
@@ -52,37 +64,55 @@ static void render_page_environmental(const h1os_telemetry_t *telem)
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
+    // Bind keypad event listener to screen
+    lv_obj_add_event_cb(scr, keypad_event_cb, LV_EVENT_KEY, NULL);
+    lv_group_t *def_grp = lv_group_get_default();
+    if (def_grp == NULL) {
+        def_grp = lv_group_create();
+        lv_group_set_default(def_grp);
+        lv_indev_t *indev = h1os_lvgl_get_indev();
+        if (indev != NULL) {
+            lv_indev_set_group(indev, def_grp);
+        }
+    }
+    lv_group_add_obj(def_grp, scr);
+
     // 1. Header Bar: HUMIDYNE LABS (left), 1/2 (right)
     lv_obj_t *header = lv_label_create(scr);
     lv_label_set_text(header, "HUMIDYNE LABS");
+    lv_obj_set_style_text_font(header, H1OS_FONT_14, 0);
     lv_obj_align(header, LV_ALIGN_TOP_LEFT, 6, 4);
 
     lv_obj_t *lbl_page = lv_label_create(scr);
     lv_label_set_text(lbl_page, "1/2");
+    lv_obj_set_style_text_font(lbl_page, H1OS_FONT_14, 0);
     lv_obj_align(lbl_page, LV_ALIGN_TOP_RIGHT, -6, 4);
 
     // Divider Line 1
-    static lv_point_precise_t line1_pts[] = {{4, 20}, {196, 20}};
+    static lv_point_precise_t line1_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line1 = lv_line_create(scr);
     lv_line_set_points(line1, line1_pts, 2);
     lv_obj_set_style_line_width(line1, 1, 0);
     lv_obj_set_style_line_color(line1, lv_color_black(), 0);
 
-    // 2. Primary Telemetry Display
+    // 2. Primary Telemetry Display (Large 20pt Numbers)
     lv_obj_t *lbl_temp = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_temp, "%.1f°F", telem->ambient_temp_f);
-    lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_obj_set_style_text_font(lbl_temp, H1OS_FONT_20, 0);
+    lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 6, 28);
 
     lv_obj_t *lbl_rh = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_rh, "%.1f%%", telem->ambient_rh_pct);
-    lv_obj_align(lbl_rh, LV_ALIGN_TOP_RIGHT, -6, 26);
+    lv_obj_set_style_text_font(lbl_rh, H1OS_FONT_20, 0);
+    lv_obj_align(lbl_rh, LV_ALIGN_TOP_RIGHT, -6, 28);
 
     lv_obj_t *lbl_sub = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_sub, "(%.1f°C ambient)", telem->ambient_temp_c);
-    lv_obj_align(lbl_sub, LV_ALIGN_TOP_LEFT, 6, 50);
+    lv_obj_set_style_text_font(lbl_sub, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_sub, LV_ALIGN_TOP_LEFT, 6, 54);
 
     // Divider Line 2
-    static lv_point_precise_t line2_pts[] = {{4, 68}, {196, 68}};
+    static lv_point_precise_t line2_pts[] = {{4, 74}, {196, 74}};
     lv_obj_t *line2 = lv_line_create(scr);
     lv_line_set_points(line2, line2_pts, 2);
     lv_obj_set_style_line_width(line2, 1, 0);
@@ -91,17 +121,20 @@ static void render_page_environmental(const h1os_telemetry_t *telem)
     // 3. Psychrometrics Block
     lv_obj_t *lbl_dew = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", telem->dew_point_f);
-    lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 74);
+    lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 80);
 
     lv_obj_t *lbl_abs = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_abs, "Abs Humid:  %.1f g/m³", telem->absolute_humidity_g);
-    lv_obj_align(lbl_abs, LV_ALIGN_TOP_LEFT, 6, 94);
+    lv_obj_set_style_text_font(lbl_abs, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_abs, LV_ALIGN_TOP_LEFT, 6, 102);
 
     // Footer
     lv_obj_t *lbl_foot = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot, "Cycle #%lu | %s",
                           (unsigned long)s_app_state.cycle_counter,
                           telem->is_thermally_settled ? "SETTLED" : "SETTLING");
+    lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
     lv_refr_now(NULL);
@@ -115,17 +148,26 @@ static void render_page_system_health(const h1os_telemetry_t *telem)
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
+    // Bind keypad event listener to screen
+    lv_obj_add_event_cb(scr, keypad_event_cb, LV_EVENT_KEY, NULL);
+    lv_group_t *def_grp = lv_group_get_default();
+    if (def_grp != NULL) {
+        lv_group_add_obj(def_grp, scr);
+    }
+
     // 1. Header Bar: HUMIDYNE LABS (left), 2/2 (right)
     lv_obj_t *header = lv_label_create(scr);
     lv_label_set_text(header, "SYSTEM HEALTH");
+    lv_obj_set_style_text_font(header, H1OS_FONT_14, 0);
     lv_obj_align(header, LV_ALIGN_TOP_LEFT, 6, 4);
 
     lv_obj_t *lbl_page = lv_label_create(scr);
     lv_label_set_text(lbl_page, "2/2");
+    lv_obj_set_style_text_font(lbl_page, H1OS_FONT_14, 0);
     lv_obj_align(lbl_page, LV_ALIGN_TOP_RIGHT, -6, 4);
 
     // Divider Line 1
-    static lv_point_precise_t line1_pts[] = {{4, 20}, {196, 20}};
+    static lv_point_precise_t line1_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line1 = lv_line_create(scr);
     lv_line_set_points(line1, line1_pts, 2);
     lv_obj_set_style_line_width(line1, 1, 0);
@@ -138,17 +180,20 @@ static void render_page_system_health(const h1os_telemetry_t *telem)
     } else {
         lv_label_set_text_fmt(lbl_vbat, "BAT: %.2fV (%u%%)", (float)telem->battery_mv / 1000.0f, telem->battery_percent);
     }
-    lv_obj_align(lbl_vbat, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_obj_set_style_text_font(lbl_vbat, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_vbat, LV_ALIGN_TOP_LEFT, 6, 28);
 
     // Tri-Node Temperatures
     lv_obj_t *lbl_nodes = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_nodes, "SHTC3: %.1f°C\nDie:   %.1f°C\nGlass: %.1f°C",
+    lv_label_set_text_fmt(lbl_nodes, "SHTC3: %.1f°C\nMCU:   %.1f°C\nGlass: %.1f°C",
                           telem->raw_shtc3_temp_c, telem->mcu_die_temp_c, telem->epd_glass_temp_c);
-    lv_obj_align(lbl_nodes, LV_ALIGN_TOP_LEFT, 6, 60);
+    lv_obj_set_style_text_font(lbl_nodes, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_nodes, LV_ALIGN_TOP_LEFT, 6, 56);
 
     // Footer
     lv_obj_t *lbl_foot = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot, "Uptime: %lu s", (unsigned long)s_app_state.total_uptime_sec);
+    lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
     lv_refr_now(NULL);

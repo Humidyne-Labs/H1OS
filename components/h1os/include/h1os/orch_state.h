@@ -23,9 +23,11 @@ extern "C" {
 
 typedef enum {
     ULP_DISPATCH_NONE = 0,
-    ULP_DISPATCH_SENSOR_SPRINT,    /* Flow A: <4ms wake stub sprint */
-    ULP_DISPATCH_MAIN_WAKE,        /* Flow B: Full application / LVGL UI wake */
-    ULP_DISPATCH_CRITICAL_SHUTDOWN /* Battery brownout tripwire (<3.25V) */
+    ULP_DISPATCH_SENSOR_SPRINT,     /* Flow A: <4ms wake stub sprint */
+    ULP_DISPATCH_MAIN_WAKE,         /* Flow B: Full application / LVGL UI wake */
+    ULP_DISPATCH_CRITICAL_SHUTDOWN, /* Battery brownout tripwire (<3.25V) */
+    ULP_DISPATCH_BOOTLOADER_JUMP,   /* Primed by BOOT hold > 2.5s */
+    ULP_DISPATCH_POWER_OFF          /* Primed by POWER hold > 2.5s */
 } orch_ulp_dispatch_t;
 
 typedef struct {

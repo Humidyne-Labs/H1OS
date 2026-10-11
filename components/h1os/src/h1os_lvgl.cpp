@@ -18,6 +18,7 @@
 #include "hal_io.h"
 #include "hal_types.h"
 #include "h1os_lvgl.h"
+#include "h1os.h"
 #include "display/lv_display_private.h"
 #include "sdkconfig.h"
 
@@ -54,9 +55,11 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_NEXT;
+        h1os_reset_session_timer();
     } else if (btns & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_ENTER;
+        h1os_reset_session_timer();
     }
 }
 
@@ -233,6 +236,11 @@ bool h1os_lvgl_has_pending_tasks(void)
         }
     }
     return false;
+}
+
+lv_indev_t* h1os_lvgl_get_indev(void)
+{
+    return s_lv_keypad_indev;
 }
 
 static void h1os_lvgl_port_task(void *pvParameters)
