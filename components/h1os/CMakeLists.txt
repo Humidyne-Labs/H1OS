@@ -36,8 +36,6 @@ set(bsp_requires
     log
     freertos
     lvgl
-    esp_mmap_assets
-    esp_lv_fs
     esp_driver_tsens
     esp_pm
     esp_partition
