@@ -52,11 +52,32 @@ esp_err_t hal_io_set_sensor_rail(bool enable);
 esp_err_t hal_io_set_led(bool on);
 
 /**
+ * @brief Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
+ * 
+ * @return ESP_OK on success.
+ */
+static inline esp_err_t hal_io_release_power_latch(void)
+{
+    return hal_io_lock_power_latch(false);
+}
+
+/**
  * @brief Samples instantaneous state of hardware tactile buttons.
  * 
  * @return Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
  */
 hal_btn_mask_t hal_io_read_buttons(void);
+
+/**
+ * @brief Stateless check if a specific button pin is actively held down (Active LOW).
+ * 
+ * @param pin GPIO_NUM_0 (BOOT) or GPIO_NUM_18 (POWER)
+ * @return true if depressed, false otherwise
+ */
+static inline bool hal_io_button_is_pressed(gpio_num_t pin)
+{
+    return gpio_get_level(pin) == 0;
+}
 
 /**
  * @brief Configures and locks all lines subject to parasitic leakage prior to deep sleep.

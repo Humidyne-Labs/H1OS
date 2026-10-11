@@ -8,13 +8,18 @@
 #include "h1os/orch_flow.h"
 #include "h1os/orch_state.h"
 #include "h1os/orch_math.h"
+#include "h1os/orch_display_sync.h"
 #include "h1os/sub_sensor.h"
 #include "h1os/sub_rtc.h"
 #include "h1os/sub_power.h"
+#include "h1os/sub_display.h"
+#include "h1os/h1os_lvgl.h"
 #include "h1os/hal_io.h"
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <time.h>
 
 static const char *TAG = "orch_flow";
@@ -200,14 +205,51 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec)
 {
     ESP_LOGI(TAG, "Stand-down sequence starting (%lu sec)", (unsigned long)sleep_sec);
-    // Arm external countdown timer if duration > 0
+
+    /* 1. Wait for LVGL render and flush pipeline to drain completely */
+    if (h1os_lvgl_has_pending_tasks()) {
+        ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
+        uint32_t wait_ms = 0;
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < 500) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            wait_ms += 20;
+        }
+    }
+
+    /* 2. Wait for physical EPD panel to finish driving electrophoretic particles (GPIO 8 BUSY falling edge) */
+    ESP_LOGI(TAG, "Waiting for EPD panel BUSY line...");
+    sub_display_wait_busy(pdMS_TO_TICKS(5000));
+
+    /* 3. Post-Busy Particle Settling Guard: 250ms delay for micro-capsule voltages to discharge */
+    vTaskDelay(pdMS_TO_TICKS(250));
+
+    /* 4. Persist 5000-byte EPD frame to raw flash partition if modified */
+    orch_display_sync_save_if_dirty();
+
+    /* 5. Put SSD1681 display controller into Deep Sleep Mode 1 (1.0 µA) */
+    sub_display_enter_deep_sleep();
+
+    /* 6. Arm external PCF85063A countdown timer if sleep duration > 0 */
     if (sleep_sec > 0) {
         sub_rtc_arm_countdown(sleep_sec);
     }
-    // Enter deep sleep via power manager with buttons and RTC INT wake sources
+
+    /* 7. Zero-Hour Collision Math: lookahead remaining seconds on external countdown */
+    uint32_t rem_sec = 0;
+    esp_err_t rtc_err = sub_rtc_get_remaining_seconds(&rem_sec);
+    uint32_t internal_sleep_sec = sleep_sec;
+
+    if (rtc_err == ESP_OK && rem_sec > 0 && rem_sec <= sleep_sec) {
+        /* Next lookahead overshoots or straddles countdown: do not arm internal timer */
+        ESP_LOGI(TAG, "Zero-Hour Guard: RTC countdown due in %lus (<= %lus). Suppressing internal timer.",
+                 (unsigned long)rem_sec, (unsigned long)sleep_sec);
+        internal_sleep_sec = 0; // Sleep purely on external GPIO 5 RTC_INT
+    }
+
+    /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
                          (1ULL << HAL_PIN_BUTTON_POWER) |
                          (1ULL << HAL_PIN_RTC_INT);
-    return sub_power_enter_deep_sleep(sleep_sec, wake_mask);
+    return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
 }
 
