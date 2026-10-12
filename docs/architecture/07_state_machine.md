@@ -1,6 +1,6 @@
 # Application Execution Flow & State Machine
 
-This document models the end-to-end execution flow of **H1OS** across deep sleep, the reactive ULP Monitor, isolated Flow A sensor pulses (<4ms), and the Flow B 30-second interactive user session.
+This document models the end-to-end execution flow of **H1OS** across deep sleep, the reactive ULP Monitor, isolated Flow A sensor pulses, and the Flow B interactive user session (with a developer-configurable inactivity timeout defaulting to 30 seconds).
 
 ---
 
@@ -9,7 +9,7 @@ This document models the end-to-end execution flow of **H1OS** across deep sleep
 ```mermaid
 flowchart TD
     %% Deep Sleep Resting State
-    DeepSleep[Hardware Deep Sleep Standby<br/>Current ~12 µA] --> ULP_Wake{ULP Hardware Event}
+    DeepSleep[Hardware Deep Sleep Standby] --> ULP_Wake{ULP Hardware Event}
 
     %% ULP Reactive Monitor Decisions
     subgraph ULP_Monitor ["ULP-RISC-V Reactive Monitor (RTC Domain)"]
@@ -26,13 +26,13 @@ flowchart TD
         CheckVbat -- "Vbat == 0mV (USB Cable)" --> KeepSleeping[Bypass Shutdown<br/>Return to Sleep]
     end
 
-    %% FLOW A: Unified Binary RTC Wake Stub (<4ms)
-    subgraph FlowA ["FLOW A: Headless Sensor Pulse (<4ms)"]
+    %% FLOW A: Unified Binary RTC Wake Stub
+    subgraph FlowA ["FLOW A: Headless Sensor Pulse"]
         LaunchFlowA --> StubExec[esp_wake_stub on Core 0 @ 80MHz<br/>• Core 1 GATED OFF<br/>• Flash Cache UNPOWERED<br/>• FreeRTOS NOT Booted]
-        StubExec --> StubI2C[Read SHTC3 Low-Power 1ms & MCU Die TSENS]
+        StubExec --> StubI2C[Read SHTC3 Normal Mode & MCU Die TSENS]
         StubI2C --> StubMath[Compute Dew Point, Vapor Pressure & EWMA]
         StubMath --> StubCommit[Append to 32-slot Ring in RTC Slow Memory]
-        StubCommit --> StubRearm[Re-arm 60s RTC Timer]
+        StubCommit --> StubRearm[Re-arm Periodic RTC Timer]
         StubRearm --> StubSleep[Return immediately to Deep Sleep]
     end
     StubSleep --> DeepSleep
@@ -47,15 +47,15 @@ flowchart TD
         BootFreeRTOS --> TurboRender[240 MHz Turbo PM Lock<br/>Read Telemetry & Blit LVGL Screen to EPD]
         
         TurboRender --> WakeSource{Wake Source?}
-        WakeSource -- "RTC Countdown Timer (Unattended)" --> StandDown
-        WakeSource -- "User Tap or Cold Boot" --> LVGL_Active[Interactive Session (30s Timeout)<br/>LVGL Takes Hold of Display & Buttons]
+        WakeSource -- "RTC Countdown Timer (Unattended)" --> SleepStart
+        WakeSource -- "User Tap or Cold Boot" --> LVGL_Active[Interactive Session (Configurable Timeout)<br/>LVGL Takes Hold of Display & Buttons]
         
         LVGL_Active --> UserClick{User Button Click?}
-        UserClick -- "BOOT Click" --> ScreenToggle[Toggle Screen 1 Env <-> Screen 2 Health<br/>Reset 30s Inactivity Timer]
+        UserClick -- "BOOT Click" --> ScreenToggle[Toggle Screen 1 Env <-> Screen 2 Health<br/>Reset Inactivity Timer]
         ScreenToggle --> LVGL_Active
 
         UserClick -- "No Interaction (Idle)" --> DFSDrop[Dynamic Frequency Scaling:<br/>Drop CPU to 80 MHz Baseline]
-        DFSDrop --> InactivityTimer{30s Inactivity Timer Expired?}
+        DFSDrop --> InactivityTimer{Inactivity Timer Expired?}
         InactivityTimer -- "NO" --> UserClick
         InactivityTimer -- "YES" --> SleepStart[Initiate Sleep Transition]
     end
@@ -103,14 +103,14 @@ sequenceDiagram
     alt Next Sleep Total Accumulator > T_rtc_total
         Note over App: Accumulator overshoots external timer!<br/>Do NOT arm internal periodic timer.
         App->>ULP: Arm EXTINT only (GPIO 5 Countdown Timer, Buttons)
-        App->>App: Enter Deep Sleep (~12 µA)
+        App->>App: Enter Deep Sleep
         Note over ULP: ULP sleeps purely on EXTINT
         RTC-->>ULP: GPIO 5 falls LOW (Countdown Timer Reaches Zero)
         ULP->>Xtensa: Catch RTC Timer Interrupt -> Wake into Flow B directly!
     else Next Sleep Accumulator <= T_rtc_total
         Note over App: Window is clear. Arm both timers.
         App->>ULP: Arm internal periodic timer + EXTINT
-        App->>App: Enter Deep Sleep (~12 µA)
-        ULP->>App: Timer expires -> Wake Core 0 into Flow A (<4ms sample burst)
+        App->>App: Enter Deep Sleep
+        ULP->>App: Timer expires -> Wake Core 0 into Flow A (sample burst)
     end
 ```

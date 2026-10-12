@@ -79,12 +79,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
 void orch_flow_execute_sensor_sample(void)
 {
-    /* Flow A: Execute rapid <4ms sensor read */
+    /* Flow A: Execute high-precision normal power mode sensor read */
     sub_sensor_init();
 
     uint16_t raw_temp = 0;
     uint16_t raw_rh = 0;
-    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_temp, &raw_rh, true /* Low-Power 1ms */);
+    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_temp, &raw_rh, false /* Normal Power Mode for full precision */);
 
     float temp_c = 25.0f;
     float rh_pct = 50.0f;

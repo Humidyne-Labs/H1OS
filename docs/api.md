@@ -34,7 +34,7 @@ Defined in components/h1os/include/h1os/h1os.h:33
 ### H1OS_SUBTITLE
 
 ```cpp
-#define H1OS_SUBTITLE "Class-E Environmental Operating System"
+#define H1OS_SUBTITLE "E-Class Environmental Operating System"
 ```
 
 Defined in components/h1os/include/h1os/h1os.h:34
@@ -1396,13 +1396,28 @@ Reset the interactive session inactivity timer (extends session by timeout_sec).
 
 ---
 
+### h1os_is_session_active
+
+```cpp
+bool h1os_is_session_active(void)
+```
+
+Defined in components/h1os/include/h1os/h1os.h:166
+
+Check whether an interactive inactivity countdown session is active.
+
+#### Returns
+true if running in an interactive user session, false during unattended wakes.
+
+---
+
 ### h1os_shutdown
 
 ```cpp
 void h1os_shutdown(void)
 ```
 
-Defined in components/h1os/include/h1os/h1os.h:164
+Defined in components/h1os/include/h1os/h1os.h:171
 
 Orderly system shutdown and physical battery power cut.
 
@@ -1414,7 +1429,7 @@ Orderly system shutdown and physical battery power cut.
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in components/h1os/include/h1os/h1os.h:170
+Defined in components/h1os/include/h1os/h1os.h:177
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -1630,7 +1645,7 @@ ESP_OK on success, or driver error code.
 esp_err_t hal_io_lock_power_latch(bool enable)
 ```
 
-Defined in components/h1os/src/hal_io.c:86
+Defined in components/h1os/src/hal_io.c:87
 
 Asserts and locks the battery LDO enable latch (GPIO 17).
 
@@ -1651,7 +1666,7 @@ ESP_OK on success.
 esp_err_t hal_io_set_sensor_rail(bool enable)
 ```
 
-Defined in components/h1os/src/hal_io.c:111
+Defined in components/h1os/src/hal_io.c:112
 
 Controls the 3.3V switched peripheral rail (GPIO 6, Active LOW).
 
@@ -1672,7 +1687,7 @@ ESP_OK on success.
 esp_err_t hal_io_set_led(bool on)
 ```
 
-Defined in components/h1os/src/hal_io.c:128
+Defined in components/h1os/src/hal_io.c:129
 
 Controls user status LED (GPIO 3, Active LOW).
 
@@ -1693,7 +1708,7 @@ ESP_OK on success.
 hal_btn_mask_t hal_io_read_buttons(void)
 ```
 
-Defined in components/h1os/src/hal_io.c:134
+Defined in components/h1os/src/hal_io.c:135
 
 Samples instantaneous state of hardware tactile buttons.
 
@@ -1708,7 +1723,7 @@ Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 esp_err_t hal_io_isolate_sleep_pads(void)
 ```
 
-Defined in components/h1os/src/hal_io.c:146
+Defined in components/h1os/src/hal_io.c:147
 
 Configures and locks all lines subject to parasitic leakage prior to deep sleep.
 
@@ -1728,7 +1743,7 @@ ESP_OK on success.
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in components/h1os/src/hal_io.c:196
+Defined in components/h1os/src/hal_io.c:197
 
 Releases RTC pad holds upon waking from deep sleep.
 
@@ -1743,7 +1758,7 @@ ESP_OK on success.
 bool hal_check_usb_ll(void)
 ```
 
-Defined in components/h1os/src/hal_io.c:213
+Defined in components/h1os/src/hal_io.c:214
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
 
@@ -5766,6 +5781,21 @@ Reset the interactive session inactivity timer (extends session by timeout_sec).
 
 ---
 
+### h1os_is_session_active
+
+```cpp
+bool h1os_is_session_active(void)
+```
+
+Defined in components/h1os/src/h1os_lifecycle.c:52
+
+Check whether an interactive inactivity countdown session is active.
+
+#### Returns
+true if running in an interactive user session, false during unattended wakes.
+
+---
+
 ### h1os_trigger_chime
 
 `static`
@@ -5774,7 +5804,7 @@ Reset the interactive session inactivity timer (extends session by timeout_sec).
 static void h1os_trigger_chime(h1os_chime_type_t type)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:52
+Defined in components/h1os/src/h1os_lifecycle.c:57
 
 ---
 
@@ -5786,7 +5816,7 @@ Defined in components/h1os/src/h1os_lifecycle.c:52
 static void h1os_session_monitor_task(void * arg)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:61
+Defined in components/h1os/src/h1os_lifecycle.c:66
 
 ---
 
@@ -5796,7 +5826,7 @@ Defined in components/h1os/src/h1os_lifecycle.c:61
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:81
+Defined in components/h1os/src/h1os_lifecycle.c:86
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -5808,7 +5838,7 @@ Initialize H1OS and dispatch application lifecycle.
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:203
+Defined in components/h1os/src/h1os_lifecycle.c:214
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -5820,7 +5850,7 @@ Retrieve current Tri-Node environmental telemetry.
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:252
+Defined in components/h1os/src/h1os_lifecycle.c:263
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -5834,7 +5864,7 @@ Put the platform into ultra-low-power deep sleep.
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:262
+Defined in components/h1os/src/h1os_lifecycle.c:273
 
 ---
 
@@ -5844,7 +5874,7 @@ Defined in components/h1os/src/h1os_lifecycle.c:262
 void h1os_shutdown(void)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:309
+Defined in components/h1os/src/h1os_lifecycle.c:320
 
 Orderly system shutdown and physical battery power cut.
 
@@ -5856,7 +5886,7 @@ Orderly system shutdown and physical battery power cut.
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in components/h1os/src/h1os_lifecycle.c:318
+Defined in components/h1os/src/h1os_lifecycle.c:329
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 

@@ -62,10 +62,10 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **Root Cause (The Hardware Traps):**
   1. **ULP Routing:** The shared I2C bus is routed to **GPIO 47 (SDA) and GPIO 48 (SCL)**. On the ESP32-S3, the RTC IO domain is strictly limited to `RTCIO 0..21` (GPIOs 0–21). GPIO 47 and 48 are standard digital matrix pins and **cannot be accessed by the ULP or RTC-I2C controller when the digital core is power-gated in deep sleep**.
   2. **ES8311 Bus Clamping:** Cutting power to the audio codec while keeping the I2C bus pulled up causes the unpowered ES8311's internal ESD protection diodes to forward-bias, pulling the shared SDA/SCL lines to ground and clamping the entire I2C bus!
-  3. **EPD 3.3V Power Rail (`GPIO 6`):** Cutting the EPD power rail drops panel charge and can corrupt display RAM. Instead of cutting power to the display, placing the SSD1681 into **Deep Sleep Mode 1 (`0x10, 0x01`)** drops display quiescent current to **1.0 µA** while preserving RAM and image state without rail cycling.
+  3. **EPD 3.3V Power Rail (`GPIO 6`):** Cutting the EPD power rail drops panel charge and can corrupt display RAM. Instead of cutting power to the display, placing the SSD1681 into **Deep Sleep Mode 1 (`0x10, 0x01`)** drops display quiescent current to nominal sleep levels while preserving RAM and image state without rail cycling.
 - **H1OS Fix:**
-  - Keep the 3.3V peripheral rail powered and let peripherals sleep natively in low-leakage state (SHTC3 in sleep `0xB098` @ 0.3 µA, ES8311 register `0x0D` power-down @ <1.0 µA, SSD1681 in Deep Sleep Mode 1 @ 1.0 µA).
-  - Use **Flow A (Xtensa Sub-Execution Sample Burst)** for periodic sampling: wakes at 80 MHz, performs I2C transaction in <1 ms, updates RTC Slow SRAM, and returns to deep sleep in <8 ms total without clamping the bus or fighting RTC domain routing.
+  - Keep the 3.3V peripheral rail powered and let peripherals sleep natively in low-leakage state (SHTC3 in sleep `0xB098`, ES8311 register `0x0D` power-down, SSD1681 in Deep Sleep Mode 1).
+  - Use **Flow A (Xtensa Sub-Execution Sample Burst)** for periodic sampling: wakes at 80 MHz, performs I2C transaction, updates RTC Slow SRAM, and returns to deep sleep without clamping the bus or fighting RTC domain routing.
 
 ---
 
@@ -88,14 +88,14 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 ## 2. What Worked & Must Be Kept
 
 ### 2.1 Hardware Power Latch Locking (`BAT_CTRL` GPIO 17)
-- **The Design:** In the 2nd-stage bootloader (`h1os_boot_hook`) and in `hal_io_early_init`, `GPIO 17` is driven HIGH and locked with RTC IO pad holds (`rtc_gpio_hold_en`).
+- **The Design:** In the 2nd-stage bootloader (`h1os_boot_hook`), `GPIO 17` is driven HIGH and locked with RTC IO pad holds (`rtc_gpio_hold_en`).
 - **Why It Works:** Prevents the battery LDO enable pin from floating LOW during deep sleep transitions or soft resets, which would otherwise abruptly drop power to the board. Release is strictly centralized in `hal_io_release_power_latch()`.
 
 ---
 
 ### 2.2 SSD1681 Ping-Pong RAM Partial Waveform Differential Scanning
 - **The Design:** Using SSD1681 RAM `0x24` (New) and `0x26` (Old) with custom 159-byte partial LUT (`WF_PARTIAL_1IN54`) and Differential Ping-Pong Display Option (`0x37`).
-- **Why It Works:** Delivers ultra-fast partial refreshes (~300ms) with zero visible screen flash, while eliminating ghosting and preserving particle stability on electrophoretic glass.
+- **Why It Works:** Delivers rapid partial refreshes with zero visible screen flash, while eliminating ghosting and preserving particle stability on electrophoretic glass.
 
 ---
 
@@ -105,9 +105,9 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 
 ---
 
-### 2.4 Headless Sub-Execution (<10ms Budget)
-- **The Design:** Waking from deep sleep, taking an ultra-fast raw SHTC3 sample (<1ms read time), checking integer gate, and returning directly to deep sleep in 6–8 ms.
-- **Why It Works:** Keeps average system power draw under 20 µA while continuously capturing high-frequency environmental trends in the background.
+### 2.4 Headless Sub-Execution
+- **The Design:** Waking from deep sleep, taking an efficient raw SHTC3 sample in normal power mode, checking integer gate, and returning directly to deep sleep.
+- **Why It Works:** Minimizes wake duration while continuously capturing environmental trends in the background.
 
 ---
 
@@ -121,18 +121,18 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 
 | Architectural Feature | Legacy Scaffolding | Clean-Slate H1OS Architecture |
 | :--- | :--- | :--- |
-| **Identity & Scope** | Legacy BSP mixed with app code | **H1OS** (Strict Class-E luxury telemetry OS) |
+| **Identity & Scope** | Legacy BSP mixed with app code | **H1OS** (Strict E-Class environmental telemetry OS) |
 | **Dependency Structure** | Entangled, circular inclusions | Strict 4-layer unidirectional hierarchy |
 | **Common Data Types** | Scattered across subsystem headers | Consolidated at base in `hal_types.h` |
 | **Button Management** | Bespoke `bsp_button.c` background task | **LVGL native `lv_indev` (Keypad)**; ULP during sleep |
 | **ULP Operation** | Theoretical continuous polling | **Purely event-driven monitor**; gated during main app run |
 | **Zero-Hour Conflict** | None (woke twice in rapid succession) | **ULP arbiter** suppresses Flow A when RTC alarm fires |
 | **MicroSD Architecture**| Complex unfinished subsystem | Minimal **`sub_sdcard`** (file I/O, format, capacity) |
-| **Interactive Session** | Ad-hoc unmanaged loop | **30s session** with 80MHz DFS power droop at idle |
+| **Interactive Session** | Ad-hoc unmanaged loop | **Configurable session** with 80MHz DFS power droop at idle |
 | **Power Latch** | Scattered across app & drivers | **`h1os_boot_hook`** asserts latch; HAL releases on shutdown |
 | **No-Battery Operation** | Spurious shutdown on $0\text{mV}$ | **Zero-Volt Cable Guard** (bypasses shutdown on USB) |
 | **Framebuffer Storage** | RTC memory (failed) $\to$ flash partition | SPI flash partition (`epd_frame`, 16KB) only |
 | **RTC Slow Memory Use** | ~5200 bytes (Over capacity) | **< 256 bytes** (Minimal footprint) |
 | **Flash Write Timing** | On every partial/full flush | **Deferred** to sleep and shutdown only |
-| **Sub-Execution Budget** | ~15–25 ms (checking locks & math) | **< 10 ms** (pure HAL raw read + integer gate) |
+| **Sub-Execution Budget** | ~15–25 ms (checking locks & math) | **Fast burst** (pure HAL raw read + integer gate) |
 | **Public API** | Fragmented across `bsp_*.h` headers | Unified `h1os.h` (`h1os_app_start`, `sleep`, `shutdown`) |

@@ -1,7 +1,7 @@
 # Layer 3: ULP-RISC-V Coprocessor Hardware Monitor Specification
 
 ## 1. Overview
-The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP32-S3 RTC domain. While the high-performance dual-core Xtensa LX7 processors sleep at ~12 µA quiescent current, the ULP coprocessor sleeps alongside them in RTC Slow Memory.
+The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP32-S3 RTC domain. While the dual-core Xtensa LX7 processors are in deep sleep, the ULP coprocessor sleeps alongside them in RTC Slow Memory.
 
 > **The Sleep-Gating Rule:** The ULP Coprocessor is gated strictly by the main application. It executes **only while the system is in deep sleep**. Once Flow B wakes, the dual-core Xtensa processor and LVGL take complete, exclusive control of the hardware. The ULP is completely idle and suppressed to ensure Flow B is never interrupted.
 
@@ -11,22 +11,16 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 
 ## 2. Core Responsibilities & Silicon Boundaries
 
-```
-                      RTC SLOW DOMAIN (Deep Sleep @ ~12 µA)
-                    ═════════════════════════════════════
-                                      │
-                         [ULP-RISC-V Reactive Monitor]
-                         (Sleeps until hardware event)
-                                      │
-        ┌─────────────────────────────┼─────────────────────────────┐
-        │                             │                             │
-        ▼                             ▼                             ▼
-  [ADC1 Channel 3]              [RTCIO 5]                     [RTCIO 0 & 18]
-  Battery Divider               PCF85063A INT                 Tactile Buttons
-  • 12 dB Attenuation           • Alarm Line (Active LOW)     • Reactive Wake on Edge
-  • eFuse Curve Hand-Off        • Zero-Hour Master Arbiter    • Tap vs Hold Classification
-  • Brownout Threshold (<3.25V) • Suppresses Flow A Sample   • BOOT Hold -> Bootloader
-  • Zero-Volt Cable Guard       • Launches Flow B Directly    • POWER Hold -> Power-Off
+```mermaid
+flowchart TD
+    ULP["ULP-RISC-V Reactive Monitor<br/>(Sleeps in RTC Slow Domain until hardware event)"]
+    ADC["ADC1 Channel 3 (Battery Divider)<br/>• 12 dB Attenuation<br/>• eFuse Curve Hand-Off<br/>• Brownout Threshold (<3.25V)<br/>• Zero-Volt Cable Guard"]
+    RTC["RTCIO 5 (PCF85063A INT)<br/>• Alarm Line (Active LOW)<br/>• Zero-Hour Master Arbiter<br/>• Suppresses Flow A Sample<br/>• Launches Flow B Directly"]
+    BTN["RTCIO 0 & 18 (Tactile Buttons)<br/>• Reactive Wake on Edge<br/>• Tap vs Hold Classification<br/>• BOOT Hold -> Bootloader<br/>• POWER Hold -> Power-Off"]
+
+    ULP --> ADC
+    ULP --> RTC
+    ULP --> BTN
 ```
 
 ---
@@ -36,7 +30,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 ### 3.1 Condition 1: Internal Periodic Timer Expired
 1. ULP wakes from its internal RTC timer (which was armed only because $T_{\text{rtc\_total\_period}} \ge (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}$).
 2. Sets `ULP_DISPATCH_SENSOR_SAMPLE` in `orch_persisted_state_t`.
-3. Triggers `ulp_riscv_wakeup_main_processor()` to launch Core 0 into the <4ms Flow A Wake Stub.
+3. Triggers `ulp_riscv_wakeup_main_processor()` to launch Core 0 into the Flow A Wake Stub.
 4. Core 0 logs the SHTC3 reading, updates `ulp_cnt`, evaluates next-sleep lookahead, re-arms the timer if window remains clear, and returns to deep sleep.
  
 ### 3.2 Condition 2: External Hardware Interrupts (`EXTINT` / Edge)

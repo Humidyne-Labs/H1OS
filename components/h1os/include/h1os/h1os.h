@@ -1,10 +1,10 @@
 /**
  * @file h1os.h
- * @brief H1OS: Class-E Environmental Operating System Master Public Interface
+ * @brief H1OS: E-Class Environmental Operating System Master Public Interface
  *
  * Platform: H1OS (Humid-1 Operating System)
  * Hardware Target: Waveshare ESP32-S3 ePaper 1.54" V2 (ESP32-S3-PICO-1-N8R8)
- * Role: Luxury Hygrometer & Environmental Telemetry Executive Engine
+ * Role: E-Class Environmental Telemetry Executive Engine
  *
  * @version 2.0.0-dev
  * @attribution
@@ -31,7 +31,7 @@ extern "C" {
  * Platform Identity & Versioning
  * ========================================================================= */
 #define H1OS_NAME               "H1OS"
-#define H1OS_SUBTITLE           "Class-E Environmental Operating System"
+#define H1OS_SUBTITLE           "E-Class Environmental Operating System"
 #define H1OS_VERSION_MAJOR      2
 #define H1OS_VERSION_MINOR      0
 #define H1OS_VERSION_PATCH      0
@@ -157,6 +157,13 @@ esp_err_t h1os_sleep(uint32_t sleep_sec);
  * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
  */
 void h1os_reset_session_timer(void);
+
+/**
+ * @brief Check whether an interactive inactivity countdown session is active.
+ *
+ * @return true if running in an interactive user session, false during unattended wakes.
+ */
+bool h1os_is_session_active(void);
 
 /**
  * @brief Orderly system shutdown and physical battery power cut.

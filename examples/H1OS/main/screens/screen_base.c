@@ -40,11 +40,24 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_obj_set_style_text_font(lbl_title, H1OS_FONT_14, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 6, 4);
 
-    // Page Indicator: Right-aligned at (X: -6, Y: 4)
-    lv_obj_t *lbl_pg = lv_label_create(scr);
+    // 2. Invertible Sleep/Wake Status Badge (Page Indicator at Top-Right)
+    //    - Active interactive session (AWAKE): Inverted badge (Black background, White text)
+    //    - Sleeping / Unattended wake (SLEEP): Standard badge (White background, Black text)
+    bool is_awake = h1os_is_session_active();
+    lv_obj_t *badge = lv_obj_create(scr);
+    lv_obj_remove_style_all(badge);
+    lv_obj_set_size(badge, 36, 17);
+    lv_obj_align(badge, LV_ALIGN_TOP_RIGHT, -4, 2);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(badge, is_awake ? lv_color_black() : lv_color_white(), 0);
+    lv_obj_set_style_border_width(badge, 1, 0);
+    lv_obj_set_style_border_color(badge, lv_color_black(), 0);
+
+    lv_obj_t *lbl_pg = lv_label_create(badge);
     lv_label_set_text(lbl_pg, page_str);
     lv_obj_set_style_text_font(lbl_pg, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_pg, LV_ALIGN_TOP_RIGHT, -6, 4);
+    lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
+    lv_obj_center(lbl_pg);
 
     // Divider Line (Y = 22, X: 4 to 196)
     static lv_point_precise_t line_pts[] = {{4, 22}, {196, 22}};

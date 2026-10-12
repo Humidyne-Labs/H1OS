@@ -22,12 +22,13 @@ esp_err_t hal_io_early_init(void)
     // 1. Release pad holds on wake inputs
     hal_io_release_pad_holds();
 
-    // 2. Lock BAT_CTRL (GPIO 17) HIGH immediately to hold battery regulator
-    ret = hal_io_lock_power_latch(true);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to lock power latch GPIO 17: %d", ret);
-        return ret;
-    }
+    // 2. BAT_CTRL (GPIO 17) is locked strictly in 2nd-stage bootloader (h1os_boot_hook.c).
+    // Runtime re-assertion is commented out to test strict bootloader latching independence.
+    // ret = hal_io_lock_power_latch(true);
+    // if (ret != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to lock power latch GPIO 17: %d", ret);
+    //     return ret;
+    // }
 
     // 3. Keep 3.3V EPD & Peripheral rail energized (GPIO 6 = 0)
     ret = hal_io_set_sensor_rail(true);

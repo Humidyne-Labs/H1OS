@@ -23,13 +23,13 @@ Layer 2 comprises dedicated peripheral subsystem managers ("Does the thing"). Ea
 ## 3. Subsystem Specifications
 
 ### 3.1 `sub_display.cpp/.h` (SSD1681 1.54" E-Paper Display Manager)
-Manages the electrophoretic particle state on the 200x200 panel.
+Manages the electrophoretic particle state on the 200x200 non-touch panel.
 - **Dual-RAM Architecture (Ping-Pong)**:
-  - RAM 0x24 = New Frame Data.
-  - RAM 0x26 = Old / Previous Frame Data.
-  - Partial refreshes (~300ms) use differential hardware waveforms between 0x24 and 0x26.
+  - RAM `0x24` = New Frame Data.
+  - RAM `0x26` = Old / Previous Frame Data.
+  - Partial refreshes use differential hardware waveforms between `0x24` and `0x26`.
 - **Power Isolation**:
-  - Puts panel into Deep Sleep Mode 1 (`0x10, 0x01` @ 1.0 µA) while keeping 3.3V rail latched.
+  - Puts panel into Deep Sleep Mode 1 (`0x10, 0x01`) while keeping 3.3V rail latched.
 
 ```cpp
 esp_err_t sub_display_init(bool is_wake_cycle);
@@ -50,8 +50,8 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c);
 ### 3.2 `sub_sensor.c/.h` (SHTC3 & Internal TSENS Manager)
 Provides physical sensor readings without algorithmic post-processing.
 - **SHTC3 Pure Read Lifecycle**:
-  1. `0x3517` (Wakeup). Wait 250 µs.
-  2. `0x609C` (Low-Power T-first, 1 ms measurement) or `0x7866` (Normal T-first).
+  1. `0x3517` (Wakeup).
+  2. `0x7866` (Normal Power Mode T-first for full ADC resolution) or `0x609C` (Low-Power Mode T-first).
   3. Read 6 bytes (`[Temp MSB, LSB, CRC]`, `[RH MSB, LSB, CRC]`).
   4. `0xB098` (Sleep).
 
@@ -83,7 +83,7 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer);
 ---
 
 ### 3.4 `sub_power.c/.h` (Battery Monitor & Sleep Execution Driver)
-- **12 dB ADC Curve Fitting**: Reads `GPIO 4` (ADC1_CH3) with 16-sample trimmed mean.
+- **12 dB ADC Curve Fitting**: Reads `GPIO 4` (ADC1_CH3 across 200kΩ/200kΩ divider) with 16-sample trimmed mean.
 - **Zero-Volt Cable Guard**: If latch is asserted and $V_{\text{bat}} \approx 0\text{mV}$, detects instrument is running from USB VBUS without a battery; bypasses low-battery shutdown.
 - **Hardware Sleep Entry**: Configures EXT1 wakeup and puts CPU into deep sleep.
 
@@ -99,7 +99,7 @@ void      sub_power_cut_power_latch(void);
 ---
 
 ### 3.5 `sub_audio.c/.h` (Audio Codec & Amplifier Subsystem)
-- **Zero-Heat Software Standby**: Keeps `PA_EN` (GPIO 42) low/energized while awake and writes Reg `0x0D = 0x01` to put ES8311 into software standby (<1.0 µA), preventing ESD diode I2C clamping.
+- **Software Standby**: Keeps `PA_EN` (`GPIO 42`) held LOW and writes the ES8311 software standby register sequence to avoid ESD diode I2C clamping (see [Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-clamps-shared-i2c-bus-to-07v)).
 - **Tone Synthesizer**: Generates hardware beeps and chimes via I2S.
 
 ```c

@@ -192,18 +192,18 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     esp_rom_delay_us(250);
 
-    /* 4. Send SHTC3 Low-Power Measurement Command: 0x609C */
+    /* 4. Send SHTC3 Normal-Power Measurement Command: 0x7866 (full ADC precision) */
     i2c_start();
     if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
         i2c_stop();
         esp_default_wake_deep_sleep();
         return;
     }
-    i2c_write_byte(0x60);
-    i2c_write_byte(0x9C);
+    i2c_write_byte(0x78);
+    i2c_write_byte(0x66);
     i2c_stop();
 
-    esp_rom_delay_us(1000);
+    esp_rom_delay_us(13000);
 
     /* 5. Read 6-Byte SHTC3 Data: [T_MSB, T_LSB, T_CRC, RH_MSB, RH_LSB, RH_CRC] */
     i2c_start();

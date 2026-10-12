@@ -16,23 +16,27 @@ The SHTC3 is a stateless, low-power environmental sensor that operates using 16-
 
 | Command Name | 16-Bit Hex Code | Payload Transmitted | Required Post-Command Delay | Description |
 |---|---|---|---|---|
-| **WAKEUP** | `0x3517` | `[0x35, 0x17]` | **250 µs** (`esp_rom_delay_us(250)`) | Transitions sensor from sleep mode (<0.2 µA) to idle ready state. |
-| **SLEEP** | `0xB098` | `[0xB0, 0x98]` | None (instantaneous) | Puts sensor into ultra-low-power sleep mode to prevent self-heating. |
+| **WAKEUP** | `0x3517` | `[0x35, 0x17]` | **250 µs** (`esp_rom_delay_us(250)`) | Transitions sensor from sleep mode to idle ready state. |
+| **SLEEP** | `0xB098` | `[0xB0, 0x98]` | None (instantaneous) | Puts sensor into low-power sleep mode to prevent self-heating. |
 | **READ_ID** | `0xEFC8` | `[0xEF, 0xC8]` | None | Reads 3 bytes: 2-byte Product ID + 1-byte CRC. Mask `0x0847`. |
 | **SOFT_RESET** | `0x805D` | `[0x80, 0x5D]` | **200 µs** | Reinitializes digital control logic. |
-| **MEAS_NORMAL_T_FIRST** | `0x7866` | `[0x78, 0x66]` | **15 ms** (`pdMS_TO_TICKS(15) + 1`) | Normal precision measurement (Temperature read first). Clock stretching disabled. |
-| **MEAS_LOWPWR_T_FIRST** | `0x609C` | `[0x60, 0x9C]` | **1000 µs** (`esp_rom_delay_us(1000)`) | Low-power fast measurement (~1 ms). Clock stretching disabled. |
+| **MEAS_NORMAL_T_FIRST** | `0x7866` | `[0x78, 0x66]` | **13–15 ms** | **Standard H1OS Mode:** Normal precision measurement (full ADC resolution, Temperature read first). Clock stretching disabled. |
+| **MEAS_LOWPWR_T_FIRST** | `0x609C` | `[0x60, 0x9C]` | **1000 µs** | Low-power fast measurement (reduced ADC precision; not used in H1OS Flow A/B). |
 
 ---
 
 ## 3. Readout Sequence & Payload Format
 
 The SHTC3 readout sequence is strictly:
-```
-[I2C WAKE (0x3517)] ──> [Delay 250 µs] ──> [I2C MEAS (0x7866 / 0x609C)] ──> [Delay 15ms / 1ms]
-       │
-       ▼
-[I2C READ 6 Bytes] ──> [I2C SLEEP (0xB098)] ──> [Verify CRC-8]
+
+```mermaid
+flowchart LR
+    Wake["I2C WAKE (0x3517)"] --> Delay1["Delay 250 µs"]
+    Delay1 --> Meas["I2C MEAS NORMAL (0x7866)"]
+    Meas --> Delay2["Conversion Wait (13–15 ms)"]
+    Delay2 --> Read["I2C READ 6 Bytes"]
+    Read --> Sleep["I2C SLEEP (0xB098)"]
+    Sleep --> CRC["Verify CRC-8"]
 ```
 
 ### 6-Byte Read Payload

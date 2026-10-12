@@ -123,18 +123,6 @@ def generate_header(out_dir: Path, montserrat_sizes, dejavu_sizes):
 
     lines.extend([
         "",
-        "/* =========================================================================",
-        " * 1-Bit Packed Binary Typography (DejaVuSans Tabular/Data + Math)",
-        " * ========================================================================= */",
-    ])
-
-    for sz in dejavu_sizes:
-        lines.append(f"extern const lv_font_t h1os_font_dejavu_{sz}_1bpp;")
-        lines.append(f"#define H1OS_FONT_DEJAVU_{sz} (&h1os_font_dejavu_{sz}_1bpp)")
-        lines.append(f"#define H1OS_FONT_MONO_{sz}   (&h1os_font_dejavu_{sz}_1bpp)")
-
-    lines.extend([
-        "",
         "#ifdef __cplusplus",
         "}",
         "#endif",
@@ -215,7 +203,6 @@ def main():
         print(f"[*] Bold font not located, falling back to: {montserrat_ttf}")
 
     montserrat_sizes = [14, 16, 18, 20, 24, 32]
-    dejavu_sizes = [14, 16, 20]
 
     # Generate Montserrat suite (all sizes bold with autohint-strong)
     for sz in montserrat_sizes:
@@ -225,16 +212,8 @@ def main():
         if not success:
             sys.exit(1)
 
-    # Generate DejaVu suite (tabular / data with autohint-strong)
-    for sz in dejavu_sizes:
-        sym_name = f"h1os_font_dejavu_{sz}_1bpp"
-        out_file = out_dir / f"{sym_name}.c"
-        success = generate_font(sz, dejavu_ttf, None, out_file, sym_name)
-        if not success:
-            sys.exit(1)
-
     # Generate Master Header
-    generate_header(out_dir, montserrat_sizes, dejavu_sizes)
+    generate_header(out_dir, montserrat_sizes, [])
 
     # Copy Licenses
     copy_licenses(lvgl_dir, out_dir)

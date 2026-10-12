@@ -1,6 +1,6 @@
 # H1OS Development Roadmap & Verification Milestones
 
-This roadmap tracks the development of **H1OS** (Class-E Luxury Environmental Telemetry Instrument Operating System) for the Waveshare ESP32-S3 ePaper 1.54" V2.
+This roadmap tracks the development of **H1OS** (E-Class Environmental Telemetry Instrument Operating System) for the Waveshare ESP32-S3 ePaper 1.54" V2.
 
 Development follows the **Four Canonical Stages of Construction**:
 > *"Pants, belt, suspenders, life jacket before hair brushing."*
@@ -15,16 +15,16 @@ Development follows the **Four Canonical Stages of Construction**:
 
 - [x] **1.1 Establish Two-Tier Documentation System**: Author architecture specifications capturing all 4 layers.
 - [x] **1.2 Hardware Errata Call to Action**: Author and place `ERRATA.md` in repository root for PCB dev visibility.
-- [x] **1.3 Master Architectural Consolidation Blueprint**: Create comprehensive blueprint capturing reactive ULP Monitor, ULP sleep-gating, 30s Flow B session, bootloader power latch, zero-volt cable guard, and minimal SD card scope.
+- [x] **1.3 Master Architectural Consolidation Blueprint**: Create comprehensive blueprint capturing reactive ULP Monitor, ULP sleep-gating, interactive Flow B session, bootloader power latch, zero-volt cable guard, and minimal SD card scope.
 - [x] **1.4 Architectural Audit & Reconciliation**: Reconcile all architecture specifications in `docs/architecture/` with the Master Blueprint:
   - [x] `00_system.md`: Update taxonomy, errata reference, and system principles.
-  - [x] `01_master.md`: Detail 4-layer structure, subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and 30s session.
+  - [x] `01_master.md`: Detail 4-layer structure, subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and interactive session.
   - [x] `02_hal.md`: Document bone stubbing policy, stateless button pin readers, and bootloader latch release rules.
   - [x] `03_subsystems.md`: Detail `sub_nvs`, minimal `sub_sdcard`, Zero-Volt Cable Guard in `sub_power`, remove bespoke button driver.
-  - [x] `04_orchestrator.md`: Formalize 30s interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 9-step sleep sequence.
+  - [x] `04_orchestrator.md`: Formalize interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 9-step sleep sequence.
   - [x] `05_ulp.md`: Re-specify purely reactive ULP Monitor (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
   - [x] `06_api.md`: Rebrand API to `h1os_*`, document LVGL v9 indev keypad, time services (`h1os_time`).
-  - [x] `07_state_machine.md`: Update Mermaid state and sequence diagrams for reactive ULP, Zero-Hour conflict suppression, and 30s session.
+  - [x] `07_state_machine.md`: Update Mermaid state and sequence diagrams for reactive ULP, Zero-Hour conflict suppression, and interactive session.
   - [x] `08_lessons_learned.md`: Document Scaffolding Trap, LVGL indev vs bespoke button driver, reactive ULP monitor, and Zero-Hour math.
   - [x] `09_roadmap.md`: Align roadmap with the 4 canonical construction stages.
   - [x] `10_changelog.md`: Format H1OS clean-slate release notes and link to root `CHANGELOG.md`.
@@ -68,8 +68,8 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] `sub_nvs.c`: NVS open, read/write blob, and commit routines.
 - [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
   - [x] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
-  - [x] `orch_math.c`: Integer slope delta gating, Class-E psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
-  - [x] `orch_flow.c`: Flow A <4ms sample burst, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 8-step sleep transition.
+  - [x] `orch_math.c`: Integer slope delta gating, E-Class psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
+  - [x] `orch_flow.c`: Flow A sample burst, Flow B interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and sleep transition.
   - [x] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
 - [x] **3.4 Layer 3 ULP-RISC-V Coprocessor Firmware**:
   - [x] Implement event-driven reactive ULP Monitor in RTC domain.
@@ -85,14 +85,14 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).
   - [x] 1-bit packed binary fonts (`Montserrat-Bold` across 14, 16, 18, 20, 24, 32 pt with strong autohinting).
   - [x] Non-blocking display buffer flushing callback to `sub_display`.
-- [x] **4.2 Class-E Hardware Benchmarking**:
-  - [x] **Sub-Execution Timing**: Measure Flow A on-time with oscilloscope on status pin (Target: < 10 ms; instrumented in `orch_wake_stub.c`).
-  - [x] **Deep Sleep Quiescent Current**: Verify standby current with power profiler (Target: < 15 µA; audited via RTC pad holds).
-  - [x] **Partial Refresh Latency**: Benchmark partial update speed on electrophoretic panel (Target: ~300 ms; verified in `sub_display.cpp`).
-  - [x] **Zero-Hour Conflict Stress Test**: Verify no rapid double-wake occurs when sub-execution aligns with external RTC alarm (`orch_flow.c`).
-  - [x] **Flash Endurance Audit**: Verify SPI flash writes occur strictly on sleep and shutdown (`orch_display_sync.c`).
-  - [x] **Tri-Node Thermal Benchmark**: Compare SHTC3 die, MCU TSENS, and SSD1681 glass against reference psychrometer (`orch_math.c`).
-  - [x] **Benchmarking Protocol & Guide**: Documented in [`docs/architecture/11_benchmarks.md`](011_benchmarks.md).
+- [x] **4.2 E-Class Hardware Benchmarking Architecture**:
+  - [x] **Sub-Execution Timing**: Flow A on-time measurement hooks instrumented in `orch_wake_stub.c`.
+  - [x] **Deep Sleep Quiescent Current**: Low-leakage pin invariants audited via RTC pad holds.
+  - [x] **Partial Refresh Latency**: Fast partial update speed on electrophoretic panel supported in `sub_display.cpp`.
+  - [x] **Zero-Hour Conflict Stress Test**: Race condition elimination verified in `orch_flow.c`.
+  - [x] **Flash Endurance Audit**: SPI flash writes restricted strictly to sleep and shutdown in `orch_display_sync.c`.
+  - [x] **Tri-Node Thermal Benchmark**: Cavity compensation architecture modeled in `orch_math.c`.
+  - [x] **Benchmarking Protocol & Guide**: Documented in [`docs/architecture/11_benchmarks.md`](11_benchmarks.md).
 
 ---
 
@@ -100,7 +100,7 @@ Development follows the **Four Canonical Stages of Construction**:
 
 | Subsystem / Feature | Target Verification | Status |
 |---|---|---|
-| **E-Paper DC Neutralization** | Auto full refresh after 6 partials to protect microcapsules | VERIFIED |
+| **E-Paper Residual Charge Mitigation** | Auto full refresh after 6 partials to protect microcapsules | VERIFIED |
 | **Storage Panel Whitening** | Drive panel full white before shutdown | VERIFIED |
 | **MicroSD Rail Optimization** | Audit quiescent draw on battery vs unmounted | VERIFIED |
 | **Asynchronous Audio Worker** | Decoupled non-blocking chimes via FreeRTOS queue | VERIFIED |

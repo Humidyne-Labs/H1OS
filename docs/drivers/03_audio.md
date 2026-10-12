@@ -17,23 +17,13 @@
 
 ## 2. Electrical Invariant: The ESD Diode Clamping Hazard
 
-### Physical Circuit Behavior
-The ES8311 has internal ESD clamping diodes connected between its digital input pins (SDA, SCL) and its internal VDD supply rail:
-```
-           3.3V (Pull-ups)
-              │
-              ├──[ 4.7kΩ ]─── SDA (GPIO 47) ──┬──[ ES8311 ESD Diode ]──> VDD_ES8311 (GPIO 42)
-              │                               │
-              └──[ 4.7kΩ ]─── SCL (GPIO 48) ──┴──[ ES8311 ESD Diode ]──> VDD_ES8311 (GPIO 42)
-```
-If software drives `PA_EN` (`GPIO 42`) HIGH to cut power to the audio subsystem:
-1. `VDD_ES8311` drops to 0V.
-2. Current flows from the 3.3V I2C pull-up resistors through the forward-biased ESD protection diodes into the dead VDD rail.
-3. The forward voltage drop across silicon ESD diodes is ~0.6V to 0.7V.
-4. **Result:** The shared I2C bus SDA and SCL lines are clamped down to **~0.7V**, completely deadlocking communication with the PCF85063A RTC and SHTC3 sensor!
+### Physical Circuit Behavior & Link to Errata E4
+The ES8311 has internal ESD clamping diodes connected between its digital input pins (SDA, SCL) and its internal VDD supply rail. Driving `PA_EN` (`GPIO 42`) HIGH to cut power to the audio subsystem causes current to flow from the 3.3V I2C pull-ups through the forward-biased ESD protection diodes into the dead VDD rail, clamping the shared I2C bus down to **~0.7V** and freezing the entire bus.
+
+For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.md` Errata E4](../../ERRATA.md#e4-es8311-esd-diode-i2c-bus-clamping).
 
 ### Immutable Software Requirement
-`PA_EN` (`GPIO 42`) **MUST REMAIN ENERGIZED (LOW = 0)** during all normal and deep sleep operations. Audio power saving must be achieved strictly through software register suspension in the ES8311 and hardware mute on `PA_CTRL` (`GPIO 46 = 0`), which achieves `< 1.0 µA` total quiescent current without disturbing the I2C bus.
+`PA_EN` (`GPIO 42`) **MUST REMAIN ENERGIZED (LOW = 0)** during all normal and deep sleep operations. Audio power saving must be achieved strictly through software register suspension in the ES8311 (`0x0D=0xFC`) and hardware mute on `PA_CTRL` (`GPIO 46 = 0`), without disturbing the shared I2C bus.
 
 ---
 
@@ -103,7 +93,7 @@ bsp_codec_write_reg(0x31, 0x00); /* Unmute DAC DSM/DEM */
 
 ---
 
-## 4. Zero-Heat Deep Standby Sequence (<1.0 µA)
+## 4. Zero-Heat Deep Standby Sequence
 
 When placing the audio subsystem into sleep:
 1. Mute NS4168 Amplifier immediately: `gpio_set_level(HAL_PIN_PA_CTRL, 0);`
@@ -157,7 +147,7 @@ If Dynamic Frequency Scaling (**DFS** via `CONFIG_PM_ENABLE`) or runtime manual 
 |---|---|---|---|
 | **PA Power Rail (GPIO 42)** | `bsp_audio_power_enable(true)` sets `GPIO 42 = 0` (Active LOW) | **Never configured or initialized!** | **FIXED:** Added `HAL_PIN_PA_EN` output configuration and set LOW in `sub_audio_init()` and `hal_io_early_init()`. |
 | **ES8311 Clock Tree** | Complete 22-register table with OSR, dividers, and reference biases | Wrote only 4 registers (`0x00`, `0x0D`, `0x12`, `0x32`)! | **FIXED:** Ported complete reference register table to guarantee valid clocking and decoding. |
-| **Zero-Heat Deep Standby** | Complete 15-register suspend sequence per `es8311_suspend()` | Wrote only 2 registers (`0x12=0x03`, `0x0D=0x00`) | **FIXED:** Implemented reference shutdown sequence to guarantee `< 1.0 µA` and eliminate thermal drift. |
+| **Zero-Heat Deep Standby** | Complete 15-register suspend sequence per `es8311_suspend()` | Wrote only 2 registers (`0x12=0x03`, `0x0D=0x00`) | **FIXED:** Implemented reference shutdown sequence to eliminate standby draw and thermal drift. |
 | **I2S Clock & DFS Lock** | Default PLL_160M clock with PM lock | Default PLL_160M | **PASS:** Driver enforces APB max lock during transmission. |
 | **I2S Channel Format** | 16-bit 16kHz Philips Standard Mono | 16-bit 16kHz Philips Standard Mono | **PASS** |
 | **I2C Bus Clamping Protection** | Rail kept ON (`0`) during sleep | Rail kept ON (`0`) in `hal_io` | **PASS** |

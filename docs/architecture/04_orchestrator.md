@@ -1,7 +1,7 @@
 # Layer 3: System Pipeline & Orchestrator Specification
 
 ## 1. Overview
-Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sample Burst, <4ms)** and **Flow B (Interactive User Session, 30s Inactivity Sleep)**.
+Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sample Burst)** and **Flow B (Interactive User Session with Configurable Inactivity Sleep)**.
 
 ---
 
@@ -13,7 +13,7 @@ Layer 3 is the central orchestration brain of H1OS. It maintains persistent stat
 | `orch_math.c/.h` | Psychrometric Math Engine | Magnus equations, vapor pressure invariant, dew point reconstruction, continuous EWMA, integer slope gates. |
 | `orch_flow.c/.h` | Execution Flow Arbiter | Single Unified Binary Arbiter: routes Flow A sample vs Flow B interactive session; coordinates 8-step sleep transition sequence. |
 | `orch_display_sync.c/.h` | Frame Sync Engine | Coordinates display framebuffer persistence to `epd_frame` flash partition during sleep transition events. |
-| `orch_wake_stub.c/.h` | Fast RTC Wake Stub | Executes <3ms Flow A sensor pulse directly from RTC Fast Memory on Core 0. |
+| `orch_wake_stub.c/.h` | Fast RTC Wake Stub | Executes Flow A sensor sample burst directly from RTC Fast Memory on Core 0. |
 
 ---
 
@@ -32,7 +32,7 @@ ESP32-S3 has 8KB of RTC Slow SRAM. Layer 3 uses **less than 512 bytes**, leaving
 
 typedef enum {
     ULP_DISPATCH_NONE = 0,
-    ULP_DISPATCH_SENSOR_SAMPLE,     // Flow A (<4ms sensor pulse)
+    ULP_DISPATCH_SENSOR_SAMPLE,     // Flow A (Headless sensor sample burst)
     ULP_DISPATCH_MAIN_WAKE,         // Flow B (Interactive LVGL session)
     ULP_DISPATCH_BOOTLOADER_JUMP,   // Primed by BOOT hold > 2.5s
     ULP_DISPATCH_POWER_OFF,         // Primed by POWER hold > 2.5s
@@ -140,16 +140,16 @@ float     orch_math_update_ewma(float sample, float current_ewma, float alpha);
 The Orchestrator determines sleep timing based on the origin of the wake event:
 1. **User Interactive Wake (`ULP_DISPATCH_MAIN_WAKE` from Button Tap):**
    - The device was sleeping and the user tapped `BOOT` or `POWER`.
-   - Starts the **30-second inactivity session**. LVGL keypad indev processes button events.
-   - Any button click resets the 30-second timer.
+   - Starts the **configurable inactivity session** (`session.inactivity_timeout_sec`, default 30s) and renders the inverted awake indicator badge. LVGL keypad indev processes button events.
+   - Any button click resets the inactivity timer back to `inactivity_timeout_sec`.
    - Dynamic Frequency Scaling (DFS) droops CPU from 240 MHz turbo to 80 MHz baseline between clicks.
-   - When 30 seconds of inactivity elapse, triggers the coordinated sleep sequence below.
+   - When the configured inactivity duration elapses without interaction, triggers the coordinated 8-step sleep sequence below.
 2. **External RTC Timer Wake (`ULP_DISPATCH_MAIN_WAKE` from PCF85063A Countdown Timer):**
    - Woken purely to execute the periodic environmental screen update.
-   - Renders telemetry to the E-Paper panel, flushes the framebuffer, waits for panel BUSY line release, and **goes right back to sleep immediately** without idling or waiting for user interaction.
+   - Renders telemetry to the E-Paper panel (with standard non-inverted sleep badge), flushes the framebuffer, waits for panel BUSY line release, and **goes right back to sleep immediately** without idling or waiting for user interaction.
 3. **Cold Boot (`ORCH_FLOW_COLD_BOOT`):**
    - Fresh power application or battery insertion.
-   - System runs hardware bring-up, renders initial UI, and **waits 30 seconds** for potential user interaction or debug before entering initial deep sleep.
+   - System runs hardware bring-up, renders initial UI, and **waits the configured inactivity timeout** (`session.inactivity_timeout_sec`, default 30s) for potential user interaction or debug before entering initial deep sleep.
 
 #### Deterministic 8-Step Sleep Transition Sequence
 When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic 8-step sleep transition sequence:

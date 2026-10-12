@@ -73,9 +73,6 @@ set(GENERATED_FONT_SRCS
     "${GEN_FONT_DIR}/h1os_font_montserrat_20_1bpp.c"
     "${GEN_FONT_DIR}/h1os_font_montserrat_24_1bpp.c"
     "${GEN_FONT_DIR}/h1os_font_montserrat_32_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_dejavu_14_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_dejavu_16_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_dejavu_20_1bpp.c"
 )
 set(GENERATED_FONT_HDR "${GEN_FONT_DIR}/h1os_fonts.h")
 
@@ -92,7 +89,6 @@ add_custom_command(
             --all
     DEPENDS "${FONT_GEN_SCRIPT}"
             "${LVGL_FONT_SRC_DIR}/Montserrat-Medium.ttf"
-            "${LVGL_FONT_SRC_DIR}/DejaVuSans.ttf"
             "${LVGL_FONT_SRC_DIR}/FontAwesome5-Solid+Brands+Regular.woff"
     COMMENT "Synthesizing H1OS 1-BPP Typography & Font Licenses from LVGL Assets..."
     VERBATIM

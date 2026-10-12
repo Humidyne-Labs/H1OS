@@ -26,18 +26,18 @@ This digest preserves the critical technical rationale, empirical findings, and 
 
 ### 2.3 Bilevel 1-Bit Font Conversion & Inversion Dynamics (`docs/archive/epaper_1bit_font_inversion_guide.md`)
 - **Summary:** Explores why anti-aliased 4-bpp grayscale fonts experience perimeter erosion when rendered inverted (white text on black background) on 188 DPI electrophoretic displays.
-- **Current Takeaway:** In 4-bpp anti-aliasing, semi-transparent edge pixels thresholded at $\ge 128$ snap to white (background in inverted mode), eroding letter stems inward by 1 pixel per edge. On fine fonts (14pt bold with 1.5–2.0 px stems), this collapses glyphs into broken dots. H1OS mitigates this by generating 1-bpp bilevel Montserrat and DejaVu fonts using `--autohint-strong` and `--bpp 1`, ensuring symmetric dilation, 50% flash savings, and instant bit-blitting without renderer interpolation.
+- **Current Takeaway:** In 4-bpp anti-aliasing, semi-transparent edge pixels thresholded at $\ge 128$ snap to white (background in inverted mode), eroding letter stems inward by 1 pixel per edge. On fine fonts, this collapses glyphs into broken dots. H1OS mitigates this by generating 1-bpp bilevel Montserrat bold fonts using `--autohint-strong` and `--bpp 1`, ensuring symmetric dilation, 50% flash savings, and instant bit-blitting without renderer interpolation. Inverted text blocks are now utilized intentionally for the top-right interactive session badge to visually signal awake vs unattended sleep state.
 
 ### 2.4 ULP-RISC-V Coprocessor Bring-Up Guide (`docs/archive/ulp_riscv_guide.md`)
 - **Summary:** Detailed early instructions for compiling and embedding RV32IMC assembly and C code into the ESP32-S3 RTC Slow Memory domain (`0x5000_0000` to `0x5000_1FFF`).
-- **Current Takeaway:** Served as the foundation for Layer 3 ULP engineering. The earlier polling design (waking every 60s) has evolved into H1OS's event-driven, interrupt-reactive ULP Monitor that avoids bus contention while Xtensa executes Flow B sessions.
+- **Current Takeaway:** Served as the foundation for Layer 3 ULP engineering. The earlier polling design has evolved into H1OS's event-driven, interrupt-reactive ULP Monitor that avoids bus contention while Xtensa executes Flow B sessions, with wake intervals configured dynamically by the developer.
 
 ### 2.5 VS Code & ESP-IDF Toolchain Environment (`docs/archive/VSCODE_ESP_IDF_GUIDE.md`)
 - **Summary:** Setup walk-through for Visual Studio Code, CMake, and the Espressif IDF extension across ESP-IDF v5.1 through v6.1.
 - **Current Takeaway:** Standardized our recommended toolchain configuration, `c_cpp_properties.json`, compile commands database, and Express installation paths for the `xtensa-esp32s3-elf` toolchain.
 
 ### 2.6 Early Modernization Action Plan (`docs/archive/dev-action/ACTION_PLAN.md`)
-- **Summary:** Outlined multi-phase modernization covering ES8311 audio brings-up, fast RTC Wi-Fi cache reconnection (<400ms), SNTP synchronization to the PCF85063A RTC, and ThingsBoard IoT provisioning.
+- **Summary:** Outlined multi-phase modernization covering ES8311 audio bring-up, fast RTC Wi-Fi cache reconnection, SNTP synchronization to the PCF85063A RTC, and ThingsBoard IoT provisioning.
 - **Current Takeaway:** Defined the separation of network services from hardware HAL. ThingsBoard telemetry schemas and RTC calibration sequences developed here remain active reference patterns.
 
 ### 2.7 ULP Cooldown Gating & Ring Buffer Model (`docs/archive/dev-action/gated-model.md`)

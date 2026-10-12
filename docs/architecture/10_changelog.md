@@ -6,7 +6,7 @@ This document defines the release cadence, versioning policy, and modification t
 
 ## 1. Authoritative Changelog Location
 
-To maintain a single source of truth and eliminate fractured records, all official release notes, code changes, breaking architectural modifications, and bug fixes are maintained exclusively in the repository root:
+To maintain a canonical reference and eliminate fractured records, all official release notes, code changes, breaking architectural modifications, and bug fixes are maintained exclusively in the repository root:
 
 👉 **[`CHANGELOG.md`](../../CHANGELOG.md)**
 

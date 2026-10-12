@@ -1,7 +1,7 @@
 # Solomon Systech SSD1681 1.54" E-Paper Display Subsystem
 
 ## 1. Physical Specifications & Hardware Architecture
-- **Display Panel:** 1.54-inch Monochrome Active Matrix E-Paper Display (200x200 resolution)
+- **Display Panel:** 1.54-inch Monochrome Active Matrix E-Paper Display (200x200 resolution, strictly **non-touch**)
 - **Controller IC:** Solomon Systech SSD1681
 - **Bus Interface:** 4-Wire SPI (Mode 0: CPOL=0, CPHA=0) on `SPI2_HOST`
   - SPI SCK: `GPIO 12`
@@ -37,7 +37,7 @@ The SSD1681 uses two distinct SPI device configurations on `SPI2_HOST`:
 | **0x01** | `DRIVER_OUTPUT_CONTROL` | Configures multiplexer line count | 3 Bytes: `[0xC7, 0x00, 0x00]` (200 Mux lines) |
 | **0x03** | `GATE_VOLTAGE_CONTROL` | Gate driving voltage | 1 Byte: `0x17` (+19V / -19V) |
 | **0x04** | `SOURCE_VOLTAGE_CONTROL` | Source driving voltages (VSH1, VSH2, VSL) | 3 Bytes: `[0x41, 0xB0, 0x32]` |
-| **0x10** | `DEEP_SLEEP_MODE` | Enters deep sleep | 1 Byte: `0x01` (Mode 1: RAM retained, Iq ~ 1.0 µA) |
+| **0x10** | `DEEP_SLEEP_MODE` | Enters deep sleep | 1 Byte: `0x01` (Mode 1: RAM retained) |
 | **0x11** | `DATA_ENTRY_MODE` | RAM address counter auto-increment | 1 Byte: `0x03` (X increment, Y increment) |
 | **0x12** | `SW_RESET` | Software reset | None. Requires `wait_busy()`. |
 | **0x18** | `TEMP_SENSOR_SELECTION` | Selects internal thermal sensor | 1 Byte: `0x80` (Internal sensor) |
@@ -90,7 +90,7 @@ void epd_load_custom_lut(const uint8_t *lut_buffer) {
 
 ## 5. Differential Ping-Pong Refresh Sequence
 
-To update the display in **~300 ms without full-screen flashing**:
+To update the display using differential partial refresh without full-screen flashing:
 1. Write updated framebuffer to `0x24` (New RAM).
 2. **DO NOT OVERWRITE** `0x26` (Old RAM)! The controller physically compares RAM `0x24` against RAM `0x26` to apply electrostatic pulses only to pixels that change state.
 3. Call `epd_load_custom_lut(WF_PARTIAL_1IN54)`.
@@ -107,16 +107,7 @@ To update the display in **~300 ms without full-screen flashing**:
 The SSD1681 includes an internal on-glass thermistor used to compensate electrophoretic pigment viscosity.
 
 ### Invariant: Continuous CS# Hold
-Under 4-wire SPI on the SSD1681, **CS# must remain held LOW continuously** across both the Command Phase and Data Read Phase:
-```
-CS#  ──┐                                                        ┌──
-       └────────────────────────────────────────────────────────┘
-       │ <──── Command Phase ────> │ <───── Read Phase ───────> │
-DC#  ──┐                           ┌───────────────────────────────
-       └───────────────────────────┘
-MOSI ───[ 0x1B: Read Temp Cmd ]───► ───[ High-Z / Input ]─────────
-MISO ───[ Tristate ]──────────────► ───[ Byte 0: Int ][ Byte 1: Frac ]──
-```
+Under 4-wire SPI on the SSD1681, **CS# must remain held LOW continuously** across both the Command Phase (`DC# = LOW`, MOSI sends `0x1B`) and the Data Read Phase (`DC# = HIGH`, SDA switches to input to read 2 bytes `[temp_int, temp_frac]`). See [`ERRATA.md` Errata E3](../../ERRATA.md#e3-ssd1681-3-wire-half-duplex-spi-cs-hold-violation) for full bus protocol details.
 
 ### Mathematical Decoding
 ```c
@@ -132,7 +123,7 @@ float  glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac)
 ### Entry Procedure
 1. Wait for panel idle: `sub_display_wait_busy()`.
 2. Send Command `0x10`, data `0x01` (Deep Sleep Mode 1).
-3. The display enters ultra-low power standby (<1.0 µA) with RAM contents retained.
+3. The display enters low-power standby with RAM contents retained.
 
 ### Wakeup Procedure
 1. Hardware Reset Pulse on `RST#` (`GPIO 9`): 10 ms HIGH, 10 ms LOW, 10 ms HIGH.

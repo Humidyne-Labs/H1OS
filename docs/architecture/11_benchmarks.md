@@ -1,34 +1,37 @@
-# H1OS Class-E Hardware Benchmarking & Validation Guide
+# Optional / Future Hardware Verification & Benchmarking Plan
+
+> [!NOTE]
+> **Document Scope:** This document outlines an optional, future physical bench verification plan for evaluating hardware timing and power tolerances using laboratory instrumentation (oscilloscope, inline current profiler, reference psychrometer). The figures below represent design targets and test procedures rather than active runtime assertions.
 
 ## 1. Overview & Verification Targets
 
-This document defines the physical measurement procedures, test fixtures, expected tolerances, and automated diagnostic assertions for **Stage 4.2: Class-E Hardware Benchmarking**.
+This document defines the physical measurement procedures, test fixtures, expected design targets, and diagnostic hooks for **Stage 4.2: E-Class Hardware Benchmarking**.
 
-| Benchmark Metric | Target Requirement | Measured Channel / Hook | Architectural Significance |
+| Benchmark Metric | Design Target | Measured Channel / Hook | Architectural Significance |
 | :--- | :--- | :--- | :--- |
-| **Flow A Sub-Execution Timing** | $< 10\text{ ms}$ (Nominal $\sim 2.5\text{ ms}$) | GPIO 3 (`HAL_PIN_STATUS_LED`) pulse width | Eliminates MCU self-heating in the sensor cavity. |
-| **Deep Sleep Standby Current** | $< 15\text{ }\mu\text{A}$ (Nominal $9\text{--}12\text{ }\mu\text{A}$) | Nordic PPK2 / inline µA meter on battery input | Guarantees multi-month battery operation on 500mAh LiPo. |
-| **Partial Refresh Latency** | $\sim 300\text{ ms}$ (OTP LUT $\sim 280\text{--}320\text{ ms}$) | SSD1681 `EPD_BUSY` (GPIO 8) low-to-high-to-low duration | Clean electrophoretic particle migration with zero flicker. |
+| **Flow A Sub-Execution Timing** | Minimal wake window | GPIO 3 (`HAL_PIN_STATUS_LED`) pulse width | Minimizes MCU self-heating in the sensor cavity. |
+| **Deep Sleep Standby Current** | Low-leakage standby floor | Nordic PPK2 / inline µA meter on battery input | Extends multi-month battery operation on 500mAh LiPo. |
+| **Partial Refresh Latency** | Fast partial update | SSD1681 `EPD_BUSY` (GPIO 8) low-to-high-to-low duration | Clean electrophoretic particle migration with zero flicker. |
 | **Zero-Hour Conflict Suppression** | $0$ rapid double-wakes when sub-sample meets RTC alarm | Internal timer suppression logic in `orch_flow.c` & `orch_wake_stub.c` | Eliminates race condition between internal timer & PCF85063A. |
 | **Flash Endurance Audit** | $\le 1$ erase/write per sleep cycle (0 if clean) | `epd_frame` partition sector write counter | Extends SPI NOR flash lifespan beyond 100,000 cycles. |
-| **Tri-Node Thermal Equilibrium** | $T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}$ in steady state | Tri-Node telemetry query (`SHTC3`, `TSENS`, `SSD1681 0x1B`) | Proves thermodynamic invariant engine validity. |
+| **Tri-Node Thermal Equilibrium** | $T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}$ in steady state | Tri-Node telemetry query (`SHTC3`, `TSENS`, `SSD1681 0x1B`) | Validates thermodynamic invariant engine model. |
 
 ---
 
 ## 2. Test Procedures & Test Fixtures
 
-### 2.1 Benchmark 1: Flow A Sub-Execution Timing (< 10 ms)
-- **Objective:** Verify that the RTC Fast Memory wake stub captures SHTC3 telemetry in $< 10\text{ ms}$ before returning directly to deep sleep.
+### 2.1 Benchmark 1: Flow A Sub-Execution Timing
+- **Objective:** Measure the RTC Fast Memory wake stub duration while capturing SHTC3 normal-power telemetry before returning directly to deep sleep.
 - **Fixture:** Connect an oscilloscope channel to **GPIO 3** (`STATUS_LED`) with active-low trigger.
 - **Instrumented Code:** In `orch_wake_stub.c`, GPIO 3 is pulled LOW upon wake entry (`REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED))`) and set HIGH (`GPIO_OUT_W1TS_REG`) immediately before `esp_wake_stub_sleep()`.
-- **Expected Trace:**
-  - $0.0\text{ ms}$: Wake stub asserts GPIO 3 LOW.
-  - $0.0\text{--}0.25\text{ ms}$: SHTC3 Wake Command (`0x3517`).
-  - $0.25\text{--}1.25\text{ ms}$: SHTC3 Low-Power measurement delay ($1\text{ ms}$).
-  - $1.25\text{--}1.85\text{ ms}$: Read 6 bytes of SHTC3 data and send Sleep Command (`0xB098`).
-  - $1.85\text{--}2.20\text{ ms}$: Integer math conversion and RTC Slow SRAM ring push.
-  - $2.20\text{ ms}$: Deassert GPIO 3 HIGH and trigger `esp_wake_stub_sleep()`.
-- **Pass Criterion:** Measured pulse width on oscilloscope cursor $< 10.0\text{ ms}$ (typically $2.2\text{--}2.8\text{ ms}$).
+- **Expected Sequence:**
+  1. Wake stub asserts GPIO 3 LOW.
+  2. SHTC3 Wake Command (`0x3517`) and Normal-Power measurement command (`0x7866`).
+  3. SHTC3 Normal-Power conversion wait ($13\text{ ms}$).
+  4. Read 6 bytes of SHTC3 data and send Sleep Command (`0xB098`).
+  5. Integer math conversion and RTC Slow SRAM ring push.
+  6. Deassert GPIO 3 HIGH and trigger `esp_wake_stub_sleep()`.
+- **Pass Criterion:** Clean single pulse width on oscilloscope cursor matching the normal-mode conversion sequence.
 
 ---
 

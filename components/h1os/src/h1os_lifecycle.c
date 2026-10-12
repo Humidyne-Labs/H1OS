@@ -49,6 +49,11 @@ void h1os_reset_session_timer(void)
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
 
+bool h1os_is_session_active(void)
+{
+    return s_session_running;
+}
+
 static void h1os_trigger_chime(h1os_chime_type_t type)
 {
     if (s_app_lifecycle.presentation.on_chime != NULL) {
@@ -159,6 +164,11 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         }
     }
 
+    s_session_running = !is_rtc_wake;
+    if (s_session_running) {
+        h1os_reset_session_timer();
+    }
+
     if (flow == ORCH_FLOW_COLD_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
         if (s_app_lifecycle.on_boot) {
@@ -184,16 +194,17 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 6. Invariant Governance:
     //    - If RTC Wake: screen update rendered, go right back to sleep immediately!
-    //    - If Cold Boot or User Button Wake: wait 30s session timeout for user interaction.
+    //    - If Cold Boot or User Button Wake: wait configured inactivity session timeout for user interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
         if (sleep_sec == 0) sleep_sec = 120;
         return h1os_sleep(sleep_sec);
     } else {
-        ESP_LOGI(TAG, "Starting 30-second interactive session monitor...");
+        uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
+        if (timeout_sec == 0) timeout_sec = 30;
+        ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
-        s_session_running = true;
         xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 3072, NULL, 3, &s_session_task_handle, 0);
     }
 
