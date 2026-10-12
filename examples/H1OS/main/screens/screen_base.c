@@ -32,6 +32,7 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_group_remove_obj(scr);
     lv_group_add_obj(def_grp, scr);
     lv_group_focus_obj(scr);
+    lv_obj_set_clickable(scr, true);
 
     // 1. Header Title: Left-aligned at (X: 6, Y: 4)
     lv_obj_t *lbl_title = lv_label_create(scr);

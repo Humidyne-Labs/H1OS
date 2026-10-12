@@ -83,30 +83,44 @@ static void keypad_event_cb(lv_event_t *e)
     lv_event_code_t code = lv_event_get_code(e);
 
     if (code == LV_EVENT_LONG_PRESSED) {
-        // Native LVGL Long-Press Detection (>= 2.0s on focused input)
+        // Native LVGL Long-Press Detection (>= 2.0s hold on POWER / LV_KEY_ENTER)
         ESP_LOGI(TAG, "Keypad: Native LVGL long-press (>=2.0s) detected! Executing shutdown...");
         s_is_shutting_down = true;
         h1os_shutdown();
         return;
     }
 
-    if (code == LV_EVENT_SHORT_CLICKED) {
+    if (code == LV_EVENT_KEY) {
         uint32_t key = lv_event_get_key(e);
-        if (key == LV_KEY_RIGHT || key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
-            // BOOT Button Short-Click: Forward Cycle (Non-blocking acoustic feedback)
+        if (key == 0 && lv_event_get_param(e) != NULL) {
+            key = *(const uint32_t *)lv_event_get_param(e);
+        }
+        if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT) {
+            // BOOT Button: Forward Cycle (Non-blocking acoustic feedback)
             sub_audio_play_tone_async(2400, 15);
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad forward: Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
-        } else if (key == LV_KEY_LEFT || key == LV_KEY_PREV) {
-            // POWER Button Short-Click: Reverse Cycle (Non-blocking acoustic feedback)
+            return;
+        } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT) {
+            // Reverse Cycle (Non-blocking acoustic feedback)
             sub_audio_play_tone_async(1800, 15);
             s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad reverse: Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
+            return;
         }
+    }
+
+    if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_CLICKED) {
+        // POWER Button Short-Click (LV_KEY_ENTER): Reverse Cycle (Non-blocking acoustic feedback)
+        sub_audio_play_tone_async(1800, 15);
+        s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
+        ESP_LOGI(TAG, "Keypad short click (ENTER): Navigating to page %u/%u",
+                 s_app_state.active_page + 1, H1OS_NUM_SCREENS);
+        update_active_display();
     }
 }
 
