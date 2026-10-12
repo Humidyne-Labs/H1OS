@@ -18,8 +18,17 @@ extern "C" {
 
 /**
  * @brief Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
+ *
+ * @param[in] is_wake_cycle True if resuming from sleep (enables differential partial flush).
  */
-esp_err_t h1os_lvgl_init(void);
+esp_err_t h1os_lvgl_init(bool is_wake_cycle);
+
+/**
+ * @brief Explicitly override whether the first flush executes a full or partial refresh.
+ *
+ * @param[in] full_refresh True for full OTP flashing refresh, False for differential partial.
+ */
+void h1os_lvgl_set_first_flush_mode(bool full_refresh);
 
 /**
  * @brief Start the LVGL background FreeRTOS task.

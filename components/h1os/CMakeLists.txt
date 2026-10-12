@@ -87,6 +87,7 @@ add_custom_command(
     OUTPUT ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR}
     COMMAND "${python_bin}" "${FONT_GEN_SCRIPT}"
             --lvgl-font-dir "${LVGL_FONT_SRC_DIR}"
+            --lvgl-root "${lvgl_dir}"
             --out-dir "${GEN_FONT_DIR}"
             --all
     DEPENDS "${FONT_GEN_SCRIPT}"

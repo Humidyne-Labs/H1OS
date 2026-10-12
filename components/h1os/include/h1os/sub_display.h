@@ -48,6 +48,15 @@ uint8_t* sub_display_get_framebuffer(void);
 void sub_display_clear(uint8_t color);
 
 /**
+ * @brief Synchronize previous frame into shadow buffer and hardware RAM 0x26.
+ * Essential on deep sleep wake to enable differential partial scanning against the glass.
+ *
+ * @param[in] prev_frame Pointer to 5000-byte pre-sleep image buffer.
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame);
+
+/**
  * @brief Synchronously wait for EPD panel to finish driving electrophoretic particles.
  * Blocks on binary semaphore driven by GPIO 8 (BUSY) falling edge.
  *

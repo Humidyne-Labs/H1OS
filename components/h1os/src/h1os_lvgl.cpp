@@ -139,15 +139,18 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     lv_display_flush_ready(disp);
 }
 
-esp_err_t h1os_lvgl_init(void)
+esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
     if (s_lv_display != NULL) return ESP_OK;
 
-    esp_err_t ret = sub_display_init(false);
+    esp_err_t ret = sub_display_init(is_wake_cycle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize display hardware: %s", esp_err_to_name(ret));
         return ret;
     }
+
+    /* On cold boot, execute full OTP refresh; on sleep wake, execute differential partial refresh */
+    s_first_boot_flush = !is_wake_cycle;
 
     lv_init();
     lv_tick_set_cb(lvgl_tick_get_cb);
@@ -188,15 +191,21 @@ esp_err_t h1os_lvgl_init(void)
         ESP_LOGI(TAG, "Registered LVGL keypad indev handler (Long-press: 2000ms)");
     }
 
-    ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode");
+    ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode (first flush: %s)",
+             s_first_boot_flush ? "FULL" : "PARTIAL");
     return ESP_OK;
+}
+
+void h1os_lvgl_set_first_flush_mode(bool full_refresh)
+{
+    s_first_boot_flush = full_refresh;
 }
 
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 {
     if (s_lvgl_task_handle != NULL) return ESP_OK;
 
-    esp_err_t ret = h1os_lvgl_init();
+    esp_err_t ret = h1os_lvgl_init(false);
     if (ret != ESP_OK) return ret;
 
     task_priority = (task_priority > 0) ? task_priority : 5;

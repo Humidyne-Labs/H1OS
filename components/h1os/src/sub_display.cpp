@@ -147,10 +147,8 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     hal_spi_write_cmd(0x3C);
     hal_spi_write_data(d_border, sizeof(d_border));
 
-    if (!is_wake_cycle) {
-        memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
-        memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
-    }
+    memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
+    memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
 
     s_inited = true;
     return ESP_OK;
@@ -174,6 +172,21 @@ static void set_ram_counters(void)
     uint8_t d_y[] = { 0x00, 0x00 };
     hal_spi_write_cmd(0x4F);
     hal_spi_write_data(d_y, sizeof(d_y));
+}
+
+esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
+{
+    if (prev_frame == NULL) return ESP_ERR_INVALID_ARG;
+
+    memcpy(s_previous_frame, prev_frame, EPD_BUFFER_SIZE);
+    memcpy(s_current_frame, prev_frame, EPD_BUFFER_SIZE);
+
+    set_ram_counters();
+    hal_spi_write_cmd(0x26);
+    hal_spi_write_frame_dma(s_previous_frame);
+
+    ESP_LOGI(TAG, "SSD1681 RAM 0x26 synchronized with prior frame for differential scan");
+    return ESP_OK;
 }
 
 esp_err_t sub_display_refresh_full(void)

@@ -53,6 +53,7 @@ def generate_font(size: int, font_path: Path, fa_path: Path, output_file: Path, 
         "--bpp", "1",
         "--font", str(font_path),
         "-r", DEFAULT_UNICODE_RANGE,
+        "--autohint-strong",
     ]
     if fa_path and fa_path.is_file():
         cmd.extend([
@@ -160,7 +161,7 @@ def copy_licenses(lvgl_dir: Path, out_dir: Path):
     readme.write_text(
         "# H1OS 1-BPP Typography Licenses\n\n"
         "This directory contains the licenses for fonts incorporated into H1OS:\n"
-        "- **Montserrat-Medium**: Licensed under the SIL Open Font License (OFL).\n"
+        "- **Montserrat-Bold / Montserrat-Medium**: Licensed under the SIL Open Font License (OFL).\n"
         "- **DejaVuSans**: Licensed under the Bitstream Vera / Arev Fonts License.\n"
         "- **FontAwesome5**: Licensed under the Font Awesome Free License.\n",
         encoding="utf-8"
@@ -170,6 +171,8 @@ def copy_licenses(lvgl_dir: Path, out_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for H1OS from LVGL font assets")
     parser.add_argument("--lvgl-font-dir", type=str, required=True, help="Path to LVGL built_in_font directory")
+    parser.add_argument("--lvgl-root", type=str, default=None, help="Root path of LVGL component")
+    parser.add_argument("--bold-font", type=str, default=None, help="Explicit path to Montserrat-Bold.ttf")
     parser.add_argument("--out-dir", type=str, required=True, help="Target output directory")
     parser.add_argument("--all", action="store_true", help="Generate all standard H1OS font sizes")
     args = parser.parse_args()
@@ -189,18 +192,40 @@ def main():
         print(f"[!] Could not locate {dejavu_ttf}")
         sys.exit(1)
 
+    # Search for Montserrat-Bold.ttf for high-contrast 1-bpp EPD rendering across all sizes
+    montserrat_bold_ttf = None
+    if args.bold_font and Path(args.bold_font).is_file():
+        montserrat_bold_ttf = Path(args.bold_font).resolve()
+    elif args.lvgl_root:
+        cand = Path(args.lvgl_root).resolve() / "tests" / "src" / "test_files" / "fonts" / "Montserrat-Bold.ttf"
+        if cand.is_file():
+            montserrat_bold_ttf = cand
+    if not montserrat_bold_ttf:
+        try:
+            cand = lvgl_dir.parents[2] / "tests" / "src" / "test_files" / "fonts" / "Montserrat-Bold.ttf"
+            if cand.is_file():
+                montserrat_bold_ttf = cand
+        except IndexError:
+            pass
+
+    font_for_montserrat = montserrat_bold_ttf if (montserrat_bold_ttf and montserrat_bold_ttf.is_file()) else montserrat_ttf
+    if montserrat_bold_ttf and montserrat_bold_ttf.is_file():
+        print(f"[+] Prioritizing Bold typography for EPD: {montserrat_bold_ttf}")
+    else:
+        print(f"[*] Bold font not located, falling back to: {montserrat_ttf}")
+
     montserrat_sizes = [14, 16, 18, 20, 24, 32]
     dejavu_sizes = [14, 16, 20]
 
-    # Generate Montserrat suite
+    # Generate Montserrat suite (all sizes bold with autohint-strong)
     for sz in montserrat_sizes:
         sym_name = f"h1os_font_montserrat_{sz}_1bpp"
         out_file = out_dir / f"{sym_name}.c"
-        success = generate_font(sz, montserrat_ttf, fa_woff, out_file, sym_name)
+        success = generate_font(sz, font_for_montserrat, fa_woff, out_file, sym_name)
         if not success:
             sys.exit(1)
 
-    # Generate DejaVu suite (tabular / data)
+    # Generate DejaVu suite (tabular / data with autohint-strong)
     for sz in dejavu_sizes:
         sym_name = f"h1os_font_dejavu_{sz}_1bpp"
         out_file = out_dir / f"{sym_name}.c"

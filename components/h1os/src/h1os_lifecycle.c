@@ -130,7 +130,15 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    h1os_lvgl_init();
+    bool is_wake = (flow != ORCH_FLOW_COLD_BOOT);
+    h1os_lvgl_init(is_wake);
+    if (is_wake) {
+        esp_err_t r_err = orch_display_sync_restore_to_framebuffer();
+        if (r_err != ESP_OK) {
+            ESP_LOGW(TAG, "Display frame restore failed (%s), forcing full OTP refresh", esp_err_to_name(r_err));
+            h1os_lvgl_set_first_flush_mode(true);
+        }
+    }
     sub_audio_init();
 
     bool is_rtc_wake = false;

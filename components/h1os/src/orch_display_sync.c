@@ -55,6 +55,10 @@ esp_err_t orch_display_sync_restore_to_framebuffer(void)
     esp_err_t err = hal_flash_read_frame(fb, EPD_BUFFER_SIZE);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Restored 5000-byte EPD frame from flash partition");
+        /* Synchronize hardware RAM 0x26 with restored frame for differential partial scan */
+        sub_display_sync_previous_frame(fb);
+    } else {
+        ESP_LOGW(TAG, "Failed to read EPD frame from flash: %s", esp_err_to_name(err));
     }
     return err;
 }
