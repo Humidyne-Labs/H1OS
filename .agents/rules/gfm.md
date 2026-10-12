@@ -2,7 +2,7 @@
 
 All documentation (`.md`) across this repository must strictly adhere to the GitHub Flavored Markdown (GFM) specification.
 
-Refer to the skill [`.agents/skills/gfm-markdown-formatting/SKILL.md`](../skills/gfm-markdown-formatting/SKILL.md) for full reference.
+Refer to the skill [`.agents/skills/gfm/SKILL.md`](../skills/gfm/SKILL.md) for full reference.
 
 ## Mandatory Rules
 

@@ -1,5 +1,5 @@
 ---
-name: gfm-markdown-formatting
+name: gfm
 description: >-
   Strict GitHub Flavored Markdown (GFM) formatting guidelines, MathJax equation syntax,
   and Mermaid diagram specifications. Use whenever authoring, updating, validating, or refactoring
