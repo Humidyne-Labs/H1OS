@@ -132,14 +132,17 @@ H1OS avoids synthetic curve fitting by tracking physical thermodynamic invariant
 
 ---
 
-## 6. Display Architecture & LVGL v9 Integration
+## 6. Display Architecture & Refresh Policy
 
 - **Resolution:** 200×200 pixels monochrome (5000 bytes working RAM).
 - **Format:** `LV_COLOR_FORMAT_I1` with 1-bit packed binary typography (`H1OS_FONT_14`, `H1OS_FONT_20`).
+- **Full-Suite Bold Typography:** Build-time synthesized `Montserrat-Bold` and `DejaVuSans` with `--autohint-strong` bilevel rasterization, ensuring 2-to-3-pixel solid stems that eliminate hairline stroke erosion on 188 DPI glass.
 - **Keypad Indev:** Hardware tactile buttons are exposed as `LV_INDEV_TYPE_KEYPAD`:
   - `BOOT` (GPIO 0): `LV_KEY_NEXT` (toggles screens / focuses objects).
   - `POWER` (GPIO 18): `LV_KEY_ENTER`.
 - **Differential Partial Refresh:** Custom 159-byte partial LUT completes screen updates in ~300 ms without full-screen flicker.
+- **Anti-Ghosting Threshold (6-Cycle Quota):** Automatically triggers a full OTP refresh after every 6 partial updates (`CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT`, default 6) to reset residual DC bias and restore peak pigment contrast. In battery operation with a 4-hour max sleep interval, 6 cycles guarantees a full refresh at least once every 24 hours ($6 \times 4\text{h} = 24\text{h}$) to meet manufacturer panel longevity requirements without redundant clock tracking.
+- **Power-Off & Long-Term Storage Neutralization:** `h1os_shutdown()` (when `CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN=y`, default) and `h1os_shutdown_for_storage()` drive all microcapsules to clean white (`0xFF`) via a full OTP refresh before cutting battery power, preventing dye migration, charge accumulation, and permanent burn-in.
 
 ---
 

@@ -163,6 +163,12 @@ void h1os_reset_session_timer(void);
  */
 void h1os_shutdown(void);
 
+/**
+ * @brief Shutdown for long-term storage: clears display to pure white before cutting power.
+ * Protects e-Paper electrophoretic microcapsules against permanent dye migration and burn-in.
+ */
+void h1os_shutdown_for_storage(void);
+
 #ifdef __cplusplus
 }
 #endif

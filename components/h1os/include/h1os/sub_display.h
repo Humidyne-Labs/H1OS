@@ -74,6 +74,14 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks);
 esp_err_t sub_display_refresh_full(void);
 
 /**
+ * @brief Clear display to pure white and trigger full OTP refresh.
+ * Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_display_clear_to_white_full(void);
+
+/**
  * @brief Execute fast partial refresh (~300ms) with software LUT.
  *
  * @return ESP_OK on success.

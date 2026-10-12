@@ -56,6 +56,9 @@ typedef struct {
     uint32_t            ulp_vbat_scale;
     int32_t             ulp_vbat_offset_mv;
 
+    /* E-Paper anti-ghosting quota counter (survives deep sleep) */
+    uint16_t            epd_partial_refresh_count;
+
     /* Dynamic sliding ambient floor (minimum over recent history) */
     int16_t             amb_floor_temp_centi_c;
     int16_t             _pad;

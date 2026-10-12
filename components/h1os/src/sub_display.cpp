@@ -218,6 +218,14 @@ esp_err_t sub_display_refresh_full(void)
     return ESP_OK;
 }
 
+esp_err_t sub_display_clear_to_white_full(void)
+{
+    memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
+    memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
+    ESP_LOGI(TAG, "Clearing e-Paper display to pure white for storage / burn-in protection...");
+    return sub_display_refresh_full();
+}
+
 static void epd_load_custom_lut(const uint8_t *lut_buffer)
 {
     if (lut_buffer == NULL) return;

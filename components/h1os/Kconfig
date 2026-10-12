@@ -78,4 +78,23 @@ menu "H1OS Operating System Configuration"
             Exponential Moving Average (EMA) low-pass filter weight multiplied by 1000.
             Default 50 represents alpha = 0.050 (low-pass filter to smooth CPU junction thermal spikes).
 
+    menu "E-Paper Display Maintenance & Anti-Ghosting Configuration"
+
+        config H1OS_EPD_PARTIAL_REFRESH_LIMIT
+            int "Partial Refresh Anti-Ghosting Threshold (Count)"
+            range 1 50
+            default 6
+            help
+                Number of differential partial refreshes before triggering a mandatory full refresh
+                to clear residual DC bias and pigment sticking (SSD1681 best practice: 5 to 10; default 6 guarantees a full refresh every 24h at 4h max sleep).
+
+        config H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN
+            bool "Refresh to Clean White Screen on Power Off / Storage"
+            default y
+            help
+                When powering down or storing the device, clears the e-Paper panel to pure white
+                via a full refresh to neutralize microcapsule charges and prevent permanent burn-in.
+
+    endmenu
+
 endmenu

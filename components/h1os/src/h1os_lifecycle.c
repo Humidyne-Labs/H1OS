@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "hal_io.h"
@@ -258,9 +259,10 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
     return orch_flow_transition_to_sleep(sleep_sec);
 }
 
-void h1os_shutdown(void)
+static void execute_system_shutdown(bool force_clean_white)
 {
-    ESP_LOGI(TAG, "Executing system shutdown and battery power cut...");
+    ESP_LOGI(TAG, "Executing system shutdown (%s)...",
+             force_clean_white ? "storage mode: clean white" : "standard mode");
     s_session_running = false; /* Stop inactivity monitor from racing into h1os_sleep() */
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
@@ -270,9 +272,14 @@ void h1os_shutdown(void)
     // Wait for shutdown chime to finish playing cleanly before cutting power
     sub_audio_wait_idle(1500);
 
-    /* Persist last frame and park the EPD controller */
+    /* Display shutdown / storage handling */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
-    orch_display_sync_save_if_dirty();
+    if (force_clean_white) {
+        sub_display_clear_to_white_full();
+        orch_state_get()->flags &= ~ORCH_FLAG_EPD_FRAME_VALID;
+    } else {
+        orch_display_sync_save_if_dirty();
+    }
     sub_display_enter_deep_sleep();
 
     /* The POWER button physically bridges the LDO gate while held, and an
@@ -297,4 +304,18 @@ void h1os_shutdown(void)
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
     esp_sleep_enable_ext1_wakeup(1ULL << HAL_PIN_BUTTON_POWER, ESP_EXT1_WAKEUP_ANY_LOW);
     esp_deep_sleep_start();
+}
+
+void h1os_shutdown(void)
+{
+#if CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN
+    execute_system_shutdown(true);
+#else
+    execute_system_shutdown(false);
+#endif
+}
+
+void h1os_shutdown_for_storage(void)
+{
+    execute_system_shutdown(true);
 }

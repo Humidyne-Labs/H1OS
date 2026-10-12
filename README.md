@@ -33,7 +33,7 @@ Production-grade, event-driven ambient operating system and peripheral architect
 The Waveshare ESP32-S3 ePaper 1.54" V2 is an integrated, battery-powered IoT hardware platform featuring:
 
 - **Compute Module**: Espressif Systems ESP32-S3-PICO-1-N8R8 (Xtensa® dual-core 32-bit LX7 @ up to 240 MHz, 8 MB Quad SPI Flash, 8 MB Octal PSRAM).
-- **Bi-Stable Display**: 1.54-inch 200×200 pixel monochrome e-Paper display (Solomon Systech SSD1681 driver, 188 DPI). Maintains image state indefinitely with **zero static current draw**.
+- **Bi-Stable Display**: 1.54-inch 200×200 pixel monochrome e-Paper display (Solomon Systech SSD1681 driver, 188 DPI). Maintains image state indefinitely with **zero static current draw**. Features full-suite bold typography, automated 6-cycle anti-ghosting full refresh, and clean-white power-off shutdown.
 - **Environmental Sensor**: Sensirion SHTC3 (I2C `0x70`) high-precision relative humidity and temperature sensor.
 - **Calendar Real-Time Clock**: NXP PCF85063A ultra-low power calendar RTC (I2C `0x51`) with 32.768 kHz crystal backup, programmable countdown timer, and alarms.
 - **Audio Codec Subsystem**: Everest Semi ES8311 I2S codec + NS4168 Class-D mono power amplifier driving an onboard speaker. Features dedicated background FreeRTOS worker (`h1os_audio_worker`), ES8311 CSM ready status polling (Reg `0xFC`), hardware soft-mute zero-cross ramps, and synchronous/asynchronous raw 16-bit signed PCM audio clip playback.

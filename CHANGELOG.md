@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.1.0-alpha] - 2026-10-12
 
 ### 🚀 Added
+- **SSD1681 E-Paper Maintenance & Scheduled Refresh Policy** (`sub_display.cpp/.h`, `orch_state.c/.h`, `orch_display_sync.c/.h`, `h1os_lvgl.cpp`, `h1os_lifecycle.c`, `Kconfig`):
+  - Added anti-ghosting quota tracking (`epd_partial_refresh_count`) in persistent RTC Slow memory, automatically triggering a full OTP refresh after every 6 partial updates (`CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT`, default 6; guarantees full refresh $\le 24\text{h}$ at 4h max sleep) to reset residual DC bias.
+  - Added long-term storage panel neutralization: implemented `sub_display_clear_to_white_full()` in Layer 2 and `h1os_shutdown_for_storage()` in Layer 4, driving the display to clean white (`0xFF`) before cutting power (`CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN`) to protect microcapsule chemistry against permanent dye migration.
 - **Full Typography Suite Bold Weight & Strong Autohinting** (`tools/generate_1bpp_fonts.py`, `components/h1os/CMakeLists.txt`):
   - Updated font generator to discover and prioritize `Montserrat-Bold.ttf` across all point sizes (`14`, `16`, `18`, `20`, `24`, `32`).
   - Added `--autohint-strong` to all bilevel rasterization invocations across both Montserrat and DejaVu suites, generating solid 2-to-3-pixel stems and eliminating hairline dropouts and stroke erosion on 188 DPI monochrome electrophoretic glass.

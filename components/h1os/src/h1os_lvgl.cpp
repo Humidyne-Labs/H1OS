@@ -128,11 +128,14 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
     if (lv_display_flush_is_last(disp)) {
         orch_display_sync_mark_dirty();
-        if (s_first_boot_flush) {
+        bool do_full = s_first_boot_flush || orch_display_sync_should_full_refresh();
+        if (do_full) {
             sub_display_refresh_full();
             s_first_boot_flush = false;
+            orch_display_sync_record_full_refresh();
         } else {
             sub_display_refresh_partial();
+            orch_display_sync_record_partial_refresh();
         }
     }
 

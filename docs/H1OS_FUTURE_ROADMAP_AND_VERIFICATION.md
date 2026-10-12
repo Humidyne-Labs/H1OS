@@ -164,6 +164,13 @@ When hardware bench testing begins, execute these 5 standardized test protocols:
 3. Record Tri-Node temperature array: $T_{\text{SHTC3}}$, $T_{\text{TSENS}}$, $T_{\text{EPD\_GLASS}}$.
 4. **Pass Criteria:** Calculated ambient plateau temperature deviates by $\le \pm 0.2^\circ\text{C}$ from chamber reference.
 
+### Protocol 6: E-Paper Anti-Ghosting Quota & Storage Neutralization Verification Test
+1. Set `CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT` to 6 and trigger sequential navigation cycles.
+2. Verify partial updates 1 through 5 execute in ~300 ms with zero OTP inversion flash.
+3. Verify update 6 triggers an automatic full OTP refresh (`0xF7` + `0x20`), resetting `epd_partial_refresh_count` back to 0.
+4. Trigger `h1os_shutdown()` (with `CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN=y`) or `h1os_shutdown_for_storage()` and verify the panel drives completely white (`0xFF`) before cutting power.
+5. **Pass Criteria:** Zero ghosting artifacts, anti-ghosting quota accurately tracks across deep sleep in RTC memory (guaranteeing $\le 24\text{h}$ full refresh at 4h max sleep), and clean white screen on power-off shutdown.
+
 ---
 
 ## 5. Quick-Resume Checklist for Next Session
