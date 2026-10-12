@@ -122,13 +122,28 @@ When the user taps `BOOT` (GPIO 0) or `POWER` (GPIO 18), H1OS initiates Flow B:
 
 H1OS avoids synthetic curve fitting by tracking physical thermodynamic invariants:
 - **Saturation Vapor Pressure ($e_s$):**
-  $$e_s(T) = 6.112 \cdot \exp\left(\frac{17.625 \cdot T}{243.04 + T}\right) \quad [\text{hPa}]$$
+
+  $$
+  e_s(T) = 6.112 \cdot \exp\left(\frac{17.625 \cdot T}{243.04 + T}\right) \quad [\text{hPa}]
+  $$
+
 - **Vapor Pressure ($e$):**
-  $$e = \frac{RH}{100} \cdot e_s(T) \quad [\text{hPa}]$$
+
+  $$
+  e = \frac{RH}{100} \cdot e_s(T) \quad [\text{hPa}]
+  $$
+
 - **True Dew Point ($T_{\text{dew}}$):**
-  $$T_{\text{dew}} = \frac{243.04 \cdot \ln(e / 6.112)}{17.625 - \ln(e / 6.112)} \quad [^\circ\text{C}]$$
+
+  $$
+  T_{\text{dew}} = \frac{243.04 \cdot \ln(e / 6.112)}{17.625 - \ln(e / 6.112)} \quad [^\circ\text{C}]
+  $$
+
 - **Ambient RH Reconstruction:**
-  $$RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}$$
+
+  $$
+  RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}
+  $$
 
 ---
 

@@ -38,8 +38,14 @@ The Waveshare ESP32-S3 board features a hardware power latch circuit controlling
           GND
 ```
 - **Divider Transfer Function:**
-  $$V_{\text{ADC}} = V_{\text{BAT}} \times \left(\frac{R_2}{R_1 + R_2}\right) = \frac{V_{\text{BAT}}}{2}$$
-  $$V_{\text{BAT}} = 2.0 \times V_{\text{ADC}}$$
+
+  $$
+  V_{\text{ADC}} = V_{\text{BAT}} \times \left(\frac{R_2}{R_1 + R_2}\right) = \frac{V_{\text{BAT}}}{2}
+  $$
+
+  $$
+  V_{\text{BAT}} = 2.0 \times V_{\text{ADC}}
+  $$
 
 ### ADC Configuration Parameters
 - **ADC Unit:** `ADC_UNIT_1`
@@ -54,7 +60,11 @@ To eliminate ADC thermal noise and supply switching ripple:
 2. Sort ascending via `qsort()`.
 3. Discard lowest 4 samples and highest 4 samples.
 4. Average the 8 middle samples:
-   $$\bar{S} = \frac{1}{8} \sum_{i=4}^{11} \text{samples}[i]$$
+
+   $$
+   \bar{S} = \frac{1}{8} \sum_{i=4}^{11} \text{samples}[i]
+   $$
+
 5. Convert $\bar{S}$ to calibrated millivolts through `adc_cali_raw_to_voltage()`.
 6. Multiply by 2.0 to calculate $V_{\text{BAT}}$.
 

@@ -81,7 +81,11 @@ This document defines the physical measurement procedures, test fixtures, expect
 ### 2.6 Benchmark 6: Tri-Node Thermal Equilibrium Validation
 - **Objective:** Verify that ambient temperature reconstruction correctly captures the cavity gradient without synthetic curve fitting.
 - **Gradient Rule:**
-  $$T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}$$
+
+  $$
+  T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}
+  $$
+
   - $T_{\text{MCU}}$ (die junction) is warmest due to silicon dissipation.
   - $T_{\text{Glass}}$ reflects frontal case surface temperature.
   - $T_{\text{SHTC3}}$ reflects cavity thermodynamic floor.

@@ -53,7 +53,10 @@ Without a physical Card Detect switch, probing an empty card slot causes the SDM
 ## 4. Capacity Calculation
 
 Card capacity in gigabytes is decoded from the CSD register:
-$$\text{Capacity } [\text{GB}] = \frac{\text{card->csd.capacity}}{2048 \times 1024}$$
+
+$$
+\text{Capacity } [\text{GB}] = \frac{\text{card->csd.capacity}}{2048 \times 1024}
+$$
 
 ```c
 float bsp_sdcard_get_capacity_gb(void) {

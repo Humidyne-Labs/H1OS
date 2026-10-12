@@ -68,7 +68,11 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 
 #### C. Battery Guard & Zero-Volt Cable Guard (`GPIO 4` / ADC1_CH3)
 - When awakened, the ULP reads battery voltage using factory eFuse linear coefficients:
-  $$V_{\text{bat\_mV}} = \left(\frac{\text{raw} \times m_{\text{scale}}}{4096}\right) \times 2 + b_{\text{offset}}$$
+
+  $$
+  V_{\text{bat\_mV}} = \left(\frac{\text{raw} \times m_{\text{scale}}}{4096}\right) \times 2 + b_{\text{offset}}
+  $$
+
 - **Brownout Threshold ($V_{\text{bat}} < 3.25\text{V}$):**
   - If $V_{\text{bat}} > 100\text{mV}$ and $< 3250\text{mV}$, sets `ULP_DISPATCH_CRITICAL_SHUTDOWN` to draw the emergency low-battery icon and cut the latch.
 - **Zero-Volt Cable Guard ($V_{\text{bat}} \approx 0\text{mV}$):**

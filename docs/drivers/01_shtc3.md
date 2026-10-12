@@ -68,13 +68,26 @@ static uint8_t shtc3_calc_crc(const uint8_t *data, size_t len) {
 ## 4. Mathematical Conversion Formulas
 
 ### Floating-Point Conversion (Standard)
-$$\text{Temperature } [^\circ\text{C}] = -45.0 + 175.0 \times \left(\frac{S_T}{2^{16} - 1}\right)$$
-$$\text{Relative Humidity } [\%] = 100.0 \times \left(\frac{S_{RH}}{2^{16} - 1}\right)$$
+
+$$
+\text{Temperature } [^\circ\text{C}] = -45.0 + 175.0 \times \left(\frac{S_T}{2^{16} - 1}\right)
+$$
+
+$$
+\text{Relative Humidity } [\%] = 100.0 \times \left(\frac{S_{RH}}{2^{16} - 1}\right)
+$$
+
 Where $S_T = \text{raw\_temp}$ and $S_{RH} = \text{raw\_rh}$.
 
 ### Fixed-Point Centi-Unit Conversion (Integer Math for ULP / Wake Stub)
-$$\text{Temp Centi-Deg } [0.01^\circ\text{C}] = -4500 + \frac{17500 \times S_T}{65535}$$
-$$\text{RH Centi-Pct } [0.01\%] = \frac{10000 \times S_{RH}}{65535}$$
+
+$$
+\text{Temp Centi-Deg } [0.01^\circ\text{C}] = -4500 + \frac{17500 \times S_T}{65535}
+$$
+
+$$
+\text{RH Centi-Pct } [0.01\%] = \frac{10000 \times S_{RH}}{65535}
+$$
 
 ---
 

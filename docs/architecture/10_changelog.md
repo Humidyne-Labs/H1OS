@@ -16,7 +16,9 @@ To maintain a single source of truth and eliminate fractured records, all offici
 
 H1OS strictly adheres to [Semantic Versioning 2.0.0](https://semver.org/):
 
-$$\text{Version} = \text{MAJOR}.\text{MINOR}.\text{PATCH}$$
+$$
+\text{Version} = \text{MAJOR}.\text{MINOR}.\text{PATCH}
+$$
 
 - **MAJOR (vX.0.0):** Incompatible API changes, Layer 1–4 boundary reorganizations, or hardware breaking alterations.
 - **MINOR (vx.Y.0):** Backward-compatible feature additions, new subsystem capabilities, or non-breaking API extensions.

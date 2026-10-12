@@ -50,18 +50,18 @@ graph TD
     Sub --> HAL[Layer 1: Hardware Abstraction Layer]
     HAL --> HW[Layer 0: Physical Silicon & GPIOs]
 
-    subgraph "Layer 2 Subsystem Drivers"
-        sub_sensor[sub_sensor.c: SHTC3 & TSENS]
-        sub_rtc[sub_rtc.c: PCF85063A RTC]
-        sub_audio[sub_audio.c: ES8311 & NS4168]
-        sub_display[sub_display.cpp: SSD1681 E-Paper]
-        sub_power[sub_power.c: Battery ADC & Sleep Engine]
+    subgraph Layer2_Subsystems ["Layer 2 Subsystem Drivers"]
+        sub_sensor["sub_sensor.c: SHTC3 & TSENS"]
+        sub_rtc["sub_rtc.c: PCF85063A RTC"]
+        sub_audio["sub_audio.c: ES8311 & NS4168"]
+        sub_display["sub_display.cpp: SSD1681 E-Paper"]
+        sub_power["sub_power.c: Battery ADC & Sleep Engine"]
     end
 
-    subgraph "Layer 1 HAL Drivers"
-        hal_i2c[hal_i2c.c: Shared Master I2C 400kHz]
-        hal_spi[hal_spi.c: EPD SPI Master 20MHz/2MHz]
-        hal_io[hal_io.c: Pinout, Latch & Sleep Isolation]
+    subgraph Layer1_HAL ["Layer 1 HAL Drivers"]
+        hal_i2c["hal_i2c.c: Shared Master I2C 400kHz"]
+        hal_spi["hal_spi.c: EPD SPI Master 20MHz/2MHz"]
+        hal_io["hal_io.c: Pinout, Latch & Sleep Isolation"]
     end
 ```
 

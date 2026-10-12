@@ -60,7 +60,7 @@ graph TD
     end
 
     subgraph DISPLAY_BUS ["SPI2 Master Bus"]
-        SSD1681["SSD1681 1.54'' Mono EPD (CS=IO11, DC=IO10, RST=IO9, 3V3_EN=IO6, BUSY=IO8)"]
+        SSD1681["SSD1681 1.54in Mono EPD (CS=IO11, DC=IO10, RST=IO9, 3V3_EN=IO6, BUSY=IO8)"]
     end
 
     subgraph AUDIO_BUS ["I2S0 Audio Interface"]

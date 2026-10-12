@@ -53,7 +53,11 @@ The Sensirion SHTC3 relative humidity and temperature sensor is situated along t
 
 #### 2. Metrological Impact
 Relative Humidity ($RH$) is an exponential function of temperature according to the Clausius-Clapeyron relation:
-$$RH = \frac{e}{e_s(T)} \times 100\%$$
+
+$$
+RH = \frac{e}{e_s(T)} \times 100\%
+$$
+
 Where saturation vapor pressure $e_s(T) \approx 6.112 \times \exp\left(\frac{17.67 \cdot T}{T + 243.5}\right)\,\text{hPa}$.
 
 A thermal bias of $+1.0^\circ\text{C}$ at $22^\circ\text{C}$ / $50\%$ RH artificially depresses the reported relative humidity by approximately $-3.1\%$ RH. Rapid sub-10ms sensor sprints completely bypass this drift.
@@ -164,7 +168,11 @@ The Waveshare board includes a dedicated power rail gate for the audio subsystem
 
 **The Electrical Catastrophe:**
 1. The ES8311 I2C inputs (`SDA`, `SCL`) include internal electrostatic discharge (ESD) protection clamp diodes connected between the IO pins and the codec's internal $V_{\text{DD}}$ supply rail:
-   $$D_{\text{clamp}}: \text{I2C Pin} \longrightarrow V_{\text{DD\_AUDIO}}$$
+
+   $$
+   D_{\text{clamp}}: \text{I2C Pin} \longrightarrow V_{\text{DD\_AUDIO}}
+   $$
+
 2. When firmware de-asserts `PA_EN` (`GPIO 42 = 1`) to cut power to the audio section, $V_{\text{DD\_AUDIO}}$ collapses to $0.0\,\text{V}$.
 3. The external $4.7\,\text{k}\Omega$ pull-up resistors on `GPIO 47` and `GPIO 48` are connected to the permanent system $3.3\,\text{V}$ rail.
 4. Current flows from $3.3\,\text{V} \rightarrow R_{\text{pullup}} \rightarrow D_{\text{clamp}} \rightarrow V_{\text{DD\_AUDIO}}$ ($0\,\text{V}$).
@@ -216,12 +224,23 @@ The divider is **hardwired permanently** between $V_{\text{BAT}}$ and GND with n
 #### 2. Battery Drain Impact
 Total series resistance is $R_{\text{total}} = 200\,\text{k}\Omega$.
 At a nominal battery voltage of $4.0\,\text{V}$:
-$$I_{\text{leakage}} = \frac{4.0\,\text{V}}{200\,\text{k}\Omega} = 20\,\mu\text{A}$$
+
+$$
+I_{\text{leakage}} = \frac{4.0\,\text{V}}{200\,\text{k}\Omega} = 20\,\mu\text{A}
+$$
+
 At full charge ($4.2\,\text{V}$):
-$$I_{\text{leakage}} = \frac{4.2\,\text{V}}{200\,\text{k}\Omega} = 21\,\mu\text{A}$$
+
+$$
+I_{\text{leakage}} = \frac{4.2\,\text{V}}{200\,\text{k}\Omega} = 21\,\mu\text{A}
+$$
 
 This continuous $21\,\mu\text{A}$ bleed occurs **24 hours a day, 365 days a year**, even when the device is completely powered down or in deep sleep. Over one year, this parasitic divider drains:
-$$21\,\mu\text{A} \times 24\,\text{h} \times 365\,\text{days} \approx 184\,\text{mAh}$$
+
+$$
+21\,\mu\text{A} \times 24\,\text{h} \times 365\,\text{days} \approx 184\,\text{mAh}
+$$
+
 For a typical $500\,\text{mAh}$ wearable/appliance LiPo battery, this single resistor pair consumes nearly **40% of the entire battery capacity** doing nothing!
 
 #### 3. Current H1OS Firmware Mitigations

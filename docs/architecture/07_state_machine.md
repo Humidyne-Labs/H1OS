@@ -57,25 +57,25 @@ flowchart TD
         UserClick -- "No Interaction (Idle)" --> DFSDrop[Dynamic Frequency Scaling:<br/>Drop CPU to 80 MHz Baseline]
         DFSDrop --> InactivityTimer{30s Inactivity Timer Expired?}
         InactivityTimer -- "NO" --> UserClick
-        InactivityTimer -- "YES" --> SleepTransition
+        InactivityTimer -- "YES" --> SleepStart[Initiate Sleep Transition]
     end
 
     %% Coordinated Sleep Transition Sequence
-    subgraph SleepTransition ["Coordinated Sleep Transition Sequence"]
-        SleepTransition --> PreSleepHook[1. Invoke user on_pre_sleep hook]
-        PreSleepHook --> DrainLVGL[2. Drain LVGL Buffer & Finish Draw Tasks]
-        DrainLVGL --> WaitBusy[3. Wait for SSD1681 BUSY release @ 80 MHz DFS]
-        WaitBusy --> SettleDelay[4. 250ms Micro-capsule Settling Delay]
+    subgraph Sleep_Transition_Seq ["Coordinated Sleep Transition Sequence"]
+        SleepStart --> PreSleepHook["1. Invoke user on_pre_sleep hook"]
+        PreSleepHook --> DrainLVGL["2. Drain LVGL Buffer & Finish Draw Tasks"]
+        DrainLVGL --> WaitBusy["3. Wait for SSD1681 BUSY release @ 80 MHz DFS"]
+        WaitBusy --> SettleDelay["4. 250ms Micro-capsule Settling Delay"]
         SettleDelay --> CheckDirty{Frame Marked Dirty?}
-        CheckDirty -- "YES" --> FlashSync[5. Commit 5000B to 'epd_frame' flash]
-        CheckDirty -- "NO" --> SkipSync[5. Skip Flash Write]
-        FlashSync --> PanelSleep[6. Put SSD1681 into Deep Sleep Mode 1]
+        CheckDirty -- "YES" --> FlashSync["5. Commit 5000B to epd_frame flash"]
+        CheckDirty -- "NO" --> SkipSync["5. Skip Flash Write"]
+        FlashSync --> PanelSleep["6. Put SSD1681 into Deep Sleep Mode 1"]
         SkipSync --> PanelSleep
-        PanelSleep --> ClearTF[7. Clear PCF85063A TF Flag in Control_2]
-        ClearTF --> GateCheck{8. Zero-Hour Lookahead:<br/>T_rtc_total < (ulp_cnt * T_sleep) + T_sleep?}
-        GateCheck -- "YES (Accumulator Overshoot)" --> ArmExtOnly[Arm ONLY GPIO 5 RTC_INT & Buttons<br/>Do NOT arm internal periodic timer]
-        GateCheck -- "NO (Safe Window)" --> ArmAll[Arm internal periodic timer + EXTINT]
-        ArmExtOnly --> EnterSleep[9. Enter Hardware Deep Sleep]
+        PanelSleep --> ClearTF["7. Clear PCF85063A TF Flag in Control_2"]
+        ClearTF --> GateCheck{"8. Zero-Hour Lookahead:<br/>T_rtc_total < (ulp_cnt * T_sleep) + T_sleep?"}
+        GateCheck -- "YES (Accumulator Overshoot)" --> ArmExtOnly["Arm ONLY GPIO 5 RTC_INT & Buttons<br/>Do NOT arm internal periodic timer"]
+        GateCheck -- "NO (Safe Window)" --> ArmAll["Arm internal periodic timer + EXTINT"]
+        ArmExtOnly --> EnterSleep["9. Enter Hardware Deep Sleep"]
         ArmAll --> EnterSleep
     end
     EnterSleep --> DeepSleep
