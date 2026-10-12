@@ -13,13 +13,22 @@
 #include "esp_sleep.h"
 #include "esp_attr.h"
 #include "esp_rom_sys.h"
+#include "esp32s3/rom/rtc.h"
 #include "soc/gpio_reg.h"
+#include "soc/io_mux_reg.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/rtc_io_reg.h"
 #include "soc/soc.h"
 
-#define SDA_BIT_MASK    (1UL << (HAL_PIN_I2C_SDA - 32))  /* GPIO 47 -> Bit 15 in Reg 1 */
-#define SCL_BIT_MASK    (1UL << (HAL_PIN_I2C_SCL - 32))  /* GPIO 48 -> Bit 16 in Reg 1 */
+#define SDA_BIT_MASK      (1UL << (HAL_PIN_I2C_SDA - 32))  /* GPIO 47 -> Bit 15 in Reg 1 */
+#define SCL_BIT_MASK      (1UL << (HAL_PIN_I2C_SCL - 32))  /* GPIO 48 -> Bit 16 in Reg 1 */
 
-#define I2C_ADDR_SHTC3  0x70
+#define I2C_ADDR_SHTC3    0x70
+#define I2C_ADDR_PCF85063 0x51
+#define RTC_REG_TIMER_VAL 0x10
+#define RTC_TIMER_TE_BIT  (1 << 2)
+#define RTC_TIMER_TCF_MASK (3 << 3)
+#define RTC_TIMER_TCF_MIN  (3 << 3)
 
 /* Fast Bit-Bang I2C Primitives running from RTC Fast Memory */
 static inline void RTC_IRAM_ATTR i2c_delay(void)
@@ -156,27 +165,36 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 /* Master RTC Wake Stub Entry Point */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
-    /* Pull GPIO 3 LOW (pulse start for oscilloscope measurement) */
+    /* Configure GPIO 3 in IO_MUX and pull LOW (pulse start for oscilloscope measurement) */
+    PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
     REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
     REG_WRITE(GPIO_ENABLE_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
 
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
-    /* 1. Only timer wakeups are processed by the ultra-fast sensor stub */
-    if (cause != ESP_SLEEP_WAKEUP_TIMER) {
+    /* 1. Only pure internal timer wakeups (TIMER_EXPIRE = BIT(3)) are processed by the sensor stub */
+    if (cause != TIMER_EXPIRE) {
         REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
 
-    /* 2. Zero-Hour Check: Inspect GPIO 5 (PCF85063A Alarm INT) */
-    /* GPIO 5 is Active LOW */
-    if ((REG_READ(GPIO_IN_REG) & (1UL << HAL_PIN_RTC_INT)) == 0) {
+    /* 2. Zero-Hour Check: Inspect RTC GPIO 5 (PCF85063A Alarm/Timer INT, Active LOW) */
+    if (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
         /* External RTC alarm triggered! Promote cleanly to Flow B full UI wake */
         REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
+
+    /* Route GPIO 47 (SDA) and GPIO 48 (SCL) to digital GPIO with input & pull-up enabled */
+    PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
+    PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG);
+    PIN_PULLUP_EN(IO_MUX_GPIO47_REG);
+
+    PIN_FUNC_SELECT(IO_MUX_GPIO48_REG, PIN_FUNC_GPIO);
+    PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG);
+    PIN_PULLUP_EN(IO_MUX_GPIO48_REG);
 
     /* 3. Send SHTC3 Wake Command: 0x3517 */
     i2c_start();
@@ -196,6 +214,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     i2c_start();
     if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
         i2c_stop();
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -209,6 +228,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     i2c_start();
     if (!i2c_write_byte((I2C_ADDR_SHTC3 << 1) | 1)) {
         i2c_stop();
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;
     }
@@ -261,14 +281,55 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         st->amb_floor_temp_centi_c = temp_centi_c;
     }
 
-    /* 10. Rearm sleep timer and re-enter deep sleep immediately */
+    /* 10. Query PCF85063A (0x51) remaining countdown to prevent Zero-Hour runt collisions */
     uint32_t sleep_sec = st->sample_interval_sec;
     if (sleep_sec == 0) sleep_sec = 60;
+
+    bool rtc_timer_active = false;
+    uint32_t rem_sec = 0;
+
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(RTC_REG_TIMER_VAL);
+        i2c_start();
+        if (i2c_write_byte((I2C_ADDR_PCF85063 << 1) | 1)) {
+            uint8_t timer_val  = i2c_read_byte(true);
+            uint8_t timer_mode = i2c_read_byte(false);
+            if (timer_mode & RTC_TIMER_TE_BIT) {
+                rtc_timer_active = true;
+                rem_sec = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN)
+                          ? ((uint32_t)timer_val * 60U)
+                          : (uint32_t)timer_val;
+            }
+        }
+    }
+    i2c_stop();
+
+    /* If RTC INT asserted or countdown hit 0 during the 13ms conversion, promote to Flow B */
+    if (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0 ||
+        (rtc_timer_active && rem_sec == 0)) {
+        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
+        esp_default_wake_deep_sleep();
+        return;
+    }
+
+    /* Increment wake counter for this completed Flow A wake stub execution */
+    st->wake_count++;
+    st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
+
+    if (!rtc_timer_active || sleep_sec < rem_sec) {
+        /* Next Flow A sample lands strictly before external RTC expires -> Rearm internal timer */
+        esp_wake_stub_set_wakeup_time((uint64_t)sleep_sec * 1000000ULL);
+    } else {
+        /* Next sample lands at or after external RTC expiry -> Discard runt timer rearm!
+         * Disable internal timer wakeup so chip sleeps purely until external RTC INT fires Flow B */
+        uint32_t wake_ena = REG_GET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA);
+        REG_SET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA, wake_ena & ~((uint32_t)TIMER_EXPIRE));
+    }
 
     /* Turn off status pin pulse right before re-entering sleep */
     REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
 
-    esp_wake_stub_set_wakeup_time((uint64_t)sleep_sec * 1000000ULL);
     esp_wake_stub_sleep(&bsp_wake_stub);
 }
 

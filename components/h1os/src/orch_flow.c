@@ -102,7 +102,7 @@ void orch_flow_execute_sensor_sample(void)
         .mcu_tsens_centi_c  = (int16_t)(die_temp_c * 100.0f),
         .epd_glass_centi_c  = (int16_t)(temp_c * 100.0f),
         .timestamp_sec      = (uint32_t)time(NULL),
-        .quality_flags      = 0x01, /* Cold sample */
+        .quality_flags      = 0x01, /* Cold sample */ // <- based on what? a 'feeling'?
     };
     orch_state_push_sample(&sample);
 
@@ -116,7 +116,7 @@ void orch_flow_execute_sensor_sample(void)
         st->amb_floor_temp_centi_c = sample.shtc3_temp_centi_c;
     }
     float amb_floor_c = (float)st->amb_floor_temp_centi_c / 100.0f;
-    float rh_amb = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);
+    float rh_amb = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);   // why are we doing reconstruction in flow A?
 
     if (!st->ewma_inited) {
         st->reconstructed_amb_temp_c  = amb_floor_c;
@@ -174,6 +174,13 @@ void orch_flow_execute_sensor_sample(void)
 
 bool orch_flow_is_thermal_lockout(void)
 {
+    /*
+    This function should be taking the sample buffer and comparing the last
+    two samples, if the delta is < the preset thermal threshold, its
+    considered theramly stable
+
+    what your doing is simply checking a timer, which is set to 0 of all things.    
+    */
     return (esp_timer_get_time() < s_lockout_until_us);
 }
 
@@ -207,10 +214,27 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     if (err == ESP_OK) {
         float live_t = 25.0f, live_rh = 50.0f;
         sub_sensor_convert_shtc3_units(raw_temp, raw_rh, &live_t, &live_rh);
+        int16_t live_t_centi = (int16_t)(live_t * 100.0f);
+        if (live_t_centi < st->amb_floor_temp_centi_c || !st->ewma_inited) {
+            st->amb_floor_temp_centi_c = live_t_centi;
+        }
         float vp = orch_math_calc_vapor_pressure(live_t, live_rh);
         float dew = orch_math_calc_dew_point(live_t, live_rh);
         float amb_floor_c = (float)st->amb_floor_temp_centi_c / 100.0f;
         float recon_rh = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);
+
+        if (!st->ewma_inited) {
+            st->reconstructed_amb_temp_c  = amb_floor_c;
+            st->reconstructed_amb_rh_pct  = recon_rh;
+            st->reconstructed_dew_point_c = dew;
+            st->vapor_pressure_hpa        = vp;
+            st->ewma_inited               = true;
+        } else {
+            st->reconstructed_amb_temp_c  = orch_math_update_ewma(amb_floor_c, st->reconstructed_amb_temp_c, 0.30f);
+            st->reconstructed_amb_rh_pct  = orch_math_update_ewma(recon_rh, st->reconstructed_amb_rh_pct, 0.30f);
+            st->reconstructed_dew_point_c = orch_math_update_ewma(dew, st->reconstructed_dew_point_c, 0.30f);
+            st->vapor_pressure_hpa        = vp;
+        }
 
         if (out_temp_c) *out_temp_c = amb_floor_c;
         if (out_rh_pct) *out_rh_pct = recon_rh;
