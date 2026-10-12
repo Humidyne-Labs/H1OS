@@ -65,7 +65,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
   3. **EPD 3.3V Power Rail (`GPIO 6`):** Cutting the EPD power rail drops panel charge and can corrupt display RAM. Instead of cutting power to the display, placing the SSD1681 into **Deep Sleep Mode 1 (`0x10, 0x01`)** drops display quiescent current to **1.0 µA** while preserving RAM and image state without rail cycling.
 - **H1OS Fix:**
   - Keep the 3.3V peripheral rail powered and let peripherals sleep natively in low-leakage state (SHTC3 in sleep `0xB098` @ 0.3 µA, ES8311 register `0x0D` power-down @ <1.0 µA, SSD1681 in Deep Sleep Mode 1 @ 1.0 µA).
-  - Use **Flow A (Xtensa Sub-Execution Sprint)** for periodic sampling: wakes at 80 MHz, performs I2C transaction in <1 ms, updates RTC Slow SRAM, and returns to deep sleep in <8 ms total without clamping the bus or fighting RTC domain routing.
+  - Use **Flow A (Xtensa Sub-Execution Sample Burst)** for periodic sampling: wakes at 80 MHz, performs I2C transaction in <1 ms, updates RTC Slow SRAM, and returns to deep sleep in <8 ms total without clamping the bus or fighting RTC domain routing.
 
 ---
 
@@ -80,7 +80,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **What Happened:** Early ULP designs proposed running a continuous polling loop or state machine while the main application was running, leading to state conflicts and bus contention.
 - **Root Cause:** Violating single-owner hardware principles.
 - **H1OS Fix:**
-  1. **Purely Event-Driven (No Polling):** ULP sleeps by default on RTC slow clock. It wakes **only** on: (a) periodic timer for Flow A sprint, or (b) external hardware interrupt on GPIO 5 (PCF85063A Alarm INT), GPIO 0/18 (button press), or GPIO 4 (ADC threshold).
+  1. **Purely Event-Driven (No Polling):** ULP sleeps by default on RTC slow clock. It wakes **only** on: (a) periodic timer for Flow A sample burst, or (b) external hardware interrupt on GPIO 5 (PCF85063A Alarm INT), GPIO 0/18 (button press), or GPIO 4 (ADC threshold).
   2. **Application Gating:** The ULP runs **only while the main processor is actively in deep sleep**. Once Flow B wakes, the main Xtensa core owns all hardware exclusively. The ULP is never armed while the interactive session is running.
 
 ---

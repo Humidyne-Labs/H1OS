@@ -40,7 +40,7 @@ Code must be formatted into clean, columnar visual blocks that allow rapid verti
 ### Example: Columnar Struct Definitions
 ```c
 typedef struct {
-    uint32_t  flow_a_period_sec;      /**< Period between headless sensor sprints. */
+    uint32_t  flow_a_period_sec;      /**< Period between headless sensor sample bursts. */
     uint32_t  flow_b_period_sec;      /**< Period between unattended display flushes. */
     uint32_t  inactivity_timeout_sec; /**< Interactive session idle sleep timeout. */
     bool      enable_audio;           /**< Audio codec and amplifier power gate. */

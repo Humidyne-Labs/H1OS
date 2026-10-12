@@ -1217,10 +1217,10 @@ Defined in components/h1os/include/h1os/orch_flow.h:24
 | Value | Description |
 |-------|-------------|
 | `ORCH_FLOW_COLD_BOOT` |  |
-| `ORCH_FLOW_A_SPRINT` |  |
-| `ORCH_FLOW_B_MAIN_WAKE` |  |
-| `ORCH_FLOW_BOOTLOADER_JUMP` |  |
-| `ORCH_FLOW_CRITICAL_OFF` |  |
+| `ORCH_FLOW_A_SAMPLE` | Headless <4ms sensor sample burst. |
+| `ORCH_FLOW_B_MAIN_WAKE` | Full UI wake / Button wake / RTC timer expiry. |
+| `ORCH_FLOW_BOOTLOADER_JUMP` | ROM bootloader download mode. |
+| `ORCH_FLOW_CRITICAL_OFF` | Low battery shutdown or power cut. |
 
 ---
 
@@ -1251,7 +1251,7 @@ Defined in components/h1os/include/h1os/orch_state.h:24
 | Value | Description |
 |-------|-------------|
 | `ULP_DISPATCH_NONE` |  |
-| `ULP_DISPATCH_SENSOR_SPRINT` |  |
+| `ULP_DISPATCH_SENSOR_SAMPLE` |  |
 | `ULP_DISPATCH_MAIN_WAKE` |  |
 | `ULP_DISPATCH_CRITICAL_SHUTDOWN` |  |
 | `ULP_DISPATCH_BOOTLOADER_JUMP` |  |
@@ -3098,15 +3098,15 @@ Detected flow type.
 
 ---
 
-### orch_flow_execute_sub_sprint
+### orch_flow_execute_sensor_sample
 
 ```cpp
-void orch_flow_execute_sub_sprint(void)
+void orch_flow_execute_sensor_sample(void)
 ```
 
-Defined in components/h1os/include/h1os/orch_flow.h:45
+Defined in components/h1os/include/h1os/orch_flow.h:46
 
-Execute Flow A Headless Sub-Execution Sprint.
+Execute Flow A Headless Sensor Sample Burst.
 
 Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms, commits sample to RTC Slow Memory ring buffer, and re-enters deep sleep immediately. Zero measurable thermal impact on sensor cavity.
 
@@ -3118,7 +3118,7 @@ Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms, commits samp
 bool orch_flow_is_thermal_lockout(void)
 ```
 
-Defined in components/h1os/include/h1os/orch_flow.h:53
+Defined in components/h1os/include/h1os/orch_flow.h:54
 
 Check whether system is in Thermal Lockout state.
 
@@ -3135,7 +3135,7 @@ True if in lockout, False if in thermal equilibrium.
 void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec)
 ```
 
-Defined in components/h1os/include/h1os/orch_flow.h:61
+Defined in components/h1os/include/h1os/orch_flow.h:62
 
 Arm or disarm thermal lockout gatekeeper.
 
@@ -3154,7 +3154,7 @@ Arm or disarm thermal lockout gatekeeper.
 esp_err_t orch_flow_query_telemetry(float * out_temp_c, float * out_rh_pct, float * out_dew_c)
 ```
 
-Defined in components/h1os/include/h1os/orch_flow.h:73
+Defined in components/h1os/include/h1os/orch_flow.h:76
 
 Query current environmental telemetry through the Thermal Lockout MUX.
 
@@ -3179,21 +3179,18 @@ ESP_OK on success.
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 ```
 
-Defined in components/h1os/include/h1os/orch_flow.h:78
+Defined in components/h1os/include/h1os/orch_flow.h:85
 
-Transition system to deep sleep.
+Execute coordinated 8-step sleep transition sequence to deep sleep.
 
----
+#### Returns
+ESP_OK on success.
 
-### orch_flow_stand_down_and_sleep
+#### Parameters
 
-`static` `inline`
-
-```cpp
-static inline esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec)
-```
-
-Defined in components/h1os/include/h1os/orch_flow.h:80
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sleep_sec` | `uint32_t` | Sleep duration in seconds. |
 
 ---
 
@@ -3908,15 +3905,15 @@ Detected flow type.
 
 ---
 
-### orch_flow_execute_sub_sprint
+### orch_flow_execute_sensor_sample
 
 ```cpp
-void orch_flow_execute_sub_sprint(void)
+void orch_flow_execute_sensor_sample(void)
 ```
 
 Defined in components/h1os/src/orch_flow.c:80
 
-Execute Flow A Headless Sub-Execution Sprint.
+Execute Flow A Headless Sensor Sample Burst.
 
 Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms, commits sample to RTC Slow Memory ring buffer, and re-enters deep sleep immediately. Zero measurable thermal impact on sensor cavity.
 
@@ -3991,7 +3988,16 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 
 Defined in components/h1os/src/orch_flow.c:228
 
-Transition system to deep sleep.
+Execute coordinated 8-step sleep transition sequence to deep sleep.
+
+#### Returns
+ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sleep_sec` | `uint32_t` | Sleep duration in seconds. |
 
 ---
 
@@ -7328,7 +7334,7 @@ Defined in components/h1os/include/h1os/h1os.h:94
 |--------|------|-------------|
 | `uint32_t` | [`inactivity_timeout_sec`](#inactivity_timeout_sec)  | Inactivity sleep timer (default: 30s). |
 | `bool` | [`enable_dfs_80mhz`](#enable_dfs_80mhz)  | Enable 80 MHz power droop while waiting for input (default: true). |
-| `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Flow A headless sensor sprint interval (default: 60s). |
+| `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Flow A headless sensor sample burst interval (default: 60s). |
 | `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec)  | Flow B main application wake interval (default: 120s). |
 
 ---
@@ -7365,7 +7371,7 @@ uint32_t flow_a_period_sec
 
 Defined in components/h1os/include/h1os/h1os.h:97
 
-Flow A headless sensor sprint interval (default: 60s).
+Flow A headless sensor sample burst interval (default: 60s).
 
 ---
 
@@ -8189,7 +8195,7 @@ Defined in components/h1os/include/h1os/h1os.h:94
 |--------|------|-------------|
 | `uint32_t` | [`inactivity_timeout_sec`](#inactivity_timeout_sec)  | Inactivity sleep timer (default: 30s). |
 | `bool` | [`enable_dfs_80mhz`](#enable_dfs_80mhz)  | Enable 80 MHz power droop while waiting for input (default: true). |
-| `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Flow A headless sensor sprint interval (default: 60s). |
+| `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Flow A headless sensor sample burst interval (default: 60s). |
 | `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec)  | Flow B main application wake interval (default: 120s). |
 
 ---
@@ -8226,7 +8232,7 @@ uint32_t flow_a_period_sec
 
 Defined in components/h1os/include/h1os/h1os.h:97
 
-Flow A headless sensor sprint interval (default: 60s).
+Flow A headless sensor sample burst interval (default: 60s).
 
 ---
 

@@ -1,6 +1,6 @@
 /**
  * @file orch_wake_stub.c
- * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sprint)
+ * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sample Burst)
  *
  * SPDX-License-Identifier: MIT
  */

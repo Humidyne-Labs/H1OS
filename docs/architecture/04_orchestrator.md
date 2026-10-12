@@ -1,7 +1,7 @@
 # Layer 3: System Pipeline & Orchestrator Specification
 
 ## 1. Overview
-Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sprint, <4ms)** and **Flow B (Interactive User Session, 30s Inactivity Sleep)**.
+Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sample Burst, <4ms)** and **Flow B (Interactive User Session, 30s Inactivity Sleep)**.
 
 ---
 
@@ -11,7 +11,7 @@ Layer 3 is the central orchestration brain of H1OS. It maintains persistent stat
 | :--- | :--- | :--- |
 | `orch_state.h/.c` | Persistent RTC Storage | Retains counters, system flags, ULP dispatch commands, and 32-slot sensor ring buffer (<512 bytes) in RTC Slow Memory. |
 | `orch_math.c/.h` | Psychrometric Math Engine | Magnus equations, vapor pressure invariant, dew point reconstruction, continuous EWMA, integer slope gates. |
-| `orch_flow.c/.h` | Execution Flow Arbiter | Single Unified Binary Arbiter: routes Flow A sprint vs Flow B interactive session; coordinates 7-step sleep transition sequence. |
+| `orch_flow.c/.h` | Execution Flow Arbiter | Single Unified Binary Arbiter: routes Flow A sample vs Flow B interactive session; coordinates 8-step sleep transition sequence. |
 | `orch_display_sync.c/.h` | Frame Sync Engine | Coordinates display framebuffer persistence to `epd_frame` flash partition during sleep transition events. |
 | `orch_wake_stub.c/.h` | Fast RTC Wake Stub | Executes <3ms Flow A sensor pulse directly from RTC Fast Memory on Core 0. |
 
@@ -32,7 +32,7 @@ ESP32-S3 has 8KB of RTC Slow SRAM. Layer 3 uses **less than 512 bytes**, leaving
 
 typedef enum {
     ULP_DISPATCH_NONE = 0,
-    ULP_DISPATCH_SENSOR_SPRINT,     // Flow A (<4ms sensor pulse)
+    ULP_DISPATCH_SENSOR_SAMPLE,     // Flow A (<4ms sensor pulse)
     ULP_DISPATCH_MAIN_WAKE,         // Flow B (Interactive LVGL session)
     ULP_DISPATCH_BOOTLOADER_JUMP,   // Primed by BOOT hold > 2.5s
     ULP_DISPATCH_POWER_OFF,         // Primed by POWER hold > 2.5s
@@ -151,30 +151,28 @@ The Orchestrator determines sleep timing based on the origin of the wake event:
    - Fresh power application or battery insertion.
    - System runs hardware bring-up, renders initial UI, and **waits 30 seconds** for potential user interaction or debug before entering initial deep sleep.
 
-#### Coordinated Sleep Transition Sequence
-When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic sleep transition sequence:
-1. Invoke user `on_pre_sleep` hook.
-2. Render sleep visual splash and play sleep chime if configured.
-3. **LVGL Frame Pipeline Drain:** Verify that LVGL has no pending draw tasks or dirty areas in the pipeline (`lv_display_refr_timer` complete, flush callback finished).
-4. **Hardware Panel Busy Wait:** Wait for SSD1681 `EPD_BUSY` (`GPIO 8`) to release LOW (blocking on FreeRTOS semaphore with CPU dropped to 80 MHz via DFS).
-5. **Post-Busy Particle Settling Guard:** Optionally wait an additional **250 ms** post-BUSY guard to ensure all micro-capsule voltages have completely discharged before clock gating.
-6. Check dirty flag; commit 5000-byte framebuffer to `epd_frame` SPI flash partition if modified.
-7. Put SSD1681 into Deep Sleep Mode 1 (`0x10, 0x01` @ 1.0 µA).
-8. Clear PCF85063A `TF` interrupt flag in `Control_2` and assert `GPIO 5` is HIGH.
-9. Evaluate Zero-Hour gate: if $T_{\text{rtc\_remaining}} \le T_{\text{sleep\_period}}$ (or accumulator lookahead overshoots), arm only external `RTC_INT` interrupt; else arm both internal ULP periodic timer and external interrupts.
-10. Enter hardware deep sleep.
+#### Deterministic 8-Step Sleep Transition Sequence
+When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic 8-step sleep transition sequence:
+1. **LVGL Frame Pipeline Drain:** Wait for LVGL render and flush pipeline to drain completely (`h1os_lvgl_has_pending_tasks()`).
+2. **Audio Subsystem Teardown:** Wait for any background audio playback and hardware soft-ramp teardown to complete (`sub_audio_wait_idle()`).
+3. **Hardware Panel Busy Wait:** Wait for SSD1681 `EPD_BUSY` (`GPIO 8`) to release LOW (`sub_display_wait_busy()`).
+4. **Post-Busy Particle Settling Guard:** 250 ms delay for micro-capsule voltages to discharge before cutting clocks.
+5. **Flash Commit:** Commit 5000-byte framebuffer to `epd_frame` SPI flash partition if modified (`orch_display_sync_save_if_dirty()`).
+6. **Controller Deep Sleep:** Put SSD1681 into Deep Sleep Mode 1 (`sub_display_enter_deep_sleep()`).
+7. **External RTC Arming:** Arm external PCF85063A countdown timer (`sub_rtc_arm_countdown()`).
+8. **Hardware Sleep Entry:** Evaluate Zero-Hour conflict gate, arm wake sources, and enter deep sleep (`sub_power_enter_deep_sleep()`).
 
 ```c
 typedef enum {
     ORCH_FLOW_COLD_BOOT = 0,
-    ORCH_FLOW_A_SPRINT,
+    ORCH_FLOW_A_SAMPLE,
     ORCH_FLOW_B_MAIN_WAKE,
     ORCH_FLOW_BOOTLOADER_JUMP,
     ORCH_FLOW_CRITICAL_OFF
 } orch_flow_type_t;
 
 orch_flow_type_t orch_flow_determine_wakeup(void);
-void             orch_flow_execute_sub_sprint(void);
+void             orch_flow_execute_sensor_sample(void);
 bool             orch_flow_is_thermal_lockout(void);
 void             orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 esp_err_t        orch_flow_query_telemetry(float *out_t, float *out_rh, float *out_dew);

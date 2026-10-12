@@ -110,9 +110,9 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 3. Inspect Flow Arbiter (Flow A Wake Stub vs Flow B Interactive UI)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
 
-    if (flow == ORCH_FLOW_A_SPRINT) {
-        ESP_LOGI(TAG, "Executing Flow A Sensor Sprint...");
-        orch_flow_execute_sub_sprint();
+    if (flow == ORCH_FLOW_A_SAMPLE) {
+        ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
+        orch_flow_execute_sensor_sample();
         // Returns immediately to sleep inside stub
         return ESP_OK;
     }

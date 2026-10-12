@@ -3,7 +3,7 @@
  * @brief Layer 3: Execution Flow Arbiter & Thermal Lockout MUX
  *
  * Distinguishes and arbitrates:
- *  - Flow A: Headless Sub-Execution Sprint (<8ms) for zero-heat periodic telemetry.
+ *  - Flow A: Headless Sensor Sample Burst (<4ms) for zero-heat periodic telemetry.
  *  - Flow B: Full Application Wake for LVGL UI and network interactions.
  *  - Thermal Lockout MUX: Prevents self-heating bias from tainting environmental data.
  *
@@ -23,10 +23,10 @@ extern "C" {
 
 typedef enum {
     ORCH_FLOW_COLD_BOOT = 0,
-    ORCH_FLOW_A_SPRINT,         /* Headless <8ms sensor sprint */
-    ORCH_FLOW_B_MAIN_WAKE,       /* Full UI wake / Button wake / RTC timer expiry */
-    ORCH_FLOW_BOOTLOADER_JUMP,   /* ROM bootloader download mode */
-    ORCH_FLOW_CRITICAL_OFF       /* Low battery shutdown or power cut */
+    ORCH_FLOW_A_SAMPLE,          /**< Headless <4ms sensor sample burst. */
+    ORCH_FLOW_B_MAIN_WAKE,       /**< Full UI wake / Button wake / RTC timer expiry. */
+    ORCH_FLOW_BOOTLOADER_JUMP,   /**< ROM bootloader download mode. */
+    ORCH_FLOW_CRITICAL_OFF       /**< Low battery shutdown or power cut. */
 } orch_flow_type_t;
 
 /**
@@ -37,12 +37,13 @@ typedef enum {
 orch_flow_type_t orch_flow_determine_wakeup(void);
 
 /**
- * @brief Execute Flow A Headless Sub-Execution Sprint.
+ * @brief Execute Flow A Headless Sensor Sample Burst.
+ *
  * Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms,
  * commits sample to RTC Slow Memory ring buffer, and re-enters deep sleep immediately.
  * Zero measurable thermal impact on sensor cavity.
  */
-void orch_flow_execute_sub_sprint(void);
+void orch_flow_execute_sensor_sample(void);
 
 /**
  * @brief Check whether system is in Thermal Lockout state.
@@ -55,31 +56,33 @@ bool orch_flow_is_thermal_lockout(void);
 /**
  * @brief Arm or disarm thermal lockout gatekeeper.
  *
- * @param[in] enable True to arm thermal lockout (e.g. after display refresh or Wi-Fi).
+ * @param[in] enable       True to arm thermal lockout (e.g. after display refresh or Wi-Fi).
  * @param[in] duration_sec Duration of lockout in seconds (typically 30-60s).
  */
 void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 
 /**
  * @brief Query current environmental telemetry through the Thermal Lockout MUX.
+ *
  * If in thermal equilibrium, takes fresh sensor reading.
  * If in thermal lockout, transparently returns pristine cold reading from RTC ring buffer.
  *
  * @param[out] out_temp_c Reconstructed ambient temperature in Celsius.
  * @param[out] out_rh_pct Reconstructed ambient relative humidity in percent.
  * @param[out] out_dew_c  True dew point in Celsius.
+ *
  * @return ESP_OK on success.
  */
 esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c);
 
 /**
- * @brief Transition system to deep sleep.
+ * @brief Execute coordinated 8-step sleep transition sequence to deep sleep.
+ *
+ * @param[in] sleep_sec Sleep duration in seconds.
+ *
+ * @return ESP_OK on success.
  */
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec);
-
-static inline esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec) {
-    return orch_flow_transition_to_sleep(sleep_sec);
-}
 
 #ifdef __cplusplus
 }

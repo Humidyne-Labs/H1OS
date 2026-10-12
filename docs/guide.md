@@ -11,7 +11,7 @@
 
 1. [Architectural Overview & Philosophy](#1-architectural-overview--philosophy)
 2. [Lifecycle Engine & Application Entry](#2-lifecycle-engine--application-entry)
-3. [Flow A: Headless Sensor Sprint (<4ms Execution)](#3-flow-a-headless-sensor-sprint-4ms-execution)
+3. [Flow A: Headless Sensor Sample Burst (<4ms Execution)](#3-flow-a-headless-sensor-sample-burst-4ms-execution)
 4. [Flow B: Interactive UI Session (30s Inactivity Sleep)](#4-flow-b-interactive-ui-session-30s-inactivity-sleep)
 5. [Class-E Psychrometric Invariant Engine](#5-class-e-psychrometric-invariant-engine)
 6. [Display Architecture & LVGL v9 Integration](#6-display-architecture--lvgl-v9-integration)
@@ -40,7 +40,7 @@ H1OS is an instrument-grade operating system designed specifically for ultra-low
 ```
 
 ### Core Invariants
-1. **Zero-Heat Sensing:** High-frequency environmental sampling executes entirely in headless sprints (<4ms) before the chip can heat its cavity.
+1. **Zero-Heat Sensing:** High-frequency environmental sampling executes entirely in headless sample bursts (<4ms) before the chip can heat its cavity.
 2. **Keep All Gates Open:** Critical power rails (`BAT_CTRL` GPIO 17, `EPD_3V3_EN` GPIO 6) remain latched and frozen via RTC pad holds during sleep to eliminate capacitor inrush spikes and bus clamping.
 3. **No Polling in Deep Sleep:** The ULP-RISC-V coprocessor is event-driven; when the main Xtensa cores are awake, the ULP is completely gated off.
 4. **Midnight-Agnostic Timing:** Wakes are governed strictly by the PCF85063A hardware countdown timer rather than calendar alarms to prevent day-rollover lockups.
@@ -88,7 +88,7 @@ void app_main(void)
 
 ---
 
-## 3. Flow A: Headless Sensor Sprint (<4ms Execution)
+## 3. Flow A: Headless Sensor Sample Burst (<4ms Execution)
 
 When internal timer wakeup occurs, H1OS executes Flow A without booting the secondary core, Wi-Fi stacks, or display drivers:
 1. SHTC3 sensor wakes via fast I2C in RTC memory (<250 µs).
@@ -105,14 +105,14 @@ When the user taps `BOOT` (GPIO 0) or `POWER` (GPIO 18), H1OS initiates Flow B:
 - Starts a **30-second inactivity countdown**.
 - Any button press resets the timer back to 30 seconds.
 - When 30 seconds of inactivity elapse, the system executes the coordinated 8-step sleep transition sequence:
-  1. Wait for LVGL pipeline to drain.
-  2. Wait for electrophoretic panel `EPD_BUSY` falling edge.
-  3. Wait 250 ms particle settling delay.
-  4. Persist 5000-byte framebuffer to `epd_frame` SPI flash if dirty.
-  5. Put SSD1681 into Deep Sleep Mode 1 (1.0 µA).
-  6. Arm external PCF85063A countdown timer.
-  7. Run Zero-Hour lookahead collision avoidance.
-  8. Enter hardware deep sleep with RTC pad holds.
+  1. Drain LVGL render and flush pipeline completely (`h1os_lvgl_has_pending_tasks()`).
+  2. Wait for audio playback idle and hardware soft-mute zero-cross ramp (`sub_audio_wait_idle()`).
+  3. Wait for physical EPD BUSY falling edge on `GPIO 8` (`sub_display_wait_busy()`).
+  4. Post-busy microcapsule voltage settling guard ($250\text{ ms}$).
+  5. Commit dirty framebuffer to raw SPI flash partition `epd_frame` if modified (`orch_display_sync_save_if_dirty()`).
+  6. Command SSD1681 display controller into Deep Sleep Mode 1 ($1.0\ \mu\text{A}$) (`sub_display_enter_deep_sleep()`).
+  7. Arm external PCF85063A countdown timer (`sub_rtc_arm_countdown()`).
+  8. Zero-Hour conflict avoidance & hardware deep sleep entry (`sub_power_enter_deep_sleep()`).
 
 > **Note on RTC Countdown Wake:** If the system is woken by the external PCF85063A countdown timer purely to update the e-paper display, it renders the frame, flushes to the screen, and **immediately returns to deep sleep** without waiting 30 seconds.
 

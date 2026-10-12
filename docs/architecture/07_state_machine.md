@@ -13,7 +13,7 @@ flowchart TD
 
     %% ULP Reactive Monitor Decisions
     subgraph ULP_Monitor ["ULP-RISC-V Reactive Monitor (RTC Domain)"]
-        ULP_Wake -- "Internal Timer Expired (Armed only if RTC_rem >= ULP_int)" --> LaunchFlowA[Set DISPATCH_SENSOR_SPRINT<br/>Wake Core 0 into Flow A]
+        ULP_Wake -- "Internal Timer Expired (Armed only if RTC_rem >= ULP_int)" --> LaunchFlowA[Set DISPATCH_SENSOR_SAMPLE<br/>Wake Core 0 into Flow A]
 
         ULP_Wake -- "External Interrupt (GPIO 5 Timer)" --> LaunchFlowB_Alarm[Set DISPATCH_MAIN_WAKE<br/>Wake Dual-Core into Flow B]
         ULP_Wake -- "Button Edge (GPIO 0 / 18)" --> CheckHold{Hold Duration}
@@ -111,6 +111,6 @@ sequenceDiagram
         Note over App: Window is clear. Arm both timers.
         App->>ULP: Arm internal periodic timer + EXTINT
         App->>App: Enter Deep Sleep (~12 µA)
-        ULP->>App: Timer expires -> Wake Core 0 into Flow A (<4ms sprint)
+        ULP->>App: Timer expires -> Wake Core 0 into Flow A (<4ms sample burst)
     end
 ```

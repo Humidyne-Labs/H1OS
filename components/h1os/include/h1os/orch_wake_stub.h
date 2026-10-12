@@ -1,6 +1,6 @@
 /**
  * @file orch_wake_stub.h
- * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub (<3ms Flow A Sensor Sprint)
+ * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub (<3ms Flow A Sensor Sample Burst)
  *
  * Runs immediately upon deep sleep wakeup before the 2nd-stage bootloader
  * or FreeRTOS initializes. Captures SHTC3 telemetry in ~2.5ms and returns

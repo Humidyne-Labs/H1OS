@@ -72,7 +72,7 @@ H1OS enforces a strict unidirectional dependency model: **Upper layers call lowe
 ## 🌡️ Zero-Heat Sensing & Psychrometric Invariants
 
 H1OS resolves sensor self-heating bias by maintaining strict thermodynamic invariants:
-1. **Flow A Headless Sensor Sprint (<4ms):** Wakes only the RTC Fast Memory stub to sample SHTC3 telemetry in ~2.5 ms before entering deep sleep, eliminating PCB thermal conduction into the cavity.
+1. **Flow A Headless Sensor Sample Burst (<4ms):** Wakes only the RTC Fast Memory stub to sample SHTC3 telemetry in ~2.5 ms before entering deep sleep, eliminating PCB thermal conduction into the cavity.
 2. **True Invariant Tracking:** Uses August-Roche-Magnus equations to calculate ambient vapor pressure ($e$), true dew point ($T_{\text{dew}}$), and reconstructed relative humidity ($RH_{\text{amb}}$) based on dynamic ambient floor tracking.
 
 ---

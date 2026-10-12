@@ -57,15 +57,15 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
-        if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SPRINT) {
-            return ORCH_FLOW_A_SPRINT;
+        if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) {
+            return ORCH_FLOW_A_SAMPLE;
         }
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
-    /* Internal timer wake -> Flow A Headless Sensor Sprint */
+    /* Internal timer wake -> Flow A Headless Sensor Sample Burst */
     if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
-        return ORCH_FLOW_A_SPRINT;
+        return ORCH_FLOW_A_SAMPLE;
     }
 
     /* Button or External RTC (EXT1) wake -> Flow B Main Wake */
@@ -77,7 +77,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
-void orch_flow_execute_sub_sprint(void)
+void orch_flow_execute_sensor_sample(void)
 {
     /* Flow A: Execute rapid <4ms sensor read */
     sub_sensor_init();
@@ -155,12 +155,12 @@ void orch_flow_execute_sub_sprint(void)
     if (rtc_err == ESP_OK && next_sample_sec < rem_sec) {
         /* Next sensor sample will complete BEFORE external RTC expires -> Rearm */
         internal_sleep_sec = next_sample_sec;
-        ESP_LOGD(TAG, "Rearming internal timer for next sprint (%lus, RTC due in %lus)",
+        ESP_LOGD(TAG, "Rearming internal timer for next sensor sample (%lus, RTC due in %lus)",
                  (unsigned long)internal_sleep_sec, (unsigned long)rem_sec);
     } else {
         /* Next sample lands at or after external RTC expiry -> Discard rearm!
          * Sleep purely until external PCF85063A INT triggers Flow B (internal_sleep_sec = 0) */
-        ESP_LOGI(TAG, "Discarding runt sprint rearm (RTC due in %lus <= %lus). Sleeping until external RTC INT.",
+        ESP_LOGI(TAG, "Discarding runt sample rearm (RTC due in %lus <= %lus). Sleeping until external RTC INT.",
                  (unsigned long)rem_sec, (unsigned long)next_sample_sec);
         internal_sleep_sec = 0;
     }
@@ -272,7 +272,7 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
         internal_sleep_sec = sample_sec;
     }
 
-    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sprint timer = %lus",
+    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
              (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
 
     /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */

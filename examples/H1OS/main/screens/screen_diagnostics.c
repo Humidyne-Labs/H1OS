@@ -58,7 +58,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     // Row 3: ULP Monitor Dispatch
     const char *ulp_str = "NONE";
-    if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SPRINT) ulp_str = "SENSOR_SPRINT";
+    if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) ulp_str = "SENSOR_SAMPLE";
     else if (st->ulp_dispatch_reason == ULP_DISPATCH_MAIN_WAKE) ulp_str = "MAIN_WAKE";
     else if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN) ulp_str = "CRIT_SHUTDOWN";
 

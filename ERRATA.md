@@ -49,7 +49,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 The Sensirion SHTC3 relative humidity and temperature sensor is situated along the outer board edge and benefits from a perimeter milling slot for physical isolation from the main board area.
 1. **Edge Placement & Milling Slot:** The sensor is located along the board edge and separated by a PCB milling slot, which provides good spatial separation from direct mechanical contact with hot components.
 2. **Copper Trace Thermal Conduction:** However, ground and power traces traversing the narrow bridge neck to the sensor are copper. Copper has a high thermal conductivity ($k_{\text{Cu}} \approx 385\,\text{W/(m}\cdot\text{K)}$ compared to FR4 at $k_{\text{FR4}} \approx 0.25\,\text{W/(m}\cdot\text{K)}$). Over extended active sessions (sustained 240 MHz operation, prolonged display compositing, or RF transmissions), heat can slowly conduct across the bridge copper.
-3. **Thermal Profile:** During cold boot or rapid <10ms sprints, the sensor is thermally decoupled. Sustained active sessions (>30s) can exhibit localized temperature rises of $+0.5^\circ\text{C}\dots +1.5^\circ\text{C}$.
+3. **Thermal Profile:** During cold boot or rapid <10ms sample bursts, the sensor is thermally decoupled. Sustained active sessions (>30s) can exhibit localized temperature rises of $+0.5^\circ\text{C}\dots +1.5^\circ\text{C}$.
 
 #### 2. Metrological Impact
 Relative Humidity ($RH$) is an exponential function of temperature according to the Clausius-Clapeyron relation:
@@ -60,10 +60,10 @@ $$
 
 Where saturation vapor pressure $e_s(T) \approx 6.112 \times \exp\left(\frac{17.67 \cdot T}{T + 243.5}\right)\,\text{hPa}$.
 
-A thermal bias of $+1.0^\circ\text{C}$ at $22^\circ\text{C}$ / $50\%$ RH artificially depresses the reported relative humidity by approximately $-3.1\%$ RH. Rapid sub-10ms sensor sprints completely bypass this drift.
+A thermal bias of $+1.0^\circ\text{C}$ at $22^\circ\text{C}$ / $50\%$ RH artificially depresses the reported relative humidity by approximately $-3.1\%$ RH. Rapid sub-10ms sensor sample bursts completely bypass this drift.
 
 #### 3. Current H1OS Firmware Mitigations
-- **$<10\,\text{ms}$ Zero-Heat Sprint:** The Xtensa processor completes SHTC3 sampling in a sub-10ms burst before internal silicon heat can conduct across the PCB.
+- **$<10\,\text{ms}$ Zero-Heat Sample Burst:** The Xtensa processor completes SHTC3 sampling in a sub-10ms burst before internal silicon heat can conduct across the PCB.
 - **Thermal Lockout MUX:** Telemetry samples taken during active display refresh or button interaction are flagged as thermally contaminated and locked out from the ambient history ring buffer.
 - **Thermodynamic Invariants:** Calculates actual vapor pressure ($e$) and dew point ($T_{\text{dew}}$), which remain invariant even if the sensor package experiences minor self-heating.
 
@@ -148,7 +148,7 @@ Because `GPIO 47/48` cannot be controlled from the RTC domain:
 3. Every sensor reading requires waking the primary dual-core Xtensa processor (powering up the high-voltage LDO, PLL, and clock trees).
 
 #### 3. Current H1OS Firmware Mitigations
-- Implemented the **RTC Fast Wake Stub** (`orch_wake_stub.c`): When waking for sensor sprints, the CPU executes directly from RTC Fast SRAM at low frequency, bypassing the secondary bootloader, flash cache, and FreeRTOS kernel to complete execution in $<3\,\text{ms}$.
+- Implemented the **RTC Fast Wake Stub** (`orch_wake_stub.c`): When waking for sensor sample bursts, the CPU executes directly from RTC Fast SRAM at low frequency, bypassing the secondary bootloader, flash cache, and FreeRTOS kernel to complete execution in $<3\,\text{ms}$.
 - Reserved the ULP-RISC-V coprocessor for ADC battery threshold monitoring (`ADC1_CH3` on `GPIO 4`), button debounce (`GPIO 0/18`), and RTC interrupt clearing (`GPIO 5`), which are on RTC GPIOs.
 
 #### 4. Rev B Hardware Redesign Recommendations

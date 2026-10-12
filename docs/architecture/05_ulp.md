@@ -25,7 +25,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
   Battery Divider               PCF85063A INT                 Tactile Buttons
   • 12 dB Attenuation           • Alarm Line (Active LOW)     • Reactive Wake on Edge
   • eFuse Curve Hand-Off        • Zero-Hour Master Arbiter    • Tap vs Hold Classification
-  • Brownout Threshold (<3.25V) • Suppresses Flow A Sprint    • BOOT Hold -> Bootloader
+  • Brownout Threshold (<3.25V) • Suppresses Flow A Sample   • BOOT Hold -> Bootloader
   • Zero-Volt Cable Guard       • Launches Flow B Directly    • POWER Hold -> Power-Off
 ```
 
@@ -35,7 +35,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
  
 ### 3.1 Condition 1: Internal Periodic Timer Expired
 1. ULP wakes from its internal RTC timer (which was armed only because $T_{\text{rtc\_total\_period}} \ge (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}$).
-2. Sets `ULP_DISPATCH_SENSOR_SPRINT` in `orch_persisted_state_t`.
+2. Sets `ULP_DISPATCH_SENSOR_SAMPLE` in `orch_persisted_state_t`.
 3. Triggers `ulp_riscv_wakeup_main_processor()` to launch Core 0 into the <4ms Flow A Wake Stub.
 4. Core 0 logs the SHTC3 reading, updates `ulp_cnt`, evaluates next-sleep lookahead, re-arms the timer if window remains clear, and returns to deep sleep.
  
@@ -91,7 +91,7 @@ The ULP program and the main application share a strict structure located at the
 
 typedef enum {
     ULP_DISPATCH_NONE = 0,
-    ULP_DISPATCH_SENSOR_SPRINT,     // Flow A Wake Stub (<4ms)
+    ULP_DISPATCH_SENSOR_SAMPLE,     // Flow A Wake Stub (<4ms)
     ULP_DISPATCH_MAIN_WAKE,         // Flow B Interactive LVGL Session
     ULP_DISPATCH_BOOTLOADER_JUMP,   // ROM Bootloader Jump primed by BOOT hold
     ULP_DISPATCH_POWER_OFF,         // Clean Power-Off primed by POWER hold

@@ -67,7 +67,7 @@ Self-contained peripheral drivers ("Does the thing"). Expose clean APIs with sta
 The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration, psychrometric math, and sleep coordination.
 - **`orch_state.h/.c`**: Shared RTC Slow Memory structure (<512 bytes), boot/wake counters, flags, Tri-Node sliding ring buffer.
 - **`orch_math.c/.h`**: Class-E psychrometrics: Magnus vapor pressure invariant ($e$), dew point reconstruction, continuous EWMA filtering, integer slope stability gating.
-- **`orch_flow.c/.h`**: Single Unified Binary Execution Arbiter. Governs Flow A (Sensor Sprint <4ms) vs Flow B (Interactive Session). Manages 60s Thermal Lockout MUX. Executes coordinated 7-step sleep transition sequence.
+- **`orch_flow.c/.h`**: Single Unified Binary Execution Arbiter. Governs Flow A (Sensor Sample Burst <4ms) vs Flow B (Interactive Session). Manages 60s Thermal Lockout MUX. Executes coordinated 8-step sleep transition sequence.
 - **`orch_display_sync.c/.h`**: Dirty framebuffer commit to `epd_frame` SPI flash partition during sleep transition.
 - **`orch_wake_stub.c/.h`**: Fast RTC wake stub for <3ms Flow A pulse.
 - **`ulp/main.c` (ULP-RISC-V Coprocessor Monitor)**: Purely reactive hardware monitor running in deep sleep. Wakes on timer (Flow A) or external interrupt (GPIO 5 alarm, GPIO 0/18 button tap/hold, GPIO 4 battery guard). Gated off during Flow B!
@@ -95,5 +95,12 @@ The public interface of H1OS exposed to developers.
    - **User Tap Wake (Interactive Session):** Initiated by a user button tap on `GPIO 0` or `GPIO 18`. System activates the 30-second inactivity session. LVGL native `lv_indev` owns buttons. Between user interactions, DFS drops CPU to 80 MHz baseline. Any user click resets the 30s timer. After 30s of inactivity, system executes coordinated transition to deep sleep.
    - **External RTC Timer Wake (Unattended Refresh):** Initiated when PCF85063A countdown timer reaches zero on `GPIO 5`. The dual-core processor boots, renders the updated telemetry dashboard to the E-Paper panel, flushes the framebuffer, and **goes right back to sleep immediately** once the display update completes to preserve battery power.
    - **First / Cold Boot:** Initiated by initial battery insertion or power-on. System boots, executes hardware self-tests, renders initial screen, and **waits 30 seconds for potential user interaction** before entering initial deep sleep.
-3. **Deterministic Sleep Transition Sequence:**
-   - User pre-sleep hook $\rightarrow$ Commit dirty frame to flash $\rightarrow$ SSD1681 Deep Sleep Mode 1 $\rightarrow$ Arm Zero-Hour gated ULP reactive interrupts $\rightarrow$ Enter Deep Sleep.
+3. **Deterministic 8-Step Sleep Transition Sequence (`orch_flow_transition_to_sleep`):**
+   1. Drain LVGL rendering and flush pipeline completely (`h1os_lvgl_has_pending_tasks()`).
+   2. Wait for audio playback idle and hardware soft-mute zero-cross ramp (`sub_audio_wait_idle()`).
+   3. Wait for physical EPD BUSY falling edge on `GPIO 8` (`sub_display_wait_busy()`).
+   4. Post-busy microcapsule voltage settling guard ($250\text{ ms}$).
+   5. Commit dirty framebuffer to raw SPI flash partition `epd_frame` if modified (`orch_display_sync_save_if_dirty()`).
+   6. Command SSD1681 display controller into Deep Sleep Mode 1 ($1.0\ \mu\text{A}$) (`sub_display_enter_deep_sleep()`).
+   7. Arm external PCF85063A countdown timer (`sub_rtc_arm_countdown()`).
+   8. Zero-Hour conflict avoidance & hardware deep sleep entry (`sub_power_enter_deep_sleep()`).

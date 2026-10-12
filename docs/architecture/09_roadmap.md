@@ -69,7 +69,7 @@ Development follows the **Four Canonical Stages of Construction**:
 - [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
   - [x] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
   - [x] `orch_math.c`: Integer slope delta gating, Class-E psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
-  - [x] `orch_flow.c`: Flow A <10ms sprint, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 9-step sleep transition.
+  - [x] `orch_flow.c`: Flow A <4ms sample burst, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 8-step sleep transition.
   - [x] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
 - [x] **3.4 Layer 3 ULP-RISC-V Coprocessor Firmware**:
   - [x] Implement event-driven reactive ULP Monitor in RTC domain.

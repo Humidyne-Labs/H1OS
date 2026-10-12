@@ -18,7 +18,7 @@
 
 /* Exported variables accessible by the main Xtensa core via ulp_<var> */
 uint32_t wake_counter = 0;
-uint32_t dispatch_reason = 0; /* 0: None, 1: Sensor Sprint, 2: Main Wake, 3: Critical Shutdown */
+uint32_t dispatch_reason = 0; /* 0: None, 1: Sensor Sample, 2: Main Wake, 3: Critical Shutdown */
 
 /* Battery Calibration Parameters (Provided by main core from eFuses) */
 uint32_t cal_scale = 1000;
@@ -104,8 +104,8 @@ int main(void)
         return 0;
     }
 
-    /* Default: Sensor sprint wake stub */
-    dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SPRINT */
+    /* Default: Sensor sample wake stub */
+    dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
     ulp_riscv_wakeup_main_processor();
 
     return 0;

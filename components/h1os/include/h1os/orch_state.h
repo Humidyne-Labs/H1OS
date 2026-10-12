@@ -23,7 +23,7 @@ extern "C" {
 
 typedef enum {
     ULP_DISPATCH_NONE = 0,
-    ULP_DISPATCH_SENSOR_SPRINT,     /* Flow A: <4ms wake stub sprint */
+    ULP_DISPATCH_SENSOR_SAMPLE,     /* Flow A: <4ms wake stub sensor sample burst */
     ULP_DISPATCH_MAIN_WAKE,         /* Flow B: Full application / LVGL UI wake */
     ULP_DISPATCH_CRITICAL_SHUTDOWN, /* Battery brownout threshold (<3.25V) */
     ULP_DISPATCH_BOOTLOADER_JUMP,   /* Primed by BOOT hold > 2.5s */
@@ -48,7 +48,7 @@ typedef struct {
     uint8_t             ulp_dispatch_reason;
     uint16_t            last_vbat_mv;
     
-    uint32_t            sample_interval_sec;  /* Flow A sensor sub-sprint interval */
+    uint32_t            sample_interval_sec;  /* Flow A sensor sample interval */
     uint32_t            flow_b_period_sec;    /* Flow B main application wake interval */
     uint32_t            wake_timestamp_epoch;
 

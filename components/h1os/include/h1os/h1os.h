@@ -94,7 +94,7 @@ typedef struct {
     struct {
         uint32_t inactivity_timeout_sec; ///< Inactivity sleep timer (default: 30s)
         bool     enable_dfs_80mhz;       ///< Enable 80 MHz power droop while waiting for input (default: true)
-        uint32_t flow_a_period_sec;      ///< Flow A headless sensor sprint interval (default: 60s)
+        uint32_t flow_a_period_sec;      ///< Flow A headless sensor sample burst interval (default: 60s)
         uint32_t flow_b_period_sec;      ///< Flow B main application wake interval (default: 120s)
     } session;
 

@@ -9,7 +9,7 @@ This document defines the physical measurement procedures, test fixtures, expect
 | **Flow A Sub-Execution Timing** | $< 10\text{ ms}$ (Nominal $\sim 2.5\text{ ms}$) | GPIO 3 (`HAL_PIN_STATUS_LED`) pulse width | Eliminates MCU self-heating in the sensor cavity. |
 | **Deep Sleep Standby Current** | $< 15\text{ }\mu\text{A}$ (Nominal $9\text{--}12\text{ }\mu\text{A}$) | Nordic PPK2 / inline µA meter on battery input | Guarantees multi-month battery operation on 500mAh LiPo. |
 | **Partial Refresh Latency** | $\sim 300\text{ ms}$ (OTP LUT $\sim 280\text{--}320\text{ ms}$) | SSD1681 `EPD_BUSY` (GPIO 8) low-to-high-to-low duration | Clean electrophoretic particle migration with zero flicker. |
-| **Zero-Hour Conflict Suppression** | $0$ rapid double-wakes when sub-sprint meets RTC alarm | Internal timer suppression logic in `orch_flow.c` & `orch_wake_stub.c` | Eliminates race condition between internal timer & PCF85063A. |
+| **Zero-Hour Conflict Suppression** | $0$ rapid double-wakes when sub-sample meets RTC alarm | Internal timer suppression logic in `orch_flow.c` & `orch_wake_stub.c` | Eliminates race condition between internal timer & PCF85063A. |
 | **Flash Endurance Audit** | $\le 1$ erase/write per sleep cycle (0 if clean) | `epd_frame` partition sector write counter | Extends SPI NOR flash lifespan beyond 100,000 cycles. |
 | **Tri-Node Thermal Equilibrium** | $T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}$ in steady state | Tri-Node telemetry query (`SHTC3`, `TSENS`, `SSD1681 0x1B`) | Proves thermodynamic invariant engine validity. |
 
@@ -57,9 +57,9 @@ This document defines the physical measurement procedures, test fixtures, expect
 ---
 
 ### 2.4 Benchmark 4: Zero-Hour Conflict Elimination Stress Test
-- **Objective:** Verify that when a Flow A headless sensor sprint coincides with or straddles an external PCF85063A countdown timer expiration, no rapid double-wake occurs.
+- **Objective:** Verify that when a Flow A headless sensor sample burst coincides with or straddles an external PCF85063A countdown timer expiration, no rapid double-wake occurs.
 - **Validation Logic:**
-  1. In `orch_flow_execute_sub_sprint()`:
+  1. In `orch_flow_execute_sensor_sample()`:
      - Check `sub_rtc_get_and_clear_interrupts(&alarm, &timer)`: if either fired, abort sleep and promote directly to Flow B.
      - Check `sub_rtc_get_remaining_seconds(&rem_sec)`: if $rem\_sec \le sleep\_sec$, clamp internal sleep time to $rem\_sec$.
   2. In `orch_flow_transition_to_sleep()`:
@@ -74,7 +74,7 @@ This document defines the physical measurement procedures, test fixtures, expect
   - `orch_display_sync_mark_dirty()` is called strictly when LVGL flushes a new frame.
   - `orch_display_sync_save_if_dirty()` writes and clears the dirty flag.
   - Subsequent sleep sequences without frame changes skip flash sector erase and write operations.
-- **Pass Criterion:** Flash sector erase/write calls strictly equal the number of dirty screen refreshes, and 0 writes occur during periodic headless sensor sprints.
+- **Pass Criterion:** Flash sector erase/write calls strictly equal the number of dirty screen refreshes, and 0 writes occur during periodic headless sensor sample bursts.
 
 ---
 
