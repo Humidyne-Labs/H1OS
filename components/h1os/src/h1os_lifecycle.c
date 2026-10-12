@@ -50,7 +50,7 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
     if (s_app_lifecycle.presentation.on_chime != NULL) {
         s_app_lifecycle.presentation.on_chime(type, s_app_lifecycle.user_data);
     } else if (s_app_lifecycle.presentation.chime_mask & (1 << type)) {
-        sub_audio_play_chime((uint8_t)type);
+        sub_audio_play_chime_async((uint8_t)type);
     }
 }
 
@@ -252,6 +252,9 @@ void h1os_shutdown(void)
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
+    // Wait for shutdown chime to finish playing cleanly before cutting power
+    sub_audio_wait_idle(1500);
+
     // Release battery LDO power latch (GPIO 17 driven LOW, hold disabled)
     hal_io_lock_power_latch(false);
 }

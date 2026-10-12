@@ -13,6 +13,8 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include <math.h>
 
 static const char *TAG = "sub_audio";
@@ -25,8 +27,41 @@ static const char *TAG = "sub_audio";
 #define ES8311_REG_CHIP_ID1     0xFD  /* Expected: 0x83 */
 #define ES8311_REG_CHIP_ID2     0xFE  /* Expected: 0x11 */
 
+/* Audio Worker Command Types */
+typedef enum {
+    AUDIO_CMD_TONE = 0,
+    AUDIO_CMD_CHIME,
+    AUDIO_CMD_PCM,
+} audio_cmd_type_t;
+
+typedef struct {
+    audio_cmd_type_t type;
+    union {
+        struct {
+            uint32_t frequency_hz;
+            uint32_t duration_ms;
+        } tone;
+        struct {
+            uint8_t chime_type;
+        } chime;
+        struct {
+            const int16_t *samples;
+            size_t sample_count;
+            uint32_t sample_rate_hz;
+        } pcm;
+    } params;
+    SemaphoreHandle_t done_sem; /* Set for synchronous caller, NULL for async */
+    esp_err_t        *result;   /* Pointer to store execution result */
+} audio_cmd_t;
+
 static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited = false;
+static QueueHandle_t     s_audio_queue       = NULL;
+static TaskHandle_t      s_audio_task_handle = NULL;
+static volatile bool     s_audio_is_busy     = false;
+
+/* Forward declaration */
+static void audio_worker_task(void *pvParameters);
 
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 {
@@ -208,8 +243,21 @@ esp_err_t sub_audio_init(void)
         ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono)");
     }
 
-    /* 6. Park in zero-heat standby until audio playback is requested */
-    sub_audio_standby();
+    /* 7. Spawn audio background worker task and command queue */
+    if (s_audio_queue == NULL) {
+        s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
+        if (s_audio_queue != NULL) {
+            xTaskCreatePinnedToCore(
+                audio_worker_task,
+                "h1os_audio_worker",
+                4096,
+                NULL,
+                4,
+                &s_audio_task_handle,
+                1
+            );
+        }
+    }
 
     s_audio_inited = true;
     return ESP_OK;
@@ -249,6 +297,26 @@ esp_err_t sub_audio_standby(void)
     return ESP_OK;
 }
 
+
+/* Internal helper: clean teardown sequence per ES8311 hardware spec */
+static void sub_audio_teardown_clean(void)
+{
+    /* Step 1: Wait ~5 ms for codec internal DSP filter and Delta-Sigma pipeline latency */
+    vTaskDelay(pdMS_TO_TICKS(5));
+
+    /* Step 2: Trigger ES8311 soft-mute to ramp down volume smoothly to zero cross */
+    es8311_write_reg(0x31, 0x40); /* DAC_DSMMUTE = 1 */
+
+    /* Step 3: Wait ~15 ms for soft-ramp down (based on DAC_RAMPRATE in 0x37) */
+    vTaskDelay(pdMS_TO_TICKS(15));
+
+    /* Step 4: Safely gate/shutdown Class D Amplifier without pops */
+    gpio_set_level(HAL_PIN_PA_CTRL, 0);
+
+    /* Step 5: Enter ultra-low-power silicon standby */
+    sub_audio_standby();
+}
+
 /* Internal helper to stream tone samples without entering standby afterwards */
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 {
@@ -272,6 +340,22 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         size_t bytes_written = 0;
         i2s_channel_write(s_tx_chan, buffer, chunk_size * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
+    }
+}
+
+/* Internal helper to stream raw 16-bit PCM buffer */
+static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_count)
+{
+    if (samples == NULL || sample_count == 0) return;
+
+    size_t samples_sent = 0;
+    while (samples_sent < sample_count) {
+        size_t chunk = sample_count - samples_sent;
+        if (chunk > 256) chunk = 256;
+
+        size_t bytes_written = 0;
+        i2s_channel_write(s_tx_chan, &samples[samples_sent], chunk * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
+        samples_sent += chunk;
     }
 }
 
@@ -306,23 +390,30 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     return ESP_OK;
 }
 
-esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 {
     esp_err_t ret = sub_audio_prepare_and_unmute();
     if (ret != ESP_OK) return ret;
 
     sub_audio_render_tone_samples(frequency_hz, duration_ms);
-
-    /* Wait for DMA buffer to drain through DAC before mute */
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    /* Return to zero-heat deep standby */
-    return sub_audio_standby();
+    sub_audio_teardown_clean();
+    return ESP_OK;
 }
 
-esp_err_t sub_audio_play_chime(uint8_t type)
+static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
 {
-    ESP_LOGI(TAG, "Playing acoustic presentation chime (Type %u)...", type);
+    (void)sample_rate_hz; /* Pre-configured 16kHz */
+    esp_err_t ret = sub_audio_prepare_and_unmute();
+    if (ret != ESP_OK) return ret;
+
+    sub_audio_render_pcm_samples(samples, sample_count);
+    sub_audio_teardown_clean();
+    return ESP_OK;
+}
+
+static esp_err_t sub_audio_exec_chime(uint8_t type)
+{
+    ESP_LOGI(TAG, "Executing acoustic presentation chime (Type %u)...", type);
 
     esp_err_t ret = sub_audio_prepare_and_unmute();
     if (ret != ESP_OK) return ret;
@@ -374,9 +465,148 @@ esp_err_t sub_audio_play_chime(uint8_t type)
             return ESP_ERR_INVALID_ARG;
     }
 
-    /* Wait for DMA buffer to completely finish playing through DAC */
-    vTaskDelay(pdMS_TO_TICKS(60));
+    sub_audio_teardown_clean();
+    return ESP_OK;
+}
 
-    /* Park in zero-heat standby once entire chime sequence is complete */
-    return sub_audio_standby();
+/* FreeRTOS Audio Background Worker Task */
+static void audio_worker_task(void *pvParameters)
+{
+    audio_cmd_t cmd;
+    ESP_LOGI(TAG, "Audio worker task initialized and active");
+
+    while (1) {
+        if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
+            s_audio_is_busy = true;
+            esp_err_t res = ESP_OK;
+
+            switch (cmd.type) {
+                case AUDIO_CMD_TONE:
+                    res = sub_audio_exec_tone(cmd.params.tone.frequency_hz, cmd.params.tone.duration_ms);
+                    break;
+                case AUDIO_CMD_CHIME:
+                    res = sub_audio_exec_chime(cmd.params.chime.chime_type);
+                    break;
+                case AUDIO_CMD_PCM:
+                    res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count, cmd.params.pcm.sample_rate_hz);
+                    break;
+            }
+
+            if (cmd.result) {
+                *cmd.result = res;
+            }
+
+            if (cmd.done_sem) {
+                xSemaphoreGive(cmd.done_sem);
+            }
+
+            s_audio_is_busy = false;
+        }
+    }
+}
+
+static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, uint32_t wait_ms)
+{
+    if (s_audio_queue == NULL) {
+        esp_err_t err = sub_audio_init();
+        if (err != ESP_OK) return err;
+    }
+
+    audio_cmd_t local_cmd = *cmd;
+    SemaphoreHandle_t sync_sem = NULL;
+    esp_err_t exec_result = ESP_OK;
+
+    if (is_sync) {
+        sync_sem = xSemaphoreCreateBinary();
+        if (sync_sem == NULL) return ESP_ERR_NO_MEM;
+        local_cmd.done_sem = sync_sem;
+        local_cmd.result   = &exec_result;
+    } else {
+        local_cmd.done_sem = NULL;
+        local_cmd.result   = NULL;
+    }
+
+    if (xQueueSend(s_audio_queue, &local_cmd, pdMS_TO_TICKS(wait_ms)) != pdTRUE) {
+        if (sync_sem) vSemaphoreDelete(sync_sem);
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (is_sync) {
+        xSemaphoreTake(sync_sem, portMAX_DELAY);
+        vSemaphoreDelete(sync_sem);
+        return exec_result;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_TONE,
+        .params.tone = { .frequency_hz = frequency_hz, .duration_ms = duration_ms },
+    };
+    return sub_audio_send_command(&cmd, true, 100);
+}
+
+esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_TONE,
+        .params.tone = { .frequency_hz = frequency_hz, .duration_ms = duration_ms },
+    };
+    return sub_audio_send_command(&cmd, false, 50);
+}
+
+esp_err_t sub_audio_play_chime(uint8_t type)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_CHIME,
+        .params.chime = { .chime_type = type },
+    };
+    return sub_audio_send_command(&cmd, true, 100);
+}
+
+esp_err_t sub_audio_play_chime_async(uint8_t type)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_CHIME,
+        .params.chime = { .chime_type = type },
+    };
+    return sub_audio_send_command(&cmd, false, 50);
+}
+
+esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_PCM,
+        .params.pcm = { .samples = samples, .sample_count = sample_count, .sample_rate_hz = sample_rate_hz },
+    };
+    return sub_audio_send_command(&cmd, true, 100);
+}
+
+esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
+{
+    audio_cmd_t cmd = {
+        .type = AUDIO_CMD_PCM,
+        .params.pcm = { .samples = samples, .sample_count = sample_count, .sample_rate_hz = sample_rate_hz },
+    };
+    return sub_audio_send_command(&cmd, false, 50);
+}
+
+bool sub_audio_is_busy(void)
+{
+    if (s_audio_is_busy) return true;
+    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0) return true;
+    return false;
+}
+
+esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
+{
+    uint32_t elapsed = 0;
+    while (sub_audio_is_busy() && elapsed < timeout_ms) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        elapsed += 10;
+    }
+    return sub_audio_is_busy() ? ESP_ERR_TIMEOUT : ESP_OK;
 }

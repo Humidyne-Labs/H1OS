@@ -95,6 +95,9 @@ Every driver in the H1OS repository has been verified against the physical IC re
   - BCLK derived from ESP32-S3 `PLL_160M` via fractional division.
   - Register `0x02` through `0x08` programmed with the 22-register Philips mono 16 kHz audio clock tree.
 - [x] **DFS & Playback Frequency Stability:** Verified that ESP-IDF's `i2s_channel_enable()` automatically acquires an `ESP_PM_APB_FREQ_MAX` power management lock, guaranteeing that Dynamic Frequency Scaling (DFS) will not drop the APB clock and alter audio pitch during active chime playback.
+- [x] **ES8311 Ready State Polling:** Confirms Chip IDs (`0xFD` = `0x83`, `0xFE` = `0x11`) and polls Register `0xFC` (`FLAG_CSM_CHIP`) bits 6:4 until Chip State Machine exits state `S0` (Power Down) before streaming I2S audio frames, eliminating blips and clipped initial audio transients.
+- [x] **Dedicated Asynchronous Worker:** Spawns `h1os_audio_worker` FreeRTOS task with thread-safe queue (`audio_cmd_t`) for non-blocking UI rendering, non-blocking tone synthesis, and synchronous/asynchronous raw 16-bit PCM clip streaming.
+- [x] **Hardware-Clean Pop-Free Teardown:** Executes 5 ms pipeline drain $\to$ soft-mute (`0x31` `0x40`) $\to$ 15 ms ramp down $\to$ Class D amp mute (`GPIO 46` = 0) $\to$ software standby.
 - [x] **Zero-Heat Standby Sequence:** 15-register suspend sequence brings ES8311 current down to $<1.0\,\mu\text{A}$ without cutting power rail.
 
 #### 4. Solomon Systech SSD1681 1.54" 200×200 E-Paper Display

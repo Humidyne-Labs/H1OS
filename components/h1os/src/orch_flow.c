@@ -13,6 +13,7 @@
 #include "h1os/sub_rtc.h"
 #include "h1os/sub_power.h"
 #include "h1os/sub_display.h"
+#include "h1os/sub_audio.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/hal_io.h"
 #include "esp_sleep.h"
@@ -225,6 +226,12 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
             vTaskDelay(pdMS_TO_TICKS(20));
             wait_ms += 20;
         }
+    }
+
+    /* 1b. Wait for any background audio playback and soft-ramp teardown to complete */
+    if (sub_audio_is_busy()) {
+        ESP_LOGI(TAG, "Waiting for audio playback to finish...");
+        sub_audio_wait_idle(1000);
     }
 
     /* 2. Wait for physical EPD panel to finish driving electrophoretic particles (GPIO 8 BUSY falling edge) */

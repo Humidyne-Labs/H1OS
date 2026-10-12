@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.1.0-alpha] - 2026-10-12
+
+### 🚀 Added
+- **Asynchronous Audio Worker Subsystem** (`sub_audio.c/.h`):
+  - Dedicated FreeRTOS background task (`h1os_audio_worker`, 4 KB stack, priority 5) with thread-safe FreeRTOS command queue (`audio_cmd_t`).
+  - Decoupled tone synthesis and chime presentation from the LVGL render loop, eliminating UI stutter and render blocking.
+  - Added non-blocking asynchronous APIs: `sub_audio_play_tone_async()`, `sub_audio_play_chime_async()`, and `sub_audio_play_pcm_async()`.
+  - Added raw 16-bit signed PCM audio clip playback (`sub_audio_play_pcm()` and `sub_audio_play_pcm_async()`) supporting dynamic sample rates, chunked I2S DMA streaming, and soft-mute ramps.
+  - Added audio state queries and synchronization: `sub_audio_is_busy()`, `sub_audio_wait_idle()`, and `sub_audio_is_ready()`.
+- **Dynamic Session Cadence Periods** (`h1os.h`, `orch_state.c/.h`, `h1os_lifecycle.c`):
+  - Added user-configurable `flow_a_period_sec` and `flow_b_period_sec` fields to `h1os_lifecycle_t.session` and `orch_persisted_state_t`.
+  - Replaced hardcoded sleep timeouts with dynamic runtime intervals for Flow A telemetry sprints and Flow B UI presentation sessions.
+
+### 🛠️ Fixed & Refactored
+- **ES8311 Ready State Polling & Audio Clipping Remediation** (`sub_audio.c`):
+  - Implemented `sub_audio_wait_until_ready()` validating Chip ID (`0xFD` = `0x83`, `0xFE` = `0x11`) and polling Register `0xFC` (`FLAG_CSM_CHIP`) bits 6:4 until the Chip State Machine exits state `S0` (Power Down).
+  - Eliminates audio blips and clipped initial transients caused by streaming I2S frames before internal PLL and analog bias circuitry stabilize.
+- **Hardware-Clean Pop-Free Audio Teardown** (`sub_audio.c`):
+  - Implemented 5-step clean teardown sequence: 5 ms group delay drain $\rightarrow$ soft-mute (`0x31` `DAC_DSMMUTE = 0x40`) $\rightarrow$ 15 ms `DAC_RAMPRATE` volume ramp-down $\rightarrow$ `PA_CTRL` Class D amplifier mute (`GPIO 46` = 0) $\rightarrow$ ultra-low-power silicon standby (`<1.0 µA`).
+  - Added `sub_audio_wait_idle()` synchronization to `h1os_shutdown()` and `orch_flow_transition_to_sleep()` to guarantee all audio pipelines drain and mute before battery latch release or sleep entry.
+- **Keypad Long-Press Shutdown vs Navigation Remediation** (`main.c`):
+  - Separated LVGL keypad events: `LV_EVENT_SHORT_CLICKED` exclusively advances screen navigation carousel with non-blocking feedback tones (`sub_audio_play_tone_async()`).
+  - `LV_EVENT_LONG_PRESSED` triggers graceful power off (`h1os_shutdown()`) with atomic state latching to prevent re-entrant navigation loops.
+- **Thermal Mitigation & Presentation Chime Masking** (`main.c`, `h1os_lifecycle.c`):
+  - Restricted sleep/wake chime triggers strictly to Flow B application presentation cycles.
+  - Defaulted `chime_mask` in `main.c` to boot and shutdown chimes only (`(1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN)`), suppressing sensor cavity self-heating during periodic sleep/wake cycles.
+
+---
+
 ## [2.0.0-alpha] - 2026-10-10
 
 ### 🚀 Added

@@ -53,7 +53,28 @@ esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms);
 bool sub_audio_is_ready(void);
 
 /**
- * @brief Play synthesized audio chime/tone.
+ * @brief Play raw 16-bit signed PCM audio samples synchronously.
+ *
+ * @param[in] samples Pointer to 16-bit signed Mono PCM samples.
+ * @param[in] sample_count Number of int16_t samples.
+ * @param[in] sample_rate_hz Sample rate in Hz (default: 16000).
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz);
+
+/**
+ * @brief Play raw 16-bit signed PCM audio samples asynchronously in background worker task.
+ * Note: Caller must ensure the buffer remains valid until playback finishes (e.g., const/static buffer).
+ *
+ * @param[in] samples Pointer to 16-bit signed Mono PCM samples.
+ * @param[in] sample_count Number of int16_t samples.
+ * @param[in] sample_rate_hz Sample rate in Hz (default: 16000).
+ * @return ESP_OK on success, ESP_ERR_NO_MEM / ESP_ERR_TIMEOUT if queue full.
+ */
+esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz);
+
+/**
+ * @brief Play synthesized audio chime/tone synchronously.
  *
  * @param[in] frequency_hz Frequency in Hertz (e.g. 1000 for 1 kHz).
  * @param[in] duration_ms  Duration in milliseconds.
@@ -62,12 +83,44 @@ bool sub_audio_is_ready(void);
 esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms);
 
 /**
- * @brief Play standard H1OS acoustic presentation chime.
+ * @brief Play synthesized audio chime/tone asynchronously via worker task.
+ *
+ * @param[in] frequency_hz Frequency in Hertz (e.g. 1000 for 1 kHz).
+ * @param[in] duration_ms  Duration in milliseconds.
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms);
+
+/**
+ * @brief Play standard H1OS acoustic presentation chime synchronously.
  *
  * @param[in] type Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM).
  * @return ESP_OK on success.
  */
 esp_err_t sub_audio_play_chime(uint8_t type);
+
+/**
+ * @brief Play standard H1OS acoustic presentation chime asynchronously.
+ *
+ * @param[in] type Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM).
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_play_chime_async(uint8_t type);
+
+/**
+ * @brief Check if audio playback is currently active or queue has pending items.
+ *
+ * @return true if playing or queued, false if idle in standby.
+ */
+bool sub_audio_is_busy(void);
+
+/**
+ * @brief Wait until background audio worker completes all playback and enters standby.
+ *
+ * @param timeout_ms Maximum time to wait in milliseconds.
+ * @return ESP_OK if idle, ESP_ERR_TIMEOUT if still active.
+ */
+esp_err_t sub_audio_wait_idle(uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

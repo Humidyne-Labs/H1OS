@@ -63,7 +63,7 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] `sub_sensor.c`: SHTC3 physical acquisition (`Wake` -> `Read` -> `Sleep`) and ESP32-S3 internal TSENS die temperature.
   - [x] `sub_rtc.c`: PCF85063A POSIX timekeeping, clock calibration, countdown timer on GPIO 5, remaining duration query.
   - [x] `sub_power.c`: ADC1_CH3 calibrated battery sampling, LiPo OCV lookup, Zero-Volt Cable Guard logic, deep sleep EXT1 wake config.
-  - [x] `sub_audio.c`: ES8311 22-register clock tree, chime synthesizer, and register 0x0D standby power-down.
+  - [x] `sub_audio.c`: ES8311 22-register clock tree, CSM state polling (Reg `0xFC`), dedicated FreeRTOS background worker task (`h1os_audio_worker`), thread-safe command queue (`audio_cmd_t`), sync/async raw PCM streaming, chime synthesizer, 5-step pop-free soft-mute ramp teardown, and register 0x0D standby power-down.
   - [x] `sub_sdcard.c`: Basic SD SPI/MMC initialization, file I/O, format, and capacity checking.
   - [x] `sub_nvs.c`: NVS open, read/write blob, and commit routines.
 - [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:

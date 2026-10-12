@@ -93,15 +93,15 @@ static void keypad_event_cb(lv_event_t *e)
     if (code == LV_EVENT_SHORT_CLICKED) {
         uint32_t key = lv_event_get_key(e);
         if (key == LV_KEY_RIGHT || key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
-            // BOOT Button Short-Click: Forward Cycle
-            sub_audio_play_tone(2400, 15);
+            // BOOT Button Short-Click: Forward Cycle (Non-blocking acoustic feedback)
+            sub_audio_play_tone_async(2400, 15);
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad forward: Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
         } else if (key == LV_KEY_LEFT || key == LV_KEY_PREV) {
-            // POWER Button Short-Click: Reverse Cycle
-            sub_audio_play_tone(1800, 15);
+            // POWER Button Short-Click: Reverse Cycle (Non-blocking acoustic feedback)
+            sub_audio_play_tone_async(1800, 15);
             s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad reverse: Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
