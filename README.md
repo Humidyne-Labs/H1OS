@@ -13,6 +13,7 @@ Production-grade, event-driven ambient operating system and peripheral architect
 > 📘 **Looking for documentation?**
 > - **[H1OS Developer Guide & Reference Manual](docs/guide.md)**
 > - **[API Reference](docs/api.md)**
+> - **[Tri-Node Temperature & Psychrometric Sensor Operation](docs/architecture/12_temperature_sensor_operation.md)**
 > - **[Hardware Errata & PCB Rev B Guide](ERRATA.md)**
 > - **[Hardware Pinout Map](docs/pinout.md)**
 > - **[Hardware Verification & Benchmarking Plan](docs/architecture/11_benchmarks.md)**
