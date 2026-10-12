@@ -26,6 +26,10 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
+#include "driver/usb_serial_jtag.h"
+#include "orch_display_sync.h"
 
 #if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
@@ -228,8 +232,12 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
         out_telemetry->battery_mv = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        /* Zero-Volt Cable Guard: < 100mV means powered exclusively by USB VBUS without battery */
-        out_telemetry->is_usb_powered = (vbat_mv < 100);
+        /* External power detection:
+         *  - < 100 mV: Zero-Volt Cable Guard (no cell, charger not floating)
+         *  - USB host attached: the charger IC floats VBAT at ~4.2 V with no cell,
+         *    which is electrically indistinguishable from a full battery via ADC,
+         *    so never report a percentage while USB is attached. */
+        out_telemetry->is_usb_powered = (vbat_mv < 100) || usb_serial_jtag_is_connected();
     }
 
     return ret;
@@ -248,6 +256,8 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
 void h1os_shutdown(void)
 {
     ESP_LOGI(TAG, "Executing system shutdown and battery power cut...");
+    s_session_running = false; /* Stop inactivity monitor from racing into h1os_sleep() */
+
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
@@ -255,6 +265,31 @@ void h1os_shutdown(void)
     // Wait for shutdown chime to finish playing cleanly before cutting power
     sub_audio_wait_idle(1500);
 
-    // Release battery LDO power latch (GPIO 17 driven LOW, hold disabled)
+    /* Persist last frame and park the EPD controller */
+    sub_display_wait_busy(pdMS_TO_TICKS(5000));
+    orch_display_sync_save_if_dirty();
+    sub_display_enter_deep_sleep();
+
+    /* The POWER button physically bridges the LDO gate while held, and an
+     * EXT1 ANY_LOW wake would fire instantly if it is still down. Wait for a
+     * stable release (4 x 50 ms HIGH), bounded to 10 s. */
+    int stable_high = 0;
+    for (int i = 0; i < 200 && stable_high < 4; i++) {
+        stable_high = (gpio_get_level(HAL_PIN_BUTTON_POWER) == 1) ? stable_high + 1 : 0;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+
+    /* Release battery LDO power latch (GPIO 17 LOW). On battery, power dies here. */
+    ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17)");
     hal_io_lock_power_latch(false);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    /* Still running => powered from USB VBUS. Do NOT use sub_power_enter_deep_sleep():
+     * it re-asserts and holds GPIO 17 HIGH. Enter a POWER-button-only deep sleep. */
+    ESP_LOGW(TAG, "External power detected; entering standby (wake: POWER button only)");
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
+    esp_sleep_enable_ext1_wakeup(1ULL << HAL_PIN_BUTTON_POWER, ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_deep_sleep_start();
 }

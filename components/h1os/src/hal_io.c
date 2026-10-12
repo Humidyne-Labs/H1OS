@@ -83,6 +83,14 @@ esp_err_t hal_io_early_init(void)
 
 esp_err_t hal_io_lock_power_latch(bool enable)
 {
+    if (!enable) {
+        /* Release holds FIRST: a held pad ignores gpio_set_level() */
+        gpio_deep_sleep_hold_dis();
+        gpio_hold_dis(HAL_PIN_POWER_HOLD);
+        gpio_set_level(HAL_PIN_POWER_HOLD, 0);
+        return ESP_OK;
+    }
+
     gpio_config_t pwr_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_POWER_HOLD),
         .mode = GPIO_MODE_OUTPUT,
@@ -91,16 +99,12 @@ esp_err_t hal_io_lock_power_latch(bool enable)
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&pwr_cfg);
-    gpio_set_level(HAL_PIN_POWER_HOLD, enable ? 1 : 0);
-
-    if (enable) {
-        gpio_hold_en(HAL_PIN_POWER_HOLD);
-    } else {
-        gpio_hold_dis(HAL_PIN_POWER_HOLD);
-    }
+    gpio_set_level(HAL_PIN_POWER_HOLD, 1);
+    gpio_hold_en(HAL_PIN_POWER_HOLD);
 
     return ESP_OK;
 }
+
 
 esp_err_t hal_io_set_sensor_rail(bool enable)
 {

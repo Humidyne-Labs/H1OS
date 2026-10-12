@@ -114,7 +114,7 @@ static void keypad_event_cb(lv_event_t *e)
         }
     }
 
-    if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_SHORT_CLICKED) {
         // POWER Button Short-Click (LV_KEY_ENTER): Reverse Cycle (Non-blocking acoustic feedback)
         sub_audio_play_tone_async(1800, 15);
         s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;

@@ -40,6 +40,7 @@ set(bsp_requires
     spi_flash
     esp_hw_support
     ulp
+    esp_driver_usb_serial_jtag
 )
 
 # Ensure generated_fonts directory exists so include directory checks pass during configure
