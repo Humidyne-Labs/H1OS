@@ -148,17 +148,28 @@ void orch_flow_execute_sub_sprint(void)
         return;
     }
 
-    uint32_t sleep_sec = st->sample_interval_sec;
-    if (rtc_err == ESP_OK && rem_sec > 0 && rem_sec <= sleep_sec) {
-        /* Main app wakes soon: sleep directly until external RTC countdown */
-        ESP_LOGI(TAG, "Zero-Hour Guard: RTC alarm due in %lus (<= %lus sub-interval). Clamping sleep.",
-                 (unsigned long)rem_sec, (unsigned long)sleep_sec);
-        sleep_sec = rem_sec;
+    /* Cadence Decision: Discard runt rearm if next sample lands at or after external RTC expiry */
+    uint32_t next_sample_sec = st->sample_interval_sec;
+    uint32_t internal_sleep_sec = 0;
+
+    if (rtc_err == ESP_OK && next_sample_sec < rem_sec) {
+        /* Next sensor sample will complete BEFORE external RTC expires -> Rearm */
+        internal_sleep_sec = next_sample_sec;
+        ESP_LOGD(TAG, "Rearming internal timer for next sprint (%lus, RTC due in %lus)",
+                 (unsigned long)internal_sleep_sec, (unsigned long)rem_sec);
+    } else {
+        /* Next sample lands at or after external RTC expiry -> Discard rearm!
+         * Sleep purely until external PCF85063A INT triggers Flow B (internal_sleep_sec = 0) */
+        ESP_LOGI(TAG, "Discarding runt sprint rearm (RTC due in %lus <= %lus). Sleeping until external RTC INT.",
+                 (unsigned long)rem_sec, (unsigned long)next_sample_sec);
+        internal_sleep_sec = 0;
     }
 
     /* Return to deep sleep immediately */
     sub_sensor_deinit();
-    sub_power_enter_deep_sleep(sleep_sec, (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT));
+    sub_power_enter_deep_sleep(internal_sleep_sec, (1ULL << HAL_PIN_BUTTON_BOOT) |
+                                                   (1ULL << HAL_PIN_BUTTON_POWER) |
+                                                   (1ULL << HAL_PIN_RTC_INT));
 }
 
 bool orch_flow_is_thermal_lockout(void)
@@ -252,16 +263,13 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
         sub_rtc_arm_countdown(sleep_sec);
     }
 
-    /* 7. Zero-Hour Collision Math: lookahead remaining seconds on external countdown */
-    uint32_t rem_sec = 0;
-    esp_err_t rtc_err = sub_rtc_get_remaining_seconds(&rem_sec);
-    uint32_t internal_sleep_sec = sleep_sec;
-
-    if (rtc_err == ESP_OK && rem_sec > 0 && rem_sec <= sleep_sec) {
-        /* Next lookahead overshoots or straddles countdown: do not arm internal timer */
-        ESP_LOGI(TAG, "Zero-Hour Guard: RTC countdown due in %lus (<= %lus). Suppressing internal timer.",
-                 (unsigned long)rem_sec, (unsigned long)sleep_sec);
-        internal_sleep_sec = 0; // Sleep purely on external GPIO 5 RTC_INT
+    /* 7. Sub-Interval Sensor Cadence:
+     * Arm internal timer for Flow A sample cadence (e.g. 30s) if sample_interval_sec < sleep_sec.
+     * If sample interval is disabled or >= sleep_sec, sleep purely until external RTC expires. */
+    uint32_t sample_sec = orch_state_get()->sample_interval_sec;
+    uint32_t internal_sleep_sec = 0;
+    if (sample_sec > 0 && sample_sec < sleep_sec) {
+        internal_sleep_sec = sample_sec;
     }
 
     /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */

@@ -165,10 +165,28 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
-    // 4. Enable deep sleep hold on all held pads
+    // 4. Configure RTC IO domain pull-ups for EXT1 wake sources.
+    // Digital domain pull-ups vanish when VDD3P3_CPU powers down in deep sleep.
+    // RTC IO pull-ups maintain HIGH level so floating pads do not trigger false EXT1 wakes.
+    rtc_gpio_init(HAL_PIN_RTC_INT);
+    rtc_gpio_set_direction(HAL_PIN_RTC_INT, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(HAL_PIN_RTC_INT);
+    rtc_gpio_pulldown_dis(HAL_PIN_RTC_INT);
+
+    rtc_gpio_init(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_set_direction(HAL_PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_BOOT);
+
+    rtc_gpio_init(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_set_direction(HAL_PIN_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
+
+    // 5. Enable deep sleep hold on all held pads
     gpio_deep_sleep_hold_en();
 
-    // 5. Force RTC Peripherals domain to remain powered ON during deep sleep so RTC GPIO 17 keeps latch held
+    // 6. Force RTC Peripherals domain to remain powered ON during deep sleep so RTC GPIO 17 keeps latch held
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     ESP_LOGD(TAG, "Sleep pads isolated and latched.");
@@ -177,6 +195,11 @@ esp_err_t hal_io_isolate_sleep_pads(void)
 
 esp_err_t hal_io_release_pad_holds(void)
 {
+    // De-init RTC GPIO function to return pins to standard digital GPIO domain
+    rtc_gpio_deinit(HAL_PIN_RTC_INT);
+    rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+
     gpio_hold_dis(HAL_PIN_BUTTON_BOOT);
     gpio_hold_dis(HAL_PIN_BUTTON_POWER);
     gpio_hold_dis(HAL_PIN_RTC_INT);
