@@ -5,7 +5,7 @@ Layer 1 is the lowest layer of H1OS. It is written in pure C, interacts directly
 > **Layer 1 contains ZERO application state, ZERO math logic, and ZERO power-management decisions.** It exposes stateless primitives ("How the thing gets done") to Layer 2 and Layer 3 by directly poking hardware registers.
 
 ### Architectural Stubs Policy (The Bones Phase)
-During the initial structural bring-up of H1OS, HAL driver functions may implement valid function signatures with clean return codes and null/stub bodies. This guarantees the architectural skeleton links cleanly before low-level registers are actively manipulated using [`docs/perf_and_drivers/`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/docs/perf_and_drivers/).
+During the initial structural bring-up of H1OS, HAL driver functions may implement valid function signatures with clean return codes and null/stub bodies. This guarantees the architectural skeleton links cleanly before low-level registers are actively manipulated using [`docs/drivers/`](../drivers/).
 
 ---
 

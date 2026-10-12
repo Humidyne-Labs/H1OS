@@ -73,12 +73,12 @@ Every peripheral has a single Layer 1 HAL gateway and an isolated Layer 2 Subsys
 
 | Spec # | Document | Scope & Physical Subsystem |
 |---|---|---|
-| `00` | [`00_overview_and_hardware_matrix.md`](00_overview_and_hardware_matrix.md) | Master pinout, bus topology, power sequencing, and architecture map. |
-| `01` | [`01_shtc3_temp_humidity.md`](01_shtc3_temp_humidity.md) | Sensirion SHTC3 Relative Humidity & Temperature Sensor. |
-| `02` | [`02_pcf85063a_rtc.md`](02_pcf85063a_rtc.md) | NXP PCF85063A Ultra-Low Power Calendar RTC & Countdown Timer. |
-| `03` | [`03_es8311_ns4168_audio.md`](03_es8311_ns4168_audio.md) | Everest Semi ES8311 Codec & NS4168 Class-D Mono Power Amplifier. |
-| `04` | [`04_ssd1681_epaper_display.md`](04_ssd1681_epaper_display.md) | Solomon Systech SSD1681 1.54" 200×200 E-Paper Display Controller. |
-| `05` | [`05_power_latch_and_battery_adc.md`](05_power_latch_and_battery_adc.md) | Power Latch (`BAT_CTRL`), 12 dB Battery ADC & LiPo OCV Curve. |
-| `06` | [`06_microsd_fatfs.md`](06_microsd_fatfs.md) | MicroSD Storage Slot & 1-Bit SDMMC Mode FATFS File System. |
-| `07` | [`07_tactile_buttons_and_led.md`](07_tactile_buttons_and_led.md) | Tactile Pushbuttons (`BOOT`, `POWER`), 100k Pull-ups & Status LED. |
-| `08` | [`08_hardware_errata_and_pcb_rev_guide.md`](08_hardware_errata_and_pcb_rev_guide.md) | Hardware Errata, Silicon Nuances & PCB Rev B Redesign Guidelines. |
+| `00` | [`00_overview.md`](00_overview.md) | Master pinout, bus topology, power sequencing, and architecture map. |
+| `01` | [`01_shtc3.md`](01_shtc3.md) | Sensirion SHTC3 Relative Humidity & Temperature Sensor. |
+| `02` | [`02_rtc.md`](02_rtc.md) | NXP PCF85063A Ultra-Low Power Calendar RTC & Countdown Timer. |
+| `03` | [`03_audio.md`](03_audio.md) | Everest Semi ES8311 Codec & NS4168 Class-D Mono Power Amplifier. |
+| `04` | [`04_epaper.md`](04_epaper.md) | Solomon Systech SSD1681 1.54" 200×200 E-Paper Display Controller. |
+| `05` | [`05_power.md`](05_power.md) | Power Latch (`BAT_CTRL`), 12 dB Battery ADC & LiPo OCV Curve. |
+| `06` | [`06_sdcard.md`](06_sdcard.md) | MicroSD Storage Slot & 1-Bit SDMMC Mode FATFS File System. |
+| `07` | [`07_io.md`](07_io.md) | Tactile Pushbuttons (`BOOT`, `POWER`), 10k Pull-ups & Status LED. |
+| `Root` | [`ERRATA.md`](../../ERRATA.md) | Hardware Errata, Silicon Nuances & PCB Rev B Redesign Guidelines. |
