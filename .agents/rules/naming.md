@@ -14,7 +14,9 @@ In embedded systems and hardware firmware, **literal clarity strictly trumps cle
 
 Construct function identifiers using a clear, predictable hierarchy:
 
-$$\text{[Layer/Module Prefix]} \_ \text{[Physical Target/Peripheral]} \_ \text{[Literal Action]}$$
+$$
+\text{[Layer/Module Prefix]} \_ \text{[Physical Target/Peripheral]} \_ \text{[Literal Action]}
+$$
 
 ### Examples:
 - ✅ `orch_flow_sample_sensors()` — Clearly samples physical sensors in the flow arbiter.

@@ -7,10 +7,9 @@ Refer to the skill [`.agents/skills/gfm/SKILL.md`](../skills/gfm/SKILL.md) for f
 ## Mandatory Rules
 
 1. **MathJax Block Math (`$$`):**
-   - MUST be isolated on separate lines.
+   - MUST be isolated on separate lines starting strictly at **column 0** (zero leading spaces, even when following a bulleted or numbered list item). GitHub's `cmark-gfm` parser breaks indented `  $$` blocks inside lists into plain text!
    - MUST be preceded and followed by an empty blank line.
    - NEVER format block math on a single line (`$$formula$$` is forbidden).
-   - Indent `$$` and its content to match list nesting levels.
 
 2. **MathJax Inline Math (`$`):**
    - No whitespace between the opening/closing `$` and the expression (`$x$` is valid, `$ x $` breaks MathJax).

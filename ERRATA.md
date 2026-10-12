@@ -121,9 +121,9 @@ The Waveshare board includes a dedicated power rail gate for the audio subsystem
 **The Electrical Hazard:**
 1. The ES8311 I2C inputs (`SDA`, `SCL`) include internal electrostatic discharge (ESD) protection clamp diodes connected between the IO pins and the codec's internal $V_{\text{DD}}$ supply rail:
 
-   $$
-   D_{\text{clamp}}: \text{I2C Pin} \longrightarrow V_{\text{DD\_AUDIO}}
-   $$
+$$
+D_{\text{clamp}}: \text{I2C Pin} \longrightarrow V_{\text{DD\_AUDIO}}
+$$
 
 2. When firmware de-asserts `PA_EN` (`GPIO 42 = 1`) to cut power to the audio section, $V_{\text{DD\_AUDIO}}$ collapses to $0.0\,\text{V}$.
 3. The external $4.7\,\text{k}\Omega$ pull-up resistors on `GPIO 47` and `GPIO 48` are connected to the permanent system $3.3\,\text{V}$ rail.

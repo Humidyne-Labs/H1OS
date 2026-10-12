@@ -33,14 +33,14 @@ Text proceeding the equation.
 #### Formatting Invariants:
 1. **Never write single-line display math:** `$$formula$$` is brittle across differing GitHub renderers.
 2. **Surround with empty newlines:** There **must** be a blank newline before the opening `$$` and after the closing `$$`.
-3. **Indented block math:** When placing block equations inside bulleted lists, indent the opening `$$`, the equation content, and the closing `$$` by 2 or 4 spaces to match the list level, and keep empty lines between them.
+3. **Never indent `$$` blocks (Column 0 Rule):** Even when placing block equations after bulleted or numbered list items, the opening `$$`, equation content, and closing `$$` **must start at column 0 (no leading spaces)** with blank lines above and below. Indented `  $$` inside lists fails to parse as display math in GitHub's `cmark-gfm` engine and collapses onto a single plain-text line.
 
 ```markdown
 - **Vapor Pressure ($e$):**
 
-  $$
-  e = \frac{RH}{100} \cdot e_s(T) \quad [\text{hPa}]
-  $$
+$$
+e = \frac{RH}{100} \cdot e_s(T) \quad [\text{hPa}]
+$$
 
 - **True Dew Point ($T_{\text{dew}}$):**
 ```

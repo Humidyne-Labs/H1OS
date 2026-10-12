@@ -89,25 +89,25 @@ void                    orch_state_reset(void);
 Implements thermodynamic reconstruction with zero artificial curve fitting:
 - **Vapor Pressure Invariant ($e$):** Ambient vapor pressure in the cavity is invariant across temperature shifts.
 
-  $$
-  e_s(T) = 6.112 \cdot \exp\left(\frac{17.625 \cdot T}{243.04 + T}\right) \quad [\text{hPa}]
-  $$
+$$
+e_s(T) = 6.112 \cdot \exp\left(\frac{17.625 \cdot T}{243.04 + T}\right) \quad [\text{hPa}]
+$$
 
-  $$
-  e = \frac{RH_{\text{meas}}}{100} \cdot e_s(T_{\text{meas}}) \quad [\text{hPa}]
-  $$
+$$
+e = \frac{RH_{\text{meas}}}{100} \cdot e_s(T_{\text{meas}}) \quad [\text{hPa}]
+$$
 
 - **Dew Point Invariant ($T_{\text{dew}}$):**
 
-  $$
-  T_{\text{dew}} = \frac{243.04 \cdot \ln(e / 6.112)}{17.625 - \ln(e / 6.112)} \quad [^\circ\text{C}]
-  $$
+$$
+T_{\text{dew}} = \frac{243.04 \cdot \ln(e / 6.112)}{17.625 - \ln(e / 6.112)} \quad [^\circ\text{C}]
+$$
 
 - **Ambient RH Reconstruction:**
 
-  $$
-  RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}
-  $$
+$$
+RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}
+$$
 
 ```c
 float     orch_math_calc_vapor_pressure(float temp_c, float rh_pct);
@@ -128,9 +128,9 @@ float     orch_math_update_ewma(float sample, float current_ewma, float alpha);
 - **Deterministic Zero-Hour Collision Math (Next-Sleep Lookahead):**
   Before going to sleep, the Orchestrator evaluates whether the *next* accumulated sleep duration would overshoot or collide with the external RTC timer timeout:
 
-  $$
-  \text{if } \Big(T_{\text{rtc\_total\_period}} < (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}\Big) \implies \textbf{DO NOT ARM INTERNAL RTC / ULP TIMER}
-  $$
+$$
+\text{if } \Big(T_{\text{rtc\_total\_period}} < (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}\Big) \implies \textbf{DO NOT ARM INTERNAL RTC / ULP TIMER}
+$$
 
   - **Rule:** If the projected sleep accumulator $\big((N_{\text{ulp\_cnt}} + 1) \times T_{\text{sleep\_period}}\big)$ exceeds $T_{\text{rtc\_total\_period}}$, scheduling another Flow A wake would collide with or straddle the external RTC timer interrupt. Therefore, the internal periodic timer is **not armed**.
   - **Result:** The ULP sleeps purely on the external hardware interrupt line (`GPIO 5` `RTC_INT`). When the external PCF85063A countdown timer expires, the ULP catches the interrupt cleanly and wakes the system into Flow B.
