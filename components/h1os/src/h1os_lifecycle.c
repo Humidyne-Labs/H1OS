@@ -28,7 +28,6 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
-#include "driver/usb_serial_jtag.h"
 #include "orch_display_sync.h"
 
 #if CONFIG_ULP_COPROC_ENABLED
@@ -234,10 +233,8 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->battery_percent = vbat_pct;
         /* External power detection:
          *  - < 100 mV: Zero-Volt Cable Guard (no cell, charger not floating)
-         *  - USB host attached: the charger IC floats VBAT at ~4.2 V with no cell,
-         *    which is electrically indistinguishable from a full battery via ADC,
-         *    so never report a percentage while USB is attached. */
-        out_telemetry->is_usb_powered = (vbat_mv < 100) || usb_serial_jtag_is_connected();
+         *  - Active USB host connection via hardware SOF detection */
+        out_telemetry->is_usb_powered = (vbat_mv < 100) || sub_power_connected_usb();
     }
 
     return ret;

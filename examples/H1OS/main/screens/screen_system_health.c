@@ -29,7 +29,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     // Row 2: Projected Autonomy
     lv_obj_t *lbl_autonomy = lv_label_create(scr);
     if (telem->is_usb_powered) {
-        lv_label_set_text(lbl_autonomy, "Autonomy:    CONTINUOUS");
+        lv_label_set_text(lbl_autonomy, "Autonomy:    CHARGING");
     } else {
         float days = battery_estimate_remaining_days(400, telem->battery_mv, 0.35f);
         lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days", days);

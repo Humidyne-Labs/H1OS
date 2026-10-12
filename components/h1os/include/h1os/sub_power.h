@@ -64,6 +64,14 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
  */
 void sub_power_cut_power_latch(void);
 
+/**
+ * @brief Check to see if USB is connected.
+ * Used for charger detection.
+ * 
+ * @return true if usb is connected, or false if disconnected.
+ */
+bool sub_power_connected_usb(void); 
+
 #ifdef __cplusplus
 }
 #endif

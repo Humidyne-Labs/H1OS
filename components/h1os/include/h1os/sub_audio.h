@@ -37,6 +37,13 @@ esp_err_t sub_audio_init(void);
 esp_err_t sub_audio_standby(void);
 
 /**
+ * @brief Teardown audio subsystem, stop background worker task, and delete I2S channel.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_deinit(void);
+
+/**
  * @brief Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11)
  * and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
  *

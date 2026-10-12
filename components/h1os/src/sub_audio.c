@@ -56,6 +56,7 @@ typedef struct {
 
 static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited = false;
+static bool s_i2s_chan_enabled = false;
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
@@ -232,7 +233,10 @@ esp_err_t sub_audio_init(void)
     }
 
     /* 4. Enable I2S channel to supply MCLK/BCLK during codec register setup */
-    i2s_channel_enable(s_tx_chan);
+    err = i2s_channel_enable(s_tx_chan);
+    if (err == ESP_OK) {
+        s_i2s_chan_enabled = true;
+    }
     vTaskDelay(pdMS_TO_TICKS(5));
 
     /* 5. Initialize complete 22-register ES8311 clock tree and DAC */
@@ -243,7 +247,7 @@ esp_err_t sub_audio_init(void)
         ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono)");
     }
 
-    /* 7. Spawn audio background worker task and command queue */
+    /* 6. Spawn audio background worker task and command queue */
     if (s_audio_queue == NULL) {
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
@@ -260,6 +264,10 @@ esp_err_t sub_audio_init(void)
     }
 
     s_audio_inited = true;
+
+    /* 7. Enter quiet standby immediately so amplifier and I2S clocks stay silent/quiescent */
+    sub_audio_standby();
+
     return ESP_OK;
 }
 
@@ -290,8 +298,9 @@ esp_err_t sub_audio_standby(void)
     es8311_write_reg(0x02, 0x00);
 
     /* 4. Disable active I2S clock oscillation to stop digital switching dissipation */
-    if (s_tx_chan != NULL) {
+    if (s_tx_chan != NULL && s_i2s_chan_enabled) {
         i2s_channel_disable(s_tx_chan);
+        s_i2s_chan_enabled = false;
     }
 
     return ESP_OK;
@@ -369,8 +378,15 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         es8311_init_dac_registers();
     }
 
-    /* Start I2S clocking (MCLK/BCLK) so ES8311 PLL and CSM can lock */
-    i2s_channel_enable(s_tx_chan);
+    /* Start I2S clocking (MCLK/BCLK) if not already active so ES8311 PLL and CSM can lock */
+    if (s_tx_chan != NULL && !s_i2s_chan_enabled) {
+        esp_err_t chan_err = i2s_channel_enable(s_tx_chan);
+        if (chan_err == ESP_OK) {
+            s_i2s_chan_enabled = true;
+        } else {
+            ESP_LOGW(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(chan_err));
+        }
+    }
 
     /* Poll ES8311 Chip State Machine (Reg 0xFC bits 6:4) to verify active state */
     esp_err_t err = sub_audio_wait_until_ready(100);
@@ -610,3 +626,31 @@ esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
     }
     return sub_audio_is_busy() ? ESP_ERR_TIMEOUT : ESP_OK;
 }
+
+esp_err_t sub_audio_deinit(void)
+{
+    sub_audio_standby();
+
+    if (s_tx_chan != NULL) {
+        if (s_i2s_chan_enabled) {
+            i2s_channel_disable(s_tx_chan);
+            s_i2s_chan_enabled = false;
+        }
+        i2s_del_channel(s_tx_chan);
+        s_tx_chan = NULL;
+    }
+
+    if (s_audio_task_handle != NULL) {
+        vTaskDelete(s_audio_task_handle);
+        s_audio_task_handle = NULL;
+    }
+
+    if (s_audio_queue != NULL) {
+        vQueueDelete(s_audio_queue);
+        s_audio_queue = NULL;
+    }
+
+    s_audio_inited = false;
+    return ESP_OK;
+}
+

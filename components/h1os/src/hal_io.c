@@ -9,7 +9,9 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
+#include "soc/usb_serial_jtag_reg.h"
 #include "esp_sleep.h"
+#include "esp_rom_sys.h"
 
 static const char *TAG = "HAL_IO";
 
@@ -183,4 +185,24 @@ esp_err_t hal_io_release_pad_holds(void)
     gpio_hold_dis(HAL_PIN_PA_EN);
     gpio_hold_dis(HAL_PIN_PA_CTRL);
     return ESP_OK;
+}
+
+bool hal_check_usb_ll(void)
+{
+    /* Check whether USB Serial/JTAG is receiving active Start-Of-Frame (SOF) packets.
+     * On USB Full-Speed (12 Mbps), an active host transmits an SOF packet every 1.0 ms.
+     * 1. Clear the raw SOF interrupt latch bit.
+     * 2. Delay 1500 µs (1.5 ms) to span at least one SOF period.
+     * 3. Check if the hardware raised the SOF raw interrupt bit. */
+    REG_WRITE(USB_SERIAL_JTAG_INT_CLR_REG, USB_SERIAL_JTAG_SOF_INT_CLR);
+    esp_rom_delay_us(1500);
+    if ((REG_READ(USB_SERIAL_JTAG_INT_RAW_REG) & USB_SERIAL_JTAG_SOF_INT_RAW) != 0) {
+        return true;
+    }
+
+    /* Fallback: Check if the 11-bit SOF frame counter ticks over 1.5 ms */
+    uint32_t f1 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
+    esp_rom_delay_us(1500);
+    uint32_t f2 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
+    return (f1 != f2);
 }

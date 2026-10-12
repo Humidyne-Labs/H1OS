@@ -32,6 +32,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Thermal Mitigation & Presentation Chime Masking** (`main.c`, `h1os_lifecycle.c`):
   - Restricted sleep/wake chime triggers strictly to Flow B application presentation cycles.
   - Defaulted `chime_mask` in `main.c` to boot and shutdown chimes only (`(1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN)`), suppressing sensor cavity self-heating during periodic sleep/wake cycles.
+- **I2S Channel State Collision Remediation** (`sub_audio.c/.h`):
+  - Added hardware state tracker `s_i2s_chan_enabled` and guarded all `i2s_channel_enable()` and `i2s_channel_disable()` transitions.
+  - Guaranteed `sub_audio_standby()` is entered immediately after boot-time ES8311 register initialization, silencing audio clocks and preventing the `E (2871) i2s_common: i2s_channel_enable(1485): the channel has already enabled` fault on navigation click tones.
+  - Added `sub_audio_deinit()` for complete teardown of worker tasks, command queues, and I2S peripherals.
+- **Hardware SOF-Based USB Host & Charger Detection** (`hal_io.c/.h`, `sub_power.c/.h`, `h1os_lifecycle.c`):
+  - Implemented Layer 1 `hal_check_usb_ll()` verifying live USB Full-Speed Start-Of-Frame (SOF) raw interrupt pulses and frame counter deltas over 1.5 ms.
+  - Removed high-overhead `esp_driver_usb_serial_jtag` component dependency and tick hook overhead.
+  - Combined USB host detection with Zero-Volt Cable Guard (`< 100 mV`) in `h1os_get_telemetry()`, preventing phantom 100% battery readings on UI when running on external USB power without an attached cell.
 
 ---
 

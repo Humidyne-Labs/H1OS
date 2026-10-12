@@ -224,3 +224,10 @@ void sub_power_cut_power_latch(void)
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");
     hal_io_lock_power_latch(false);
 }
+
+bool sub_power_connected_usb(void) 
+{
+    bool usb_state = hal_check_usb_ll();
+    ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
+    return usb_state;
+}

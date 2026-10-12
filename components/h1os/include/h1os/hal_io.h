@@ -98,6 +98,13 @@ esp_err_t hal_io_isolate_sleep_pads(void);
  */
 esp_err_t hal_io_release_pad_holds(void);
 
+/**
+ * @brief Check if USB Serial/JTAG is connected to an active host via SOF packets.
+ * 
+ * @return true if USB host connection detected, false otherwise.
+ */
+bool hal_check_usb_ll(void);
+
 #ifdef __cplusplus
 }
 #endif
