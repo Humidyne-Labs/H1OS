@@ -28,7 +28,7 @@ flowchart TD
 ## 3. Purely Reactive Wake Events
  
 ### 3.1 Condition 1: Internal Periodic Timer Expired
-1. ULP wakes from its internal RTC timer (which was armed only because $T_{\text{rtc\_total\_period}} \ge (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}$).
+1. ULP wakes from its internal RTC timer (which was armed only because $T_{\text{rtc}} \ge (N_{\text{ulp}} \times T_{\text{sleep}}) + T_{\text{sleep}}$).
 2. Sets `ULP_DISPATCH_SENSOR_SAMPLE` in `orch_persisted_state_t`.
 3. Triggers `ulp_riscv_wakeup_main_processor()` to launch Core 0 into the Flow A Wake Stub.
 4. Core 0 logs the SHTC3 reading, updates `ulp_cnt`, evaluates next-sleep lookahead, re-arms the timer if window remains clear, and returns to deep sleep.
@@ -41,7 +41,7 @@ flowchart TD
   - The PCF85063A calendar alarm registers (`0x0B..0x0F`) match discrete seconds, minutes, and hours, but **fail on midnight boundary rollover**. An alarm set at 23:57 for a 5-minute wake (intended for 00:02) would fail or produce undefined behavior across the day boundary without complex software calendar arithmetic.
   - The PCF85063A **hardware countdown timer** (`Timer_val` `0x10`, `Timer_mode` `0x11`) decrements independent of time-of-day. It ticks at 1 Hz or 1/60 Hz directly to zero, asserting the Timer Flag (`TF` in Reg `0x01`) and pulling `GPIO 5` LOW reliably regardless of midnight transitions.
 - **Simplified Zero-Hour Gating (Next-Sleep Lookahead):**
-  - If the orchestrator determined that $T_{\text{rtc\_total\_period}} < (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}$ (i.e., the next sleep accumulation would overshoot or straddle the external RTC timer expiration), the internal periodic timer was **never armed**.
+  - If the orchestrator determined that $T_{\text{rtc}} < (N_{\text{ulp}} \times T_{\text{sleep}}) + T_{\text{sleep}}$ (i.e., the next sleep accumulation would overshoot or straddle the external RTC timer expiration), the internal periodic timer was **never armed**.
   - The ULP sleeps until `GPIO 5` transitions LOW.
   - Upon catching the RTC timer interrupt, the ULP sets `ULP_DISPATCH_MAIN_WAKE` and wakes the dual-core Xtensa directly into Flow B (Interactive LVGL Session).
   - **Zero-Hour Conflict Solved:** Competing timers are eliminated. No race condition can occur when the next sub-interval crosses the countdown timer boundary.
@@ -53,7 +53,7 @@ flowchart TD
   - It tracks hold duration and **wakes the processor strictly upon release (rising edge back to HIGH)** for short taps.
   - **Why Wake on Release:** This guarantees that when the dual-core Xtensa boots and LVGL initializes its keypad driver, the user's finger is **already lifted off the physical button**. The button line is clean, idle HIGH, eliminating spurious double-clicks, unwanted initial screen toggles, or bootloader timing races.
 - **Short Tap Release ($50\text{ms} - 800\text{ms}$):**
-  - Upon release, sets `ULP_DISPATCH_MAIN_WAKE` and wakes the CPU into Flow B (Interactive 30s Session).
+  - Upon release, sets `ULP_DISPATCH_MAIN_WAKE` and wakes the CPU into Flow B (Interactive Session).
   - Main CPU and LVGL boot into an idle, clean input state ready for new user clicks.
 - **Hold on BOOT ($> 2.5\text{s}$):**
   - Sets `ULP_DISPATCH_BOOTLOADER_JUMP` upon hold detection and wakes the CPU directly into the ROM Download Bootloader for safe reflashing.
@@ -64,7 +64,7 @@ flowchart TD
 - When awakened, the ULP reads battery voltage using factory eFuse linear coefficients:
 
 $$
-V_{\text{bat\_mV}} = \left(\frac{\text{raw} \times m_{\text{scale}}}{4096}\right) \times 2 + b_{\text{offset}}
+V_{\text{bat(mV)}} = \left(\frac{\text{raw} \times m_{\text{scale}}}{4096}\right) \times 2 + b_{\text{offset}}
 $$
 
 - **Brownout Threshold ($V_{\text{bat}} < 3.25\text{V}$):**

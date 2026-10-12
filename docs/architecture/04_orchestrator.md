@@ -106,7 +106,7 @@ $$
 - **Ambient RH Reconstruction:**
 
 $$
-RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}
+RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{floor}})}
 $$
 
 ```c
@@ -129,12 +129,12 @@ float     orch_math_update_ewma(float sample, float current_ewma, float alpha);
   Before going to sleep, the Orchestrator evaluates whether the *next* accumulated sleep duration would overshoot or collide with the external RTC timer timeout:
 
 $$
-\text{if } \Big(T_{\text{rtc\_total\_period}} < (N_{\text{ulp\_cnt}} \times T_{\text{sleep\_period}}) + T_{\text{sleep\_period}}\Big) \implies \textbf{DO NOT ARM INTERNAL RTC / ULP TIMER}
+\text{if } \Big(T_{\text{rtc}} < (N_{\text{ulp}} \times T_{\text{sleep}}) + T_{\text{sleep}}\Big) \implies \textbf{DO NOT ARM INTERNAL RTC / ULP TIMER}
 $$
 
-  - **Rule:** If the projected sleep accumulator $\big((N_{\text{ulp\_cnt}} + 1) \times T_{\text{sleep\_period}}\big)$ exceeds $T_{\text{rtc\_total\_period}}$, scheduling another Flow A wake would collide with or straddle the external RTC timer interrupt. Therefore, the internal periodic timer is **not armed**.
+  - **Rule:** If the projected sleep accumulator $\big((N_{\text{ulp}} + 1) \times T_{\text{sleep}}\big)$ exceeds $T_{\text{rtc}}$, scheduling another Flow A wake would collide with or straddle the external RTC timer interrupt. Therefore, the internal periodic timer is **not armed**.
   - **Result:** The ULP sleeps purely on the external hardware interrupt line (`GPIO 5` `RTC_INT`). When the external PCF85063A countdown timer expires, the ULP catches the interrupt cleanly and wakes the system into Flow B.
-  - If $(N_{\text{ulp\_cnt}} + 1) \times T_{\text{sleep\_period}} \le T_{\text{rtc\_total\_period}}$, the internal periodic timer is safely armed for another headless Flow A sensor pulse.
+  - If $(N_{\text{ulp}} + 1) \times T_{\text{sleep}} \le T_{\text{rtc}}$, the internal periodic timer is safely armed for another headless Flow A sensor pulse.
 
 #### Flow B Wake Profiles & Lifecycle Governance
 The Orchestrator determines sleep timing based on the origin of the wake event:

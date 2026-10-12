@@ -59,6 +59,7 @@ The sensor completes sampling in $<10\text{ ms}$ with quiescent leakage $\le 15\
    - ❌ Invalid: `$ x $` or `$ T_{\text{dew}} $` (Breaks MathJax rendering)
 2. **Escaping Literal Dollar Signs:** To display literal currency or shell symbols, escape with `\$` or wrap in backticks (`$HOME`).
 3. **Units in Math:** Use `\text{...}` for engineering units, e.g., `$\mu\text{A}$`, `\text{mV}`, `\text{hPa}`, `\Omega`.
+4. **Never Use `\_` Inside `\text{...}` or Math Mode:** GitHub's Markdown preprocessor strips the backslash from `\_` before MathJax parses the formula, leaving a raw `_` inside text mode and throwing `'_' allowed only in math mode`. Always use single-word subscripts (`T_{\text{floor}}`), hyphens (`T_{\text{amb-floor}}`), or parentheses (`V_{\text{bat(mV)}}`).
 
 ---
 

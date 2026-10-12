@@ -138,7 +138,7 @@ $$
 - **Ambient RH Reconstruction:**
 
 $$
-RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{ambient\_floor}})}
+RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{floor}})}
 $$
 
 ---

@@ -64,9 +64,9 @@ This document defines the physical measurement procedures, test fixtures, expect
 - **Validation Logic:**
   1. In `orch_flow_execute_sensor_sample()`:
      - Check `sub_rtc_get_and_clear_interrupts(&alarm, &timer)`: if either fired, abort sleep and promote directly to Flow B.
-     - Check `sub_rtc_get_remaining_seconds(&rem_sec)`: if $rem\_sec \le sleep\_sec$, clamp internal sleep time to $rem\_sec$.
+     - Check `sub_rtc_get_remaining_seconds(&rem_sec)`: if $T_{\text{rem}} \le T_{\text{sleep}}$, clamp internal sleep time to $T_{\text{rem}}$.
   2. In `orch_flow_transition_to_sleep()`:
-     - Lookahead evaluation: if $rem\_sec \le sleep\_sec$, suppress internal timer ($internal\_sleep\_sec = 0$) and sleep exclusively on external GPIO 5 `RTC_INT`.
+     - Lookahead evaluation: if $T_{\text{rem}} \le T_{\text{sleep}}$, suppress internal timer ($T_{\text{internal}} = 0$) and sleep exclusively on external GPIO 5 `RTC_INT`.
 - **Pass Criterion:** Zero back-to-back wakes $< 100\text{ ms}$ observed over 1,000 continuous sleep cycles.
 
 ---

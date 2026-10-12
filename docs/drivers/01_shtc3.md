@@ -81,7 +81,7 @@ $$
 \text{Relative Humidity } [\%] = 100.0 \times \left(\frac{S_{RH}}{2^{16} - 1}\right)
 $$
 
-Where $S_T = \text{raw\_temp}$ and $S_{RH} = \text{raw\_rh}$.
+Where $S_T$ is `raw_temp` and $S_{RH}$ is `raw_rh`.
 
 ### Fixed-Point Centi-Unit Conversion (Integer Math for ULP / Wake Stub)
 

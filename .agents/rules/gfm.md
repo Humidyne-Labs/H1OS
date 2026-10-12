@@ -11,8 +11,9 @@ Refer to the skill [`.agents/skills/gfm/SKILL.md`](../skills/gfm/SKILL.md) for f
    - MUST be preceded and followed by an empty blank line.
    - NEVER format block math on a single line (`$$formula$$` is forbidden).
 
-2. **MathJax Inline Math (`$`):**
+2. **MathJax Inline & Block Subscripts (`$` / `$$`):**
    - No whitespace between the opening/closing `$` and the expression (`$x$` is valid, `$ x $` breaks MathJax).
+   - **NEVER use `\_` inside `\text{...}` or math expressions:** GitHub's Markdown preprocessor strips the backslash from `\_` before passing the expression to MathJax, causing a fatal `'_' allowed only in math mode` error. Use single-word subscripts (`T_{\text{floor}}`), hyphens (`T_{\text{amb-floor}}`), or parentheses (`V_{\text{bat(mV)}}`).
    - Use `\text{...}` for units: `$\mu\text{A}$`, `\text{ms}`, `^\circ\text{C}`.
    - Escape literal dollar signs with `\$` or wrap in backticks.
 
