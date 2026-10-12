@@ -40,7 +40,7 @@ esp_err_t sub_power_deinit(void);
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct);
 
 /**
- * @brief Extract linear calibration coefficients (scale and offset) for ULP Sentinel hand-off.
+ * @brief Extract linear calibration coefficients (scale and offset) for ULP coprocessor hand-off.
  *
  * @param[out] out_scale Multiplier scaled by 4096.
  * @param[out] out_offset_mv Voltage offset in millivolts.

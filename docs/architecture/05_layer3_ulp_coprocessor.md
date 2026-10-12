@@ -1,7 +1,7 @@
-# Layer 3: ULP-RISC-V Coprocessor Hardware Bouncer Specification
+# Layer 3: ULP-RISC-V Coprocessor Hardware Monitor Specification
 
 ## 1. Overview
-The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Bouncer** in the ESP32-S3 RTC domain. While the high-performance dual-core Xtensa LX7 processors sleep at ~12 µA quiescent current, the ULP coprocessor sleeps alongside them in RTC Slow Memory.
+The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP32-S3 RTC domain. While the high-performance dual-core Xtensa LX7 processors sleep at ~12 µA quiescent current, the ULP coprocessor sleeps alongside them in RTC Slow Memory.
 
 > **The Sleep-Gating Rule:** The ULP Coprocessor is gated strictly by the main application. It executes **only while the system is in deep sleep**. Once Flow B wakes, the dual-core Xtensa processor and LVGL take complete, exclusive control of the hardware. The ULP is completely idle and suppressed to ensure Flow B is never interrupted.
 
@@ -15,7 +15,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Bouncer** in the ESP3
                       RTC SLOW DOMAIN (Deep Sleep @ ~12 µA)
                     ═════════════════════════════════════
                                       │
-                         [ULP-RISC-V Reactive Bouncer]
+                         [ULP-RISC-V Reactive Monitor]
                          (Sleeps until hardware event)
                                       │
         ┌─────────────────────────────┼─────────────────────────────┐
@@ -25,7 +25,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Bouncer** in the ESP3
   Battery Divider               PCF85063A INT                 Tactile Buttons
   • 12 dB Attenuation           • Alarm Line (Active LOW)     • Reactive Wake on Edge
   • eFuse Curve Hand-Off        • Zero-Hour Master Arbiter    • Tap vs Hold Classification
-  • Brownout Tripwire (<3.25V)  • Suppresses Flow A Sprint    • BOOT Hold -> Bootloader
+  • Brownout Threshold (<3.25V) • Suppresses Flow A Sprint    • BOOT Hold -> Bootloader
   • Zero-Volt Cable Guard       • Launches Flow B Directly    • POWER Hold -> Power-Off
 ```
 
@@ -69,7 +69,7 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Bouncer** in the ESP3
 #### C. Battery Guard & Zero-Volt Cable Guard (`GPIO 4` / ADC1_CH3)
 - When awakened, the ULP reads battery voltage using factory eFuse linear coefficients:
   $$V_{\text{bat\_mV}} = \left(\frac{\text{raw} \times m_{\text{scale}}}{4096}\right) \times 2 + b_{\text{offset}}$$
-- **Brownout Tripwire ($V_{\text{bat}} < 3.25\text{V}$):**
+- **Brownout Threshold ($V_{\text{bat}} < 3.25\text{V}$):**
   - If $V_{\text{bat}} > 100\text{mV}$ and $< 3250\text{mV}$, sets `ULP_DISPATCH_CRITICAL_SHUTDOWN` to draw the emergency low-battery icon and cut the latch.
 - **Zero-Volt Cable Guard ($V_{\text{bat}} \approx 0\text{mV}$):**
   - If the power latch is held HIGH and $V_{\text{bat}} < 100\text{mV}$, the instrument is running exclusively from USB cable VBUS without a LiPo cell. Shutdown is bypassed.
@@ -91,7 +91,7 @@ typedef enum {
     ULP_DISPATCH_MAIN_WAKE,         // Flow B Interactive LVGL Session
     ULP_DISPATCH_BOOTLOADER_JUMP,   // ROM Bootloader Jump primed by BOOT hold
     ULP_DISPATCH_POWER_OFF,         // Clean Power-Off primed by POWER hold
-    ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery brownout tripwire (<3.25V)
+    ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery brownout threshold (<3.25V)
 } ulp_dispatch_reason_t;
 
 typedef struct {

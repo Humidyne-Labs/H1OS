@@ -1,10 +1,10 @@
 /*
  * SPDX-License-Identifier: MIT
- * ESP32-S3 ePaper BSP - Layer 3: ULP-RISC-V Coprocessor Hardware Sentinel
+ * ESP32-S3 ePaper BSP - Layer 3: ULP-RISC-V Coprocessor Hardware Monitor
  *
  * Runs autonomously in RTC Slow SRAM during Deep Sleep.
  * Responsibilities:
- *  1. Autonomous Battery ADC sampling (GPIO 4 / ADC1 Channel 3) with brownout tripwire (<3.25V).
+ *  1. Autonomous Battery ADC sampling (GPIO 4 / ADC1 Channel 3) with brownout threshold (<3.25V).
  *  2. Hardware RTC arbitration (GPIO 5 / PCF85063A INT line) eliminating Zero-Hour wake races.
  *  3. Hardware button debounce and event classification (GPIO 0 / BOOT, GPIO 18 / BAT_KEY).
  */
@@ -24,7 +24,7 @@ uint32_t dispatch_reason = 0; /* 0: None, 1: Sensor Sprint, 2: Main Wake, 3: Cri
 uint32_t cal_scale = 1000;
 int32_t  cal_offset = 0;
 uint32_t last_vbat_mv = 4000;
-uint32_t vbat_critical_mv = 3250; /* Critical tripwire (< 3.25V) */
+uint32_t vbat_critical_mv = 3250; /* Critical brownout threshold (< 3.25V) */
 
 /* Button State Tracking */
 uint32_t boot_btn_events = 0;
@@ -56,7 +56,7 @@ int main(void)
 
         /* Zero-Volt Cable Guard: if v_bat_mv < 100mV, powered exclusively by USB VBUS without battery */
         if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
-            /* Brownout tripwire triggered! Wake CPU immediately to show emergency screen & latch off */
+            /* Brownout threshold reached! Wake CPU immediately to show emergency screen & latch off */
             dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
             ulp_riscv_wakeup_main_processor();
             return 0;

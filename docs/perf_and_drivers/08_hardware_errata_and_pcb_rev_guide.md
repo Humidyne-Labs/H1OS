@@ -145,7 +145,7 @@ Because `GPIO 47/48` cannot be controlled from the RTC domain:
 
 #### 3. Current H1OS Firmware Mitigations
 - Implemented the **RTC Fast Wake Stub** (`orch_wake_stub.c`): When waking for sensor sprints, the CPU executes directly from RTC Fast SRAM at low frequency, bypassing the secondary bootloader, flash cache, and FreeRTOS kernel to complete execution in $<3\,\text{ms}$.
-- Reserved the ULP-RISC-V coprocessor for ADC battery tripwire monitoring (`ADC1_CH3` on `GPIO 4`), button debounce (`GPIO 0/18`), and RTC interrupt clearing (`GPIO 5`), which are on RTC GPIOs.
+- Reserved the ULP-RISC-V coprocessor for ADC battery threshold monitoring (`ADC1_CH3` on `GPIO 4`), button debounce (`GPIO 0/18`), and RTC interrupt clearing (`GPIO 5`), which are on RTC GPIOs.
 
 #### 4. Rev B Hardware Redesign Recommendations
 - **Route I2C to RTC GPIOs:** Reassign the primary I2C bus to pins within `GPIO 0`–`GPIO 21`. Specifically:

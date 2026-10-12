@@ -1,6 +1,6 @@
 # Application Execution Flow & State Machine
 
-This document models the end-to-end execution flow of **H1OS** across deep sleep, the reactive ULP Bouncer, isolated Flow A sensor pulses (<4ms), and the Flow B 30-second interactive user session.
+This document models the end-to-end execution flow of **H1OS** across deep sleep, the reactive ULP Monitor, isolated Flow A sensor pulses (<4ms), and the Flow B 30-second interactive user session.
 
 ---
 
@@ -11,8 +11,8 @@ flowchart TD
     %% Deep Sleep Resting State
     DeepSleep[Hardware Deep Sleep Standby<br/>Current ~12 µA] --> ULP_Wake{ULP Hardware Event}
 
-    %% ULP Reactive Bouncer Decisions
-    subgraph ULP_Bouncer ["ULP-RISC-V Reactive Bouncer (RTC Domain)"]
+    %% ULP Reactive Monitor Decisions
+    subgraph ULP_Monitor ["ULP-RISC-V Reactive Monitor (RTC Domain)"]
         ULP_Wake -- "Internal Timer Expired (Armed only if RTC_rem >= ULP_int)" --> LaunchFlowA[Set DISPATCH_SENSOR_SPRINT<br/>Wake Core 0 into Flow A]
 
         ULP_Wake -- "External Interrupt (GPIO 5 Timer)" --> LaunchFlowB_Alarm[Set DISPATCH_MAIN_WAKE<br/>Wake Dual-Core into Flow B]
@@ -57,12 +57,12 @@ flowchart TD
         UserClick -- "No Interaction (Idle)" --> DFSDrop[Dynamic Frequency Scaling:<br/>Drop CPU to 80 MHz Baseline]
         DFSDrop --> InactivityTimer{30s Inactivity Timer Expired?}
         InactivityTimer -- "NO" --> UserClick
-        InactivityTimer -- "YES" --> StandDown
+        InactivityTimer -- "YES" --> SleepTransition
     end
 
-    %% Coordinated Stand-Down Sequence
-    subgraph StandDown ["Coordinated Stand-Down Sequence"]
-        StandDown --> PreSleepHook[1. Invoke user on_pre_sleep hook]
+    %% Coordinated Sleep Transition Sequence
+    subgraph SleepTransition ["Coordinated Sleep Transition Sequence"]
+        SleepTransition --> PreSleepHook[1. Invoke user on_pre_sleep hook]
         PreSleepHook --> DrainLVGL[2. Drain LVGL Buffer & Finish Draw Tasks]
         DrainLVGL --> WaitBusy[3. Wait for SSD1681 BUSY release @ 80 MHz DFS]
         WaitBusy --> SettleDelay[4. 250ms Micro-capsule Settling Delay]

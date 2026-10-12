@@ -1,7 +1,7 @@
 # Layer 3: System Pipeline & Orchestrator Specification
 
 ## 1. Overview
-Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sprint, <4ms)** and **Flow B (Interactive User Session, 30s Inactivity Stand-Down)**.
+Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sprint, <4ms)** and **Flow B (Interactive User Session, 30s Inactivity Sleep)**.
 
 ---
 
@@ -11,8 +11,8 @@ Layer 3 is the central orchestration brain of H1OS. It maintains persistent stat
 | :--- | :--- | :--- |
 | `orch_state.h/.c` | Persistent RTC Storage | Retains counters, system flags, ULP dispatch commands, and 32-slot sensor ring buffer (<512 bytes) in RTC Slow Memory. |
 | `orch_math.c/.h` | Psychrometric Math Engine | Magnus equations, vapor pressure invariant, dew point reconstruction, continuous EWMA, integer slope gates. |
-| `orch_flow.c/.h` | Execution Flow Arbiter | Single Unified Binary Arbiter: routes Flow A sprint vs Flow B interactive session; coordinates 7-step stand-down sequence. |
-| `orch_display_sync.c/.h` | Frame Sync Engine | Coordinates display framebuffer persistence to `epd_frame` flash partition during stand-down events. |
+| `orch_flow.c/.h` | Execution Flow Arbiter | Single Unified Binary Arbiter: routes Flow A sprint vs Flow B interactive session; coordinates 7-step sleep transition sequence. |
+| `orch_display_sync.c/.h` | Frame Sync Engine | Coordinates display framebuffer persistence to `epd_frame` flash partition during sleep transition events. |
 | `orch_wake_stub.c/.h` | Fast RTC Wake Stub | Executes <3ms Flow A sensor pulse directly from RTC Fast Memory on Core 0. |
 
 ---
@@ -36,7 +36,7 @@ typedef enum {
     ULP_DISPATCH_MAIN_WAKE,         // Flow B (Interactive LVGL session)
     ULP_DISPATCH_BOOTLOADER_JUMP,   // Primed by BOOT hold > 2.5s
     ULP_DISPATCH_POWER_OFF,         // Primed by POWER hold > 2.5s
-    ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery tripwire (< 3.25V)
+    ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery threshold (< 3.25V)
 } ulp_dispatch_reason_t;
 
 typedef struct {
@@ -54,7 +54,7 @@ typedef struct {
     uint32_t                wake_count;
     uint8_t                 flags;
     
-    // ULP Reactive Sentinel Dispatch State
+    // ULP Reactive Monitor Dispatch State
     ulp_dispatch_reason_t   ulp_dispatch_reason;
     uint16_t                last_vbat_mv;
     uint32_t                sample_interval_sec;     // Nominal 60s
@@ -105,7 +105,7 @@ float     orch_math_update_ewma(float sample, float current_ewma, float alpha);
 
 ---
 
-### 3.3 `orch_flow.c/.h` (Lifecycle Flow Arbiter & Stand-Down Sequencer)
+### 3.3 `orch_flow.c/.h` (Lifecycle Flow Arbiter & Sleep Sequencer)
 
 #### Flow Routing & Simplified ULP Sleep-Gating
 - **ULP Sleep Gating:** The ULP Coprocessor is enabled **only** while the system is actively sleeping. In Flow B, the dual-core Xtensa and LVGL have full ownership of all hardware; the ULP is completely idle.
@@ -125,7 +125,7 @@ The Orchestrator determines sleep timing based on the origin of the wake event:
    - Starts the **30-second inactivity session**. LVGL keypad indev processes button events.
    - Any button click resets the 30-second timer.
    - Dynamic Frequency Scaling (DFS) droops CPU from 240 MHz turbo to 80 MHz baseline between clicks.
-   - When 30 seconds of inactivity elapse, triggers the coordinated stand-down sequence below.
+   - When 30 seconds of inactivity elapse, triggers the coordinated sleep sequence below.
 2. **External RTC Timer Wake (`ULP_DISPATCH_MAIN_WAKE` from PCF85063A Countdown Timer):**
    - Woken purely to execute the periodic environmental screen update.
    - Renders telemetry to the E-Paper panel, flushes the framebuffer, waits for panel BUSY line release, and **goes right back to sleep immediately** without idling or waiting for user interaction.
@@ -133,8 +133,8 @@ The Orchestrator determines sleep timing based on the origin of the wake event:
    - Fresh power application or battery insertion.
    - System runs hardware bring-up, renders initial UI, and **waits 30 seconds** for potential user interaction or debug before entering initial deep sleep.
 
-#### Coordinated Stand-Down Sequence
-When Flow B stands down (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic stand-down sequence:
+#### Coordinated Sleep Transition Sequence
+When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic sleep transition sequence:
 1. Invoke user `on_pre_sleep` hook.
 2. Render sleep visual splash and play sleep chime if configured.
 3. **LVGL Frame Pipeline Drain:** Verify that LVGL has no pending draw tasks or dirty areas in the pipeline (`lv_display_refr_timer` complete, flush callback finished).
@@ -160,5 +160,5 @@ void             orch_flow_execute_sub_sprint(void);
 bool             orch_flow_is_thermal_lockout(void);
 void             orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 esp_err_t        orch_flow_query_telemetry(float *out_t, float *out_rh, float *out_dew);
-esp_err_t        orch_flow_stand_down_and_sleep(uint32_t sleep_seconds);
+esp_err_t        orch_flow_transition_to_sleep(uint32_t sleep_seconds);
 ```

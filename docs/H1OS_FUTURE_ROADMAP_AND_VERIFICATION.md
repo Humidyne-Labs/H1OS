@@ -14,7 +14,7 @@
 
 Unlike typical hobbyist IoT firmware that polls continuously and suffers from electronics-induced self-heating, H1OS is built on three core pillars:
 1. **Absolute Metrological Invariance:**
-   - **Zero-Heat Sensor Sprints:** Xtensa main core wakes for $<10\,\text{ms}$ (or executes via the $<3\,\text{ms}$ RTC Fast Wake Stub / autonomous ULP-RISC-V sentinel), ensuring ambient thermal readings are completely untainted by MCU power dissipation.
+   - **Zero-Heat Sensor Sprints:** Xtensa main core wakes for $<10\,\text{ms}$ (or executes via the $<3\,\text{ms}$ RTC Fast Wake Stub / autonomous ULP-RISC-V coprocessor monitor), ensuring ambient thermal readings are completely untainted by MCU power dissipation.
    - **Tri-Node Psychrometrics:** Real-time cross-correlation between the Sensirion SHTC3 ambient sensor, the ESP32-S3 internal silicon TSENS, and the SSD1681 on-glass electrophoretic thermistor.
    - **Thermodynamic Invariants:** Calculation of invariant actual vapor pressure ($e$), true dew point ($T_{\text{dew}}$) using August-Roche-Magnus formulations, and psychrometric enthalpy.
 2. **Visual Serenity & Bi-Stable Permanence:**

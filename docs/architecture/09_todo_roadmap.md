@@ -15,17 +15,17 @@ Development follows the **Four Canonical Stages of Construction**:
 
 - [x] **1.1 Establish Two-Tier Documentation System**: Author `docs/architecture/00` through `10` capturing all 4 layers.
 - [x] **1.2 Hardware Errata Call to Action**: Author and place `HARDWARE_ERRATA_AND_PCB_REV_GUIDE.md` in repository root for PCB dev visibility.
-- [x] **1.3 Master Architectural Consolidation Blueprint**: Create comprehensive blueprint capturing reactive ULP Bouncer, ULP sleep-gating, 30s Flow B session, bootloader power latch, zero-volt cable guard, and minimal SD card scope.
+- [x] **1.3 Master Architectural Consolidation Blueprint**: Create comprehensive blueprint capturing reactive ULP Monitor, ULP sleep-gating, 30s Flow B session, bootloader power latch, zero-volt cable guard, and minimal SD card scope.
 - [x] **1.4 Architectural Audit & Reconciliation**: Reconcile all 11 architecture specifications in `docs/architecture/` with the Master Blueprint:
   - [x] `00_documentation_system.md`: Update taxonomy, errata reference, and system principles.
-  - [x] `01_master_architecture.md`: Detail 4-layer structure, missing subsystems (`sub_nvs`, `sub_sdcard`), ULP bouncer, and 30s session.
+  - [x] `01_master_architecture.md`: Detail 4-layer structure, missing subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and 30s session.
   - [x] `02_layer1_hal.md`: Document bone stubbing policy, stateless button pin readers, and bootloader latch release rules.
   - [x] `03_layer2_subsystems.md`: Detail `sub_nvs`, minimal `sub_sdcard`, Zero-Volt Cable Guard in `sub_power`, remove bespoke button driver.
-  - [x] `04_layer3_orchestrator.md`: Formalize 30s interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 7-step stand-down sequence.
-  - [x] `05_layer3_ulp_sentinel.md`: Re-specify purely reactive ULP Bouncer (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
+  - [x] `04_layer3_orchestrator.md`: Formalize 30s interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 7-step sleep sequence.
+  - [x] `05_layer3_ulp_coprocessor.md`: Re-specify purely reactive ULP Monitor (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
   - [x] `06_layer4_api.md`: Rebrand API to `h1os_*`, document LVGL v9 indev keypad, time services (`h1os_time`), and remove obsolete `on_pxe`.
   - [x] `07_flowchart_state_machine.md`: Update Mermaid state and sequence diagrams for reactive ULP, Zero-Hour conflict suppression, and 30s session.
-  - [x] `08_lessons_learned_and_rationale.md`: Document Scaffolding Trap, LVGL indev vs bespoke button driver, reactive ULP bouncer, and Zero-Hour math.
+  - [x] `08_lessons_learned_and_rationale.md`: Document Scaffolding Trap, LVGL indev vs bespoke button driver, reactive ULP monitor, and Zero-Hour math.
   - [x] `09_todo_roadmap.md`: Align roadmap with the 4 canonical construction stages.
   - [x] `10_changelog_template.md`: Format H1OS v2.0.0 clean-slate release notes.
 
@@ -69,13 +69,13 @@ Development follows the **Four Canonical Stages of Construction**:
 - [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
   - [x] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
   - [x] `orch_math.c`: Integer slope delta gating, Class-E psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
-  - [x] `orch_flow.c`: Flow A <10ms sprint, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 7-step stand-down.
+  - [x] `orch_flow.c`: Flow A <10ms sprint, Flow B 30s interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and 7-step sleep transition.
   - [x] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
 - [x] **3.4 Layer 3 ULP-RISC-V Coprocessor Firmware**:
-  - [x] Implement event-driven reactive ULP Bouncer in RTC domain.
+  - [x] Implement event-driven reactive ULP Monitor in RTC domain.
   - [x] GPIO 5 PCF85063A alarm wake handler.
   - [x] GPIO 0/18 button tap/hold classifier ($>2.5\text{s}$ bootloader priming / power cut).
-  - [x] GPIO 4 ADC battery tripwire with zero-volt USB bypass.
+  - [x] GPIO 4 ADC battery threshold with zero-volt USB bypass.
 
 ---
 

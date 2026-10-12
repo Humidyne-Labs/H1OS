@@ -145,7 +145,7 @@ Because `GPIO 47/48` cannot be controlled from the RTC domain:
 
 #### 3. Current H1OS Firmware Mitigations
 - Implemented the **RTC Fast Wake Stub** (`orch_wake_stub.c`): When waking for sensor sprints, the CPU executes directly from RTC Fast SRAM at low frequency, bypassing the secondary bootloader, flash cache, and FreeRTOS kernel to complete execution in $<3\,\text{ms}$.
-- Reserved the ULP-RISC-V coprocessor for ADC battery tripwire monitoring (`ADC1_CH3` on `GPIO 4`), button debounce (`GPIO 0/18`), and RTC interrupt clearing (`GPIO 5`), which are on RTC GPIOs.
+- Reserved the ULP-RISC-V coprocessor for ADC battery threshold monitoring (`ADC1_CH3` on `GPIO 4`), button debounce (`GPIO 0/18`), and RTC interrupt clearing (`GPIO 5`), which are on RTC GPIOs.
 
 #### 4. Rev B Hardware Redesign Recommendations
 - **Route I2C to RTC GPIOs:** Reassign the primary I2C bus to pins within `GPIO 0`–`GPIO 21`. Specifically:
@@ -291,7 +291,7 @@ The tactile buttons (`BOOT` on `GPIO 0` and `POWER` on `GPIO 18`) utilize extern
  
 #### 3. Current H1OS Firmware Mitigations
 - In `hal_io.c`, the SoC internal pull-ups ($\sim 45\,\text{k}\Omega$) can be paralleled with the external $10\,\text{k}\Omega$ pull-ups to slightly stiffen the line to $\sim 8.2\,\text{k}\Omega$ during active wake.
-- Hardware debouncing and glitch filtering ($\ge 30\,\text{ms}$) are handled at the ULP bouncer (in sleep) and via LVGL keypad indev debouncing (in active wake).
+- Hardware debouncing and glitch filtering ($\ge 30\,\text{ms}$) are handled at the ULP coprocessor monitor (in sleep) and via LVGL keypad indev debouncing (in active wake).
  
 #### 4. Rev B Hardware Redesign Recommendations
 - Maintain $10\,\text{k}\Omega$ ($1\%$) pull-up resistors.

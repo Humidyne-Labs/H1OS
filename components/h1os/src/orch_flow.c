@@ -44,7 +44,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     st->wake_count++;
 
-    /* Check ULP Sentinel dispatch reason */
+    /* Check ULP Coprocessor dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
 #if CONFIG_ULP_COPROC_ENABLED
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
@@ -213,9 +213,9 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     return err;
 }
 
-esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec)
+esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 {
-    ESP_LOGI(TAG, "Stand-down sequence starting (%lu sec)", (unsigned long)sleep_sec);
+    ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
 
     /* 1. Wait for LVGL render and flush pipeline to drain completely */
     if (h1os_lvgl_has_pending_tasks()) {

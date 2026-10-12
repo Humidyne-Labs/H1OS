@@ -3,7 +3,7 @@
 ## 1. Overview
 Layer 4 is the top-level public interface of H1OS (`h1os.h`). It isolates developers from low-level register manipulation, coprocessor details, and power sequencing by exposing:
 1. **Declarative Lifecycle Engine:** `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, and `h1os_get_telemetry()`.
-2. **Interactive UI Session Engine:** LVGL v9 display driver port, keypad indev binding, 80 MHz DFS idle power droop, and 30-second inactivity stand-down.
+2. **Interactive UI Session Engine:** LVGL v9 display driver port, keypad indev binding, 80 MHz DFS idle power droop, and 30-second inactivity sleep.
 3. **System Time Services:** POSIX clock bridge, timezone formatting, and pluggable external SNTP sync callbacks.
 
 ---
@@ -67,7 +67,7 @@ typedef struct {
     /* Core Execution Hooks */
     h1os_boot_cb_t      on_boot;       ///< Cold boot / power-on reset hook
     h1os_wake_cb_t      on_wake;       ///< Interactive wake hook (Timer / RTC Alarm / Button Tap)
-    h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to deep sleep stand-down
+    h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to entering deep sleep
     h1os_shutdown_cb_t  on_shutdown;   ///< Hook executed immediately prior to battery cut
 
     /* Presentation Cues */
@@ -79,7 +79,7 @@ typedef struct {
 
     /* Interactive Session Parameters */
     struct {
-        uint32_t inactivity_timeout_sec; ///< Inactivity stand-down timer (default: 30s)
+        uint32_t inactivity_timeout_sec; ///< Inactivity sleep timer (default: 30s)
         bool     enable_dfs_80mhz;       ///< Enable 80 MHz power droop while waiting for input (default: true)
     } session;
 
@@ -105,14 +105,14 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config);
     - Sets 240 MHz turbo for initial render.
     - Binds physical buttons to LVGL `lv_indev` (Keypad).
     - Dispatches to user `on_boot` or `on_wake`.
-    - Manages the 30-second inactivity stand-down loop with 80 MHz DFS idle power droop.
+    - Manages the 30-second inactivity sleep loop with 80 MHz DFS idle power droop.
 
 ### 3.2 `h1os_sleep()`
 Explicit command to enter deep sleep:
 ```c
 esp_err_t h1os_sleep(uint32_t sleep_sec);
 ```
-- Executes the deterministic 7-step stand-down sequence via Layer 3 `orch_flow`.
+- Executes the deterministic 7-step sleep sequence via Layer 3 `orch_flow`.
 
 ### 3.3 `h1os_shutdown()`
 Orderly power cut:

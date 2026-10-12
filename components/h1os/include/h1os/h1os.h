@@ -80,7 +80,7 @@ typedef struct {
     /* Core Lifecycle Execution Hooks */
     h1os_boot_cb_t      on_boot;       ///< Cold boot / power-on reset hook
     h1os_wake_cb_t      on_wake;       ///< Interactive wake hook (Timer / RTC Alarm / Button Tap)
-    h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to deep sleep stand-down
+    h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to entering deep sleep
     h1os_shutdown_cb_t  on_shutdown;   ///< Hook executed immediately prior to battery cut
 
     /* Presentation Cues */
@@ -92,7 +92,7 @@ typedef struct {
 
     /* Interactive Session Parameters */
     struct {
-        uint32_t inactivity_timeout_sec; ///< Inactivity stand-down timer (default: 30s)
+        uint32_t inactivity_timeout_sec; ///< Inactivity sleep timer (default: 30s)
         bool     enable_dfs_80mhz;       ///< Enable 80 MHz power droop while waiting for input (default: true)
     } session;
 

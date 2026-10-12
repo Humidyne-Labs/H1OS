@@ -20,8 +20,8 @@ Production-grade, event-driven ambient operating system and peripheral architect
 3. [Zero-Heat Sensing & Psychrometric Invariants](#-zero-heat-sensing--psychrometric-invariants)
 4. [Hardware Pinout & Power Rail Map](#-hardware-pinout--power-rail-map)
 5. [Declarative Application Lifecycle Engine](#-declarative-application-lifecycle-engine)
-6. [Interactive Flow B & 30-Second Stand-Down](#-interactive-flow-b--30-second-stand-down)
-7. [ULP-RISC-V Coprocessor Sentinel](#-ulp-risc-v-coprocessor-sentinel)
+6. [Interactive Flow B & 30-Second Inactivity Sleep](#-interactive-flow-b--30-second-inactivity-sleep)
+7. [ULP-RISC-V Coprocessor Monitor](#-ulp-risc-v-coprocessor-monitor)
 8. [Dual-Plane E-Paper Persistence & Partial Refresh](#-dual-plane-e-paper-persistence--partial-refresh)
 9. [Build Instructions](#-build-instructions)
 10. [License](#-license)
@@ -52,7 +52,7 @@ H1OS enforces a strict unidirectional dependency model: **Upper layers call lowe
 ├────────────────────────────────────────────────────────────────────────┤
 │ Layer 4: Application API & Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h) │
 ├────────────────────────────────────────────────────────────────────────┤
-│ Layer 3: Orchestration Brain & Sentinel (orch_flow, orch_math, ULP)    │
+│ Layer 3: Orchestration Engine & Coprocessor Monitor (orch_flow, ULP)   │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Layer 2: Peripheral Subsystems (sub_display, sub_sensor, sub_rtc...)   │
 ├────────────────────────────────────────────────────────────────────────┤
@@ -132,18 +132,18 @@ void app_main(void) {
 
 ---
 
-## ⏱️ Interactive Flow B & 30-Second Stand-Down
+## ⏱️ Interactive Flow B & 30-Second Inactivity Sleep
 
 - **Button Wake:** Waking the system by tapping `BOOT` or `POWER` launches an interactive 30-second session. Any button click resets the timer.
 - **RTC Periodic Wake:** When woken by the PCF85063A countdown timer for a scheduled telemetry update, H1OS renders the new frame, flushes the display, and **immediately returns to deep sleep** to preserve battery.
-- **Stand-Down Sequence:** Drains LVGL $\to$ waits `EPD_BUSY` falling edge $\to$ waits 250 ms particle settling delay $\to$ saves frame to flash if dirty $\to$ enters Deep Sleep Mode 1 (1.0 µA).
+- **Sleep Transition Sequence:** Drains LVGL $\to$ waits `EPD_BUSY` falling edge $\to$ waits 250 ms particle settling delay $\to$ saves frame to flash if dirty $\to$ enters Deep Sleep Mode 1 (1.0 µA).
 
 ---
 
-## 🛡️ ULP-RISC-V Coprocessor Sentinel
+## 🛡️ ULP-RISC-V Coprocessor Monitor
 
 Runs autonomously in RTC Slow SRAM while the main dual-core CPU is asleep:
-- **Brownout Tripwire:** Autonomous ADC sampling on GPIO 4 with emergency wake if $V_{\text{bat}} < 3.25\text{V}$.
+- **Brownout Threshold Detection:** Autonomous ADC sampling on GPIO 4 with emergency wake if $V_{\text{bat}} < 3.25\text{V}$.
 - **Zero-Volt Cable Guard:** Ignores brownout when $V_{\text{bat}} < 100\text{mV}$ (USB cable powered without battery).
 - **Wake-on-Release:** Wakes Xtensa strictly when the button transitions back HIGH.
 - **Hold Classification:** Holds $> 2.5\text{s}$ prime ROM bootloader or power cut.

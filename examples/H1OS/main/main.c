@@ -10,7 +10,7 @@
  *  - Screen 4: Verbose OS Diagnostics (Reset Reason, Wake Causes, ULP Reason, Free/Min Heap, HWM Stack).
  *  - Hardware Keypad Input (BOOT toggles Page 1 -> 2 -> 3 -> 4 -> 1).
  *  - Synthesized Audio Feedback (Harmonic Boot Chime & Micro-Tone Navigation Tick).
- *  - 30-Second Inactivity Stand-Down with 80 MHz DFS Power Droop.
+ *  - 30-Second Inactivity Sleep with 80 MHz DFS Power Droop.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -82,7 +82,7 @@ static const char* get_wake_causes_str(uint32_t causes)
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) return "COLD_BOOT";
     if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1))      return "EXT1_BUTTON_RTC";
     if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER))     return "HW_TIMER";
-    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))       return "ULP_SENTINEL";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))       return "ULP_MONITOR";
     return "INTERNAL";
 }
 
@@ -351,7 +351,7 @@ static void render_page_diagnostics(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_wake, H1OS_FONT_14, 0);
     lv_obj_align(lbl_wake, LV_ALIGN_TOP_LEFT, 6, 48);
 
-    // Row 3: ULP Sentinel Dispatch
+    // Row 3: ULP Monitor Dispatch
     const char *ulp_str = "NONE";
     if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SPRINT) ulp_str = "SENSOR_SPRINT";
     else if (st->ulp_dispatch_reason == ULP_DISPATCH_MAIN_WAKE) ulp_str = "MAIN_WAKE";

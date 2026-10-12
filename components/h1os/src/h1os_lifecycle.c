@@ -49,10 +49,10 @@ static void h1os_session_monitor_task(void *arg)
     while (s_session_running) {
         vTaskDelay(pdMS_TO_TICKS(500));
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
-            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Standing down...",
+            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
-            h1os_sleep(120); /* Stand down to deep sleep */
+            h1os_sleep(120); /* Enter deep sleep */
             break;
         }
     }
@@ -204,11 +204,11 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
-    ESP_LOGI(TAG, "Entering coordinated stand-down sequence (%lu sec)...", (unsigned long)sleep_sec);
+    ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     if (s_app_lifecycle.on_pre_sleep) {
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
-    return orch_flow_stand_down_and_sleep(sleep_sec);
+    return orch_flow_transition_to_sleep(sleep_sec);
 }
 
 void h1os_shutdown(void)

@@ -4,7 +4,7 @@
 - **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2.
 - **Operating System:** **H1OS** (Class-E Luxury Environmental Telemetry Instrument Operating System).
 - **Framework:** ESP-IDF v6.1 (Ninja Build System, Driver V2 APIs, FreeRTOS SMP).
-- **Architecture Philosophy:** Strict unidirectional dependency layering, zero circular inclusions, hardware determinism, reactive coprocessor sentinels, and interactive user sessions with dynamic power droop.
+- **Architecture Philosophy:** Strict unidirectional dependency layering, zero circular inclusions, hardware determinism, reactive coprocessor monitors, and interactive user sessions with dynamic power droop.
 
 ---
 
@@ -20,7 +20,7 @@
  ┌────────────────────────────────────▼────────────────────────────────────┐
  │              LAYER 3: SYSTEM ORCHESTRATION PIPELINE                     │
  │  Flow Arbiter | Psychrometric Math Engine | RTC Memory | Display Sync   │
- │  [GATED COPROCESSOR SENTINEL: ULP-RISC-V Bouncer active in sleep only]  │
+ │  [GATED COPROCESSOR MONITOR: ULP-RISC-V Monitor active in sleep only]   │
  └────────────────────────────────────┬────────────────────────────────────┘
                                       │ commands
  ┌────────────────────────────────────▼────────────────────────────────────┐
@@ -64,19 +64,19 @@ Self-contained peripheral drivers ("Does the thing"). Expose clean APIs with sta
 - **`sub_sdcard.c/.h`**: Basic 1-bit SDMMC FATFS manager: initialization, de-initialization, basic file I/O, format, and capacity checking.
 
 ### Layer 3: System Pipeline & Orchestrator
-The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration, psychrometric math, and stand-down coordination.
+The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration, psychrometric math, and sleep coordination.
 - **`orch_state.h/.c`**: Shared RTC Slow Memory structure (<512 bytes), boot/wake counters, flags, Tri-Node sliding ring buffer.
 - **`orch_math.c/.h`**: Class-E psychrometrics: Magnus vapor pressure invariant ($e$), dew point reconstruction, continuous EWMA filtering, integer slope stability gating.
-- **`orch_flow.c/.h`**: Single Unified Binary Execution Arbiter. Governs Flow A (Sensor Sprint <4ms) vs Flow B (Interactive Session). Manages 60s Thermal Lockout MUX. Executes coordinated 7-step stand-down sequence.
-- **`orch_display_sync.c/.h`**: Dirty framebuffer commit to `epd_frame` SPI flash partition during stand-down.
+- **`orch_flow.c/.h`**: Single Unified Binary Execution Arbiter. Governs Flow A (Sensor Sprint <4ms) vs Flow B (Interactive Session). Manages 60s Thermal Lockout MUX. Executes coordinated 7-step sleep transition sequence.
+- **`orch_display_sync.c/.h`**: Dirty framebuffer commit to `epd_frame` SPI flash partition during sleep transition.
 - **`orch_wake_stub.c/.h`**: Fast RTC wake stub for <3ms Flow A pulse.
-- **`ulp/main.c` (ULP-RISC-V Coprocessor Bouncer)**: Purely reactive hardware sentinel running in deep sleep. Wakes on timer (Flow A) or external interrupt (GPIO 5 alarm, GPIO 0/18 button tap/hold, GPIO 4 battery guard). Gated off during Flow B!
+- **`ulp/main.c` (ULP-RISC-V Coprocessor Monitor)**: Purely reactive hardware monitor running in deep sleep. Wakes on timer (Flow A) or external interrupt (GPIO 5 alarm, GPIO 0/18 button tap/hold, GPIO 4 battery guard). Gated off during Flow B!
 
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
 - **`h1os_lifecycle.c`**: Declarative lifecycle engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_get_telemetry()`, `h1os_get_diagnostics()`.
-- **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, keypad indev binding, 80 MHz DFS idle power droop, 30-second inactivity stand-down timer.
+- **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, keypad indev binding, 80 MHz DFS idle power droop, 30-second inactivity sleep timer.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.
 - **`h1os_font_*.c`**: 1bpp pre-rendered monochrome fonts (`MONTSERRAT_14_1BPP`, `MONTSERRAT_20_1BPP`).
 
@@ -92,8 +92,8 @@ The public interface of H1OS exposed to developers.
    - If user holds BOOT $> 2.5\text{s}$, ULP primes and triggers ROM Bootloader jump.
    - If user holds POWER $> 2.5\text{s}$, ULP primes instant clean power-off.
 2. **Flow B Execution Profiles & Sleep Timing:**
-   - **User Tap Wake (Interactive Session):** Initiated by a user button tap on `GPIO 0` or `GPIO 18`. System activates the 30-second inactivity session. LVGL native `lv_indev` owns buttons. Between user interactions, DFS drops CPU to 80 MHz baseline. Any user click resets the 30s timer. After 30s of inactivity, system executes coordinated stand-down to deep sleep.
+   - **User Tap Wake (Interactive Session):** Initiated by a user button tap on `GPIO 0` or `GPIO 18`. System activates the 30-second inactivity session. LVGL native `lv_indev` owns buttons. Between user interactions, DFS drops CPU to 80 MHz baseline. Any user click resets the 30s timer. After 30s of inactivity, system executes coordinated transition to deep sleep.
    - **External RTC Timer Wake (Unattended Refresh):** Initiated when PCF85063A countdown timer reaches zero on `GPIO 5`. The dual-core processor boots, renders the updated telemetry dashboard to the E-Paper panel, flushes the framebuffer, and **goes right back to sleep immediately** once the display update completes to preserve battery power.
    - **First / Cold Boot:** Initiated by initial battery insertion or power-on. System boots, executes hardware self-tests, renders initial screen, and **waits 30 seconds for potential user interaction** before entering initial deep sleep.
-3. **Deterministic Stand-Down Sequence:**
+3. **Deterministic Sleep Transition Sequence:**
    - User pre-sleep hook $\rightarrow$ Commit dirty frame to flash $\rightarrow$ SSD1681 Deep Sleep Mode 1 $\rightarrow$ Arm Zero-Hour gated ULP reactive interrupts $\rightarrow$ Enter Deep Sleep.

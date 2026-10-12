@@ -1,7 +1,7 @@
 # Document 00: Documentation System Architecture & Boundary Governance
 
 ## 1. Overview & Purpose
-This document governs the **two-tier documentation system** of **H1OS** (Class-E Luxury Environmental Telemetry Instrument Operating System). It establishes a permanent, immutable boundary between **Public User-Facing Guides** (for application developers building products with H1OS) and **Internal Architectural Specifications** (for systems engineers maintaining core drivers, silicon pipelines, and coprocessor sentinels).
+This document governs the **two-tier documentation system** of **H1OS** (Class-E Luxury Environmental Telemetry Instrument Operating System). It establishes a permanent, immutable boundary between **Public User-Facing Guides** (for application developers building products with H1OS) and **Internal Architectural Specifications** (for systems engineers maintaining core drivers, silicon pipelines, and coprocessor monitors).
 
 ---
 
@@ -31,7 +31,7 @@ h1os/ (Repository Root)
 │       ├── 02_layer1_hal.md           <-- Doc 02: HAL, Pad Holds, Flash & Bus Drivers
 │       ├── 03_layer2_subsystems.md    <-- Doc 03: Peripheral Subsystem Managers
 │       ├── 04_layer3_orchestrator.md  <-- Doc 04: Flow Arbiter & Class-E Math Engine
-│       ├── 05_layer3_ulp_sentinel.md  <-- Doc 05: ULP-RISC-V Coprocessor Hardware Bouncer
+│       ├── 05_layer3_ulp_coprocessor.md  <-- Doc 05: ULP-RISC-V Coprocessor Hardware Monitor
 │       ├── 06_layer4_api.md           <-- Doc 06: Declarative Lifecycle & LVGL v9 Engine
 │       ├── 07_flowchart_state_machine.md <-- Doc 07: Mermaid Execution State Flowcharts
 │       ├── 08_lessons_learned_and_rationale.md <-- Doc 08: Post-Mortem & Scaffolding Purge

@@ -73,9 +73,13 @@ void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c);
 
 /**
- * @brief Stand down system and enter deep sleep.
+ * @brief Transition system to deep sleep.
  */
-esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec);
+esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec);
+
+static inline esp_err_t orch_flow_stand_down_and_sleep(uint32_t sleep_sec) {
+    return orch_flow_transition_to_sleep(sleep_sec);
+}
 
 #ifdef __cplusplus
 }

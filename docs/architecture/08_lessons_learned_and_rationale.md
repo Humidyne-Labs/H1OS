@@ -44,7 +44,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 ### 1.6 "Zero-Hour" Collision Between Sub-Execution and Main Wake
 - **What Happened:** A device scheduled for a 10-minute main wake (external PCF85063A countdown timer) woke up at 9 minutes and 55 seconds on an internal sub-execution timer. It sampled the sensor, scheduled another 60s sub-exec timer, and went back to sleep—only for the external RTC to fire 5 seconds later. The MCU woke up twice in 5 seconds.
 - **Root Cause:** The sub-execution timer had no awareness of the remaining duration on the external hardware RTC timer, or main Xtensa was forced to juggle competing clocks.
-- **H1OS Fix:** Zero-Hour collision elimination by the reactive ULP Bouncer and Layer 3 Orchestrator. When GPIO 5 (PCF85063A alarm) fires or is imminent, Flow B is launched directly and Flow A is suppressed.
+- **H1OS Fix:** Zero-Hour collision elimination by the reactive ULP Monitor and Layer 3 Orchestrator. When GPIO 5 (PCF85063A alarm) fires or is imminent, Flow B is launched directly and Flow A is suppressed.
 
 ---
 
@@ -72,7 +72,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 ### 1.9 Redundant Button Handlers vs. LVGL Input Subsystem
 - **What Happened:** Building a monolithic, bespoke `sub_button` driver with custom queues, debouncers, and callbacks running concurrently with LVGL.
 - **Root Cause:** Reinventing the wheel. LVGL v9 already contains a battle-tested keypad/encoder input subsystem (`lv_indev_t`).
-- **H1OS Fix:** Eliminate bespoke button subsystem. During deep sleep, the ULP RISC-V Bouncer acts as the hardware gatekeeper. During active wake (Flow B), buttons are owned directly by LVGL via `LV_INDEV_TYPE_KEYPAD`. HAL provides stateless pin readers (`hal_io_get_button_boot()`, `hal_io_get_button_pwr()`) queried by LVGL's read callback.
+- **H1OS Fix:** Eliminate bespoke button subsystem. During deep sleep, the ULP RISC-V monitor acts as the hardware gatekeeper. During active wake (Flow B), buttons are owned directly by LVGL via `LV_INDEV_TYPE_KEYPAD`. HAL provides stateless pin readers (`hal_io_get_button_boot()`, `hal_io_get_button_pwr()`) queried by LVGL's read callback.
 
 ---
 
@@ -80,7 +80,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **What Happened:** Early ULP designs proposed running a continuous polling loop or state machine while the main application was running, leading to state conflicts and bus contention.
 - **Root Cause:** Violating single-owner hardware principles.
 - **H1OS Fix:**
-  1. **Purely Event-Driven (No Polling):** ULP sleeps by default on RTC slow clock. It wakes **only** on: (a) periodic timer for Flow A sprint, or (b) external hardware interrupt on GPIO 5 (PCF85063A Alarm INT), GPIO 0/18 (button press), or GPIO 4 (ADC tripwire).
+  1. **Purely Event-Driven (No Polling):** ULP sleeps by default on RTC slow clock. It wakes **only** on: (a) periodic timer for Flow A sprint, or (b) external hardware interrupt on GPIO 5 (PCF85063A Alarm INT), GPIO 0/18 (button press), or GPIO 4 (ADC threshold).
   2. **Application Gating:** The ULP runs **only while the main processor is actively in deep sleep**. Once Flow B wakes, the main Xtensa core owns all hardware exclusively. The ULP is never armed while the interactive session is running.
 
 ---
@@ -125,7 +125,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 | **Dependency Structure** | Entangled, circular inclusions | Strict 4-layer unidirectional hierarchy |
 | **Common Data Types** | Scattered across subsystem headers | Consolidated at base in `hal_types.h` |
 | **Button Management** | Bespoke `bsp_button.c` background task | **LVGL native `lv_indev` (Keypad)**; ULP during sleep |
-| **ULP Operation** | Theoretical continuous polling | **Purely event-driven Bouncer**; gated during main app run |
+| **ULP Operation** | Theoretical continuous polling | **Purely event-driven monitor**; gated during main app run |
 | **Zero-Hour Conflict** | None (woke twice in rapid succession) | **ULP arbiter** suppresses Flow A when RTC alarm fires |
 | **MicroSD Architecture**| Complex unfinished subsystem | Minimal **`sub_sdcard`** (file I/O, format, capacity) |
 | **Interactive Session** | Ad-hoc unmanaged loop | **30s session** with 80MHz DFS power droop at idle |

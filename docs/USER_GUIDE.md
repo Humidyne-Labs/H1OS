@@ -12,11 +12,11 @@
 1. [Architectural Overview & Philosophy](#1-architectural-overview--philosophy)
 2. [Lifecycle Engine & Application Entry](#2-lifecycle-engine--application-entry)
 3. [Flow A: Headless Sensor Sprint (<4ms Cadence)](#3-flow-a-headless-sensor-sprint-4ms-cadence)
-4. [Flow B: Interactive UI Session (30s Stand-Down)](#4-flow-b-interactive-ui-session-30s-stand-down)
+4. [Flow B: Interactive UI Session (30s Inactivity Sleep)](#4-flow-b-interactive-ui-session-30s-inactivity-sleep)
 5. [Class-E Psychrometric Invariant Engine](#5-class-e-psychrometric-invariant-engine)
 6. [Display Architecture & LVGL v9 Integration](#6-display-architecture--lvgl-v9-integration)
 7. [Persistent State & Flash Frame Synchronization](#7-persistent-state--flash-frame-synchronization)
-8. [ULP-RISC-V Coprocessor Sentinel](#8-ulp-risc-v-coprocessor-sentinel)
+8. [ULP-RISC-V Coprocessor Monitor](#8-ulp-risc-v-coprocessor-monitor)
 9. [Complete Application Template](#9-complete-application-template)
 
 ---
@@ -31,7 +31,7 @@ H1OS is an instrument-grade operating system designed specifically for ultra-low
 ├────────────────────────────────────────────────────────────────────────┤
 │ Layer 4: Application API & Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h) │
 ├────────────────────────────────────────────────────────────────────────┤
-│ Layer 3: Orchestration Brain & Sentinel (orch_flow, orch_math, ULP)    │
+│ Layer 3: Orchestration Engine & Coprocessor Monitor (orch_flow, ULP)   │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Layer 2: Peripheral Subsystems (sub_display, sub_sensor, sub_rtc...)   │
 ├────────────────────────────────────────────────────────────────────────┤
@@ -98,13 +98,13 @@ When internal timer wakeup occurs, H1OS executes Flow A without booting the seco
 
 ---
 
-## 4. Flow B: Interactive UI Session (30s Stand-Down)
+## 4. Flow B: Interactive UI Session (30s Inactivity Sleep)
 
 When the user taps `BOOT` (GPIO 0) or `POWER` (GPIO 18), H1OS initiates Flow B:
 - Spawns the LVGL v9 runtime task and renders the interactive screen.
 - Starts a **30-second inactivity countdown**.
 - Any button press resets the timer back to 30 seconds.
-- When 30 seconds of inactivity elapse, the system executes the coordinated 8-step stand-down sequence:
+- When 30 seconds of inactivity elapse, the system executes the coordinated 8-step sleep transition sequence:
   1. Wait for LVGL pipeline to drain.
   2. Wait for electrophoretic panel `EPD_BUSY` falling edge.
   3. Wait 250 ms particle settling delay.
@@ -150,11 +150,11 @@ H1OS avoids synthetic curve fitting by tracking physical thermodynamic invariant
 
 ---
 
-## 8. ULP-RISC-V Coprocessor Sentinel
+## 8. ULP-RISC-V Coprocessor Monitor
 
 While the main cores are in deep sleep, the ULP coprocessor runs autonomously in RTC Slow SRAM:
-- **Brownout Tripwire:** Monitors battery voltage via ADC1 CH3 (GPIO 4); wakes the main CPU for emergency shutdown if $V_{\text{bat}} < 3.25\text{V}$.
-- **Zero-Volt Cable Guard:** Ignores the brownout tripwire if $V_{\text{bat}} < 100\text{mV}$ (indicates USB cable power with no battery connected).
+- **Brownout Threshold Detection:** Monitors battery voltage via ADC1 CH3 (GPIO 4); wakes the main CPU for emergency shutdown if $V_{\text{bat}} < 3.25\text{V}$.
+- **Zero-Volt Cable Guard:** Ignores the brownout threshold if $V_{\text{bat}} < 100\text{mV}$ (indicates USB cable power with no battery connected).
 - **Wake-on-Release Rule:** Waits for button release before waking the main Xtensa core, ensuring the main application starts with clean released input state.
 - **Long-Press Classifier:** Classifies button holds $> 2.5\text{s}$ into bootloader mode (`BOOT`) or power cut (`POWER`).
 

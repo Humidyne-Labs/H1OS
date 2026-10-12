@@ -2,7 +2,7 @@
  * @file orch_state.h
  * @brief Layer 3: Persistent RTC Slow SRAM State & Ring Buffer Manager
  *
- * Persists system lifecycle counters, ULP sentinel dispatch reasons, calibration
+ * Persists system lifecycle counters, ULP coprocessor dispatch reasons, calibration
  * parameters, dynamic psychrometric floors, and a 32-sample Tri-Node ring buffer.
  * Total memory footprint is strictly < 512 bytes in RTC Slow Memory.
  *
@@ -25,7 +25,7 @@ typedef enum {
     ULP_DISPATCH_NONE = 0,
     ULP_DISPATCH_SENSOR_SPRINT,     /* Flow A: <4ms wake stub sprint */
     ULP_DISPATCH_MAIN_WAKE,         /* Flow B: Full application / LVGL UI wake */
-    ULP_DISPATCH_CRITICAL_SHUTDOWN, /* Battery brownout tripwire (<3.25V) */
+    ULP_DISPATCH_CRITICAL_SHUTDOWN, /* Battery brownout threshold (<3.25V) */
     ULP_DISPATCH_BOOTLOADER_JUMP,   /* Primed by BOOT hold > 2.5s */
     ULP_DISPATCH_POWER_OFF          /* Primed by POWER hold > 2.5s */
 } orch_ulp_dispatch_t;
