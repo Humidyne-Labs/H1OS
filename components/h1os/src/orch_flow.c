@@ -264,13 +264,16 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
     }
 
     /* 7. Sub-Interval Sensor Cadence:
-     * Arm internal timer for Flow A sample cadence (e.g. 30s) if sample_interval_sec < sleep_sec.
+     * Arm internal timer for Flow A sample cadence (e.g. 60s) if sample_interval_sec < sleep_sec.
      * If sample interval is disabled or >= sleep_sec, sleep purely until external RTC expires. */
     uint32_t sample_sec = orch_state_get()->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;
     if (sample_sec > 0 && sample_sec < sleep_sec) {
         internal_sleep_sec = sample_sec;
     }
+
+    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sprint timer = %lus",
+             (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
 
     /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
