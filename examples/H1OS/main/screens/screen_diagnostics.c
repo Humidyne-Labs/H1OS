@@ -30,7 +30,7 @@ static const char* get_reset_reason_str(esp_reset_reason_t reason)
 
 static const char* get_wake_causes_str(uint32_t causes)
 {
-    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) return "COLD_BOOT";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) return "BOOT";
     if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1))      return "EXT1_BUTTON_RTC";
     if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER))     return "HW_TIMER";
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))       return "ULP_MONITOR";

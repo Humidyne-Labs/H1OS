@@ -136,7 +136,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    bool is_wake = (flow != ORCH_FLOW_COLD_BOOT);
+    bool is_wake = (flow != ORCH_FLOW_BOOT);
     h1os_lvgl_init(is_wake);
     if (is_wake) {
         esp_err_t r_err = orch_display_sync_restore_to_framebuffer();
@@ -169,7 +169,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         h1os_reset_session_timer();
     }
 
-    if (flow == ORCH_FLOW_COLD_BOOT) {
+    if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
         if (s_app_lifecycle.on_boot) {
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
@@ -194,7 +194,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 6. Invariant Governance:
     //    - If RTC Wake: screen update rendered, go right back to sleep immediately!
-    //    - If Cold Boot or User Button Wake: wait configured inactivity session timeout for user interaction.
+    //    - If Boot or User Button Wake: wait configured inactivity session timeout for user interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;

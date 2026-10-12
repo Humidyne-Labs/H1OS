@@ -6,36 +6,32 @@
 The Waveshare ESP32-S3 board features a hardware power latch circuit controlling the main 3.3V battery LDO regulator:
 - **Control Line:** `BAT_CTRL` on `GPIO 17` (RTC GPIO 17).
 - **Polarity:** Active HIGH (`1 = Regulator ON / Latched`, `0 = Regulator Cut / Off`).
-- **Cold Boot Trigger:** Pressing the POWER button physically bridges the gate, powering the MCU. The firmware MUST immediately drive `GPIO 17` HIGH to hold the gate before the user releases the button.
+- **Boot Trigger:** Pressing the POWER button physically bridges the gate, powering the MCU. The 2nd-stage bootloader (`h1os_boot_hook`) immediately drives `GPIO 17` HIGH and locks the RTC IO pad hold before the user releases the button.
 
 ### Lifecycle Sequencing
-1. **Early Boot (`hal_io_early_init()`):**
-   - Configured as output, driven HIGH (`1`).
-   - Pad hold enabled to prevent glitches during subsequent peripheral initialization.
+1. **2nd-Stage Bootloader (`h1os_boot_hook`):**
+   - Configured as output, driven HIGH (`1`), and locked via RTC IO pad hold (`rtc_gpio_hold_en(GPIO_NUM_17)`).
 2. **Deep Sleep Entry:**
-   - RTC IO pad hold asserted: `rtc_gpio_hold_en(GPIO_NUM_17);`
+   - RTC IO pad hold remains asserted: `rtc_gpio_hold_en(GPIO_NUM_17);`
    - Global deep sleep pad hold enabled: `gpio_deep_sleep_hold_en();`
    - RTC peripheral power domain kept ON: `esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);`
-3. **System Shutdown (`bsp_power_off()` / `sub_power_cut_power_latch()`):**
+3. **System Shutdown (`hal_io_release_power_latch()`):**
    - Release pad holds: `gpio_deep_sleep_hold_dis(); rtc_gpio_hold_dis(GPIO_NUM_17);`
    - Drive `GPIO 17` LOW (`0`).
-   - If operating on battery, the LDO gate opens immediately and power is completely severed (0 µA).
+   - If operating on battery, the LDO gate opens immediately and power is completely severed.
 
 ---
 
 ## 2. Battery Voltage Divider & ADC Sensing
 
 ### Hardware Circuit
-```
-   VBAT (3.3V - 4.2V LiPo)
-           │
-       [ 100kΩ R1 ]
-           │
-           ├─── GPIO 4 (ADC1_CHANNEL_3)
-           │
-       [ 100kΩ R2 ]
-           │
-          GND
+
+```mermaid
+flowchart TD
+    VBAT["VBAT (3.3V – 4.2V LiPo)"] --> R1["R1 = 200 kΩ"]
+    R1 --> NODE["GPIO 4 (ADC1_CHANNEL_3)"]
+    NODE --> R2["R2 = 200 kΩ"]
+    R2 --> GND["GND"]
 ```
 - **Divider Transfer Function:**
 

@@ -37,10 +37,10 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     orch_persisted_state_t *st = orch_state_get();
 
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
-        /* Cold boot / Power On Reset */
+        /* System boot / Power On Reset */
         st->boot_count++;
-        ESP_LOGI(TAG, "Cold boot detected. Boot count: %lu", (unsigned long)st->boot_count);
-        return ORCH_FLOW_COLD_BOOT;
+        ESP_LOGI(TAG, "System boot detected. Boot count: %lu", (unsigned long)st->boot_count);
+        return ORCH_FLOW_BOOT;
     }
 
     st->wake_count++;

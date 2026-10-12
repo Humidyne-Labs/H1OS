@@ -49,7 +49,7 @@ Applications interface with H1OS through declarative lifecycle hooks defined in 
 
 static void app_on_boot(void *user_data)
 {
-    ESP_LOGI("APP", "Cold boot initialized");
+    ESP_LOGI("APP", "Boot initialized");
 }
 
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)

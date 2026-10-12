@@ -152,7 +152,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         return ret;
     }
 
-    /* On cold boot, execute full OTP refresh; on sleep wake, execute differential partial refresh */
+    /* On system boot, execute full OTP refresh; on sleep wake, execute differential partial refresh */
     s_first_boot_flush = !is_wake_cycle;
 
     lv_init();

@@ -111,7 +111,7 @@ esp_err_t sub_rtc_init(void)
     uint8_t sec_reg = 0;
     err = pcf85063_read_reg(RTC_REG_SECONDS, &sec_reg, 1);
     if (err == ESP_OK && (sec_reg & 0x80)) {
-        ESP_LOGW(TAG, "PCF85063A oscillator integrity lost (battery cold boot). Time is uncalibrated.");
+        ESP_LOGW(TAG, "PCF85063A oscillator integrity lost (initial battery boot). Time is uncalibrated.");
     }
 
     return ESP_OK;

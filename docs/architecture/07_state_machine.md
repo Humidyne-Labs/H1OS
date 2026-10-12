@@ -41,14 +41,14 @@ flowchart TD
     subgraph FlowB ["FLOW B: Dual-Core Screen Refresh & Interaction"]
         LaunchFlowB_Alarm --> Bootloader2[2nd-Stage Bootloader<br/>h1os_boot_hook: Latch BAT_CTRL HIGH]
         LaunchFlowB_Tap --> Bootloader2
-        ColdBoot[First Power On / Cold Boot] --> Bootloader2
+        Boot[Initial Power On / Boot] --> Bootloader2
 
         Bootloader2 --> BootFreeRTOS[Initialize FreeRTOS SMP Dual-Core LX7]
         BootFreeRTOS --> TurboRender[240 MHz Turbo PM Lock<br/>Read Telemetry & Blit LVGL Screen to EPD]
         
         TurboRender --> WakeSource{Wake Source?}
         WakeSource -- "RTC Countdown Timer (Unattended)" --> SleepStart
-        WakeSource -- "User Tap or Cold Boot" --> LVGL_Active[Interactive Session (Configurable Timeout)<br/>LVGL Takes Hold of Display & Buttons]
+        WakeSource -- "User Tap or Boot" --> LVGL_Active[Interactive Session (Configurable Timeout)<br/>LVGL Takes Hold of Display & Buttons]
         
         LVGL_Active --> UserClick{User Button Click?}
         UserClick -- "BOOT Click" --> ScreenToggle[Toggle Screen 1 Env <-> Screen 2 Health<br/>Reset Inactivity Timer]

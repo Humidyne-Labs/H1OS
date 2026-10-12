@@ -37,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Flow B Wake Cycle Differential Partial Refresh** (`h1os_lifecycle.c`, `h1os_lvgl.cpp/.h`, `sub_display.cpp/.h`, `orch_display_sync.c/.h`):
   - Implemented `sub_display_sync_previous_frame()` in Layer 2 to pre-synchronize SSD1681 hardware RAM `0x26` (Red / Previous RAM) with the pre-sleep frame over SPI DMA.
   - Linked `orch_display_sync_restore_to_framebuffer()` in Layer 3 into `h1os_lifecycle.c` Flow B wake dispatch, restoring the 5000-byte pre-sleep frame from flash partition `epd_frame`.
-  - Configured `s_first_boot_flush = !is_wake_cycle` in `h1os_lvgl.cpp`, ensuring cold boots perform a full OTP wiping sequence while deep sleep wake cycles trigger silent ~300 ms differential partial refreshes with zero whole-screen flashing.
+  - Configured `s_first_boot_flush = !is_wake_cycle` in `h1os_lvgl.cpp`, ensuring system boots perform a full OTP wiping sequence while deep sleep wake cycles trigger silent ~300 ms differential partial refreshes with zero whole-screen flashing.
 - **ES8311 Ready State Polling & Audio Clipping Remediation** (`sub_audio.c`):
   - Implemented `sub_audio_wait_until_ready()` validating Chip ID (`0xFD` = `0x83`, `0xFE` = `0x11`) and polling Register `0xFC` (`FLAG_CSM_CHIP`) bits 6:4 until the Chip State Machine exits state `S0` (Power Down).
   - Eliminates audio blips and clipped initial transients caused by streaming I2S frames before internal PLL and analog bias circuitry stabilize.

@@ -76,7 +76,7 @@ The public interface of H1OS exposed to developers.
 2. **Flow B Execution Profiles & Sleep Timing:**
    - **User Tap Wake (Interactive Session):** Initiated by a user button tap on `GPIO 0` or `GPIO 18`. System activates the configurable inactivity session (`inactivity_timeout_sec`, default 30s) and displays the inverted awake badge. LVGL native `lv_indev` owns buttons. Between user interactions, DFS drops CPU to 80 MHz baseline. Any user click resets the inactivity timer. After the configured inactivity period elapses, system executes coordinated transition to deep sleep.
    - **External RTC Timer Wake (Unattended Refresh):** Initiated when PCF85063A countdown timer reaches zero on `GPIO 5`. The dual-core processor boots, renders the updated telemetry dashboard to the E-Paper panel, flushes the framebuffer, and **goes right back to sleep immediately** once the display update completes to preserve battery power.
-   - **First / Cold Boot:** Initiated by initial battery insertion or power-on. System boots, executes hardware self-tests, renders initial screen, and waits the configured `inactivity_timeout_sec` for potential user interaction before entering initial deep sleep.
+   - **Boot:** Initiated by initial battery insertion or power-on. System boots, executes hardware self-tests, renders initial screen, and waits the configured `inactivity_timeout_sec` for potential user interaction before entering initial deep sleep.
 3. **Deterministic 8-Step Sleep Transition Sequence (`orch_flow_transition_to_sleep`):**
    1. Drain LVGL rendering and flush pipeline completely (`h1os_lvgl_has_pending_tasks()`).
    2. Wait for audio playback idle and hardware soft-mute zero-cross ramp (`sub_audio_wait_idle()`).

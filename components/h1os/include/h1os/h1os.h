@@ -78,7 +78,7 @@ typedef void (*h1os_chime_cb_t)    (h1os_chime_type_t type, void *user_data);
 
 typedef struct {
     /* Core Lifecycle Execution Hooks */
-    h1os_boot_cb_t      on_boot;       ///< Cold boot / power-on reset hook
+    h1os_boot_cb_t      on_boot;       ///< System boot / power-on reset hook
     h1os_wake_cb_t      on_wake;       ///< Interactive wake hook (Timer / RTC Alarm / Button Tap)
     h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to entering deep sleep
     h1os_shutdown_cb_t  on_shutdown;   ///< Hook executed immediately prior to battery cut

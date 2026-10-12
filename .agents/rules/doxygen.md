@@ -58,7 +58,7 @@ Use trailing `/**< ... */` comments for members and enumerators:
  */
 typedef struct {
     uint32_t magic;                    /**< Sentinel validation magic word (0x48314F53). */
-    uint32_t boot_count;               /**< Total monotonic cold and warm boot cycles. */
+    uint32_t boot_count;               /**< Total monotonic system boot cycles. */
     uint16_t last_vbat_mv;             /**< Last sampled battery terminal voltage in mV. */
     uint8_t  epd_partial_refresh_count;/**< Quota counter for panel DC bias clearing. */
 } orch_persisted_state_t;

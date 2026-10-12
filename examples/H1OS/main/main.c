@@ -129,7 +129,7 @@ static void keypad_event_cb(lv_event_t *e)
  * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
-    ESP_LOGI(TAG, "Lifecycle: COLD BOOT initialized");
+    ESP_LOGI(TAG, "Lifecycle: BOOT initialized");
     s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 

@@ -1216,8 +1216,8 @@ Defined in components/h1os/include/h1os/orch_flow.h:24
 
 | Value | Description |
 |-------|-------------|
-| `ORCH_FLOW_COLD_BOOT` |  |
-| `ORCH_FLOW_A_SAMPLE` | Headless <4ms sensor sample burst. |
+| `ORCH_FLOW_BOOT` | Initial system boot / power-on reset. |
+| `ORCH_FLOW_A_SAMPLE` | Headless sensor sample burst. |
 | `ORCH_FLOW_B_MAIN_WAKE` | Full UI wake / Button wake / RTC timer expiry. |
 | `ORCH_FLOW_BOOTLOADER_JUMP` | ROM bootloader download mode. |
 | `ORCH_FLOW_CRITICAL_OFF` | Low battery shutdown or power cut. |
@@ -4747,7 +4747,7 @@ Defined in components/h1os/include/h1os/orch_state.h:94
 
 Retrieve pointer to the persistent state in RTC Slow Memory.
 
-Initializes default structure on cold boot magic mismatch.
+Initializes default structure on boot magic mismatch.
 
 ---
 
@@ -4967,7 +4967,7 @@ Defined in components/h1os/src/orch_state.c:14
 
 Retrieve pointer to the persistent state in RTC Slow Memory.
 
-Initializes default structure on cold boot magic mismatch.
+Initializes default structure on boot magic mismatch.
 
 ---
 
@@ -7196,7 +7196,7 @@ Defined in components/h1os/include/h1os/h1os.h:79
 
 | Return | Name | Description |
 |--------|------|-------------|
-| [`h1os_boot_cb_t`](#h1os_boot_cb_t) | [`on_boot`](#on_boot)  | Cold boot / power-on reset hook. |
+| [`h1os_boot_cb_t`](#h1os_boot_cb_t) | [`on_boot`](#on_boot)  | System boot / power-on reset hook. |
 | [`h1os_wake_cb_t`](#h1os_wake_cb_t) | [`on_wake`](#on_wake)  | Interactive wake hook (Timer / RTC Alarm / Button Tap). |
 | [`h1os_pre_sleep_cb_t`](#h1os_pre_sleep_cb_t) | [`on_pre_sleep`](#on_pre_sleep)  | Hook executed immediately prior to entering deep sleep. |
 | [`h1os_shutdown_cb_t`](#h1os_shutdown_cb_t) | [`on_shutdown`](#on_shutdown)  | Hook executed immediately prior to battery cut. |
@@ -7216,7 +7216,7 @@ Type: [`h1os_boot_cb_t`](#h1os_boot_cb_t)
 
 Defined in components/h1os/include/h1os/h1os.h:81
 
-Cold boot / power-on reset hook.
+System boot / power-on reset hook.
 
 ---
 

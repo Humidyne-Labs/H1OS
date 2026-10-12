@@ -103,7 +103,7 @@ Applications define declarative lifecycle hooks:
 #include "h1os/h1os_lvgl.h"
 
 static void app_on_boot(void *user_data) {
-    ESP_LOGI("APP", "Cold boot initialized");
+    ESP_LOGI("APP", "Boot initialized");
 }
 
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data) {

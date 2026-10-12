@@ -89,7 +89,7 @@ typedef struct {
 
 /**
  * @brief Retrieve pointer to the persistent state in RTC Slow Memory.
- * Initializes default structure on cold boot magic mismatch.
+ * Initializes default structure on boot magic mismatch.
  */
 orch_persisted_state_t* orch_state_get(void);
 

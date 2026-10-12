@@ -23,7 +23,7 @@ The table below defines the exact hardware assignment, physical pins, electrical
 ### Rule 1: BAT_CTRL (GPIO 17) Power Latch
 - **Hardware Circuit:** The battery power gate requires `GPIO 17` held HIGH to keep the main system LDO regulator enabled.
 - **Boot Requirement:** Asserted HIGH strictly in the 2nd-stage bootloader (`h1os_boot_hook`) and locked via RTC IO domain pad hold (`rtc_gpio_hold_en(GPIO_NUM_17)`).
-- **Deep Sleep:** Persists across deep sleep and warm resets via the hardware RTC IO pad hold and `esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON)`.
+- **Deep Sleep:** Persists across deep sleep and wake cycles via the hardware RTC IO pad hold and `esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON)`.
 - **System Off:** `hal_io_release_power_latch()` disables the RTC pad hold and drives `GPIO 17 = 0` to drop the regulator gate.
 
 ### Rule 2: EPD_3V3_EN (GPIO 6) Peripheral & E-Paper Rail

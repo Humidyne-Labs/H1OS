@@ -147,12 +147,12 @@ The Orchestrator determines sleep timing based on the origin of the wake event:
 2. **External RTC Timer Wake (`ULP_DISPATCH_MAIN_WAKE` from PCF85063A Countdown Timer):**
    - Woken purely to execute the periodic environmental screen update.
    - Renders telemetry to the E-Paper panel (with standard non-inverted sleep badge), flushes the framebuffer, waits for panel BUSY line release, and **goes right back to sleep immediately** without idling or waiting for user interaction.
-3. **Cold Boot (`ORCH_FLOW_COLD_BOOT`):**
+3. **Boot (`ORCH_FLOW_BOOT`):**
    - Fresh power application or battery insertion.
    - System runs hardware bring-up, renders initial UI, and **waits the configured inactivity timeout** (`session.inactivity_timeout_sec`, default 30s) for potential user interaction or debug before entering initial deep sleep.
 
 #### Deterministic 8-Step Sleep Transition Sequence
-When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the 30-second user/cold-boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic 8-step sleep transition sequence:
+When Flow B enters sleep (either immediately after an RTC screen update, upon expiration of the user/boot inactivity timer, or on an explicit `h1os_sleep()` call), `orch_flow` executes the deterministic 8-step sleep transition sequence:
 1. **LVGL Frame Pipeline Drain:** Wait for LVGL render and flush pipeline to drain completely (`h1os_lvgl_has_pending_tasks()`).
 2. **Audio Subsystem Teardown:** Wait for any background audio playback and hardware soft-ramp teardown to complete (`sub_audio_wait_idle()`).
 3. **Hardware Panel Busy Wait:** Wait for SSD1681 `EPD_BUSY` (`GPIO 8`) to release LOW (`sub_display_wait_busy()`).
@@ -164,7 +164,7 @@ When Flow B enters sleep (either immediately after an RTC screen update, upon ex
 
 ```c
 typedef enum {
-    ORCH_FLOW_COLD_BOOT = 0,
+    ORCH_FLOW_BOOT = 0,
     ORCH_FLOW_A_SAMPLE,
     ORCH_FLOW_B_MAIN_WAKE,
     ORCH_FLOW_BOOTLOADER_JUMP,
