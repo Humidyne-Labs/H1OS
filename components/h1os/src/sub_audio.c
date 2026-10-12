@@ -250,3 +250,56 @@ esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
     /* Return to zero-heat deep standby */
     return sub_audio_standby();
 }
+
+esp_err_t sub_audio_play_chime(uint8_t type)
+{
+    ESP_LOGI(TAG, "Playing acoustic presentation chime (Type %u)...", type);
+
+    switch (type) {
+        case 0: /* H1OS_CHIME_BOOT: 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
+            sub_audio_play_tone(523, 70);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(659, 70);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(784, 70);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(1046, 150);
+            break;
+
+        case 1: /* H1OS_CHIME_WAKE: 2-tone crisp wake (784 -> 1046 Hz) */
+            sub_audio_play_tone(784, 60);
+            vTaskDelay(pdMS_TO_TICKS(10));
+            sub_audio_play_tone(1046, 120);
+            break;
+
+        case 2: /* H1OS_CHIME_SLEEP: 3-tone descending cadence (1046 -> 784 -> 659 Hz) */
+            sub_audio_play_tone(1046, 80);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(784, 80);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(659, 140);
+            break;
+
+        case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down cadence (784 -> 659 -> 523 Hz) */
+            sub_audio_play_tone(784, 90);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(659, 90);
+            vTaskDelay(pdMS_TO_TICKS(15));
+            sub_audio_play_tone(523, 180);
+            break;
+
+        case 4: /* H1OS_CHIME_ALARM: Attention pulses */
+            for (int i = 0; i < 2; i++) {
+                sub_audio_play_tone(1760, 80);
+                vTaskDelay(pdMS_TO_TICKS(10));
+                sub_audio_play_tone(880, 80);
+                vTaskDelay(pdMS_TO_TICKS(20));
+            }
+            break;
+
+        default:
+            return ESP_ERR_INVALID_ARG;
+    }
+
+    return ESP_OK;
+}

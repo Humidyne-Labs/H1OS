@@ -76,22 +76,29 @@ static void update_active_display(void)
  * ========================================================================= */
 static void keypad_event_cb(lv_event_t *e)
 {
-    uint32_t key = lv_event_get_key(e);
+    lv_event_code_t code = lv_event_get_code(e);
 
-    if (key == LV_KEY_RIGHT || key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
-        // BOOT Button (Forward Cycle)
-        sub_audio_play_tone(2400, 15);
-        s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
-        ESP_LOGI(TAG, "Keypad forward: Navigating to page %u/%u",
-                 s_app_state.active_page + 1, H1OS_NUM_SCREENS);
-        update_active_display();
-    } else if (key == LV_KEY_LEFT || key == LV_KEY_PREV) {
-        // POWER Button Short-Click (Backward Cycle)
-        sub_audio_play_tone(1800, 15);
-        s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-        ESP_LOGI(TAG, "Keypad reverse: Navigating to page %u/%u",
-                 s_app_state.active_page + 1, H1OS_NUM_SCREENS);
-        update_active_display();
+    if (code == LV_EVENT_KEY) {
+        uint32_t key = lv_event_get_key(e);
+        if (key == LV_KEY_RIGHT || key == LV_KEY_NEXT || key == LV_KEY_ENTER) {
+            // BOOT Button Short-Click: Forward Cycle
+            sub_audio_play_tone(2400, 15);
+            s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
+            ESP_LOGI(TAG, "Keypad forward: Navigating to page %u/%u",
+                     s_app_state.active_page + 1, H1OS_NUM_SCREENS);
+            update_active_display();
+        } else if (key == LV_KEY_LEFT || key == LV_KEY_PREV) {
+            // POWER Button Short-Click: Reverse Cycle
+            sub_audio_play_tone(1800, 15);
+            s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
+            ESP_LOGI(TAG, "Keypad reverse: Navigating to page %u/%u",
+                     s_app_state.active_page + 1, H1OS_NUM_SCREENS);
+            update_active_display();
+        }
+    } else if (code == LV_EVENT_LONG_PRESSED) {
+        // Native LVGL Long-Press Detection (>= 2.0s on focused input)
+        ESP_LOGI(TAG, "Keypad: Native LVGL long-press detected! Initiating system shutdown...");
+        h1os_shutdown();
     }
 }
 
@@ -103,11 +110,6 @@ static void app_on_boot(void *user_data)
     ESP_LOGI(TAG, "Lifecycle: COLD BOOT initialized");
     s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
-
-    // Initial audio cue: 2-tone harmonic chord (1046 Hz -> 1318 Hz)
-    sub_audio_play_tone(1046, 40);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    sub_audio_play_tone(1318, 60);
 
     // Probe MicroSD card
     sub_sdcard_mount();
@@ -158,7 +160,8 @@ void app_main(void)
         .presentation = {
             .on_splash              = NULL,
             .on_chime               = NULL,
-            .chime_mask             = 0,
+            .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_WAKE) | 
+                                      (1 << H1OS_CHIME_SLEEP) | (1 << H1OS_CHIME_SHUTDOWN),
         },
         .session = {
             .inactivity_timeout_sec = 30,

@@ -27,7 +27,7 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
     }
     if (event_cb != NULL) {
         lv_obj_remove_event_cb(scr, event_cb);
-        lv_obj_add_event_cb(scr, event_cb, LV_EVENT_KEY, NULL);
+        lv_obj_add_event_cb(scr, event_cb, LV_EVENT_ALL, NULL);
     }
     lv_group_remove_obj(scr);
     lv_group_add_obj(def_grp, scr);

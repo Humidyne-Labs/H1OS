@@ -2,23 +2,19 @@
 """
 generate_1bpp_fonts.py
 ======================
-Automated Bilevel (1-bpp) Font Generation Tool for ESP32-S3 E-Paper BSP & LVGL v9.
+Automated Bilevel (1-bpp) Font Generation Tool for ESP32-S3 E-Paper BSP & H1OS.
 
 Author: HUMIDYNE LABS / Humiditron
 License: Apache-2.0
 
 Overview:
 ---------
-Standard LVGL fonts use 4-bpp anti-aliasing (16 levels of gray). On 1-bit monochrome
-electrophoretic displays (EPD / E-Ink), downsampling anti-aliased glyphs into 1-bit
-space causes severe stroke erosion and pixel disintegration when rendered as inverted
-white text on solid black backgrounds.
+Standard LVGL fonts use 4-bpp anti-aliasing. On 1-bit monochrome electrophoretic
+displays (EPD / E-Ink), anti-aliasing causes severe stroke erosion.
 
-This script uses `lv_font_conv` (via npx/Node.js) to convert TTF/WOFF font sources
-into true 1-bit bilevel C bitmap descriptors (`--bpp 1`), ensuring:
-  1. Identical stroke weight in both normal (black-on-white) and inverted (white-on-black) modes.
-  2. Approximately 50% reduction in flash footprint compared to 4-bpp fonts.
-  3. Seamless integration into `components/esp32-s3_bsp/src/`.
+This script leverages LVGL's bundled font sources (Montserrat-Medium, DejaVuSans,
+FontAwesome5) and their official license files to synthesize crisp 1-bit bilevel
+C font descriptors during build-time.
 """
 
 import os
@@ -28,11 +24,18 @@ import subprocess
 import argparse
 from pathlib import Path
 
-# Standard glyph ranges for embedded UI: ASCII + Degree symbol + Bullet point
-DEFAULT_UNICODE_RANGE = "0x20-0x7F,0xB0,0x2022"
+# Scientific & Math extensions:
+# 0x20-0x7F: ASCII printable
+# 0xB0: Degree (°)
+# 0xB2: Superscript 2 (²)
+# 0xB3: Superscript 3 (³)
+# 0xB5: Micro (µ)
+# 0x394: Greek Delta (Δ)
+# 0x2022: Bullet (•)
+# 0x2190-0x2193: Arrows (←, ↑, →, ↓)
+DEFAULT_UNICODE_RANGE = "0x20-0x7F,0xB0,0xB2,0xB3,0xB5,0x394,0x2022,0x2190-0x2193"
 
-# Key FontAwesome 5 symbols commonly used in IoT / telemetry dashboards
-# (e.g. battery gauges, wifi bars, thermometer, drop, exclamation, cog, etc.)
+# Built-in FontAwesome 5 symbols matching LVGL official built_in_font_gen.py
 DEFAULT_FONTAWESOME_ICONS = (
     "61441,61448,61451,61452,61453,61457,61459,61461,61465,61468,"
     "61473,61478,61479,61480,61502,61507,61512,61515,61516,61517,"
@@ -42,34 +45,13 @@ DEFAULT_FONTAWESOME_ICONS = (
     "62018,62019,62020,62087,62099,62212,62189,62810,63426,63650"
 )
 
-def find_font_sources(repo_root: Path):
-    """Attempt to locate Montserrat and FontAwesome source files."""
-    candidates_ttf = [
-        repo_root.parent / "assets" / "tool_harness" / "lvgl-9.6.0" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
-        repo_root / "examples" / "Peripherals_Test_Suite" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
-        repo_root / "examples" / "H1OS" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
-        repo_root / "examples" / "OSDemo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
-        repo_root / "examples" / "Unified_Environmental_Demo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "Montserrat-Medium.ttf",
-    ]
-    candidates_fa = [
-        repo_root.parent / "assets" / "tool_harness" / "lvgl-9.6.0" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
-        repo_root / "examples" / "Peripherals_Test_Suite" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
-        repo_root / "examples" / "H1OS" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
-        repo_root / "examples" / "OSDemo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
-        repo_root / "examples" / "Unified_Environmental_Demo" / "managed_components" / "lvgl__lvgl" / "scripts" / "generators" / "built_in_font" / "FontAwesome5-Solid+Brands+Regular.woff",
-    ]
-
-    ttf_path = next((p for p in candidates_ttf if p.is_file()), None)
-    fa_path = next((p for p in candidates_fa if p.is_file()), None)
-    return ttf_path, fa_path
-
-def generate_font(size: int, ttf_path: Path, fa_path: Path, output_file: Path, font_symbol_name: str):
+def generate_font(size: int, font_path: Path, fa_path: Path, output_file: Path, font_symbol_name: str):
     """Invoke lv_font_conv and patch include header."""
     cmd = [
         "npx", "lv_font_conv",
         "--size", str(size),
         "--bpp", "1",
-        "--font", str(ttf_path),
+        "--font", str(font_path),
         "-r", DEFAULT_UNICODE_RANGE,
     ]
     if fa_path and fa_path.is_file():
@@ -93,10 +75,9 @@ def generate_font(size: int, ttf_path: Path, fa_path: Path, output_file: Path, f
         print(f"[!] Error generating font:\n{res.stderr}")
         return False
 
-    # Patch header for ESP-IDF component structure
+    # Patch header for standard include
     if output_file.is_file():
         content = output_file.read_text(encoding="utf-8")
-        # Replace conditional lvgl include with standard #include "lvgl.h"
         if '#ifdef LV_LVGL_H_INCLUDE_SIMPLE' in content:
             old_block = (
                 '#ifdef LV_LVGL_H_INCLUDE_SIMPLE\n'
@@ -107,38 +88,133 @@ def generate_font(size: int, ttf_path: Path, fa_path: Path, output_file: Path, f
             )
             content = content.replace(old_block, '#include "lvgl.h"')
             output_file.write_text(content, encoding="utf-8")
-
-        size_kb = output_file.stat().st_size / 1024.0
-        print(f"[+] Successfully wrote {output_file.name} ({size_kb:.1f} KB)")
         return True
     return False
 
+def generate_header(out_dir: Path, montserrat_sizes, dejavu_sizes):
+    """Generate master h1os_fonts.h header file."""
+    header_path = out_dir / "h1os_fonts.h"
+    lines = [
+        "/**",
+        " * @file h1os_fonts.h",
+        " * @brief H1OS Build-Time Generated 1-BPP Bilevel Typography Suite",
+        " *",
+        " * Auto-generated by tools/generate_1bpp_fonts.py",
+        " * SPDX-License-Identifier: MIT / SIL OFL",
+        " */",
+        "",
+        "#pragma once",
+        "",
+        '#include "lvgl.h"',
+        "",
+        "#ifdef __cplusplus",
+        'extern "C" {',
+        "#endif",
+        "",
+        "/* =========================================================================",
+        " * 1-Bit Packed Binary Typography (Montserrat Proportional + FA5 + Math)",
+        " * ========================================================================= */",
+    ]
+
+    for sz in montserrat_sizes:
+        lines.append(f"extern const lv_font_t h1os_font_montserrat_{sz}_1bpp;")
+        lines.append(f"#define H1OS_FONT_{sz} (&h1os_font_montserrat_{sz}_1bpp)")
+
+    lines.extend([
+        "",
+        "/* =========================================================================",
+        " * 1-Bit Packed Binary Typography (DejaVuSans Tabular/Data + Math)",
+        " * ========================================================================= */",
+    ])
+
+    for sz in dejavu_sizes:
+        lines.append(f"extern const lv_font_t h1os_font_dejavu_{sz}_1bpp;")
+        lines.append(f"#define H1OS_FONT_DEJAVU_{sz} (&h1os_font_dejavu_{sz}_1bpp)")
+        lines.append(f"#define H1OS_FONT_MONO_{sz}   (&h1os_font_dejavu_{sz}_1bpp)")
+
+    lines.extend([
+        "",
+        "#ifdef __cplusplus",
+        "}",
+        "#endif",
+        ""
+    ])
+
+    header_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[+] Successfully wrote {header_path.name}")
+
+def copy_licenses(lvgl_dir: Path, out_dir: Path):
+    """Copy license files into the generated licenses folder."""
+    lic_src = lvgl_dir / "font_license"
+    lic_dst = out_dir / "licenses"
+    lic_dst.mkdir(parents=True, exist_ok=True)
+
+    if (lic_src / "Montserrat" / "OFL.txt").is_file():
+        shutil.copy2(lic_src / "Montserrat" / "OFL.txt", lic_dst / "Montserrat_OFL.txt")
+    if (lic_src / "DejaVuSans" / "LICENSE").is_file():
+        shutil.copy2(lic_src / "DejaVuSans" / "LICENSE", lic_dst / "DejaVuSans_LICENSE.txt")
+    if (lic_src / "FontAwesome5" / "LICENSE.txt").is_file():
+        shutil.copy2(lic_src / "FontAwesome5" / "LICENSE.txt", lic_dst / "FontAwesome5_LICENSE.txt")
+
+    readme = lic_dst / "README.md"
+    readme.write_text(
+        "# H1OS 1-BPP Typography Licenses\n\n"
+        "This directory contains the licenses for fonts incorporated into H1OS:\n"
+        "- **Montserrat-Medium**: Licensed under the SIL Open Font License (OFL).\n"
+        "- **DejaVuSans**: Licensed under the Bitstream Vera / Arev Fonts License.\n"
+        "- **FontAwesome5**: Licensed under the Font Awesome Free License.\n",
+        encoding="utf-8"
+    )
+    print(f"[+] Successfully copied font license files to {lic_dst}")
+
 def main():
-    parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for ESP32-S3 e-Paper BSP")
-    parser.add_argument("--sizes", nargs="+", type=int, default=[14, 20], help="Font pixel sizes to generate (default: 14 20)")
-    parser.add_argument("--out-dir", type=str, default="components/esp32-s3_bsp/src", help="Target output directory")
+    parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for H1OS from LVGL font assets")
+    parser.add_argument("--lvgl-font-dir", type=str, required=True, help="Path to LVGL built_in_font directory")
+    parser.add_argument("--out-dir", type=str, required=True, help="Target output directory")
+    parser.add_argument("--all", action="store_true", help="Generate all standard H1OS font sizes")
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent
-    out_dir = (repo_root / args.out_dir).resolve()
+    lvgl_dir = Path(args.lvgl_font_dir).resolve()
+    out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    ttf_path, fa_path = find_font_sources(repo_root)
-    if not ttf_path:
-        print("[!] Could not locate Montserrat-Medium.ttf in standard asset/component paths.")
+    montserrat_ttf = lvgl_dir / "Montserrat-Medium.ttf"
+    dejavu_ttf = lvgl_dir / "DejaVuSans.ttf"
+    fa_woff = lvgl_dir / "FontAwesome5-Solid+Brands+Regular.woff"
+
+    if not montserrat_ttf.is_file():
+        print(f"[!] Could not locate {montserrat_ttf}")
+        sys.exit(1)
+    if not dejavu_ttf.is_file():
+        print(f"[!] Could not locate {dejavu_ttf}")
         sys.exit(1)
 
-    print(f"[*] TTF Source: {ttf_path}")
-    print(f"[*] FontAwesome Source: {fa_path if fa_path else 'None'}")
+    montserrat_sizes = [14, 16, 18, 20, 24, 32]
+    dejavu_sizes = [14, 16, 20]
 
-    for size in args.sizes:
-        sym_name = f"bsp_font_montserrat_{size}_1bpp"
+    # Generate Montserrat suite
+    for sz in montserrat_sizes:
+        sym_name = f"h1os_font_montserrat_{sz}_1bpp"
         out_file = out_dir / f"{sym_name}.c"
-        success = generate_font(size, ttf_path, fa_path, out_file, sym_name)
+        success = generate_font(sz, montserrat_ttf, fa_woff, out_file, sym_name)
         if not success:
-            print(f"[!] Failed to generate size {size}")
+            sys.exit(1)
 
-    print("\n[+] Font generation completed successfully.")
+    # Generate DejaVu suite (tabular / data)
+    for sz in dejavu_sizes:
+        sym_name = f"h1os_font_dejavu_{sz}_1bpp"
+        out_file = out_dir / f"{sym_name}.c"
+        success = generate_font(sz, dejavu_ttf, None, out_file, sym_name)
+        if not success:
+            sys.exit(1)
+
+    # Generate Master Header
+    generate_header(out_dir, montserrat_sizes, dejavu_sizes)
+
+    # Copy Licenses
+    copy_licenses(lvgl_dir, out_dir)
+
+    print("\n[+] H1OS build-time typography generation complete.")
 
 if __name__ == "__main__":
     main()

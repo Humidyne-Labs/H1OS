@@ -48,23 +48,17 @@ static uint32_t lvgl_tick_get_cb(void) {
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
-static uint32_t s_prev_btn_state = 0;
-
 static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_RELEASED;
     data->key   = 0;
 
     uint32_t btns = (uint32_t)hal_io_read_buttons();
 
-    /* Edge detection: only fire when a button transitions from 0 -> 1 */
-    uint32_t newly_pressed = btns & (~s_prev_btn_state);
-    s_prev_btn_state = btns;
-
-    if (newly_pressed & HAL_BTN_BOOT) {
+    if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_RIGHT;
         h1os_reset_session_timer();
-    } else if (newly_pressed & HAL_BTN_POWER) {
+    } else if (btns & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_LEFT;
         h1os_reset_session_timer();
@@ -189,8 +183,9 @@ esp_err_t h1os_lvgl_init(void)
     if (s_lv_keypad_indev != NULL) {
         lv_indev_set_type(s_lv_keypad_indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
+        lv_indev_set_long_press_time(s_lv_keypad_indev, 2000); /* 2.0s hold for shutdown */
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
-        ESP_LOGI(TAG, "Registered LVGL keypad indev handler");
+        ESP_LOGI(TAG, "Registered LVGL keypad indev handler (Long-press: 2000ms)");
     }
 
     ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode");

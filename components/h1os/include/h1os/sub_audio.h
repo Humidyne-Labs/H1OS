@@ -45,6 +45,14 @@ esp_err_t sub_audio_standby(void);
  */
 esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms);
 
+/**
+ * @brief Play standard H1OS acoustic presentation chime.
+ *
+ * @param[in] type Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM).
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_play_chime(uint8_t type);
+
 #ifdef __cplusplus
 }
 #endif

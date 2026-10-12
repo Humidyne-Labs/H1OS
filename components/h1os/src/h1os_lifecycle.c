@@ -45,33 +45,19 @@ void h1os_reset_session_timer(void)
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
 
+static void h1os_trigger_chime(h1os_chime_type_t type)
+{
+    if (s_app_lifecycle.presentation.on_chime != NULL) {
+        s_app_lifecycle.presentation.on_chime(type, s_app_lifecycle.user_data);
+    } else if (s_app_lifecycle.presentation.chime_mask & (1 << type)) {
+        sub_audio_play_chime((uint8_t)type);
+    }
+}
+
 static void h1os_session_monitor_task(void *arg)
 {
-    uint32_t pwr_held_ms = 0;
-
     while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        /* Long-press detection on Hardware Power Key (GPIO 18 / BAT_KEY) */
-        if (hal_io_button_is_pressed(HAL_PIN_BUTTON_POWER)) {
-            pwr_held_ms += 100;
-            if (pwr_held_ms >= 2000) {
-                ESP_LOGI(TAG, "Power button long-press detected (>= 2.0s). Initiating system shutdown...");
-                s_session_running = false;
-
-                /* Synthesize descending shutdown tone (1046 Hz -> 784 Hz -> 523 Hz) */
-                sub_audio_play_tone(1046, 50);
-                vTaskDelay(pdMS_TO_TICKS(15));
-                sub_audio_play_tone(784, 50);
-                vTaskDelay(pdMS_TO_TICKS(15));
-                sub_audio_play_tone(523, 100);
-
-                h1os_shutdown();
-                break;
-            }
-        } else {
-            pwr_held_ms = 0;
-        }
+        vTaskDelay(pdMS_TO_TICKS(500));
 
         /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
@@ -147,9 +133,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         }
     }
 
-    if (s_app_lifecycle.on_boot && flow == ORCH_FLOW_COLD_BOOT) {
-        s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
+    if (flow == ORCH_FLOW_COLD_BOOT) {
+        h1os_trigger_chime(H1OS_CHIME_BOOT);
+        if (s_app_lifecycle.on_boot) {
+            s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
+        }
     } else if (s_app_lifecycle.on_wake) {
+        h1os_trigger_chime(H1OS_CHIME_WAKE);
         h1os_wake_context_t ctx = {
             .reset_reason = esp_reset_reason(),
             .wakeup_causes = causes,
@@ -232,6 +222,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
+    h1os_trigger_chime(H1OS_CHIME_SLEEP);
     if (s_app_lifecycle.on_pre_sleep) {
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
@@ -241,6 +232,7 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
 void h1os_shutdown(void)
 {
     ESP_LOGI(TAG, "Executing system shutdown and battery power cut...");
+    h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
