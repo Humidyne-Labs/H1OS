@@ -104,9 +104,23 @@ esp_err_t sub_audio_init(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0); /* Keep amplifier muted initially */
     vTaskDelay(pdMS_TO_TICKS(15));
 
-    /* 2. Configure I2S TX Channel (16-bit 16kHz Philips Master with MCLK) */
+    /* 2. Probe ES8311 silicon over I2C */
+    uint8_t chip_id_reg = 0xFD;
+    uint8_t chip_id[2] = {0};
+    esp_err_t err = hal_i2c_write_read(HAL_I2C_ADDR_ES8311, &chip_id_reg, 1, chip_id, 2, 50);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "ES8311 Codec I2C Probe: Detected Chip ID 0x%02X%02X (Expected: 0x8311)", chip_id[0], chip_id[1]);
+    } else {
+        ESP_LOGW(TAG, "ES8311 Codec I2C Probe failed (%s) - attempting init anyway", esp_err_to_name(err));
+    }
+
+    /* 3. Configure I2S TX Channel (16-bit 16kHz Philips Master with MCLK) */
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-    esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
+    chan_cfg.auto_clear   = true;
+    chan_cfg.dma_desc_num = 4;
+    chan_cfg.dma_frame_num = 256;
+
+    err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2S TX channel: %s", esp_err_to_name(err));
         return err;
@@ -128,6 +142,9 @@ esp_err_t sub_audio_init(void)
             },
         },
     };
+    std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256; /* 16 kHz * 256 = 4.096 MHz required for ES8311 PLL */
+    std_cfg.slot_cfg.slot_mask    = I2S_STD_SLOT_LEFT;
+
     err = i2s_channel_init_std_mode(s_tx_chan, &std_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init I2S std mode: %s", esp_err_to_name(err));
@@ -136,17 +153,19 @@ esp_err_t sub_audio_init(void)
         return err;
     }
 
-    /* 3. Enable I2S channel to supply MCLK/BCLK during codec register setup */
+    /* 4. Enable I2S channel to supply MCLK/BCLK during codec register setup */
     i2s_channel_enable(s_tx_chan);
     vTaskDelay(pdMS_TO_TICKS(5));
 
-    /* 4. Initialize complete 22-register ES8311 clock tree and DAC */
+    /* 5. Initialize complete 22-register ES8311 clock tree and DAC */
     err = es8311_init_dac_registers();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
+    } else {
+        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono)");
     }
 
-    /* 5. Park in zero-heat standby until audio playback is requested */
+    /* 6. Park in zero-heat standby until audio playback is requested */
     sub_audio_standby();
 
     s_audio_inited = true;
@@ -224,6 +243,9 @@ esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
         i2s_channel_write(s_tx_chan, buffer, chunk_size * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
+
+    /* Wait for DMA ring buffer to finish playing through codec DAC before sleep */
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     /* Return to zero-heat deep standby */
     return sub_audio_standby();

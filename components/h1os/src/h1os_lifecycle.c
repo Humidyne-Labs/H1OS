@@ -22,6 +22,7 @@
 #include "h1os.h"
 
 #include "sub_rtc.h"
+#include "sub_audio.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -46,8 +47,33 @@ void h1os_reset_session_timer(void)
 
 static void h1os_session_monitor_task(void *arg)
 {
+    uint32_t pwr_held_ms = 0;
+
     while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        /* Long-press detection on Hardware Power Key (GPIO 18 / BAT_KEY) */
+        if (hal_io_button_is_pressed(HAL_PIN_BUTTON_POWER)) {
+            pwr_held_ms += 100;
+            if (pwr_held_ms >= 2000) {
+                ESP_LOGI(TAG, "Power button long-press detected (>= 2.0s). Initiating system shutdown...");
+                s_session_running = false;
+
+                /* Synthesize descending shutdown tone (1046 Hz -> 784 Hz -> 523 Hz) */
+                sub_audio_play_tone(1046, 50);
+                vTaskDelay(pdMS_TO_TICKS(15));
+                sub_audio_play_tone(784, 50);
+                vTaskDelay(pdMS_TO_TICKS(15));
+                sub_audio_play_tone(523, 100);
+
+                h1os_shutdown();
+                break;
+            }
+        } else {
+            pwr_held_ms = 0;
+        }
+
+        /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
             ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
@@ -102,6 +128,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
     h1os_lvgl_init();
+    sub_audio_init();
 
     bool is_rtc_wake = false;
     uint32_t causes = esp_sleep_get_wakeup_causes();

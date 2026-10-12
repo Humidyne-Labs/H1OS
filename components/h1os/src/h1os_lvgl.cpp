@@ -66,7 +66,7 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
         h1os_reset_session_timer();
     } else if (newly_pressed & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
-        data->key   = LV_KEY_ENTER;
+        data->key   = LV_KEY_LEFT;
         h1os_reset_session_timer();
     }
 }

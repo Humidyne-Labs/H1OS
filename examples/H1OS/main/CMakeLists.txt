@@ -2,8 +2,14 @@ idf_component_register(
     SRCS 
         "main.c"
         "battery_estimator.c"
+        "screens/screen_base.c"
+        "screens/screen_env_hero.c"
+        "screens/screen_psychrometrics.c"
+        "screens/screen_system_health.c"
+        "screens/screen_diagnostics.c"
     INCLUDE_DIRS 
         "."
+        "screens"
     REQUIRES 
         h1os
         freertos
