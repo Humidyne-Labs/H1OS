@@ -1,5 +1,6 @@
 *.lock
-/.agents/
+# Tracking .agents workspace skills and rules
+# /.agents/
 build/
 build_*/
 sdkconfig
