@@ -54,10 +54,14 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 is an integrated, battery-powered IoT har
 H1OS enforces a strict unidirectional dependency model: **Upper layers call lower layers; lower layers NEVER call up or cross-talk.**
 
 ```mermaid
-flowchart TD
-    L4["Layer 4: Application API & Lifecycle<br/>(h1os.h, h1os_lvgl.h, h1os_time.h)"] --> L3["Layer 3: Orchestration Engine & Coprocessor Monitor<br/>(orch_flow, orch_math, orch_state, ULP)"]
-    L3 --> L2["Layer 2: Peripheral Subsystems<br/>(sub_display, sub_sensor, sub_rtc, sub_power, sub_audio, sub_sdcard)"]
-    L2 --> L1["Layer 1: Hardware Abstraction Layer (HAL)<br/>(hal_io, hal_i2c, hal_spi, hal_flash)"]
+graph TD;
+    L4["Layer 4: Application API and Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h)"];
+    L3["Layer 3: Orchestration Engine and Coprocessor Monitor (orch_flow, orch_math, orch_state, ULP)"];
+    L2["Layer 2: Peripheral Subsystems (sub_display, sub_sensor, sub_rtc, sub_power, sub_audio, sub_sdcard)"];
+    L1["Layer 1: Hardware Abstraction Layer (hal_io, hal_i2c, hal_spi, hal_flash)"];
+    L4-->L3;
+    L3-->L2;
+    L2-->L1;
 ```
 
 ---

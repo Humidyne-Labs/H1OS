@@ -30,13 +30,13 @@ The SHTC3 is a stateless, low-power environmental sensor that operates using 16-
 The SHTC3 readout sequence is strictly:
 
 ```mermaid
-flowchart LR
-    Wake["I2C WAKE (0x3517)"] --> Delay1["Delay 250 µs"]
-    Delay1 --> Meas["I2C MEAS NORMAL (0x7866)"]
-    Meas --> Delay2["Conversion Wait (13–15 ms)"]
-    Delay2 --> Read["I2C READ 6 Bytes"]
-    Read --> Sleep["I2C SLEEP (0xB098)"]
-    Sleep --> CRC["Verify CRC-8"]
+graph LR;
+    Wake["I2C WAKE (0x3517)"]-->Delay1["Delay 250 us"];
+    Delay1-->Meas["I2C MEAS NORMAL (0x7866)"];
+    Meas-->Delay2["Conversion Wait (13-15 ms)"];
+    Delay2-->Read["I2C READ 6 Bytes"];
+    Read-->Sleep["I2C SLEEP (0xB098)"];
+    Sleep-->CRC["Verify CRC-8"];
 ```
 
 ### 6-Byte Read Payload

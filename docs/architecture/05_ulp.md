@@ -12,15 +12,14 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 ## 2. Core Responsibilities & Silicon Boundaries
 
 ```mermaid
-flowchart TD
-    ULP["ULP-RISC-V Reactive Monitor<br/>(Sleeps in RTC Slow Domain until hardware event)"]
-    ADC["ADC1 Channel 3 (Battery Divider)<br/>• 12 dB Attenuation<br/>• eFuse Curve Hand-Off<br/>• Brownout Threshold (<3.25V)<br/>• Zero-Volt Cable Guard"]
-    RTC["RTCIO 5 (PCF85063A INT)<br/>• Alarm Line (Active LOW)<br/>• Zero-Hour Master Arbiter<br/>• Suppresses Flow A Sample<br/>• Launches Flow B Directly"]
-    BTN["RTCIO 0 & 18 (Tactile Buttons)<br/>• Reactive Wake on Edge<br/>• Tap vs Hold Classification<br/>• BOOT Hold -> Bootloader<br/>• POWER Hold -> Power-Off"]
-
-    ULP --> ADC
-    ULP --> RTC
-    ULP --> BTN
+graph TD;
+    ULP["ULP-RISC-V Reactive Monitor (Sleeps in RTC Slow Domain until hardware event)"];
+    ADC["ADC1 Channel 3 (Battery Divider: 12 dB Attenuation, Brownout Guard, Zero-Volt USB Guard)"];
+    RTC["RTCIO 5 (PCF85063A INT: Active LOW Alarm Line, Zero-Hour Arbiter, Launches Flow B)"];
+    BTN["RTCIO 0 and 18 (Tactile Buttons: Wake on Release, Tap vs Hold Classifier)"];
+    ULP-->ADC;
+    ULP-->RTC;
+    ULP-->BTN;
 ```
 
 ---

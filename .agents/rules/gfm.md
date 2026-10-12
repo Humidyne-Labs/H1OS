@@ -18,8 +18,10 @@ Refer to the skill [`.agents/skills/gfm/SKILL.md`](../skills/gfm/SKILL.md) for f
    - Escape literal dollar signs with `\$` or wrap in backticks.
 
 3. **Mermaid Diagrams:**
+   - Use canonical `graph TD;` or `graph LR;` syntax with explicit semicolons (`;`) at the end of statements (avoid `stateDiagram-v2` transition labels with parentheses or arrows, which fail on GitHub).
    - Always declare subgraphs with alphanumeric identifiers: `subgraph ID ["Label"]`.
-   - Wrap node text containing punctuation, parentheses, brackets, colons, or arrows in double quotes `["..."]`.
+   - Wrap all node text in double quotes `["..."]` and edge labels in `-- "Label" -->`.
+   - **NEVER use raw HTML tags (`<br/>`), raw ampersands (`&`), nested square brackets (`[...]`), bullet characters (`•`), or non-ASCII Unicode symbols (`Ω`, `µ`, `–`) inside Mermaid labels.** Use plain ASCII (` - `, `and`, `uA`, `Ohm`) instead.
    - Never use reserved keywords (`end`, `subgraph`, `graph`, `style`) as node or subgraph IDs.
    - Avoid duplicate IDs between nodes and subgraphs.
 

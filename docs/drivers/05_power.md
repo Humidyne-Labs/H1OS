@@ -27,11 +27,11 @@ The Waveshare ESP32-S3 board features a hardware power latch circuit controlling
 ### Hardware Circuit
 
 ```mermaid
-flowchart TD
-    VBAT["VBAT (3.3V – 4.2V LiPo)"] --> R1["R1 = 200 kΩ"]
-    R1 --> NODE["GPIO 4 (ADC1_CHANNEL_3)"]
-    NODE --> R2["R2 = 200 kΩ"]
-    R2 --> GND["GND"]
+graph TD;
+    VBAT["VBAT (3.3V to 4.2V LiPo)"]-->R1["R1 = 200 kOhm"];
+    R1-->NODE["GPIO 4 (ADC1_CHANNEL_3)"];
+    NODE-->R2["R2 = 200 kOhm"];
+    R2-->GND["GND"];
 ```
 - **Divider Transfer Function:**
 

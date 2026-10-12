@@ -45,23 +45,23 @@ The table below defines the exact hardware assignment, physical pins, electrical
 ## 3. Four-Layer Clean-Slate Mapping
 
 ```mermaid
-graph TD
-    App[Layer 4: Application / Orchestrator] --> Sub[Layer 2: Subsystem Drivers]
-    Sub --> HAL[Layer 1: Hardware Abstraction Layer]
-    HAL --> HW[Layer 0: Physical Silicon & GPIOs]
+graph TD;
+    App["Layer 4: Application and Orchestrator"] --> Sub["Layer 2: Subsystem Drivers"];
+    Sub --> HAL["Layer 1: Hardware Abstraction Layer"];
+    HAL --> HW["Layer 0: Physical Silicon and GPIOs"];
 
     subgraph Layer2_Subsystems ["Layer 2 Subsystem Drivers"]
-        sub_sensor["sub_sensor.c: SHTC3 & TSENS"]
-        sub_rtc["sub_rtc.c: PCF85063A RTC"]
-        sub_audio["sub_audio.c: ES8311 & NS4168"]
-        sub_display["sub_display.cpp: SSD1681 E-Paper"]
-        sub_power["sub_power.c: Battery ADC & Sleep Engine"]
+        sub_sensor["sub_sensor.c: SHTC3 and TSENS"];
+        sub_rtc["sub_rtc.c: PCF85063A RTC"];
+        sub_audio["sub_audio.c: ES8311 and NS4168"];
+        sub_display["sub_display.cpp: SSD1681 E-Paper"];
+        sub_power["sub_power.c: Battery ADC and Sleep Engine"];
     end
 
     subgraph Layer1_HAL ["Layer 1 HAL Drivers"]
-        hal_i2c["hal_i2c.c: Shared Master I2C 400kHz"]
-        hal_spi["hal_spi.c: EPD SPI Master 20MHz/2MHz"]
-        hal_io["hal_io.c: Pinout, Latch & Sleep Isolation"]
+        hal_i2c["hal_i2c.c: Shared Master I2C 400kHz"];
+        hal_spi["hal_spi.c: EPD SPI Master 20MHz and 2MHz"];
+        hal_io["hal_io.c: Pinout, Latch and Sleep Isolation"];
     end
 ```
 

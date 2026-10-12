@@ -65,26 +65,25 @@ The sensor completes sampling in $<10\text{ ms}$ with quiescent leakage $\le 15\
 
 ## 2. Mermaid Diagrams
 
-Diagrams render automatically inside fenced code blocks tagged with `mermaid`. GitHub's parser is sensitive to reserved keywords, quotes, and punctuation.
+Diagrams render automatically inside fenced code blocks tagged with `mermaid`. GitHub's Mermaid sandbox lexer and DOM sanitizer are strictly sensitive to HTML tags, special characters, and punctuation.
 
-### 2.1 Subgraphs & Node Identifiers
-1. **Valid Alphanumeric Subgraph IDs:** Always declare subgraphs with a clean alphanumeric ID and put the human-readable title inside square brackets with quotes:
+### 2.1 Subgraphs, Node Identifiers, & Label Sanitization
+1. **Use Canonical `graph TD;` / `graph LR;` with Semicolons:** Prefer `graph TD;` or `graph LR;` with semicolons (`;`) terminating every node, edge, and `end;` statement. Avoid `stateDiagram-v2` when transition labels contain parentheses `(HIGH)` or arrows `->`, as these trigger parser errors on GitHub.
+2. **Valid Alphanumeric Subgraph IDs:** Always declare subgraphs with a clean alphanumeric ID and put the human-readable title inside square brackets with quotes:
    - ✅ Correct: `subgraph Power_Rails ["Power Distribution Rails"]`
    - ❌ Invalid: `subgraph "Power Distribution Rails"`
-2. **No Reserved Keyword Collisions:** Do not name nodes or subgraphs using Mermaid keywords (`end`, `subgraph`, `graph`, `style`, `click`) or duplicate an identifier between a node and a subgraph.
-3. **Escaped Labels:** Whenever a node label contains parentheses, colons, arrows, or brackets, wrap the entire label in double quotes:
-   - ✅ Correct: `CORE0["Core 0: Networking / OS (IO47 SDA)"]`
-   - ❌ Invalid: `CORE0[Core 0: Networking / OS (IO47 SDA)]`
-4. **Sanitize Quotation Marks:** Never use raw double quotes or nested unmatched single quotes (such as `1.54''`) inside node labels. Use `1.54in` or explicit HTML entities (`&quot;`).
+3. **No Reserved Keyword Collisions:** Do not name nodes or subgraphs using Mermaid keywords (`end`, `subgraph`, `graph`, `style`, `click`) or duplicate an identifier between a node and a subgraph.
+4. **Always Quote Node & Edge Labels:** Wrap all node labels in double quotes (`NODE["Label"]`, `DECISION{"Condition?"}`) and edge labels in `-- "Label" -->`.
+5. **No HTML, Ampersands, Nested Brackets, or Unicode in Labels:** Never use `<br/>`, raw `&`, nested `[...]`, bullet characters (`•`), or non-ASCII Unicode (`Ω`, `µ`, `–`) inside Mermaid labels. Use plain ASCII equivalents (` - `, `and`, `(...)`, `uA`, `Ohm`).
 
 ### 2.2 Standard Mermaid Skeleton Examples
 
-#### Flowchart (`flowchart TD`)
+#### Flowchart (`graph TD;`)
 ```mermaid
-flowchart TD
-    StartNode["1. Boot Hardware"] --> CheckVbat{Vbat < 3.25V?}
-    CheckVbat -- "YES" --> SleepMode["Enter Low Power Sleep"]
-    CheckVbat -- "NO" --> ActiveMode["Launch FreeRTOS Tasks"]
+graph TD;
+    StartNode["1. Boot Hardware"] --> CheckVbat{"Vbat < 3.25V?"};
+    CheckVbat -- "YES" --> SleepMode["Enter Low Power Sleep"];
+    CheckVbat -- "NO" --> ActiveMode["Launch FreeRTOS Tasks"];
 ```
 
 #### Sequence Diagram (`sequenceDiagram`)

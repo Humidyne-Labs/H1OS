@@ -131,11 +131,16 @@ $$
 5. The forward voltage drop across the ESD diodes ($V_F \approx 0.65\dots 0.70\,\text{V}$) **clamps the entire I2C bus voltage down to $\sim 0.7\,\text{V}$**!
 
 ```mermaid
-flowchart TD
-    V33["Permanent 3.3V System Rail"] --> RPU["4.7 kΩ Pull-up Resistors"]
-    RPU --> BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL)<br/>Clamped to ~0.7V when PA_EN = 1"]
-    BUS --> ESD["ES8311 Internal ESD Clamp Diode (Forward Biased)"]
-    ESD --> VDD["ES8311 VDD_AUDIO = 0.0V (When PA_EN cuts rail)"]
+graph TD;
+    V33["Permanent 3.3V System Rail"];
+    RPU["4.7 kOhm Pull-up Resistors"];
+    BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL) Clamped to 0.7V when PA_EN is 1"];
+    ESD["ES8311 Internal ESD Clamp Diode (Forward Biased)"];
+    VDD["ES8311 VDD_AUDIO at 0.0V (When PA_EN cuts rail)"];
+    V33-->RPU;
+    RPU-->BUS;
+    BUS-->ESD;
+    ESD-->VDD;
 ```
 
 #### 2. Firmware Impact

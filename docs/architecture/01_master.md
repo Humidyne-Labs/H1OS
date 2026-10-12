@@ -11,10 +11,14 @@
 ## 1. High-Level 4-Layer Hierarchy
 
 ```mermaid
-flowchart TD
-    L4["LAYER 4: APPLICATION & UI ENGINE<br/>h1os_start() | h1os_sleep() | h1os_shutdown() | h1os_get_telemetry()<br/>h1os_lvgl (LVGL v9 Port, indev, Configurable Inactivity, 80MHz DFS) | h1os_time"] -->|configures & controls| L3["LAYER 3: SYSTEM ORCHESTRATION PIPELINE<br/>Flow Arbiter | Psychrometric Math Engine | RTC Memory | Display Sync<br/>[GATED COPROCESSOR MONITOR: ULP-RISC-V Monitor active in sleep only]"]
-    L3 -->|commands| L2["LAYER 2: HARDWARE SUBSYSTEM MANAGERS<br/>Display | Sensor | RTC | Power | Audio | NVS Config | MicroSD Storage"]
-    L2 -->|utilizes| L1["LAYER 1: LOW-LEVEL HARDWARE ABSTRACTION (HAL)<br/>GPIO / Pad Holds / Latch Release | I2C Master | SPI DMA | Flash Part"]
+graph TD;
+    L4["LAYER 4: APPLICATION AND UI ENGINE (h1os_start, h1os_sleep, h1os_shutdown, h1os_lvgl, h1os_time)"];
+    L3["LAYER 3: SYSTEM ORCHESTRATION PIPELINE (Flow Arbiter, Psychrometric Math, RTC Memory, Display Sync, ULP Monitor)"];
+    L2["LAYER 2: HARDWARE SUBSYSTEM MANAGERS (Display, Sensor, RTC, Power, Audio, NVS Config, MicroSD Storage)"];
+    L1["LAYER 1: LOW-LEVEL HARDWARE ABSTRACTION (GPIO, Pad Holds, Latch Release, I2C Master, SPI DMA, Flash Part)"];
+    L4-->L3;
+    L3-->L2;
+    L2-->L1;
 ```
 
 ### Invariant Rules of Layer Separation

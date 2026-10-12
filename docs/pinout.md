@@ -47,35 +47,35 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 ## 2. Hardware Subsystem Bus Architecture
 
 ```mermaid
-graph TD
+graph TD;
     subgraph ESP32_S3 ["ESP32-S3-PICO-1-N8R8 (Dual LX7 240MHz)"]
-        CORE0["Core 0: Networking / OS / BLE / MQTT / Time"]
-        CORE1["Core 1: Display / LVGL v9 / Sensors / Audio"]
+        CORE0["Core 0: Networking / OS / BLE / MQTT / Time"];
+        CORE1["Core 1: Display / LVGL v9 / Sensors / Audio"];
     end
 
-    subgraph I2C_BUS ["Shared I2C0 Bus (IO47 SDA, IO48 SCL @ 400kHz)"]
-        SHTC3["SHTC3 Temp/Humidity (0x70)"]
-        PCF85063["PCF85063A RTC (0x51, INT=IO5)"]
-        ES8311_CTRL["ES8311 Codec Control (0x18)"]
+    subgraph I2C_BUS ["Shared I2C0 Bus (IO47 SDA, IO48 SCL at 400kHz)"]
+        SHTC3["SHTC3 Temp and Humidity (0x70)"];
+        PCF85063["PCF85063A RTC (0x51, INT=IO5)"];
+        ES8311_CTRL["ES8311 Codec Control (0x18)"];
     end
 
     subgraph DISPLAY_BUS ["SPI2 Master Bus"]
-        SSD1681["SSD1681 1.54in Mono EPD (CS=IO11, DC=IO10, RST=IO9, 3V3_EN=IO6, BUSY=IO8)"]
+        SSD1681["SSD1681 1.54in Mono EPD (CS=IO11, DC=IO10, RST=IO9, 3V3_EN=IO6, BUSY=IO8)"];
     end
 
     subgraph AUDIO_BUS ["I2S0 Audio Interface"]
-        I2S_STREAM["ES8311 DAC (MCLK=IO14, SCLK=IO15, LRCK=IO38, DOUT=IO45)"]
-        NS4168_AMP["NS4168 Class-D Amp (PA_EN=IO42 Active Low, PA_CTRL=IO46 Active High)"]
+        I2S_STREAM["ES8311 DAC (BCLK=IO21, WS=IO45, DOUT=IO40)"];
+        NS4168_AMP["NS4168 Class-D Amp (PA_EN=IO42 Active Low, PA_CTRL=IO46 Active High)"];
     end
 
     subgraph POWER_MGT ["Power Management"]
-        BAT_LATCH["BAT_Control (IO17 Active High)"]
-        BAT_ADC["BAT_ADC (IO4 ADC1_CH3 Divider)"]
-        STATUS_LED["Green LED (IO3 Open-Drain Active Low)"]
+        BAT_LATCH["BAT_Control (IO17 Active High)"];
+        BAT_ADC["BAT_ADC (IO4 ADC1_CH3 Divider)"];
+        STATUS_LED["Green LED (IO3 Open-Drain Active Low)"];
     end
 
-    ESP32_S3 --> I2C_BUS
-    ESP32_S3 --> DISPLAY_BUS
-    ESP32_S3 --> AUDIO_BUS
-    ESP32_S3 --> POWER_MGT
+    ESP32_S3-->I2C_BUS;
+    ESP32_S3-->DISPLAY_BUS;
+    ESP32_S3-->AUDIO_BUS;
+    ESP32_S3-->POWER_MGT;
 ```
