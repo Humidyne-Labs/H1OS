@@ -451,7 +451,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(1046, 120);
             break;
 
-        case 2: /* H1OS_CHIME_SLEEP: 3-tone descending cadence (1046 -> 784 -> 659 Hz) */
+        case 2: /* H1OS_CHIME_SLEEP: 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
             sub_audio_render_tone_samples(1046, 80);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(784, 80);
@@ -459,7 +459,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(659, 140);
             break;
 
-        case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down cadence (784 -> 659 -> 523 Hz) */
+        case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
             sub_audio_render_tone_samples(784, 90);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(659, 90);

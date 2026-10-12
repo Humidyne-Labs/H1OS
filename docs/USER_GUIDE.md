@@ -11,7 +11,7 @@
 
 1. [Architectural Overview & Philosophy](#1-architectural-overview--philosophy)
 2. [Lifecycle Engine & Application Entry](#2-lifecycle-engine--application-entry)
-3. [Flow A: Headless Sensor Sprint (<4ms Cadence)](#3-flow-a-headless-sensor-sprint-4ms-cadence)
+3. [Flow A: Headless Sensor Sprint (<4ms Execution)](#3-flow-a-headless-sensor-sprint-4ms-execution)
 4. [Flow B: Interactive UI Session (30s Inactivity Sleep)](#4-flow-b-interactive-ui-session-30s-inactivity-sleep)
 5. [Class-E Psychrometric Invariant Engine](#5-class-e-psychrometric-invariant-engine)
 6. [Display Architecture & LVGL v9 Integration](#6-display-architecture--lvgl-v9-integration)
@@ -88,7 +88,7 @@ void app_main(void)
 
 ---
 
-## 3. Flow A: Headless Sensor Sprint (<4ms Cadence)
+## 3. Flow A: Headless Sensor Sprint (<4ms Execution)
 
 When internal timer wakeup occurs, H1OS executes Flow A without booting the secondary core, Wi-Fi stacks, or display drivers:
 1. SHTC3 sensor wakes via fast I2C in RTC memory (<250 µs).

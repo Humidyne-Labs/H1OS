@@ -148,7 +148,7 @@ void orch_flow_execute_sub_sprint(void)
         return;
     }
 
-    /* Cadence Decision: Discard runt rearm if next sample lands at or after external RTC expiry */
+    /* Timing Decision: Discard runt rearm if next sample lands at or after external RTC expiry */
     uint32_t next_sample_sec = st->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;
 
@@ -263,8 +263,8 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
         sub_rtc_arm_countdown(sleep_sec);
     }
 
-    /* 7. Sub-Interval Sensor Cadence:
-     * Arm internal timer for Flow A sample cadence (e.g. 60s) if sample_interval_sec < sleep_sec.
+    /* 7. Sub-Interval Sensor Timing:
+     * Arm internal timer for Flow A sample interval (e.g. 60s) if sample_interval_sec < sleep_sec.
      * If sample interval is disabled or >= sleep_sec, sleep purely until external RTC expires. */
     uint32_t sample_sec = orch_state_get()->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;

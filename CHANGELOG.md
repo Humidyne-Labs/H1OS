@@ -21,17 +21,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added non-blocking asynchronous APIs: `sub_audio_play_tone_async()`, `sub_audio_play_chime_async()`, and `sub_audio_play_pcm_async()`.
   - Added raw 16-bit signed PCM audio clip playback (`sub_audio_play_pcm()` and `sub_audio_play_pcm_async()`) supporting dynamic sample rates, chunked I2S DMA streaming, and soft-mute ramps.
   - Added audio state queries and synchronization: `sub_audio_is_busy()`, `sub_audio_wait_idle()`, and `sub_audio_is_ready()`.
-- **Dynamic Session Cadence Periods** (`h1os.h`, `orch_state.c/.h`, `h1os_lifecycle.c`):
+- **Dynamic Session Intervals** (`h1os.h`, `orch_state.c/.h`, `h1os_lifecycle.c`):
   - Added user-configurable `flow_a_period_sec` and `flow_b_period_sec` fields to `h1os_lifecycle_t.session` and `orch_persisted_state_t`.
   - Replaced hardcoded sleep timeouts with dynamic runtime intervals for Flow A telemetry sprints and Flow B UI presentation sessions.
 
 ### 🛠️ Fixed & Refactored
-- **Deep Sleep Premature Wakeup & Dual-Cadence Cadence Policy** (`hal_io.c`, `orch_flow.c`):
+- **Deep Sleep Premature Wakeup & Dual-Period Sleep Policy** (`hal_io.c`, `orch_flow.c`):
   - Configured persistent RTC IO pull-ups (`rtc_gpio_init`, `rtc_gpio_set_direction(INPUT_ONLY)`, `rtc_gpio_pullup_en`, `rtc_gpio_pulldown_dis`) on `HAL_PIN_RTC_INT` (GPIO 5), `HAL_PIN_BUTTON_BOOT` (GPIO 0), and `HAL_PIN_BUTTON_POWER` (GPIO 18) during deep sleep pad isolation (`hal_io_isolate_sleep_pads()`). Because standard digital GPIO pull-ups lose power when `VDD3P3_CPU` drops, the open-drain PCF85063A INT pin previously floated LOW within seconds, triggering false `ESP_SLEEP_WAKEUP_EXT1` wakeups (<10s).
   - De-initialized RTC GPIO domain on wake in `hal_io_release_pad_holds()` (`rtc_gpio_deinit()`) to seamlessly restore pins to standard digital GPIO peripherals.
-  - Implemented Dual-Cadence deep sleep coordination in `orch_flow_transition_to_sleep()`: the external PCF85063A is armed for the full display interval (`sleep_sec`), while the internal ESP32 timer is armed for the sub-interval telemetry cadence (`sample_interval_sec < sleep_sec`).
+  - Implemented Dual-Period deep sleep coordination in `orch_flow_transition_to_sleep()`: the external PCF85063A is armed for the full display interval (`sleep_sec`), while the internal ESP32 timer is armed for the sub-interval telemetry period (`sample_interval_sec < sleep_sec`).
   - Implemented Sub-Sprint Truncation Discard Policy in `orch_flow_execute_sub_sprint()`: the internal timer rearms *only* if the next sprint timeout lands before external RTC countdown expiry (`next_sample_sec < rem_sec`). If the next sample lands at or after RTC expiry, rearming is discarded (`internal_sleep_sec = 0`), allowing the external PCF85063A interrupt line to trigger the main UI refresh cleanly without runt micro-wakes.
-- **OS Diagnostics Typography Polish & Dual-Cadence Log Clarification** (`screen_diagnostics.c`, `orch_flow.c`):
+- **OS Diagnostics Typography Polish & Dual-Period Log Clarification** (`screen_diagnostics.c`, `orch_flow.c`):
   - Standardized Screen 4 (OS Diagnostics) to use high-contrast bilevel bold typography (`H1OS_FONT_14` Montserrat Bold) across all diagnostic rows (Reset reason, Wake causes, ULP, Heap, Stack HWM, Wakes counter, CPU/DFS), eliminating thin 1-pixel hairline stems from DejaVu regular.
   - Added explicit deep sleep log output distinguishing between the external RTC UI wake countdown (`sleep_sec` = 120s) and the internal headless sensor sprint timer (`internal_sleep_sec` = 60s).
 - **Flow B Wake Cycle Differential Partial Refresh** (`h1os_lifecycle.c`, `h1os_lvgl.cpp/.h`, `sub_display.cpp/.h`, `orch_display_sync.c/.h`):
