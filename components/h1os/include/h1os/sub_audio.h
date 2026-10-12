@@ -37,6 +37,22 @@ esp_err_t sub_audio_init(void);
 esp_err_t sub_audio_standby(void);
 
 /**
+ * @brief Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11)
+ * and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
+ *
+ * @param timeout_ms Maximum wait time in milliseconds.
+ * @return ESP_OK if codec is verified and in active CSM state, or error.
+ */
+esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms);
+
+/**
+ * @brief Quick status check of whether ES8311 codec is ready.
+ *
+ * @return true if communication and active CSM state verified.
+ */
+bool sub_audio_is_ready(void);
+
+/**
  * @brief Play synthesized audio chime/tone.
  *
  * @param[in] frequency_hz Frequency in Hertz (e.g. 1000 for 1 kHz).

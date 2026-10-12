@@ -64,7 +64,9 @@ static void h1os_session_monitor_task(void *arg)
             ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
-            h1os_sleep(120); /* Enter deep sleep */
+            uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+            if (sleep_sec == 0) sleep_sec = 120;
+            h1os_sleep(sleep_sec); /* Enter deep sleep */
             break;
         }
     }
@@ -78,7 +80,19 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         s_app_lifecycle = *config;
     }
 
-    ESP_LOGI(TAG, "Booting %s (%s) Version %s", H1OS_NAME, H1OS_SUBTITLE, H1OS_VERSION_STRING);
+    /* Apply configurable Flow A and Flow B timings to persistent state */
+    orch_persisted_state_t *st = orch_state_get();
+    if (s_app_lifecycle.session.flow_a_period_sec > 0) {
+        st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
+    }
+    if (s_app_lifecycle.session.flow_b_period_sec > 0) {
+        st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
+    }
+
+    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]",
+             H1OS_NAME, H1OS_SUBTITLE, H1OS_VERSION_STRING,
+             (unsigned long)st->sample_interval_sec,
+             (unsigned long)st->flow_b_period_sec);
 
     // 1. Initialize Base Hardware I/O & Release Boot Pad Holds
     hal_io_early_init();
@@ -161,7 +175,9 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     //    - If Cold Boot or User Button Wake: wait 30s session timeout for user interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
-        return h1os_sleep(120);
+        uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+        if (sleep_sec == 0) sleep_sec = 120;
+        return h1os_sleep(sleep_sec);
     } else {
         ESP_LOGI(TAG, "Starting 30-second interactive session monitor...");
         h1os_reset_session_timer();

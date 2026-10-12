@@ -27,6 +27,7 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     }
     s_persisted_state.magic = ORCH_RTC_MAGIC;
     s_persisted_state.sample_interval_sec = 60;
+    s_persisted_state.flow_b_period_sec = 120;
     s_persisted_state.amb_floor_temp_centi_c = 2500;
 }
 

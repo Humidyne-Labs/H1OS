@@ -48,7 +48,8 @@ typedef struct {
     uint8_t             ulp_dispatch_reason;
     uint16_t            last_vbat_mv;
     
-    uint32_t            sample_interval_sec;
+    uint32_t            sample_interval_sec;  /* Flow A sensor sub-sprint interval */
+    uint32_t            flow_b_period_sec;    /* Flow B main application wake interval */
     uint32_t            wake_timestamp_epoch;
 
     /* ULP coprocessor battery ADC calibration parameters */

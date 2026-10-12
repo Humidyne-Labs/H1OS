@@ -17,9 +17,13 @@
 
 static const char *TAG = "sub_audio";
 
+#define ES8311_REG_RESET        0x00
 #define ES8311_REG_SYS_PWR_ANA  0x0D
 #define ES8311_REG_DAC_PWR      0x12
 #define ES8311_REG_DAC_VOL      0x32
+#define ES8311_REG_FLAG         0xFC  /* Read-only status flag: Bits 6:4 = FLAG_CSM_CHIP */
+#define ES8311_REG_CHIP_ID1     0xFD  /* Expected: 0x83 */
+#define ES8311_REG_CHIP_ID2     0xFE  /* Expected: 0x11 */
 
 static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited = false;
@@ -28,6 +32,45 @@ static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 {
     uint8_t buf[2] = { reg, val };
     return hal_i2c_write(HAL_I2C_ADDR_ES8311, buf, sizeof(buf), pdMS_TO_TICKS(50));
+}
+
+static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *val)
+{
+    return hal_i2c_write_read(HAL_I2C_ADDR_ES8311, &reg, 1, val, 1, pdMS_TO_TICKS(50));
+}
+
+esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
+{
+    uint8_t id1 = 0, id2 = 0;
+    esp_err_t err1 = es8311_read_reg(ES8311_REG_CHIP_ID1, &id1);
+    esp_err_t err2 = es8311_read_reg(ES8311_REG_CHIP_ID2, &id2);
+    if (err1 != ESP_OK || err2 != ESP_OK || id1 != 0x83 || id2 != 0x11) {
+        ESP_LOGE(TAG, "ES8311 Chip ID validation failed (0x%02X, 0x%02X)", id1, id2);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    uint32_t elapsed_ms = 0;
+    const uint32_t step_ms = 5;
+    while (elapsed_ms < timeout_ms) {
+        uint8_t flag = 0;
+        if (es8311_read_reg(ES8311_REG_FLAG, &flag) == ESP_OK) {
+            uint8_t csm_state = (flag >> 4) & 0x07; /* Bits 6:4 = FLAG_CSM_CHIP */
+            if (csm_state != 0) {
+                ESP_LOGD(TAG, "ES8311 CSM active in state S%u after %lu ms", csm_state, (unsigned long)elapsed_ms);
+                return ESP_OK;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(step_ms));
+        elapsed_ms += step_ms;
+    }
+
+    ESP_LOGW(TAG, "ES8311 CSM ready check timed out after %lu ms", (unsigned long)timeout_ms);
+    return ESP_ERR_TIMEOUT;
+}
+
+bool sub_audio_is_ready(void)
+{
+    return (sub_audio_wait_until_ready(10) == ESP_OK);
 }
 
 static esp_err_t es8311_init_dac_registers(void)
@@ -206,22 +249,9 @@ esp_err_t sub_audio_standby(void)
     return ESP_OK;
 }
 
-esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+/* Internal helper to stream tone samples without entering standby afterwards */
+static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 {
-    if (!s_audio_inited || s_tx_chan == NULL) {
-        esp_err_t err = sub_audio_init();
-        if (err != ESP_OK) return err;
-    } else {
-        /* Wakeup codec and restore operational DAC state */
-        es8311_init_dac_registers();
-    }
-
-    /* Start I2S clocking and unmute amplifier */
-    i2s_channel_enable(s_tx_chan);
-    vTaskDelay(pdMS_TO_TICKS(5));
-    gpio_set_level(HAL_PIN_PA_CTRL, 1);
-
-    /* Generate sine wave samples at 16 kHz */
     const uint32_t sample_rate = 16000;
     const uint32_t total_samples = (sample_rate * duration_ms) / 1000;
     int16_t buffer[256];
@@ -243,8 +273,47 @@ esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
         i2s_channel_write(s_tx_chan, buffer, chunk_size * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
+}
 
-    /* Wait for DMA ring buffer to finish playing through codec DAC before sleep */
+static esp_err_t sub_audio_prepare_and_unmute(void)
+{
+    if (!s_audio_inited || s_tx_chan == NULL) {
+        esp_err_t err = sub_audio_init();
+        if (err != ESP_OK) return err;
+    } else {
+        /* Wakeup codec and restore operational DAC state */
+        es8311_init_dac_registers();
+    }
+
+    /* Start I2S clocking (MCLK/BCLK) so ES8311 PLL and CSM can lock */
+    i2s_channel_enable(s_tx_chan);
+
+    /* Poll ES8311 Chip State Machine (Reg 0xFC bits 6:4) to verify active state */
+    esp_err_t err = sub_audio_wait_until_ready(100);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Proceeding with playback despite CSM ready warning: %s", esp_err_to_name(err));
+    }
+
+    /* Pre-roll zero samples into DMA pipeline to pre-charge DAC interpolator */
+    int16_t preroll[32] = {0};
+    size_t written = 0;
+    i2s_channel_write(s_tx_chan, preroll, sizeof(preroll), &written, pdMS_TO_TICKS(50));
+
+    /* Unmute NS4168 Class D amplifier */
+    gpio_set_level(HAL_PIN_PA_CTRL, 1);
+    vTaskDelay(pdMS_TO_TICKS(5));
+
+    return ESP_OK;
+}
+
+esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+{
+    esp_err_t ret = sub_audio_prepare_and_unmute();
+    if (ret != ESP_OK) return ret;
+
+    sub_audio_render_tone_samples(frequency_hz, duration_ms);
+
+    /* Wait for DMA buffer to drain through DAC before mute */
     vTaskDelay(pdMS_TO_TICKS(50));
 
     /* Return to zero-heat deep standby */
@@ -255,51 +324,59 @@ esp_err_t sub_audio_play_chime(uint8_t type)
 {
     ESP_LOGI(TAG, "Playing acoustic presentation chime (Type %u)...", type);
 
+    esp_err_t ret = sub_audio_prepare_and_unmute();
+    if (ret != ESP_OK) return ret;
+
     switch (type) {
         case 0: /* H1OS_CHIME_BOOT: 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
-            sub_audio_play_tone(523, 70);
+            sub_audio_render_tone_samples(523, 70);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(659, 70);
+            sub_audio_render_tone_samples(659, 70);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(784, 70);
+            sub_audio_render_tone_samples(784, 70);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(1046, 150);
+            sub_audio_render_tone_samples(1046, 150);
             break;
 
         case 1: /* H1OS_CHIME_WAKE: 2-tone crisp wake (784 -> 1046 Hz) */
-            sub_audio_play_tone(784, 60);
+            sub_audio_render_tone_samples(784, 60);
             vTaskDelay(pdMS_TO_TICKS(10));
-            sub_audio_play_tone(1046, 120);
+            sub_audio_render_tone_samples(1046, 120);
             break;
 
         case 2: /* H1OS_CHIME_SLEEP: 3-tone descending cadence (1046 -> 784 -> 659 Hz) */
-            sub_audio_play_tone(1046, 80);
+            sub_audio_render_tone_samples(1046, 80);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(784, 80);
+            sub_audio_render_tone_samples(784, 80);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(659, 140);
+            sub_audio_render_tone_samples(659, 140);
             break;
 
         case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down cadence (784 -> 659 -> 523 Hz) */
-            sub_audio_play_tone(784, 90);
+            sub_audio_render_tone_samples(784, 90);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(659, 90);
+            sub_audio_render_tone_samples(659, 90);
             vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_play_tone(523, 180);
+            sub_audio_render_tone_samples(523, 180);
             break;
 
         case 4: /* H1OS_CHIME_ALARM: Attention pulses */
             for (int i = 0; i < 2; i++) {
-                sub_audio_play_tone(1760, 80);
+                sub_audio_render_tone_samples(1760, 80);
                 vTaskDelay(pdMS_TO_TICKS(10));
-                sub_audio_play_tone(880, 80);
+                sub_audio_render_tone_samples(880, 80);
                 vTaskDelay(pdMS_TO_TICKS(20));
             }
             break;
 
         default:
+            sub_audio_standby();
             return ESP_ERR_INVALID_ARG;
     }
 
-    return ESP_OK;
+    /* Wait for DMA buffer to completely finish playing through DAC */
+    vTaskDelay(pdMS_TO_TICKS(60));
+
+    /* Park in zero-heat standby once entire chime sequence is complete */
+    return sub_audio_standby();
 }
