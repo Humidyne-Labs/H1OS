@@ -222,7 +222,7 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 void sub_power_cut_power_latch(void)
 {
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");
-    hal_io_lock_power_latch(false);
+    hal_io_release_power_latch();
 }
 
 bool sub_power_connected_usb(void) 

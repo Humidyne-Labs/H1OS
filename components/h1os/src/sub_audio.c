@@ -207,8 +207,7 @@ esp_err_t sub_audio_init(void)
 {
     if (s_audio_inited) return ESP_OK;
 
-    /* 1. Ensure Power Rail (GPIO 42: 0 = Power ON) & PA CTRL (GPIO 46: 0 = Mute) are at correct levels */
-    gpio_set_level(HAL_PIN_PA_EN, 0);   /* Rail MUST stay ON (0) to prevent I2C clamping */
+    /* 1. Ensure PA CTRL (GPIO 46: 0 = Mute) is muted initially (PA_EN GPIO 42 is latched ON in 2nd-stage bootloader) */
     gpio_set_level(HAL_PIN_PA_CTRL, 0); /* Keep amplifier muted initially */
     vTaskDelay(pdMS_TO_TICKS(15));
 
@@ -339,16 +338,16 @@ esp_err_t sub_audio_standby(void)
 /* Internal helper: clean teardown sequence per ES8311 hardware spec */
 static void sub_audio_teardown_clean(void)
 {
-    /* Step 1: Flush 1,024 zero samples (64 ms = full DMA ring buffer) so short tones
-     * (such as 15 ms button clicks) completely clock out to the DAC before muting! */
+    /* Step 1: Stream 5 * 256 = 1,280 zero samples (80 ms > 1,024-sample DMA ring)
+     * so i2s_channel_write() blocks in hardware lockstep until the tone has completely
+     * exited the DMA ring and ES8311 DAC interpolator before muting! */
     if (s_tx_chan != NULL && s_i2s_chan_enabled) {
         int16_t silence[256] = {0};
         size_t written = 0;
-        for (int i = 0; i < 4; i++) {
-            i2s_channel_write(s_tx_chan, silence, sizeof(silence), &written, pdMS_TO_TICKS(50));
+        for (int i = 0; i < 5; i++) {
+            i2s_channel_write(s_tx_chan, silence, sizeof(silence), &written, pdMS_TO_TICKS(100));
         }
     }
-    vTaskDelay(pdMS_TO_TICKS(20));
 
     /* Step 2: Trigger ES8311 soft-mute to ramp down volume smoothly to zero cross */
     es8311_write_reg(0x31, 0x40); /* DAC_DSMMUTE = 1 */
@@ -368,6 +367,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
 {
     const uint32_t sample_rate = 16000;
     const uint32_t total_samples = (sample_rate * duration_ms) / 1000;
+    const uint32_t ramp_samples = (total_samples > 64) ? 32 : (total_samples / 4);
     int16_t buffer[256];
     uint32_t samples_generated = 0;
     float phase = 0.0f;
@@ -378,7 +378,16 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         if (chunk_size > 256) chunk_size = 256;
 
         for (size_t i = 0; i < chunk_size; i++) {
-            buffer[i] = (int16_t)(sinf(phase) * 12000.0f);
+            uint32_t idx = samples_generated + (uint32_t)i;
+            float env = 1.0f;
+            if (ramp_samples > 0) {
+                if (idx < ramp_samples) {
+                    env = (float)idx / (float)ramp_samples;
+                } else if (idx + ramp_samples >= total_samples) {
+                    env = (float)(total_samples - 1 - idx) / (float)ramp_samples;
+                }
+            }
+            buffer[i] = (int16_t)(sinf(phase) * 20000.0f * env);
             phase += phase_step;
             if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
         }
@@ -432,14 +441,15 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         ESP_LOGW(TAG, "Proceeding with playback despite CSM ready warning: %s", esp_err_to_name(err));
     }
 
-    /* 4. Pre-roll zero samples into DMA pipeline to pre-charge DAC interpolator */
-    int16_t preroll[64] = {0};
-    size_t written = 0;
-    i2s_channel_write(s_tx_chan, preroll, sizeof(preroll), &written, pdMS_TO_TICKS(50));
-
-    /* 5. Unmute NS4168 Class D amplifier and allow 15 ms power-up turn-on time */
+    /* 4. Unmute NS4168 Class D amplifier and stream 4 * 256 = 1,024 zero samples (64 ms)
+     * to prime all 4 DMA descriptors while the ES8311 VMID cap, DAC soft-unmute ramp
+     * (Reg 0x37 = 0x08), and NS4168 turn-on time settle completely before the first sample! */
     gpio_set_level(HAL_PIN_PA_CTRL, 1);
-    vTaskDelay(pdMS_TO_TICKS(15));
+    int16_t preroll[256] = {0};
+    size_t written = 0;
+    for (int i = 0; i < 4; i++) {
+        i2s_channel_write(s_tx_chan, preroll, sizeof(preroll), &written, pdMS_TO_TICKS(100));
+    }
 
     return ESP_OK;
 }

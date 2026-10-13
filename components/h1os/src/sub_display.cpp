@@ -68,28 +68,32 @@ static void epd_reset_pulse(void)
 
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
-    /* If BUSY is LOW, panel is already idle */
-    if (gpio_get_level(HAL_PIN_EPD_BUSY) == 0) {
-        return ESP_OK;
-    }
+    /* Brief settle delay in case a command (0x20 / 0x12) was just clocked out over SPI */
+    esp_rom_delay_us(200);
 
-    if (s_busy_sem != NULL) {
-        xSemaphoreTake(s_busy_sem, 0); /* Drain previous */
-        if (xSemaphoreTake(s_busy_sem, timeout_ticks) == pdTRUE) {
-            return ESP_OK;
+    TickType_t start_ticks = xTaskGetTickCount();
+    while (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
+        TickType_t elapsed = xTaskGetTickCount() - start_ticks;
+        if (elapsed >= timeout_ticks) {
+            ESP_LOGW(TAG, "SSD1681 BUSY wait timed out");
+            return ESP_ERR_TIMEOUT;
         }
-    } else {
-        /* Polling fallback if scheduler not active */
-        uint32_t ms = 0;
-        while (gpio_get_level(HAL_PIN_EPD_BUSY) == 1 && ms < 5000) {
+        if (s_busy_sem != NULL) {
+            TickType_t remain = timeout_ticks - elapsed;
+            TickType_t step = pdMS_TO_TICKS(20);
+            if (step == 0) step = 1;
+            if (remain < step) step = remain;
+            if (xSemaphoreTake(s_busy_sem, step) == pdTRUE && gpio_get_level(HAL_PIN_EPD_BUSY) == 0) {
+                /* Re-give token so any concurrent waiter (e.g. sleep transition waiting on LVGL flush) wakes immediately */
+                xSemaphoreGive(s_busy_sem);
+                return ESP_OK;
+            }
+        } else {
             esp_rom_delay_us(1000);
-            ms++;
         }
-        if (ms < 5000) return ESP_OK;
     }
 
-    ESP_LOGW(TAG, "SSD1681 BUSY wait timed out");
-    return ESP_ERR_TIMEOUT;
+    return ESP_OK;
 }
 
 static void epd_configure_base_registers(void)

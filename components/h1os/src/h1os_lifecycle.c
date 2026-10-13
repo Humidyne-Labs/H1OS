@@ -317,7 +317,7 @@ static void execute_system_shutdown(bool force_clean_white)
 
     /* Release battery LDO power latch (GPIO 17 LOW). On battery, power dies here. */
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17)");
-    hal_io_lock_power_latch(false);
+    hal_io_release_power_latch();
     vTaskDelay(pdMS_TO_TICKS(200));
 
     /* Still running => powered from USB VBUS. Do NOT use sub_power_enter_deep_sleep():

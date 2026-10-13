@@ -17,39 +17,23 @@ static const char *TAG = "HAL_IO";
 
 esp_err_t hal_io_early_init(void)
 {
-    esp_err_t ret = ESP_OK;
-
-    // 1. Release pad holds on wake inputs
+    // 1. Release sleep pad holds on dynamic peripheral & wake inputs
+    // Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
+    // are latched exclusively in the 2nd-stage bootloader (h1os_boot_hook.c).
     hal_io_release_pad_holds();
 
-    // 2. BAT_CTRL (GPIO 17) is locked strictly in 2nd-stage bootloader (h1os_boot_hook.c).
-    // Runtime re-assertion is commented out to test strict bootloader latching independence.
-    // ret = hal_io_lock_power_latch(true);
-    // if (ret != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to lock power latch GPIO 17: %d", ret);
-    //     return ret;
-    // }
-
-    // 3. Keep 3.3V EPD & Peripheral rail energized (GPIO 6 = 0)
-    ret = hal_io_set_sensor_rail(true);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to energize peripheral rail GPIO 6: %d", ret);
-        return ret;
-    }
-
-    // 4. Ensure Audio Codec domain is energized (GPIO 42 = 0) to prevent I2C bus clamping, and muted (GPIO 46 = 0)
+    // 2. Ensure Audio Amplifier is muted (GPIO 46 = 0)
     gpio_config_t pa_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_PA_EN) | (1ULL << HAL_PIN_PA_CTRL),
+        .pin_bit_mask = (1ULL << HAL_PIN_PA_CTRL),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&pa_cfg);
-    gpio_set_level(HAL_PIN_PA_EN, 0);   // Keep Audio Domain ON (Active LOW: 0=ON)
     gpio_set_level(HAL_PIN_PA_CTRL, 0); // Standby Mute
 
-    // 5. User Status LED (GPIO 3: Open-Drain, 1 = OFF)
+    // 3. User Status LED (GPIO 3: Open-Drain, 1 = OFF)
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
         .mode = GPIO_MODE_OUTPUT_OD,
@@ -60,7 +44,7 @@ esp_err_t hal_io_early_init(void)
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1); // LED OFF
 
-    // 6. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 100k pull-ups and internal pull-ups in parallel)
+    // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 100k pull-ups and internal pull-ups in parallel)
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
         .mode = GPIO_MODE_INPUT,
@@ -70,7 +54,7 @@ esp_err_t hal_io_early_init(void)
     };
     gpio_config(&btn_cfg);
 
-    // 7. RTC INT (GPIO 5: Input with internal pull-up)
+    // 5. RTC INT (GPIO 5: Input with internal pull-up)
     gpio_config_t rtc_int_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_RTC_INT),
         .mode = GPIO_MODE_INPUT,
@@ -80,51 +64,17 @@ esp_err_t hal_io_early_init(void)
     };
     gpio_config(&rtc_int_cfg);
 
-    ESP_LOGD(TAG, "Early IO configuration and power latch locked.");
+    ESP_LOGD(TAG, "Early IO configuration complete (power rails held by 2nd-stage bootloader).");
     return ESP_OK;
 }
 
-esp_err_t hal_io_lock_power_latch(bool enable)
+esp_err_t hal_io_release_power_latch(void)
 {
-    if (!enable) {
-        /* Release holds FIRST: a held pad ignores gpio_set_level() */
-        gpio_deep_sleep_hold_dis();
-        gpio_hold_dis(HAL_PIN_POWER_HOLD);
-        gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
-        gpio_set_level(HAL_PIN_POWER_HOLD, 0);
-        return ESP_OK;
-    }
-
-    gpio_set_level(HAL_PIN_POWER_HOLD, 1);
-    gpio_config_t pwr_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_POWER_HOLD),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&pwr_cfg);
-    gpio_set_level(HAL_PIN_POWER_HOLD, 1);
-    gpio_hold_en(HAL_PIN_POWER_HOLD);
-
-    return ESP_OK;
-}
-
-
-esp_err_t hal_io_set_sensor_rail(bool enable)
-{
-    gpio_config_t rail_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_EPD_3V3_EN),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&rail_cfg);
-    // Active LOW: 0 = ON, 1 = OFF
-    gpio_set_level(HAL_PIN_EPD_3V3_EN, enable ? 0 : 1);
-    gpio_hold_en(HAL_PIN_EPD_3V3_EN);
-
+    /* Strictly for system shutdown: release holds FIRST so GPIO 17 can be driven LOW */
+    gpio_deep_sleep_hold_dis();
+    gpio_hold_dis(HAL_PIN_POWER_HOLD);
+    gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
+    gpio_set_level(HAL_PIN_POWER_HOLD, 0);
     return ESP_OK;
 }
 
@@ -148,27 +98,21 @@ hal_btn_mask_t hal_io_read_buttons(void)
 
 esp_err_t hal_io_isolate_sleep_pads(void)
 {
-    // 1. Freeze power rails: BAT_CTRL = 1, EPD_3V3_EN = 0
-    gpio_set_level(HAL_PIN_POWER_HOLD, 1);
-    gpio_hold_en(HAL_PIN_POWER_HOLD);
+    // Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
+    // remain untouched and held by the 2nd-stage bootloader.
 
-    gpio_set_level(HAL_PIN_EPD_3V3_EN, 0);
-    gpio_hold_en(HAL_PIN_EPD_3V3_EN);
-
-    // 2. Display SPI line isolation: Hold CS and RST HIGH
+    // 1. Display SPI line isolation: Hold CS and RST HIGH
     gpio_set_level(HAL_PIN_EPD_CS, 1);
     gpio_hold_en(HAL_PIN_EPD_CS);
 
     gpio_set_level(HAL_PIN_EPD_RST, 1);
     gpio_hold_en(HAL_PIN_EPD_RST);
 
-    // 3. Audio power domain kept ON (0=ON) to prevent I2C clamping, PA muted (0=Mute)
-    gpio_set_level(HAL_PIN_PA_EN, 0);
-    gpio_hold_en(HAL_PIN_PA_EN);
+    // 2. Keep PA muted (0 = Mute) during sleep
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
-    // 4. Configure RTC IO domain pull-ups for EXT1 wake sources.
+    // 3. Configure RTC IO domain pull-ups for EXT1 wake sources.
     // Digital domain pull-ups vanish when VDD3P3_CPU powers down in deep sleep.
     // RTC IO pull-ups maintain HIGH level so floating pads do not trigger false EXT1 wakes.
     rtc_gpio_init(HAL_PIN_RTC_INT);
@@ -186,10 +130,10 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
 
-    // 5. Enable deep sleep hold on all held pads
+    // 4. Enable deep sleep hold on all held pads
     gpio_deep_sleep_hold_en();
 
-    // 6. Force RTC Peripherals domain to remain powered ON during deep sleep so RTC GPIO 17 keeps latch held
+    // 5. Force RTC Peripherals domain to remain powered ON during deep sleep so RTC pad holds stay active
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     ESP_LOGD(TAG, "Sleep pads isolated and latched.");
@@ -198,17 +142,17 @@ esp_err_t hal_io_isolate_sleep_pads(void)
 
 esp_err_t hal_io_release_pad_holds(void)
 {
-    // De-init RTC GPIO function to return pins to standard digital GPIO domain
+    // De-init RTC GPIO function to return wake pins to standard digital GPIO domain
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
 
+    // Release holds only on dynamic peripheral/wake pins (never touch GPIO 17, GPIO 6, or GPIO 42)
     gpio_hold_dis(HAL_PIN_BUTTON_BOOT);
     gpio_hold_dis(HAL_PIN_BUTTON_POWER);
     gpio_hold_dis(HAL_PIN_RTC_INT);
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);
-    gpio_hold_dis(HAL_PIN_PA_EN);
     gpio_hold_dis(HAL_PIN_PA_CTRL);
     return ESP_OK;
 }

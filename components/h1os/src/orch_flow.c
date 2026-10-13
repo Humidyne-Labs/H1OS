@@ -28,6 +28,8 @@ static const char *TAG = "orch_flow";
 #include <math.h>
 #include <limits.h>
 #include "soc/efuse_struct.h"
+#include "soc/gpio_reg.h"
+#include "soc/rtc_cntl_reg.h"
 
 #define ORCH_HISTORICAL_EWMA_ALPHA   0.25f   /* Light EWMA alpha for long-term temp_historical */
 #define ORCH_LEAKAGE_MARGIN_C        0.30f   /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
@@ -53,8 +55,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         } else {
             st->tsens_cal_centi_c = 0;
         }
-        ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C)",
-                 (unsigned long)st->boot_count, (float)st->tsens_cal_centi_c / 100.0f);
+        uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
+        uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
+        uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> 17) & 1U;
+        ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C) | BL Hook GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
+                 (unsigned long)st->boot_count, (float)st->tsens_cal_centi_c / 100.0f,
+                 (unsigned long)g17_out, (unsigned long)g17_oe, (unsigned long)g17_hold);
         return ORCH_FLOW_BOOT;
     }
 

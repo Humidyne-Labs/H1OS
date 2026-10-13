@@ -18,30 +18,16 @@ extern "C" {
 #endif
 
 /**
- * @brief Early boot initialization of essential system pins.
+ * @brief Early boot initialization of non-latched application pins.
  * 
- * Releases RTC pad holds on buttons/interrupts, asserts BAT_CTRL HIGH immediately,
- * asserts EPD_3V3_EN LOW (rail on), and ensures audio amp is muted/cut.
+ * Releases sleep pad holds on dynamic peripheral/wake pins, configures
+ * amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5).
+ * Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are
+ * strictly latched in the 2nd-stage bootloader (h1os_boot_hook.c).
  * 
  * @return ESP_OK on success, or driver error code.
  */
 esp_err_t hal_io_early_init(void);
-
-/**
- * @brief Asserts and locks the battery LDO enable latch (GPIO 17).
- * 
- * @param enable True to drive HIGH and lock; False to drive LOW (power cut).
- * @return ESP_OK on success.
- */
-esp_err_t hal_io_lock_power_latch(bool enable);
-
-/**
- * @brief Controls the 3.3V switched peripheral rail (GPIO 6, Active LOW).
- * 
- * @param enable True to turn rail ON (drive 0); False to turn OFF (drive 1).
- * @return ESP_OK on success.
- */
-esp_err_t hal_io_set_sensor_rail(bool enable);
 
 /**
  * @brief Controls user status LED (GPIO 3, Active LOW).
@@ -54,12 +40,11 @@ esp_err_t hal_io_set_led(bool on);
 /**
  * @brief Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
  * 
+ * Strictly for system shutdown; assertion of GPIO 17 is handled exclusively by the 2nd-stage bootloader.
+ * 
  * @return ESP_OK on success.
  */
-static inline esp_err_t hal_io_release_power_latch(void)
-{
-    return hal_io_lock_power_latch(false);
-}
+esp_err_t hal_io_release_power_latch(void);
 
 /**
  * @brief Samples instantaneous state of hardware tactile buttons.
@@ -80,19 +65,19 @@ static inline bool hal_io_button_is_pressed(gpio_num_t pin)
 }
 
 /**
- * @brief Configures and locks all lines subject to parasitic leakage prior to deep sleep.
+ * @brief Configures and locks dynamic peripheral lines prior to deep sleep.
  * 
  * - Latches GPIO 11 (EPD_CS) and GPIO 9 (EPD_RST) HIGH via gpio_hold_en().
- * - Cuts audio power: GPIO 42 (PA_EN) = HIGH, GPIO 46 (PA_CTRL) = LOW.
- * - Protects SD bus: GPIO 39-41 set to High-Z with pull-ups.
- * - Freezes BAT_CTRL (GPIO 17) HIGH and EPD_3V3_EN (GPIO 6) LOW with RTC pad holds.
+ * - Holds amplifier mute GPIO 46 (PA_CTRL) LOW.
+ * - Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18).
+ * - Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
  * 
  * @return ESP_OK on success.
  */
 esp_err_t hal_io_isolate_sleep_pads(void);
 
 /**
- * @brief Releases RTC pad holds upon waking from deep sleep.
+ * @brief Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
  * 
  * @return ESP_OK on success.
  */
