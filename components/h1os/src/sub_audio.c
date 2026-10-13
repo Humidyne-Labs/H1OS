@@ -2,6 +2,16 @@
  * @file sub_audio.c
  * @brief Layer 2: ES8311 Codec & NS4168 Audio Implementation
  *
+ * @note TODO (Known Issue - Runtime Button Click Chime):
+ *   - Multi-note presentation chimes (H1OS_CHIME_BOOT, H1OS_CHIME_SHUTDOWN) play reliably,
+ *     and perceptual volume scaling (0%-100% LUT) is verified working.
+ *   - Short runtime keypad click tones (`sub_audio_play_tone_async(1046, 35)`) execute in
+ *     `h1os_audio_worker` at the exact button-press timestamp, but still produce no audible
+ *     output on hardware.
+ *   - Next session: investigate I2S DMA circular buffer overwrite timing (`i2s_channel_write`
+ *     when `uxQueueSpacesAvailable(msg_queue) <= 1`), NS4168 CTRL pulse-train / turn-on
+ *     timing, and compare directly with `sub_audio_exec_chime()` multi-note sequencing.
+ *
  * SPDX-License-Identifier: MIT
  */
 
@@ -16,6 +26,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include <math.h>
+#include <string.h>
 
 static const char *TAG = "sub_audio";
 
@@ -57,6 +68,7 @@ typedef struct {
 static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited = false;
 static bool s_i2s_chan_enabled = false;
+static bool s_codec_in_standby = true;
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
@@ -89,8 +101,9 @@ static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
     return es8311_perceptual_vol_table[pct];
 }
 
-/* Forward declaration */
+/* Forward declarations */
 static void audio_worker_task(void *pvParameters);
+static void sub_audio_park_warm(void);
 
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 {
@@ -141,6 +154,9 @@ static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
+    /* 0. Release any prior digital reset (Reg 0x00 = 0x1F from standby) and enable CSM first */
+    ret |= es8311_write_reg(0x00, 0x80);
+
     /* 1. Wake chip and set low-power analog baseline */
     ret |= es8311_write_reg(0x0D, 0xFA);
 
@@ -190,7 +206,7 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x0E, 0x02); /* Analog blocks power on / VROI */
     ret |= es8311_write_reg(0x12, 0x00); /* DAC analog power ON (PDN_DAC = 0) */
     ret |= es8311_write_reg(0x14, 0x1A);
-    ret |= es8311_write_reg(0x0D, 0x01); /* Analog reference & normal VMID */
+    ret |= es8311_write_reg(0x0D, 0x01); /* Analog reference & normal VMID (charges C_VMID to VDD/2) */
     ret |= es8311_write_reg(0x15, 0x40);
     ret |= es8311_write_reg(0x37, 0x08);
     ret |= es8311_write_reg(0x45, 0x00);
@@ -211,14 +227,14 @@ esp_err_t sub_audio_init(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0); /* Keep amplifier muted initially */
     vTaskDelay(pdMS_TO_TICKS(15));
 
-    /* 2. Probe ES8311 silicon over I2C */
-    uint8_t chip_id_reg = 0xFD;
-    uint8_t chip_id[2] = {0};
-    esp_err_t err = hal_i2c_write_read(HAL_I2C_ADDR_ES8311, &chip_id_reg, 1, chip_id, 2, 50);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "ES8311 Codec I2C Probe: Detected Chip ID 0x%02X%02X (Expected: 0x8311)", chip_id[0], chip_id[1]);
+    /* 2. Probe ES8311 silicon over I2C (two single-byte reads; ES8311 does not auto-increment 0xFD->0xFE) */
+    uint8_t id1 = 0, id2 = 0;
+    esp_err_t err1 = es8311_read_reg(ES8311_REG_CHIP_ID1, &id1);
+    esp_err_t err2 = es8311_read_reg(ES8311_REG_CHIP_ID2, &id2);
+    if (err1 == ESP_OK && err2 == ESP_OK) {
+        ESP_LOGI(TAG, "ES8311 Codec I2C Probe: Detected Chip ID 0x%02X%02X (Expected: 0x8311)", id1, id2);
     } else {
-        ESP_LOGW(TAG, "ES8311 Codec I2C Probe failed (%s) - attempting init anyway", esp_err_to_name(err));
+        ESP_LOGW(TAG, "ES8311 Codec I2C Probe failed (%s) - attempting init anyway", esp_err_to_name(err1 != ESP_OK ? err1 : err2));
     }
 
     /* 3. Configure I2S TX Channel (16-bit 16kHz Philips Master with MCLK) */
@@ -227,7 +243,7 @@ esp_err_t sub_audio_init(void)
     chan_cfg.dma_desc_num = 4;
     chan_cfg.dma_frame_num = 256;
 
-    err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
+    esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2S TX channel: %s", esp_err_to_name(err));
         return err;
@@ -275,7 +291,11 @@ esp_err_t sub_audio_init(void)
         ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", s_volume_pct);
     }
 
-    /* 6. Spawn audio background worker task and command queue */
+    /* Allow external C_VMID capacitor to charge and Reg 0x37 soft-ramp (80 ms) to reach target volume */
+    vTaskDelay(pdMS_TO_TICKS(80));
+    s_codec_in_standby = false;
+
+    /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) for instant click response */
     if (s_audio_queue == NULL) {
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
@@ -284,19 +304,30 @@ esp_err_t sub_audio_init(void)
                 "h1os_audio_worker",
                 4096,
                 NULL,
-                4,
+                6,
                 &s_audio_task_handle,
-                1
+                tskNO_AFFINITY
             );
         }
     }
 
     s_audio_inited = true;
 
-    /* 7. Enter quiet standby immediately so amplifier and I2S clocks stay silent/quiescent */
-    sub_audio_standby();
+    /* 7. Park in Warm Idle: NS4168 amp muted (PA_CTRL = 0), while I2S MCLK/LRCK and ES8311 DAC stay locked */
+    sub_audio_park_warm();
 
     return ESP_OK;
+}
+
+/*
+ * Warm Idle between sounds during an active Flow B UI session:
+ * - Mutes external NS4168 Class-D amplifier (HAL_PIN_PA_CTRL = 0 -> H-bridge off, zero speaker hiss)
+ * - Keeps I2S MCLK/LRCK running (streaming 0x0000 via auto_clear) and ES8311 CSM in State S3 at s_volume_pct
+ *   so short button clicks (35 ms) are not swallowed by ES8311 CSM clock recovery or Reg 0x37 soft-ramp (80 ms)
+ */
+static void sub_audio_park_warm(void)
+{
+    gpio_set_level(HAL_PIN_PA_CTRL, 0);
 }
 
 esp_err_t sub_audio_standby(void)
@@ -325,6 +356,8 @@ esp_err_t sub_audio_standby(void)
     es8311_write_reg(0x0D, 0xFC); /* Completely power down analog references & VMID */
     es8311_write_reg(0x02, 0x00);
 
+    s_codec_in_standby = true;
+
     /* 4. Disable active I2S clock oscillation to stop digital switching dissipation */
     if (s_tx_chan != NULL && s_i2s_chan_enabled) {
         i2s_channel_disable(s_tx_chan);
@@ -340,7 +373,7 @@ static void sub_audio_teardown_clean(void)
 {
     /* Step 1: Stream 5 * 256 = 1,280 zero samples (80 ms > 1,024-sample DMA ring)
      * so i2s_channel_write() blocks in hardware lockstep until the tone has completely
-     * exited the DMA ring and ES8311 DAC interpolator before muting! */
+     * exited the DMA ring and ES8311 DAC interpolator before muting the NS4168 amplifier! */
     if (s_tx_chan != NULL && s_i2s_chan_enabled) {
         int16_t silence[256] = {0};
         size_t written = 0;
@@ -349,20 +382,11 @@ static void sub_audio_teardown_clean(void)
         }
     }
 
-    /* Step 2: Trigger ES8311 soft-mute to ramp down volume smoothly to zero cross */
-    es8311_write_reg(0x31, 0x40); /* DAC_DSMMUTE = 1 */
-
-    /* Step 3: Wait ~15 ms for soft-ramp down (based on DAC_RAMPRATE in 0x37) */
-    vTaskDelay(pdMS_TO_TICKS(15));
-
-    /* Step 4: Safely gate/shutdown Class D Amplifier without pops */
-    gpio_set_level(HAL_PIN_PA_CTRL, 0);
-
-    /* Step 5: Enter ultra-low-power silicon standby */
-    sub_audio_standby();
+    /* Step 2: Park in Warm Idle (gate Class-D Amplifier while zero samples are streaming) */
+    sub_audio_park_warm();
 }
 
-/* Internal helper to stream tone samples without entering standby afterwards */
+/* Internal helper to stream tone samples padded to 256-sample DMA descriptor boundaries */
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 {
     const uint32_t sample_rate = 16000;
@@ -387,29 +411,39 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
                     env = (float)(total_samples - 1 - idx) / (float)ramp_samples;
                 }
             }
-            buffer[i] = (int16_t)(sinf(phase) * 20000.0f * env);
+            buffer[i] = (int16_t)(sinf(phase) * 28000.0f * env);
             phase += phase_step;
             if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
         }
 
+        if (chunk_size < 256) {
+            memset(&buffer[chunk_size], 0, (256 - chunk_size) * sizeof(int16_t));
+        }
+
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, buffer, chunk_size * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
+        i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
 }
 
-/* Internal helper to stream raw 16-bit PCM buffer */
+/* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
 static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_count)
 {
     if (samples == NULL || sample_count == 0) return;
 
+    int16_t buffer[256];
     size_t samples_sent = 0;
     while (samples_sent < sample_count) {
         size_t chunk = sample_count - samples_sent;
         if (chunk > 256) chunk = 256;
 
+        memcpy(buffer, &samples[samples_sent], chunk * sizeof(int16_t));
+        if (chunk < 256) {
+            memset(&buffer[chunk], 0, (256 - chunk) * sizeof(int16_t));
+        }
+
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, &samples[samples_sent], chunk * sizeof(int16_t), &bytes_written, pdMS_TO_TICKS(100));
+        i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_sent += chunk;
     }
 }
@@ -421,7 +455,7 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         if (err != ESP_OK) return err;
     }
 
-    /* 1. Start I2S clocking (MCLK/BCLK) FIRST so ES8311 PLL and CSM have an active MCLK! */
+    /* 1. Ensure I2S TX clocks (MCLK/BCLK/LRCK) are running */
     if (s_tx_chan != NULL && !s_i2s_chan_enabled) {
         esp_err_t chan_err = i2s_channel_enable(s_tx_chan);
         if (chan_err == ESP_OK) {
@@ -430,24 +464,35 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
             ESP_LOGW(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(chan_err));
         }
     }
-    vTaskDelay(pdMS_TO_TICKS(5));
 
-    /* 2. Wakeup codec and restore operational DAC state while MCLK is running */
-    es8311_init_dac_registers();
-
-    /* 3. Poll ES8311 Chip State Machine (Reg 0xFC bits 6:4) to verify active state */
-    esp_err_t err = sub_audio_wait_until_ready(100);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Proceeding with playback despite CSM ready warning: %s", esp_err_to_name(err));
+    if (s_codec_in_standby) {
+        /* Cold Wake Path: Codec was in deep-sleep standby (0x00=0x1F, 0x0D=0xFC, C_VMID discharged) */
+        vTaskDelay(pdMS_TO_TICKS(5));
+        es8311_init_dac_registers();
+        esp_err_t err = sub_audio_wait_until_ready(100);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Proceeding with playback despite CSM ready warning: %s", esp_err_to_name(err));
+        }
+        /* Stream 5 buffers (80 ms) of silence so C_VMID and Reg 0x37 soft-ramp settle completely */
+        int16_t vmid_charge_silence[256] = {0};
+        size_t written = 0;
+        for (int i = 0; i < 5; i++) {
+            i2s_channel_write(s_tx_chan, vmid_charge_silence, sizeof(vmid_charge_silence), &written, pdMS_TO_TICKS(100));
+        }
+        s_codec_in_standby = false;
+    } else {
+        /* Warm Fast-Path: MCLK/LRCK and ES8311 CSM are already active; ensure volume/unmute registers are set */
+        uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
+        es8311_write_reg(0x32, vol_reg);
+        es8311_write_reg(0x31, (s_volume_pct == 0) ? 0x60 : 0x00);
     }
 
-    /* 4. Unmute NS4168 Class D amplifier and stream 4 * 256 = 1,024 zero samples (64 ms)
-     * to prime all 4 DMA descriptors while the ES8311 VMID cap, DAC soft-unmute ramp
-     * (Reg 0x37 = 0x08), and NS4168 turn-on time settle completely before the first sample! */
+    /* 2. Unmute NS4168 Class-D amplifier and stream 2 zero buffers (32 ms)
+     * so the NS4168 H-bridge (~15 ms turn-on time) is fully active before the first tone sample! */
     gpio_set_level(HAL_PIN_PA_CTRL, 1);
     int16_t preroll[256] = {0};
     size_t written = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         i2s_channel_write(s_tx_chan, preroll, sizeof(preroll), &written, pdMS_TO_TICKS(100));
     }
 
@@ -456,6 +501,8 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 {
+    ESP_LOGI(TAG, "Playing tone: %lu Hz for %lu ms (Vol: %u%%)",
+             (unsigned long)frequency_hz, (unsigned long)duration_ms, s_volume_pct);
     esp_err_t ret = sub_audio_prepare_and_unmute();
     if (ret != ESP_OK) return ret;
 
@@ -525,7 +572,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             break;
 
         default:
-            sub_audio_standby();
+            sub_audio_park_warm();
             return ESP_ERR_INVALID_ARG;
     }
 
