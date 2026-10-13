@@ -2,3 +2,6 @@
 /build/
 /build_dev/
 /managed_components/
+
+# NOT Tracking bootloader in example, found patch
+# https://github.com/espressif/esp-idf/issues/18651
