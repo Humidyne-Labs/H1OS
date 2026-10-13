@@ -14,8 +14,6 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
 {
     lv_obj_t *scr = screen_base_create("PSYCHROMETRICS", "2/4", event_cb);
 
-    orch_persisted_state_t *st = orch_state_get();
-
     // Row 1: Dew Point (°F and °C)
     lv_obj_t *lbl_dew = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_dew, "Dew Point:   %.1f°F", telem->dew_point_f);
@@ -40,16 +38,18 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
     lv_obj_align(lbl_glass, LV_ALIGN_TOP_LEFT, 6, 108);
 
     lv_obj_t *lbl_floor = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_floor, "Amb Floor:   %.1f°C", (float)st->amb_floor_temp_centi_c / 100.0f);
+    lv_label_set_text_fmt(lbl_floor, "Win L/H:     %.1f/%.1f°C",
+                          telem->window_low_c, telem->window_high_c);
     lv_obj_set_style_text_font(lbl_floor, H1OS_FONT_14, 0);
     lv_obj_align(lbl_floor, LV_ALIGN_TOP_LEFT, 6, 134);
 
-    // Footer Bar: Invariant status (left), Clock Time (right)
+    // Footer Bar: Tri-Node Confidence (left), Clock Time (right)
     char time_str[16] = "--:--";
     h1os_time_get_formatted(H1OS_TIME_FMT_12H_MIN, time_str, sizeof(time_str));
 
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text(lbl_foot_l, "Invariant: OK");
+    lv_label_set_text_fmt(lbl_foot_l, "Conf: %u%% (T:%u)",
+                          telem->trinode_confidence_pct, telem->valid_trend);
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 

@@ -18,7 +18,15 @@
 #include "soc/io_mux_reg.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
+#include "soc/sens_reg.h"
 #include "soc/soc.h"
+
+#ifndef SENS_SAR_PERI_CLK_GATE_CONF_REG
+#define SENS_SAR_PERI_CLK_GATE_CONF_REG (DR_REG_SENS_BASE + 0x104)
+#endif
+#ifndef SENS_TSENS_CLK_EN
+#define SENS_TSENS_CLK_EN               (1UL << 29)
+#endif
 
 #define SDA_BIT_MASK      (1UL << (HAL_PIN_I2C_SDA - 32))  /* GPIO 47 -> Bit 15 in Reg 1 */
 #define SCL_BIT_MASK      (1UL << (HAL_PIN_I2C_SCL - 32))  /* GPIO 48 -> Bit 16 in Reg 1 */
@@ -162,6 +170,55 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
     return crc;
 }
 
+/* Low-power MCU Die TSENS readout via RTC SAR registers on ESP32-S3 (Centigrade * 100) */
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c, int16_t fallback_centi_c)
+{
+    REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
+    REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    /* Allow ~300 us for the TSENS oscillator and counter window to settle */
+    esp_rom_delay_us(300);
+
+    /* Trigger conversion by toggling DUMP_OUT and waiting for READY */
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
+    REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
+    int timeout = 100;
+    while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
+        esp_rom_delay_us(5);
+    }
+    uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
+
+    /* Shut down TSENS immediately to minimize deep-sleep leakage */
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT | SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 0);
+    REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+
+    if (timeout <= 0 || raw == 0 || raw == 0xFF) {
+        return fallback_centi_c;
+    }
+
+    /* Default I2C_SARADC_TSENS_DAC index 2 (reg_val = 15, range -10..80 C -> offset = 0):
+     * T_uncal_centi = (0.4386 * raw - (0 * 27.88) - 20.52) * 100
+     *               = (4386 * raw - 205200) / 100
+     * T_centi       = T_uncal_centi - cal_centi_c (per-die eFuse temp_calib) */
+    int32_t t_centi = (((4386 * (int32_t)raw) - 205200) / 100) - (int32_t)cal_centi_c;
+    if (t_centi < -4000 || t_centi > 12500) {
+        return fallback_centi_c;
+    }
+    return (int16_t)t_centi;
+}
+
+/* Unconditionally put SHTC3 back into low-power sleep (0xB098) */
+static void RTC_IRAM_ATTR shtc3_send_sleep(void)
+{
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+        i2c_write_byte(0xB0);
+        i2c_write_byte(0x98);
+    }
+    i2c_stop();
+}
+
 /* Master RTC Wake Stub Entry Point */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
@@ -187,6 +244,8 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         return;
     }
 
+    orch_persisted_state_t *st = orch_state_get();
+
     /* Route GPIO 47 (SDA) and GPIO 48 (SCL) to digital GPIO with input & pull-up enabled */
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG);
@@ -197,88 +256,104 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_PULLUP_EN(IO_MUX_GPIO48_REG);
 
     /* 3. Send SHTC3 Wake Command: 0x3517 */
+    bool sample_ok = true;
     i2c_start();
     if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
         i2c_stop();
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
+        sample_ok = false;
+    } else {
+        i2c_write_byte(0x35);
+        i2c_write_byte(0x17);
+        i2c_stop();
+        esp_rom_delay_us(250);
     }
-    i2c_write_byte(0x35);
-    i2c_write_byte(0x17);
-    i2c_stop();
-
-    esp_rom_delay_us(250);
 
     /* 4. Send SHTC3 Normal-Power Measurement Command: 0x7866 (full ADC precision) */
-    i2c_start();
-    if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
-        i2c_stop();
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
+    if (sample_ok) {
+        i2c_start();
+        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+            i2c_stop();
+            shtc3_send_sleep();
+            sample_ok = false;
+        } else {
+            i2c_write_byte(0x78);
+            i2c_write_byte(0x66);
+            i2c_stop();
+            esp_rom_delay_us(14500);
+        }
     }
-    i2c_write_byte(0x78);
-    i2c_write_byte(0x66);
-    i2c_stop();
-
-    esp_rom_delay_us(13000);
 
     /* 5. Read 6-Byte SHTC3 Data: [T_MSB, T_LSB, T_CRC, RH_MSB, RH_LSB, RH_CRC] */
-    i2c_start();
-    if (!i2c_write_byte((I2C_ADDR_SHTC3 << 1) | 1)) {
-        i2c_stop();
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
-    }
-    uint8_t rx[6];
-    rx[0] = i2c_read_byte(true);
-    rx[1] = i2c_read_byte(true);
-    rx[2] = i2c_read_byte(true);
-    rx[3] = i2c_read_byte(true);
-    rx[4] = i2c_read_byte(true);
-    rx[5] = i2c_read_byte(false);
-    i2c_stop();
-
-    /* 6. Send SHTC3 Sleep Command: 0xB098 */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
-        i2c_write_byte(0xB0);
-        i2c_write_byte(0x98);
-    }
-    i2c_stop();
-
-    /* 7. Verify CRC8 */
-    if (shtc3_crc8(&rx[0], 2) != rx[2] || shtc3_crc8(&rx[3], 2) != rx[5]) {
-        /* Checksum mismatch: boot normally so main app can handle diagnostic error */
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
+    uint8_t rx[6] = {0};
+    if (sample_ok) {
+        i2c_start();
+        if (!i2c_write_byte((I2C_ADDR_SHTC3 << 1) | 1)) {
+            i2c_stop();
+            sample_ok = false;
+        } else {
+            rx[0] = i2c_read_byte(true);
+            rx[1] = i2c_read_byte(true);
+            rx[2] = i2c_read_byte(true);
+            rx[3] = i2c_read_byte(true);
+            rx[4] = i2c_read_byte(true);
+            rx[5] = i2c_read_byte(false);
+            i2c_stop();
+        }
+        /* 6. Unconditionally Send SHTC3 Sleep Command: 0xB098 */
+        shtc3_send_sleep();
     }
 
-    uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
-    uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
+    /* 7. Verify CRC8 and Commit Sample */
+    if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {
+        uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
+        uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-    /* 8. Convert to Centi-Units (Pure integer arithmetic in RTC Memory) */
-    int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
-    uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
+        /* 8. Convert to Centi-Units (Pure integer arithmetic in RTC Memory) */
+        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
+        int16_t die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
 
-    /* 9. Commit Tri-Node sample into RTC Slow Memory */
-    orch_persisted_state_t *st = orch_state_get();
-    orch_tri_node_sample_t sample = {
-        .shtc3_temp_centi_c = temp_centi_c,
-        .shtc3_rh_centi_pct = rh_centi_pct,
-        .mcu_tsens_centi_c  = temp_centi_c,
-        .epd_glass_centi_c  = temp_centi_c,
-        .timestamp_sec      = 0,
-        .quality_flags      = 0x03, /* Cold sample + thermally settled in wake stub */
-    };
-    orch_state_push_sample(&sample);
+        /* 9. Successive-Sample Thermal Delta Gate & Trend Back-Marking:
+         *    - Case 0 (total_samples == 0): First sample cannot prove stability alone -> VALID_COLD = 0, valid_trend = 0.
+         *    - Case 1 (total_samples > 0 && |T_new - T_prev| <= 20 centi-C):
+         *      Back-mark previous sample VALID_COLD = 1, mark new sample VALID_COLD = 1,
+         *      and set valid_trend = 2 (if starting streak) or valid_trend++ (if continuing).
+         *    - Case 2 (total_samples > 0 && |T_new - T_prev| > 20 centi-C):
+         *      Mark new sample VALID_COLD = 0 and reset valid_trend = 0. */
+        uint8_t q_flags = 0;
+        if (st->total_samples == 0) {
+            q_flags = 0;
+            st->valid_trend = 0;
+        } else {
+            uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
+            int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
+            int16_t diff = temp_centi_c - prev_t;
+            if (diff < 0) diff = -diff;
 
-    /* Track ambient floor minimum */
-    if (temp_centi_c < st->amb_floor_temp_centi_c || !st->ewma_inited) {
-        st->amb_floor_temp_centi_c = temp_centi_c;
+            if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
+                /* Back-mark the preceding sample as valid and mark current sample as valid */
+                st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
+                q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
+                if (st->valid_trend < 2) {
+                    st->valid_trend = 2;
+                } else {
+                    st->valid_trend++;
+                }
+            } else {
+                q_flags = 0;
+                st->valid_trend = 0;
+            }
+        }
+
+        orch_tri_node_sample_t sample = {
+            .shtc3_temp_centi_c = temp_centi_c,
+            .shtc3_rh_centi_pct = rh_centi_pct,
+            .mcu_tsens_centi_c  = die_centi_c,
+            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
+            .timestamp_sec      = 0,
+            .quality_flags      = q_flags,
+        };
+        orch_state_push_sample(&sample);
     }
 
     /* 10. Query PCF85063A (0x51) remaining countdown to prevent Zero-Hour runt collisions */
@@ -305,7 +380,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
     i2c_stop();
 
-    /* If RTC INT asserted or countdown hit 0 during the 13ms conversion, promote to Flow B */
+    /* If RTC INT asserted or countdown hit 0 during the 15ms conversion, promote to Flow B */
     if (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0 ||
         (rtc_timer_active && rem_sec == 0)) {
         REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));

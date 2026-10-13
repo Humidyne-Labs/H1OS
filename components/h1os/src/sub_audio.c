@@ -60,6 +60,34 @@ static bool s_i2s_chan_enabled = false;
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
+static uint8_t           s_volume_pct        = 50; /* Default 50% perceptual volume */
+
+/*
+ * Perceptual Volume Lookup Table (0% to 100%)
+ * Maps 0%-100% input to Register 0x32 values using a logarithmic scale:
+ *   - 100% = 191 (0xBF) ->   0.0 dB (Unity Gain / Max Unclipped)
+ *   -   1% =  58 (0x3A) -> -66.5 dB (Barely audible)
+ *   -   0% =   0 (0x00) -> -95.5 dB (Digital Mute)
+ */
+static const uint8_t es8311_perceptual_vol_table[101] = {
+    0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 0x61, 0x65, 0x68, 0x6B, //  0% -  9%
+    0x6E, 0x71, 0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D, 0x7E, 0x80, // 10% - 19%
+    0x81, 0x83, 0x84, 0x85, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, // 20% - 29%
+    0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, // 30% - 39%
+    0x97, 0x98, 0x99, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9E, // 40% - 49%
+    0x9F, 0xA0, 0xA1, 0xA2, 0xA2, 0xA3, 0xA4, 0xA5, 0xA5, 0xA6, // 50% - 59%
+    0xA7, 0xA8, 0xA8, 0xA9, 0xAA, 0xAA, 0xAB, 0xAC, 0xAC, 0xAD, // 60% - 69%
+    0xAE, 0xAE, 0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 0xB3, 0xB3, // 70% - 79%
+    0xB4, 0xB5, 0xB5, 0xB6, 0xB6, 0xB7, 0xB7, 0xB8, 0xB9, 0xB9, // 80% - 89%
+    0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 0xBD, 0xBE, 0xBE, 0xBF, // 90% - 99%
+    0xBF                                                       // 100%
+};
+
+static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
+{
+    if (pct > 100) pct = 100;
+    return es8311_perceptual_vol_table[pct];
+}
 
 /* Forward declaration */
 static void audio_worker_task(void *pvParameters);
@@ -167,9 +195,10 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x37, 0x08);
     ret |= es8311_write_reg(0x45, 0x00);
 
-    /* 7. Volume and Unmute */
-    ret |= es8311_write_reg(0x32, 0xBF); /* 0 dB nominal volume */
-    ret |= es8311_write_reg(0x31, 0x00); /* Unmute DAC DSM/DEM */
+    /* 7. Volume and Unmute (using configured s_volume_pct) */
+    uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
+    ret |= es8311_write_reg(0x32, vol_reg);
+    ret |= es8311_write_reg(0x31, (s_volume_pct == 0) ? 0x60 : 0x00); /* Unmute DAC DSM/DEM if vol > 0 */
 
     return ret;
 }
@@ -244,7 +273,7 @@ esp_err_t sub_audio_init(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     } else {
-        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono)");
+        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", s_volume_pct);
     }
 
     /* 6. Spawn audio background worker task and command queue */
@@ -310,8 +339,16 @@ esp_err_t sub_audio_standby(void)
 /* Internal helper: clean teardown sequence per ES8311 hardware spec */
 static void sub_audio_teardown_clean(void)
 {
-    /* Step 1: Wait ~5 ms for codec internal DSP filter and Delta-Sigma pipeline latency */
-    vTaskDelay(pdMS_TO_TICKS(5));
+    /* Step 1: Flush 1,024 zero samples (64 ms = full DMA ring buffer) so short tones
+     * (such as 15 ms button clicks) completely clock out to the DAC before muting! */
+    if (s_tx_chan != NULL && s_i2s_chan_enabled) {
+        int16_t silence[256] = {0};
+        size_t written = 0;
+        for (int i = 0; i < 4; i++) {
+            i2s_channel_write(s_tx_chan, silence, sizeof(silence), &written, pdMS_TO_TICKS(50));
+        }
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
 
     /* Step 2: Trigger ES8311 soft-mute to ramp down volume smoothly to zero cross */
     es8311_write_reg(0x31, 0x40); /* DAC_DSMMUTE = 1 */
@@ -373,12 +410,9 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     if (!s_audio_inited || s_tx_chan == NULL) {
         esp_err_t err = sub_audio_init();
         if (err != ESP_OK) return err;
-    } else {
-        /* Wakeup codec and restore operational DAC state */
-        es8311_init_dac_registers();
     }
 
-    /* Start I2S clocking (MCLK/BCLK) if not already active so ES8311 PLL and CSM can lock */
+    /* 1. Start I2S clocking (MCLK/BCLK) FIRST so ES8311 PLL and CSM have an active MCLK! */
     if (s_tx_chan != NULL && !s_i2s_chan_enabled) {
         esp_err_t chan_err = i2s_channel_enable(s_tx_chan);
         if (chan_err == ESP_OK) {
@@ -387,21 +421,25 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
             ESP_LOGW(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(chan_err));
         }
     }
+    vTaskDelay(pdMS_TO_TICKS(5));
 
-    /* Poll ES8311 Chip State Machine (Reg 0xFC bits 6:4) to verify active state */
+    /* 2. Wakeup codec and restore operational DAC state while MCLK is running */
+    es8311_init_dac_registers();
+
+    /* 3. Poll ES8311 Chip State Machine (Reg 0xFC bits 6:4) to verify active state */
     esp_err_t err = sub_audio_wait_until_ready(100);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Proceeding with playback despite CSM ready warning: %s", esp_err_to_name(err));
     }
 
-    /* Pre-roll zero samples into DMA pipeline to pre-charge DAC interpolator */
-    int16_t preroll[32] = {0};
+    /* 4. Pre-roll zero samples into DMA pipeline to pre-charge DAC interpolator */
+    int16_t preroll[64] = {0};
     size_t written = 0;
     i2s_channel_write(s_tx_chan, preroll, sizeof(preroll), &written, pdMS_TO_TICKS(50));
 
-    /* Unmute NS4168 Class D amplifier */
+    /* 5. Unmute NS4168 Class D amplifier and allow 15 ms power-up turn-on time */
     gpio_set_level(HAL_PIN_PA_CTRL, 1);
-    vTaskDelay(pdMS_TO_TICKS(5));
+    vTaskDelay(pdMS_TO_TICKS(15));
 
     return ESP_OK;
 }
@@ -653,4 +691,23 @@ esp_err_t sub_audio_deinit(void)
     s_audio_inited = false;
     return ESP_OK;
 }
+
+esp_err_t sub_audio_set_volume(uint8_t volume_pct)
+{
+    if (volume_pct > 100) volume_pct = 100;
+    s_volume_pct = volume_pct;
+
+    /* If codec is currently active (not in standby), update DAC volume register immediately */
+    if (s_audio_inited && s_i2s_chan_enabled) {
+        uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
+        es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
+    }
+    return ESP_OK;
+}
+
+uint8_t sub_audio_get_volume(void)
+{
+    return s_volume_pct;
+}
+
 

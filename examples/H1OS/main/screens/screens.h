@@ -37,6 +37,11 @@ typedef enum {
 lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_cb_t event_cb);
 
 /**
+ * @brief Update the active top-right page indicator badge to reflect awake (inverted) or sleep (normal) state.
+ */
+void screen_base_set_awake_badge(bool is_awake);
+
+/**
  * @brief Render Screen 1: Primary Environmental Hero (Page 1/4)
  */
 void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count, lv_event_cb_t event_cb);

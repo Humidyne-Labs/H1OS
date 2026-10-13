@@ -112,15 +112,8 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 3. Initialize Persistent Storage Subsystem
     sub_nvs_init();
 
-    // 3. Inspect Flow Arbiter (Flow A Wake Stub vs Flow B Interactive UI)
+    // 3. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
-
-    if (flow == ORCH_FLOW_A_SAMPLE) {
-        ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
-        orch_flow_execute_sensor_sample();
-        // Returns immediately to sleep inside stub
-        return ESP_OK;
-    }
 
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
         ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");
@@ -145,6 +138,8 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             h1os_lvgl_set_first_flush_mode(true);
         }
     }
+    uint8_t init_vol = (s_app_lifecycle.presentation.volume_pct > 0) ? s_app_lifecycle.presentation.volume_pct : 60;
+    sub_audio_set_volume(init_vol);
     sub_audio_init();
 
     bool is_rtc_wake = false;
@@ -156,12 +151,16 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         }
 #endif
     } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-        /* Check if PCF85063A INT was the wake source */
+        uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
+        bool button_woke = (ext1_pins & ((1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER))) != 0;
+        /* Always clear any pending PCF85063A interrupt flags so INT line releases HIGH */
         bool alarm_f = false, timer_f = false;
         sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
-        if (alarm_f || timer_f) {
+        if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
             is_rtc_wake = true;
         }
+        ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
+                 (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
     }
 
     s_session_running = !is_rtc_wake;
@@ -218,6 +217,8 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
     float t = 0.0f, rh = 0.0f, dew = 0.0f;
     esp_err_t ret = orch_flow_query_telemetry(&t, &rh, &dew);
+    orch_persisted_state_t *st = orch_state_get();
+
     if (ret == ESP_OK) {
         out_telemetry->ambient_temp_c = t;
         out_telemetry->ambient_temp_f = (t * 9.0f / 5.0f) + 32.0f;
@@ -226,22 +227,31 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->dew_point_f    = (dew * 9.0f / 5.0f) + 32.0f;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
 
-        /* Reconstructed absolute humidity */
-        float vp = orch_math_calc_vapor_pressure(t, rh);
-        out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(vp, t);
+        /* Reconstructed absolute humidity from invariant vapor pressure and active T_amb */
+        out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
-    /* Multi-Node Diagnostics */
-    orch_persisted_state_t *st = orch_state_get();
+    /* Three-Tier Temporal Hierarchy & Tri-Node Confidence Metrics */
+    out_telemetry->window_low_c           = (float)st->window_low_temp_centi_c / 100.0f;
+    out_telemetry->window_high_c          = (float)st->window_high_temp_centi_c / 100.0f;
+    out_telemetry->window_avg_shtc3_c     = st->window_avg_shtc3_c;
+    out_telemetry->window_avg_die_c       = st->window_avg_die_c;
+    out_telemetry->temp_historical_c      = st->temp_historical_c;
+    out_telemetry->rh_historical_pct      = st->rh_historical_pct;
+    out_telemetry->trinode_temp_c         = st->trinode_temp_c;
+    out_telemetry->trinode_delta_c        = st->trinode_delta_c;
+    out_telemetry->trinode_confidence_pct = st->trinode_confidence_pct;
+    out_telemetry->valid_trend            = st->valid_trend;
+    out_telemetry->epd_glass_temp_c       = (float)st->last_glass_temp_centi_c / 100.0f;
+
+    /* Multi-Node Diagnostics from Ring Buffer (Flow B never reads SHTC3) */
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
         out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
-        out_telemetry->epd_glass_temp_c = (float)latest_samp.epd_glass_centi_c / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
-        sub_sensor_read_mcu_die_temp(&out_telemetry->mcu_die_temp_c);
-        sub_display_read_glass_temp(&out_telemetry->epd_glass_temp_c);
+        out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
     out_telemetry->sample_count = st->total_samples;
 
@@ -275,6 +285,9 @@ static void execute_system_shutdown(bool force_clean_white)
     ESP_LOGI(TAG, "Executing system shutdown (%s)...",
              force_clean_white ? "storage mode: clean white" : "standard mode");
     s_session_running = false; /* Stop inactivity monitor from racing into h1os_sleep() */
+
+    /* Cancel any active external PCF85063A countdown timer so it does not fire in standby */
+    sub_rtc_cancel_countdown();
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
     if (s_app_lifecycle.on_shutdown) {
@@ -330,3 +343,9 @@ void h1os_shutdown_for_storage(void)
 {
     execute_system_shutdown(true);
 }
+
+esp_err_t h1os_set_volume(uint8_t volume_pct)
+{
+    return sub_audio_set_volume(volume_pct);
+}
+

@@ -129,6 +129,22 @@ bool sub_audio_is_busy(void);
  */
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms);
 
+/**
+ * @brief Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
+ * Persists across standby/wake cycles.
+ *
+ * @param[in] volume_pct Volume percentage (0 - 100).
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_set_volume(uint8_t volume_pct);
+
+/**
+ * @brief Get currently configured output volume percentage (0 - 100).
+ *
+ * @return Current volume percentage.
+ */
+uint8_t sub_audio_get_volume(void);
+
 #ifdef __cplusplus
 }
 #endif

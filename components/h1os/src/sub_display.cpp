@@ -6,6 +6,7 @@
  */
 
 #include "h1os/sub_display.h"
+#include "h1os/orch_state.h"
 #include "h1os/hal_spi.h"
 #include "h1os/hal_types.h"
 #include "h1os/hal_io.h"
@@ -91,6 +92,34 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
     return ESP_ERR_TIMEOUT;
 }
 
+static void epd_configure_base_registers(void)
+{
+    /* Driver output control: 200 mux lines (0xC7, 0x00, 0x00) */
+    uint8_t d_drv[] = { 0xC7, 0x00, 0x00 };
+    hal_spi_write_cmd(0x01);
+    hal_spi_write_data(d_drv, sizeof(d_drv));
+
+    /* Data entry mode: X inc, Y inc */
+    uint8_t d_entry[] = { 0x03 };
+    hal_spi_write_cmd(0x11);
+    hal_spi_write_data(d_entry, sizeof(d_entry));
+
+    /* Set RAM X address window: 0 to 24 (200 pixels / 8 = 25 bytes) */
+    uint8_t d_xwin[] = { 0x00, 0x18 };
+    hal_spi_write_cmd(0x44);
+    hal_spi_write_data(d_xwin, sizeof(d_xwin));
+
+    /* Set RAM Y address window: 0 to 199 (0x0000 to 0x00C7) */
+    uint8_t d_ywin[] = { 0x00, 0x00, 0xC7, 0x00 };
+    hal_spi_write_cmd(0x45);
+    hal_spi_write_data(d_ywin, sizeof(d_ywin));
+
+    /* Border waveform: factory default for full OTP refresh */
+    uint8_t d_border[] = { 0x05 };
+    hal_spi_write_cmd(0x3C);
+    hal_spi_write_data(d_border, sizeof(d_border));
+}
+
 esp_err_t sub_display_init(bool is_wake_cycle)
 {
     if (s_inited) return ESP_OK;
@@ -122,30 +151,22 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     hal_spi_write_cmd(0x12); /* Software Reset */
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
 
-    /* Driver output control: 200 mux lines (0xC7, 0x00, 0x00) */
-    uint8_t d_drv[] = { 0xC7, 0x00, 0x00 };
-    hal_spi_write_cmd(0x01);
-    hal_spi_write_data(d_drv, sizeof(d_drv));
+    /* 4b. Pre-Display Glass Temperature Capture (Command 0x1B):
+     * Strictly read BEFORE any RAM write, LUT load, or charge-pump activation
+     * to prevent display refresh heat from offsetting the glass thermistor. */
+    uint8_t temp_raw[2] = {0};
+    if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
+        if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
+            int8_t temp_int  = (int8_t)temp_raw[0];
+            int16_t frac_c   = (temp_raw[1] & 0x80) ? 50 : 0;
+            int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
+            if (glass_cc >= -4000 && glass_cc <= 8500) {
+                orch_state_get()->last_glass_temp_centi_c = glass_cc;
+            }
+        }
+    }
 
-    /* Data entry mode: X inc, Y inc */
-    uint8_t d_entry[] = { 0x03 };
-    hal_spi_write_cmd(0x11);
-    hal_spi_write_data(d_entry, sizeof(d_entry));
-
-    /* Set RAM X address window: 0 to 24 (200 pixels / 8 = 25 bytes) */
-    uint8_t d_xwin[] = { 0x00, 0x18 };
-    hal_spi_write_cmd(0x44);
-    hal_spi_write_data(d_xwin, sizeof(d_xwin));
-
-    /* Set RAM Y address window: 0 to 199 (0x0000 to 0x00C7) */
-    uint8_t d_ywin[] = { 0x00, 0x00, 0xC7, 0x00 };
-    hal_spi_write_cmd(0x45);
-    hal_spi_write_data(d_ywin, sizeof(d_ywin));
-
-    /* Border waveform */
-    uint8_t d_border[] = { 0x05 };
-    hal_spi_write_cmd(0x3C);
-    hal_spi_write_data(d_border, sizeof(d_border));
+    epd_configure_base_registers();
 
     memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
     memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
@@ -191,29 +212,40 @@ esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
 
 esp_err_t sub_display_refresh_full(void)
 {
-    /* Write to RAM 0x24 (Current Frame) */
+    int64_t t_start = esp_timer_get_time();
+
+    /* 1. Reset SSD1681 out of any prior custom partial LUT (0x32) or Ping-Pong
+     *    differential mode (0x37 = 0x40) so 0x22 = 0xF7 reloads the factory OTP LUT. */
+    hal_spi_write_cmd(0x12); /* Software Reset */
+    sub_display_wait_busy(pdMS_TO_TICKS(1000));
+    epd_configure_base_registers();
+
+    /* 2. Write to RAM 0x24 (Current Frame) */
     set_ram_counters();
     hal_spi_write_cmd(0x24);
     hal_spi_write_frame_dma(s_current_frame);
 
-    /* Write to RAM 0x26 (Previous Frame) */
+    /* 3. Write to RAM 0x26 (Previous Frame) */
     set_ram_counters();
     hal_spi_write_cmd(0x26);
     hal_spi_write_frame_dma(s_current_frame);
 
-    /* Display Update Control 2: Full refresh sequence (0xF7) */
+    /* 4. Display Update Control 2: Full OTP refresh sequence (0xF7) */
     uint8_t d_upd[] = { 0xF7 };
     hal_spi_write_cmd(0x22);
     hal_spi_write_data(d_upd, sizeof(d_upd));
 
-    /* Master Activation */
+    /* 5. Master Activation */
     hal_spi_write_cmd(0x20);
 
-    /* Wait for panel completion */
+    /* 6. Wait for panel completion */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
-    /* Sync shadow buffer */
+    /* 7. Sync shadow buffer */
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
+
+    int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
+    ESP_LOGI(TAG, "Full OTP Refresh completed in %lld ms", t_elapsed_ms);
 
     return ESP_OK;
 }
@@ -294,6 +326,13 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 {
     if (out_temp_c == NULL) return ESP_ERR_INVALID_ARG;
 
+    /* If display is already initialized, return the pristine pre-display glass reading
+     * captured at the start of sub_display_init() before any charge-pump refresh heat. */
+    if (s_inited) {
+        *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
+        return ESP_OK;
+    }
+
     uint8_t temp_raw[2] = {0};
     /* SSD1681 Command 0x1B: Read Temperature Sensor */
     esp_err_t err = hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw));
@@ -303,12 +342,13 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
         float  glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
 
         if (glass_temp < -40.0f || glass_temp > 85.0f || temp_raw[0] == 0xFF || temp_raw[0] == 0x00) {
-            *out_temp_c = 25.0f;
+            *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
             return ESP_ERR_INVALID_RESPONSE;
         }
+        orch_state_get()->last_glass_temp_centi_c = (int16_t)(glass_temp * 100.0f);
         *out_temp_c = glass_temp;
     } else {
-        *out_temp_c = 25.0f;
+        *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
     }
     return err;
 }

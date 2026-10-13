@@ -140,12 +140,12 @@ esp_err_t sub_sensor_read_shtc3_raw(uint16_t *out_raw_temp, uint16_t *out_raw_rh
 void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *out_temp_c, float *out_rh_pct)
 {
     if (out_temp_c != NULL) {
-        /* T [°C] = -45 + 175 * (raw_temp / 65535) */
-        *out_temp_c = -45.0f + 175.0f * ((float)raw_temp / 65535.0f);
+        /* T [°C] = -45 + 175 * (raw_temp / 2^16) */
+        *out_temp_c = -45.0f + 175.0f * ((float)raw_temp / 65536.0f);
     }
     if (out_rh_pct != NULL) {
-        /* RH [%] = 100 * (raw_rh / 65535) */
-        float rh = 100.0f * ((float)raw_rh / 65535.0f);
+        /* RH [%] = 100 * (raw_rh / 2^16) */
+        float rh = 100.0f * ((float)raw_rh / 65536.0f);
         if (rh < 0.0f) rh = 0.0f;
         if (rh > 100.0f) rh = 100.0f;
         *out_rh_pct = rh;

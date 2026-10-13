@@ -88,6 +88,7 @@ typedef struct {
         h1os_splash_cb_t on_splash;    ///< Custom splash rendering callback
         h1os_chime_cb_t  on_chime;     ///< Custom chime callback
         uint8_t          chime_mask;   ///< Hardware synthesized chime bitmask
+        uint8_t          volume_pct;   ///< Initial audio output volume (0 - 100%, default 60% if 0)
     } presentation;
 
     /* Interactive Session Parameters */
@@ -105,7 +106,7 @@ typedef struct {
  * Telemetry Snapshot Structure
  * ========================================================================= */
 typedef struct {
-    // Smoothed Ambient Readings (EWMA)
+    // Active Ambient & Psychrometric Readings (Current Valid Sample or Promoted Reference)
     float    ambient_temp_c;
     float    ambient_temp_f;
     float    ambient_rh_pct;
@@ -113,13 +114,25 @@ typedef struct {
     float    dew_point_f;
     float    absolute_humidity_g;
 
-    // Multi-Node Diagnostics
+    // Three-Tier Temporal Hierarchy Metrics
+    float    window_low_c;            ///< Valid Window Floor (min over valid 32-sample window)
+    float    window_high_c;           ///< Valid Window Ceiling (max over valid 32-sample window)
+    float    window_avg_shtc3_c;      ///< Short-term valid SHTC3 window average
+    float    window_avg_die_c;        ///< Short-term valid MCU Die window average
+    float    temp_historical_c;       ///< Long-term light EWMA temperature history
+    float    rh_historical_pct;       ///< Long-term light EWMA relative humidity history
+
+    // Multi-Node & Tri-Node Confidence Diagnostics
     float    raw_shtc3_temp_c;
     float    mcu_die_temp_c;
     float    epd_glass_temp_c;
+    float    trinode_temp_c;          ///< (T_valid + T_die + T_glass) / 3.0
+    float    trinode_delta_c;         ///< T_valid - T_trinode
+    uint8_t  trinode_confidence_pct;  ///< 0-100% linear confidence score
 
     // Quality & Stability Metrics
     bool     is_thermally_settled;
+    uint16_t valid_trend;             ///< Consecutive thermally settled Flow A samples
     uint32_t sample_count;
     uint16_t battery_mv;
     uint8_t  battery_percent;
@@ -142,6 +155,11 @@ static inline const char *h1os_get_version(void)
  * @brief Initialize H1OS and dispatch application lifecycle.
  */
 esp_err_t h1os_start(const h1os_lifecycle_t *config);
+
+/**
+ * @brief Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
+ */
+esp_err_t h1os_set_volume(uint8_t volume_pct);
 
 /**
  * @brief Retrieve current Tri-Node environmental telemetry.

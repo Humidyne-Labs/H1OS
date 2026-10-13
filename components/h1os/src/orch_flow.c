@@ -25,7 +25,13 @@
 
 static const char *TAG = "orch_flow";
 
-static int64_t s_lockout_until_us = 0;
+#include <math.h>
+#include <limits.h>
+#include "soc/efuse_struct.h"
+
+#define ORCH_HISTORICAL_EWMA_ALPHA   0.25f   /* Light EWMA alpha for long-term temp_historical */
+#define ORCH_LEAKAGE_MARGIN_C        0.30f   /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
+#define ORCH_TRINODE_SPAN_C          15.0f   /* Linear confidence 0-100% span (15.0 C delta = 0%) */
 
 #if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
@@ -39,7 +45,16 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
         /* System boot / Power On Reset */
         st->boot_count++;
-        ESP_LOGI(TAG, "System boot detected. Boot count: %lu", (unsigned long)st->boot_count);
+        if (EFUSE.rd_sys_part1_data4.blk_version_major != 0) {
+            uint32_t cal_temp = EFUSE.rd_sys_part1_data4.temp_calib;
+            /* BIT(8) is sign (1: negative, 0: positive); magnitude in 0.1 C (10 centi-C) */
+            int32_t cal_deci_c = ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp) : (int32_t)((uint8_t)cal_temp);
+            st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);
+        } else {
+            st->tsens_cal_centi_c = 0;
+        }
+        ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C)",
+                 (unsigned long)st->boot_count, (float)st->tsens_cal_centi_c / 100.0f);
         return ORCH_FLOW_BOOT;
     }
 
@@ -57,141 +72,35 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
-        if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) {
-            return ORCH_FLOW_A_SAMPLE;
-        }
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
-    /* Internal timer wake -> Flow A Headless Sensor Sample Burst */
-    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
-        return ORCH_FLOW_A_SAMPLE;
-    }
-
-    /* Button or External RTC (EXT1) wake -> Flow B Main Wake */
-    if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-        return ORCH_FLOW_B_MAIN_WAKE;
-    }
-
-    /* Fallback default to Flow B */
+    /* All non-boot wakeups reaching the OS are Flow B Main Wakes
+     * (Flow A runs strictly inside bsp_wake_stub during deep sleep) */
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
 void orch_flow_execute_sensor_sample(void)
 {
-    /* Flow A: Execute high-precision normal power mode sensor read */
-    sub_sensor_init();
-
-    uint16_t raw_temp = 0;
-    uint16_t raw_rh = 0;
-    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_temp, &raw_rh, false /* Normal Power Mode for full precision */);
-
-    float temp_c = 25.0f;
-    float rh_pct = 50.0f;
-    if (err == ESP_OK) {
-        sub_sensor_convert_shtc3_units(raw_temp, raw_rh, &temp_c, &rh_pct);
-    }
-
-    float die_temp_c = 25.0f;
-    sub_sensor_read_mcu_die_temp(&die_temp_c);
-
-    /* Formulate Tri-Node sample */
-    orch_tri_node_sample_t sample = {
-        .shtc3_temp_centi_c = (int16_t)(temp_c * 100.0f),
-        .shtc3_rh_centi_pct = (uint16_t)(rh_pct * 100.0f),
-        .mcu_tsens_centi_c  = (int16_t)(die_temp_c * 100.0f),
-        .epd_glass_centi_c  = (int16_t)(temp_c * 100.0f),
-        .timestamp_sec      = (uint32_t)time(NULL),
-        .quality_flags      = 0x01, /* Cold sample */ // <- based on what? a 'feeling'?
-    };
-    orch_state_push_sample(&sample);
-
-    /* Update Math Engine Invariants */
-    orch_persisted_state_t *st = orch_state_get();
-    float vp = orch_math_calc_vapor_pressure(temp_c, rh_pct);
-    float dew = orch_math_calc_dew_point(temp_c, rh_pct);
-
-    /* Track ambient floor */
-    if (sample.shtc3_temp_centi_c < st->amb_floor_temp_centi_c || !st->ewma_inited) {
-        st->amb_floor_temp_centi_c = sample.shtc3_temp_centi_c;
-    }
-    float amb_floor_c = (float)st->amb_floor_temp_centi_c / 100.0f;
-    float rh_amb = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);   // why are we doing reconstruction in flow A?
-
-    if (!st->ewma_inited) {
-        st->reconstructed_amb_temp_c  = amb_floor_c;
-        st->reconstructed_amb_rh_pct  = rh_amb;
-        st->reconstructed_dew_point_c = dew;
-        st->vapor_pressure_hpa        = vp;
-        st->ewma_inited               = true;
-    } else {
-        st->reconstructed_amb_temp_c  = orch_math_update_ewma(amb_floor_c, st->reconstructed_amb_temp_c, 0.30f);
-        st->reconstructed_amb_rh_pct  = orch_math_update_ewma(rh_amb, st->reconstructed_amb_rh_pct, 0.30f);
-        st->reconstructed_dew_point_c = orch_math_update_ewma(dew, st->reconstructed_dew_point_c, 0.30f);
-        st->vapor_pressure_hpa        = vp;
-    }
-
-    /* Zero-Hour Conflict Elimination: Check if external RTC countdown or alarm expired */
-    bool alarm_fired = false, timer_fired = false;
-    sub_rtc_get_and_clear_interrupts(&alarm_fired, &timer_fired);
-    if (alarm_fired || timer_fired) {
-        ESP_LOGI(TAG, "Zero-Hour Collision: External RTC timer expired! Promoting to Flow B (Main App Wake)");
-        sub_sensor_deinit();
-        return;
-    }
-
-    uint32_t rem_sec = 0;
-    esp_err_t rtc_err = sub_rtc_get_remaining_seconds(&rem_sec);
-    if (rtc_err == ESP_OK && rem_sec == 0) {
-        ESP_LOGI(TAG, "Zero-Hour Collision: External RTC remaining is 0s! Promoting to Flow B (Main App Wake)");
-        sub_sensor_deinit();
-        return;
-    }
-
-    /* Timing Decision: Discard runt rearm if next sample lands at or after external RTC expiry */
-    uint32_t next_sample_sec = st->sample_interval_sec;
-    uint32_t internal_sleep_sec = 0;
-
-    if (rtc_err == ESP_OK && next_sample_sec < rem_sec) {
-        /* Next sensor sample will complete BEFORE external RTC expires -> Rearm */
-        internal_sleep_sec = next_sample_sec;
-        ESP_LOGD(TAG, "Rearming internal timer for next sensor sample (%lus, RTC due in %lus)",
-                 (unsigned long)internal_sleep_sec, (unsigned long)rem_sec);
-    } else {
-        /* Next sample lands at or after external RTC expiry -> Discard rearm!
-         * Sleep purely until external PCF85063A INT triggers Flow B (internal_sleep_sec = 0) */
-        ESP_LOGI(TAG, "Discarding runt sample rearm (RTC due in %lus <= %lus). Sleeping until external RTC INT.",
-                 (unsigned long)rem_sec, (unsigned long)next_sample_sec);
-        internal_sleep_sec = 0;
-    }
-
-    /* Return to deep sleep immediately */
-    sub_sensor_deinit();
-    sub_power_enter_deep_sleep(internal_sleep_sec, (1ULL << HAL_PIN_BUTTON_BOOT) |
-                                                   (1ULL << HAL_PIN_BUTTON_POWER) |
-                                                   (1ULL << HAL_PIN_RTC_INT));
+    /* Architectural Invariant: Flow A executes strictly inside the bare-metal
+     * RTC Wake Stub (bsp_wake_stub) while Flow B is sleeping, and never at OS runtime. */
+    ESP_LOGW(TAG, "orch_flow_execute_sensor_sample called at OS runtime (no-op; Flow A is strictly in bsp_wake_stub)");
 }
 
 bool orch_flow_is_thermal_lockout(void)
 {
-    /*
-    This function should be taking the sample buffer and comparing the last
-    two samples, if the delta is < the preset thermal threshold, its
-    considered theramly stable
-
-    what your doing is simply checking a timer, which is set to 0 of all things.    
-    */
-    return (esp_timer_get_time() < s_lockout_until_us);
+    /* Thermally settled once >= 2 successive Flow A samples pass the <= 0.20 C gate */
+    return (orch_state_get()->valid_trend < 2);
 }
 
 void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec)
 {
+    (void)duration_sec;
+    orch_persisted_state_t *st = orch_state_get();
     if (enable) {
-        s_lockout_until_us = esp_timer_get_time() + ((int64_t)duration_sec * 1000000LL);
-        orch_state_get()->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
     } else {
-        s_lockout_until_us = 0;
-        orch_state_get()->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
+        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
     }
 }
 
@@ -199,65 +108,146 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 {
     orch_persisted_state_t *st = orch_state_get();
 
-    if (orch_flow_is_thermal_lockout()) {
-        /* Transparently return pristine cold baseline values */
-        if (out_temp_c) *out_temp_c = st->reconstructed_amb_temp_c;
-        if (out_rh_pct) *out_rh_pct = st->reconstructed_amb_rh_pct;
-        if (out_dew_c)  *out_dew_c  = st->reconstructed_dew_point_c;
+    /* Flow B Invariant: Never query SHTC3 (0x70) in Flow B!
+     * All calculations operate on the 32-sample RTC ring buffer populated by Flow A,
+     * the pre-display SSD1681 Glass Thermistor (st->last_glass_temp_centi_c), and MCU Die TSENS. */
+
+    /* 1. Cold-Boot / Empty Ring Buffer Guard (total_samples == 0):
+     *    Do not fabricate or compute any temperatures on cold boot before Flow A has sampled. */
+    if (st->total_samples == 0) {
+        ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
+                 (float)st->last_glass_temp_centi_c / 100.0f);
+        if (out_temp_c) *out_temp_c = 0.0f;
+        if (out_rh_pct) *out_rh_pct = 0.0f;
+        if (out_dew_c)  *out_dew_c  = 0.0f;
         return ESP_OK;
     }
 
-    /* System in equilibrium: perform live read */
-    uint16_t raw_temp = 0;
-    uint16_t raw_rh = 0;
-    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_temp, &raw_rh, false);
-    if (err == ESP_OK) {
-        float live_t = 25.0f, live_rh = 50.0f;
-        sub_sensor_convert_shtc3_units(raw_temp, raw_rh, &live_t, &live_rh);
-        int16_t live_t_centi = (int16_t)(live_t * 100.0f);
-        if (live_t_centi < st->amb_floor_temp_centi_c || !st->ewma_inited) {
-            st->amb_floor_temp_centi_c = live_t_centi;
-        }
-        float vp = orch_math_calc_vapor_pressure(live_t, live_rh);
-        float dew = orch_math_calc_dew_point(live_t, live_rh);
-        float amb_floor_c = (float)st->amb_floor_temp_centi_c / 100.0f;
-        float recon_rh = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);
+    /* 2. Read current Glass Temp (cached pre-display in sub_display_init) and Die Temp (from Flow A ring) */
+    float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
+    orch_tri_node_sample_t latest_raw = {0};
+    orch_state_get_latest_sample(&latest_raw);
+    float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
 
-        if (!st->ewma_inited) {
-            st->reconstructed_amb_temp_c  = amb_floor_c;
-            st->reconstructed_amb_rh_pct  = recon_rh;
-            st->reconstructed_dew_point_c = dew;
-            st->vapor_pressure_hpa        = vp;
-            st->ewma_inited               = true;
-        } else {
-            st->reconstructed_amb_temp_c  = orch_math_update_ewma(amb_floor_c, st->reconstructed_amb_temp_c, 0.30f);
-            st->reconstructed_amb_rh_pct  = orch_math_update_ewma(recon_rh, st->reconstructed_amb_rh_pct, 0.30f);
-            st->reconstructed_dew_point_c = orch_math_update_ewma(dew, st->reconstructed_dew_point_c, 0.30f);
-            st->vapor_pressure_hpa        = vp;
-        }
+    /* 3. Scan 32-Sample Ring Buffer: Compute Valid Window Floor, Ceiling, & Short-Term Averages */
+    uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
+    int16_t current_low  = INT16_MAX;
+    int16_t current_high = INT16_MIN;
+    int32_t sum_shtc3    = 0;
+    int32_t sum_die      = 0;
+    uint32_t valid_cnt   = 0;
 
-        if (out_temp_c) *out_temp_c = amb_floor_c;
-        if (out_rh_pct) *out_rh_pct = recon_rh;
-        if (out_dew_c)  *out_dew_c  = dew;
-        return ESP_OK;
+    for (uint32_t i = 0; i < count; i++) {
+        if (st->ring[i].quality_flags & SAMPLE_FLAG_VALID_COLD) {
+            int16_t s_t = st->ring[i].shtc3_temp_centi_c;
+            if (s_t < current_low)  current_low  = s_t;
+            if (s_t > current_high) current_high = s_t;
+            sum_shtc3 += s_t;
+            sum_die   += st->ring[i].mcu_tsens_centi_c;
+            valid_cnt++;
+        }
     }
 
-    /* Fallback on error to cached values */
-    if (out_temp_c) *out_temp_c = st->reconstructed_amb_temp_c;
-    if (out_rh_pct) *out_rh_pct = st->reconstructed_amb_rh_pct;
-    if (out_dew_c)  *out_dew_c  = st->reconstructed_dew_point_c;
-    return err;
+    /* If no sample in the window is marked VALID_COLD yet, scan all available samples */
+    if (valid_cnt == 0) {
+        for (uint32_t i = 0; i < count; i++) {
+            int16_t s_t = st->ring[i].shtc3_temp_centi_c;
+            if (s_t < current_low)  current_low  = s_t;
+            if (s_t > current_high) current_high = s_t;
+            sum_shtc3 += s_t;
+            sum_die   += st->ring[i].mcu_tsens_centi_c;
+            valid_cnt++;
+        }
+    }
+
+    st->window_low_temp_centi_c  = current_low;
+    st->window_high_temp_centi_c = current_high;
+    st->amb_floor_temp_centi_c   = current_low;
+    st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
+    st->window_avg_die_c         = ((float)sum_die   / (float)valid_cnt) / 100.0f;
+
+    /* 4. Tier 1 (Current Valid Sample) & Tier 3 (Long-Term temp_historical Light EWMA) */
+    orch_tri_node_sample_t valid_samp = {0};
+    orch_state_get_latest_valid_sample(&valid_samp);
+
+    float t_valid  = (float)valid_samp.shtc3_temp_centi_c / 100.0f;
+    float rh_valid = (float)valid_samp.shtc3_rh_centi_pct / 100.0f;
+
+    if (!st->ewma_inited) {
+        st->temp_historical_c = t_valid;
+        st->rh_historical_pct = rh_valid;
+        st->ewma_inited       = true;
+    } else {
+        st->temp_historical_c = orch_math_update_ewma(t_valid, st->temp_historical_c, ORCH_HISTORICAL_EWMA_ALPHA);
+        st->rh_historical_pct = orch_math_update_ewma(rh_valid, st->rh_historical_pct, ORCH_HISTORICAL_EWMA_ALPHA);
+    }
+
+    /* 5. Tri-Node Composite Mean & 0-100% Linear Confidence Score */
+    float t_trinode = (t_valid + t_die + t_glass) / 3.0f;
+    float delta_trinode = t_valid - t_trinode;
+    float conf = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
+    if (conf < 0.0f) conf = 0.0f;
+    if (conf > 100.0f) conf = 100.0f;
+
+    st->trinode_temp_c         = t_trinode;
+    st->trinode_delta_c        = delta_trinode;
+    st->trinode_confidence_pct = (uint8_t)(conf + 0.5f);
+
+    /* 6. Dynamic Ambient Selection (T_amb):
+     *    - Case A (valid_trend < 2): Promote min(T_glass, T_die, T_valid)
+     *    - Case B (window_avg_shtc3 > window_avg_die + margin): Promote min(T_die, T_glass)
+     *    - Typical Settled: Use unsmoothed T_valid directly */
+    float t_amb = t_valid;
+    const char *amb_mode = "SETTLED(T_valid)";
+    if (st->valid_trend < 2) {
+        float min_ref = (t_glass < t_die) ? t_glass : t_die;
+        t_amb = (min_ref < t_valid) ? min_ref : t_valid;
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+        amb_mode = "CASE_A_UNSETTLED";
+    } else if (st->window_avg_shtc3_c > (st->window_avg_die_c + ORCH_LEAKAGE_MARGIN_C)) {
+        t_amb = (t_die < t_glass) ? t_die : t_glass;
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+        amb_mode = "CASE_B_LEAKAGE";
+    } else {
+        t_amb = t_valid;
+        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
+    }
+
+    /* 7. Psychrometric Math (Magnus Equations from T_valid, RH_valid, and T_amb) */
+    float vp     = orch_math_calc_vapor_pressure(t_valid, rh_valid);
+    float dew    = orch_math_calc_dew_point(t_valid, rh_valid);
+    float rh_amb = orch_math_reconstruct_ambient_rh(vp, t_amb);
+
+    st->reconstructed_amb_temp_c  = t_amb;
+    st->reconstructed_amb_rh_pct  = rh_amb;
+    st->reconstructed_dew_point_c = dew;
+    st->vapor_pressure_hpa        = vp;
+
+    ESP_LOGI(TAG, "Flow A Ring: samples=%lu head=%u trend=%u | Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
+             (unsigned long)st->total_samples, st->ring_head, st->valid_trend,
+             (float)latest_raw.shtc3_temp_centi_c / 100.0f,
+             (float)latest_raw.shtc3_rh_centi_pct / 100.0f,
+             t_die, latest_raw.quality_flags);
+    ESP_LOGI(TAG, "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | T_valid=%.2fC WinAvg[SHTC3=%.2fC Die=%.2fC] Hist=%.2fC | Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
+             amb_mode, t_amb, rh_amb, t_valid,
+             st->window_avg_shtc3_c, st->window_avg_die_c, st->temp_historical_c,
+             t_glass, t_trinode, delta_trinode, st->trinode_confidence_pct);
+
+    if (out_temp_c) *out_temp_c = t_amb;
+    if (out_rh_pct) *out_rh_pct = rh_amb;
+    if (out_dew_c)  *out_dew_c  = dew;
+    return ESP_OK;
 }
 
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 {
     ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
 
-    /* 1. Wait for LVGL render and flush pipeline to drain completely */
+    /* 1. Wait for LVGL render and flush pipeline to drain completely (including badge update) */
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < 500) {
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < 2500) {
             vTaskDelay(pdMS_TO_TICKS(20));
             wait_ms += 20;
         }

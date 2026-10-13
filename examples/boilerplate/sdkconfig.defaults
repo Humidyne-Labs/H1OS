@@ -116,8 +116,9 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
 # =========================================================================
-# Dual-Core Task Affinity
+# Dual-Core Task Affinity & Main Task Stack
 # =========================================================================
 CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

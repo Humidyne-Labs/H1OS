@@ -8,6 +8,10 @@
 #include "screens.h"
 #include "h1os/h1os_lvgl.h"
 
+static lv_obj_t *s_active_badge     = NULL;
+static lv_obj_t *s_active_badge_lbl = NULL;
+static bool      s_badge_is_awake   = false;
+
 lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_cb_t event_cb)
 {
     h1os_lvgl_lock(100);
@@ -59,6 +63,10 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
     lv_obj_center(lbl_pg);
 
+    s_active_badge     = badge;
+    s_active_badge_lbl = lbl_pg;
+    s_badge_is_awake   = is_awake;
+
     // Divider Line (Y = 22, X: 4 to 196)
     static lv_point_precise_t line_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line = lv_line_create(scr);
@@ -68,3 +76,20 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
 
     return scr;
 }
+
+void screen_base_set_awake_badge(bool is_awake)
+{
+    if (s_active_badge == NULL || s_active_badge_lbl == NULL) return;
+    if (s_badge_is_awake == is_awake) return;
+
+    if (h1os_lvgl_lock(100)) {
+        if (lv_obj_is_valid(s_active_badge) && lv_obj_is_valid(s_active_badge_lbl)) {
+            lv_obj_set_style_bg_color(s_active_badge, is_awake ? lv_color_black() : lv_color_white(), 0);
+            lv_obj_set_style_text_color(s_active_badge_lbl, is_awake ? lv_color_white() : lv_color_black(), 0);
+            lv_obj_invalidate(s_active_badge);
+            s_badge_is_awake = is_awake;
+        }
+        h1os_lvgl_unlock();
+    }
+}
+

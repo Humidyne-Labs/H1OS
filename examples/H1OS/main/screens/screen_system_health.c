@@ -54,15 +54,15 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_set_style_text_font(lbl_nvs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_nvs, LV_ALIGN_TOP_LEFT, 6, 102);
 
-    // Row 5: MCU Die Temp & Delta T
-    float delta_t = telem->mcu_die_temp_c - telem->ambient_temp_c;
+    // Row 5: MCU Die Temp & Tri-Node Delta
     lv_obj_t *lbl_mcu = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_mcu, "MCU Die:     %.1f°C", telem->mcu_die_temp_c);
     lv_obj_set_style_text_font(lbl_mcu, H1OS_FONT_14, 0);
     lv_obj_align(lbl_mcu, LV_ALIGN_TOP_LEFT, 6, 130);
 
     lv_obj_t *lbl_delta = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_delta, "Thermal ΔT:  %+.1f°C", delta_t);
+    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)",
+                          telem->trinode_delta_c, telem->trinode_confidence_pct);
     lv_obj_set_style_text_font(lbl_delta, H1OS_FONT_14, 0);
     lv_obj_align(lbl_delta, LV_ALIGN_TOP_LEFT, 6, 150);
 

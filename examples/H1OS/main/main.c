@@ -48,7 +48,7 @@ static void keypad_event_cb(lv_event_t *e);
  * ========================================================================= */
 static void update_active_display(void)
 {
-    h1os_telemetry_t telem = {0};
+    static h1os_telemetry_t telem;
     h1os_get_telemetry(&telem);
 
     switch (s_app_state.active_page) {
@@ -158,6 +158,7 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: PRE-SLEEP hook (Duration: %lu s)", (unsigned long)sleep_sec);
+    screen_base_set_awake_badge(false);
     sub_sdcard_unmount();
 }
 
@@ -183,6 +184,7 @@ void app_main(void)
             .on_splash              = NULL,
             .on_chime               = NULL,
             .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
+            .volume_pct             = 50,
         },
         .session = {
             .inactivity_timeout_sec = 30,

@@ -90,10 +90,12 @@ esp_err_t hal_io_lock_power_latch(bool enable)
         /* Release holds FIRST: a held pad ignores gpio_set_level() */
         gpio_deep_sleep_hold_dis();
         gpio_hold_dis(HAL_PIN_POWER_HOLD);
+        gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
         gpio_set_level(HAL_PIN_POWER_HOLD, 0);
         return ESP_OK;
     }
 
+    gpio_set_level(HAL_PIN_POWER_HOLD, 1);
     gpio_config_t pwr_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_POWER_HOLD),
         .mode = GPIO_MODE_OUTPUT,
