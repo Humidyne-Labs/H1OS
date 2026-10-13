@@ -130,6 +130,36 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
     bool is_wake = (flow != ORCH_FLOW_BOOT);
+    bool is_rtc_wake = false;
+    bool button_woke = false;
+    uint32_t causes = 0;
+
+    if (is_wake) {
+        causes = esp_sleep_get_wakeup_causes();
+        if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
+#if CONFIG_ULP_COPROC_ENABLED
+            button_woke = (ulp_last_wake_btn != 0);
+            if (!button_woke) {
+                is_rtc_wake = true;
+            }
+#endif
+        } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
+            uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
+            button_woke = (ext1_pins & ((1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER))) != 0;
+            /* Always clear any pending PCF85063A interrupt flags so INT line releases HIGH */
+            bool alarm_f = false, timer_f = false;
+            sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
+            if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
+                is_rtc_wake = true;
+            }
+            ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
+                     (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
+        } else {
+            /* Internal timer or other unattended wake */
+            is_rtc_wake = true;
+        }
+    }
+
     h1os_lvgl_init(is_wake);
     if (is_wake) {
         esp_err_t r_err = orch_display_sync_restore_to_framebuffer();
@@ -138,29 +168,16 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             h1os_lvgl_set_first_flush_mode(true);
         }
     }
-    uint8_t init_vol = (s_app_lifecycle.presentation.volume_pct > 0) ? s_app_lifecycle.presentation.volume_pct : 60;
-    sub_audio_set_volume(init_vol);
-    sub_audio_init();
 
-    bool is_rtc_wake = false;
-    uint32_t causes = esp_sleep_get_wakeup_causes();
-    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-#if CONFIG_ULP_COPROC_ENABLED
-        if (ulp_last_wake_btn == 0) {
-            is_rtc_wake = true;
-        }
-#endif
-    } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-        uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
-        bool button_woke = (ext1_pins & ((1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER))) != 0;
-        /* Always clear any pending PCF85063A interrupt flags so INT line releases HIGH */
-        bool alarm_f = false, timer_f = false;
-        sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
-        if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
-            is_rtc_wake = true;
-        }
-        ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
-                 (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
+    /* Architectural Invariant: Only initialize the audio subsystem if the user is present
+     * (Cold Boot or physical Button Wake). Unattended RTC/timer wakes keep the codec in <1uA sleep! */
+    bool is_user_wake = (!is_wake) || button_woke;
+    if (is_user_wake) {
+        uint8_t init_vol = (s_app_lifecycle.presentation.volume_pct > 0) ? s_app_lifecycle.presentation.volume_pct : 60;
+        sub_audio_set_volume(init_vol);
+        sub_audio_init();
+    } else {
+        ESP_LOGI(TAG, "Unattended wake event: Codec initialization skipped (audio sleep preserved)");
     }
 
     s_session_running = !is_rtc_wake;
@@ -174,13 +191,15 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
     } else if (s_app_lifecycle.on_wake) {
-        h1os_trigger_chime(H1OS_CHIME_WAKE);
+        if (is_user_wake) {
+            h1os_trigger_chime(H1OS_CHIME_WAKE);
+        }
         h1os_wake_context_t ctx = {
             .reset_reason = esp_reset_reason(),
             .wakeup_causes = causes,
             .boot_count = orch_state_get()->boot_count,
             .deep_sleep_count = orch_state_get()->wake_count,
-            .woke_from_button = !is_rtc_wake,
+            .woke_from_button = button_woke,
             .wake_button = 0,
             .sleep_duration_sec = orch_state_get()->sample_interval_sec,
             .user_data = s_app_lifecycle.user_data
@@ -295,6 +314,7 @@ static void execute_system_shutdown(bool force_clean_white)
     }
     // Wait for shutdown chime to finish playing cleanly before cutting power
     sub_audio_wait_idle(1500);
+    sub_audio_standby();
 
     /* Display shutdown / storage handling */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));

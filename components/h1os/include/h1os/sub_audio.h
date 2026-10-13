@@ -145,6 +145,24 @@ esp_err_t sub_audio_set_volume(uint8_t volume_pct);
  */
 uint8_t sub_audio_get_volume(void);
 
+/**
+ * @brief Configure ES8311 DAC power mode (Low-Power vs Normal).
+ *
+ * In low-power mode (default upon init), ES8311 operates with LPDAC enabled (Reg 0x0F bit 7 = 1),
+ * significantly reducing active DAC bias current. Normal mode provides standard bias.
+ *
+ * @param[in] enable true for Low-Power Mode (default), false for Normal Power Mode.
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_audio_set_low_power_mode(bool enable);
+
+/**
+ * @brief Query whether audio subsystem is in Low-Power Mode.
+ *
+ * @return true if Low-Power Mode is active, false if Normal Power Mode.
+ */
+bool sub_audio_get_low_power_mode(void);
+
 #ifdef __cplusplus
 }
 #endif

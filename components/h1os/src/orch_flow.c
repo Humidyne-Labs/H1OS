@@ -264,6 +264,7 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
         ESP_LOGI(TAG, "Waiting for audio playback to finish...");
         sub_audio_wait_idle(1000);
     }
+    sub_audio_standby();
 
     /* 2. Wait for physical EPD panel to finish driving electrophoretic particles (GPIO 8 BUSY falling edge) */
     ESP_LOGI(TAG, "Waiting for EPD panel BUSY line...");

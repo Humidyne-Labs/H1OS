@@ -32,6 +32,7 @@ static const char *TAG = "sub_audio";
 
 #define ES8311_REG_RESET        0x00
 #define ES8311_REG_SYS_PWR_ANA  0x0D
+#define ES8311_REG_SYS_LP_MOD   0x0F  /* Subsystem low power overrides: bit 7 = LPDAC */
 #define ES8311_REG_DAC_PWR      0x12
 #define ES8311_REG_DAC_VOL      0x32
 #define ES8311_REG_FLAG         0xFC  /* Read-only status flag: Bits 6:4 = FLAG_CSM_CHIP */
@@ -69,6 +70,7 @@ static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited = false;
 static bool s_i2s_chan_enabled = false;
 static bool s_codec_in_standby = true;
+static bool s_low_power_mode   = true; /* Default initialization mode is Low-Power (LPDAC enabled) */
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
@@ -207,6 +209,7 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x12, 0x00); /* DAC analog power ON (PDN_DAC = 0) */
     ret |= es8311_write_reg(0x14, 0x1A);
     ret |= es8311_write_reg(0x0D, 0x01); /* Analog reference & normal VMID (charges C_VMID to VDD/2) */
+    ret |= es8311_write_reg(ES8311_REG_SYS_LP_MOD, s_low_power_mode ? 0x80 : 0x00); /* Low-power DAC bias mode (LPDAC) */
     ret |= es8311_write_reg(0x15, 0x40);
     ret |= es8311_write_reg(0x37, 0x08);
     ret |= es8311_write_reg(0x45, 0x00);
@@ -766,5 +769,20 @@ uint8_t sub_audio_get_volume(void)
 {
     return s_volume_pct;
 }
+
+esp_err_t sub_audio_set_low_power_mode(bool enable)
+{
+    s_low_power_mode = enable;
+    if (s_audio_inited && s_i2s_chan_enabled) {
+        return es8311_write_reg(ES8311_REG_SYS_LP_MOD, enable ? 0x80 : 0x00);
+    }
+    return ESP_OK;
+}
+
+bool sub_audio_get_low_power_mode(void)
+{
+    return s_low_power_mode;
+}
+
 
 
