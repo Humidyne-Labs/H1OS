@@ -163,6 +163,23 @@ esp_err_t sub_audio_set_low_power_mode(bool enable);
  */
 bool sub_audio_get_low_power_mode(void);
 
+/**
+ * @brief Preload I2S DMA with silence based on Register 0x37 ramp rate.
+ *
+ * @param reg_0x37_val Value written to Register 0x37 (0x18 for Rate 1, 0x08 for disabled).
+ * @param sample_rate Audio sample rate in Hz (e.g., 16000).
+ * @return uint32_t Preloaded silence duration in ms.
+ */
+uint32_t sub_audio_preload_ramp(uint8_t reg_0x37_val, const uint32_t sample_rate);
+
+/**
+ * @brief Delay for the complete physical transmission: playback duration + preload duration.
+ *
+ * @param playback_duration_ms Calculated audio playback duration (sample_count / sample_rate).
+ * @param preload_duration_ms Preload silence duration returned by bsp_audio_preload_ramp().
+ */
+void sub_audio_wait_playback(uint32_t playback_duration_ms, uint32_t preload_duration_ms);
+
 #ifdef __cplusplus
 }
 #endif
