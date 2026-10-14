@@ -50,7 +50,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_rst, LV_ALIGN_TOP_LEFT, 6, 28);
 
     // Row 2: Wake Causes
-    uint32_t causes = esp_sleep_get_wakeup_causes();
+    uint32_t causes    = esp_sleep_get_wakeup_causes();
     lv_obj_t *lbl_wake = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_wake, "Wake:   %s", get_wake_causes_str(causes));
     lv_obj_set_style_text_font(lbl_wake, H1OS_FONT_14, 0);
@@ -77,7 +77,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
 
     // Row 5: FreeRTOS Task High Watermark
-    UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
+    UBaseType_t hwm     = uxTaskGetStackHighWaterMark(NULL);
     lv_obj_t *lbl_stack = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_stack, "Stack:  %u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
     lv_obj_set_style_text_font(lbl_stack, H1OS_FONT_14, 0);

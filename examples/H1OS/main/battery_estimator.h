@@ -62,10 +62,8 @@ static inline int32_t battery_estimate_avg_current_ua(uint32_t nominal_mah,
                                                       uint32_t delta_t_sec)
 {
     float i_ma = battery_estimate_avg_current_ma(nominal_mah, v1_mv, v2_mv, delta_t_sec);
-    if (i_ma < 0.0f) {
-        return (int32_t)i_ma;
-    }
-    return (int32_t)(i_ma * 1000.0f);
+    if (i_ma < 0.0f) { return (int32_t)i_ma; }
+                       return (int32_t)(i_ma * 1000.0f);
 }
 
 /**

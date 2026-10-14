@@ -241,7 +241,14 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 
 	/* Build internal debug arrays */
 	uint16_t shtc3RH_ring[32];	
-	int16_t  shtc3T_ring[32], mcuT_ring[32], epdT_ring[32];	
+	int16_t  shtc3T_ring[32], mcuT_ring[32], epdT_ring[32];
+
+    /* Set to known state */
+    memset(shtc3RH_ring, 0x0000, sizeof(shtc3RH_ring));
+    memset(shtc3T_ring,  0x0000, sizeof(shtc3T_ring));
+    memset(mcuT_ring,    0x0000, sizeof(mcuT_ring));
+    memset(epdT_ring,    0x0000, sizeof(epdT_ring));
+
 	for(int i = 0; i < 32; i++) {
 		shtc3T_ring[i]  = st->ring[i].shtc3_temp_centi_c / 100.0f;
 		shtc3RH_ring[i] = st->ring[i].shtc3_rh_centi_pct / 100.0f;
@@ -249,11 +256,11 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 		epdT_ring[i]    = st->ring[i].epd_glass_centi_c;
 	}
 	
-	/* dump ring buffer vars to console */
-	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer C", shtc3T_ring, sizeof(shtc3T_ring), ESP_LOG_INFO);
+	/* Dump ring buffer vars to console */
+	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
 	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH", shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer C", mcuT_ring, sizeof(mcuT_ring), ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer C", epdT_ring, sizeof(epdT_ring), ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
 
     if (out_temp_c) *out_temp_c = t_amb;
     if (out_rh_pct) *out_rh_pct = rh_amb;

@@ -34,7 +34,13 @@ typedef struct {
     uint32_t boot_epoch_sec;
     uint32_t total_uptime_sec;
     uint32_t cycle_counter;
-    uint8_t  active_page; // 0 = ENV HERO, 1 = PSYCHROMETRICS, 2 = HEALTH, 3 = DIAGNOSTICS
+    /**********************
+     *   0 = ENV HERO, 
+     *   1 = PSYCHROMETRICS, 
+     *   2 = HEALTH, 
+     *   3 = DIAGNOSTICS 
+     **********************/
+    uint8_t  active_page;
 } app_rtc_persisted_state_t;
 
 RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {0};
@@ -135,7 +141,6 @@ static void app_on_boot(void *user_data)
 
     // Probe MicroSD card
     sub_sdcard_mount();
-
     update_active_display();
 }
 
@@ -151,7 +156,6 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 
     // Probe MicroSD card
     sub_sdcard_mount();
-
     update_active_display();
 }
 
@@ -184,13 +188,13 @@ void app_main(void)
             .on_splash              = NULL,
             .on_chime               = NULL,
             .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
-            .volume_pct             = 50,
+            .volume_pct             = 50, /* Vol: 50% */
         },
         .session = {
-            .inactivity_timeout_sec = 30,
-            .enable_dfs_80mhz       = true,
-            .flow_a_period_sec      = 60,
-            .flow_b_period_sec      = 120,
+            .inactivity_timeout_sec = 30,   /* Inactivity Timeout       */
+            .enable_dfs_80mhz       = true, /* Dynamic Freq Scaling     */
+            .flow_a_period_sec      = 60,   /* SHTC3 Sensor Read Period */
+            .flow_b_period_sec      = 120,  /* Main App Wake Period     */
         },
         .user_data                  = NULL,
     };

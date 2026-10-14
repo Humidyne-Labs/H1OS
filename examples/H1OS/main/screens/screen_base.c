@@ -47,7 +47,7 @@ lv_obj_t* screen_base_create(const char *title, const char *page_str, lv_event_c
     // 2. Invertible Sleep/Wake Status Badge (Page Indicator at Top-Right)
     //    - Active interactive session (AWAKE): Inverted badge (Black background, White text)
     //    - Sleeping / Unattended wake (SLEEP): Standard badge (White background, Black text)
-    bool is_awake = h1os_is_session_active();
+    bool is_awake   = h1os_is_session_active();
     lv_obj_t *badge = lv_obj_create(scr);
     lv_obj_remove_style_all(badge);
     lv_obj_set_size(badge, 36, 17);
