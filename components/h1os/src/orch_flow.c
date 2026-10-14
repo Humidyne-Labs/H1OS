@@ -249,11 +249,17 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     memset(mcuT_ring,    0x0000, sizeof(mcuT_ring));
     memset(epdT_ring,    0x0000, sizeof(epdT_ring));
 
+    ESP_LOGI("debugging output", "RHP, TMP, DIE, EPD");
 	for(int i = 0; i < 32; i++) {
 		shtc3T_ring[i]  = st->ring[i].shtc3_temp_centi_c / 100.0f;
 		shtc3RH_ring[i] = st->ring[i].shtc3_rh_centi_pct / 100.0f;
 		mcuT_ring[i]    = st->ring[i].mcu_tsens_centi_c;
 		epdT_ring[i]    = st->ring[i].epd_glass_centi_c;
+        ESP_LOGI("debugging output", "%.2d, %.2d, %.2d, %.2d", 
+            shtc3T_ring[i], 
+            shtc3RH_ring[i],
+            mcuT_ring[i],
+            epdT_ring[i]);
 	}
 	
 	/* Dump ring buffer vars to console */
