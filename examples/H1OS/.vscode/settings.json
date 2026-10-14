@@ -1,17 +1,31 @@
 {
-    "idf.currentSetup": "C:\\esp\\v6.1\\esp-idf",
-    "idf.openOcdConfigs": [
-        "board/esp32s3-builtin.cfg"
-    ],
-    "idf.customExtraVars": {
-        "IDF_TARGET": "esp32s3"
-    },
-    "clangd.path": "C:\\Espressif\\tools\\esp-clangd\\esp-21.1.3_20260408\\esp-clangd\\bin\\clangd.exe",
-    "clangd.arguments": [
-      "--background-index",
-      "--query-driver=**",
-      "--compile-commands-dir=c:\\Users\\Matt\\Documents\\GitHub\\esp32-s3_bsp\\examples\\H1OS\\build_dev"
-    ],
-    "idf.flashType": "UART",
-    "idf.port": "COM3"
+  "idf.espIdfPath": "C:\\esp\\v6.1\\esp-idf",
+  "idf.toolsPath": "C:\\Users\\Matt\\.espressif",
+  "idf.pythonBinPath": "C:\\Users\\Matt\\.espressif\\python_env\\idf6.1_py3.14_env\\Scripts\\python.exe",
+  "idf.customExtraPaths": "C:\\Users\\Matt\\.espressif\\tools\\xtensa-esp-elf\\esp-15.2.0_20251204\\xtensa-esp-elf\\bin;C:\\Users\\Matt\\.espressif\\tools\\esp32s3-ulp-elf\\2.38_20240113\\esp32s3-ulp-elf\\bin;C:\\Users\\Matt\\.espressif\\tools\\cmake\\3.30.2\\bin;C:\\Users\\Matt\\.espressif\\tools\\ninja\\1.12.1;C:\\Users\\Matt\\.espressif\\python_env\\idf6.1_py3.14_env\\Scripts",
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.flashType": "UART",
+  "idf.port": "COM3",
+
+  "cmake.environment": {
+    "IDF_PATH": "C:\\esp\\v6.1\\esp-idf"
+  },
+  "cmake.buildDirectory": "${workspaceFolder}/build_dev",
+  "cmake.useCMakePresets": "always",
+  "cmake.autoSelectActiveFolder": false,
+  "cmake.ignoreKitEnv": true,
+
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.path": "C:\\Espressif\\tools\\esp-clangd\\esp-21.1.3_20260408\\esp-clangd\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=c:\\Users\\Matt\\Documents\\GitHub\\esp32-s3_bsp\\examples\\H1OS/build_dev"
+  ],
+  "idf.currentSetup": "C:\\esp\\v6.1\\esp-idf"
 }

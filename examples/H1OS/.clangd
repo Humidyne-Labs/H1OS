@@ -9,6 +9,9 @@ CompileFlags:
 
 Diagnostics:
   UnusedIncludes: Strict
+  Suppress:
+    - "-Wunused-function"
   ClangTidy:
     Remove:
       - modernize*
+      - "*"
