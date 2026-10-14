@@ -73,7 +73,7 @@ static i2s_chan_handle_t s_tx_chan = NULL;
 
 static bool s_audio_inited         = false;
 static bool s_i2s_chan_enabled     = false;
-static bool s_codec_in_standby     = true;
+static bool s_codec_in_standby     = false;
 static bool s_low_power_mode       = true; /* Default initialization mode is Low-Power (LPDAC enabled) */
 
 static QueueHandle_t     s_audio_queue       = NULL;
@@ -99,7 +99,7 @@ static const uint8_t es8311_perceptual_vol_table[101] = {
     0xAE, 0xAE, 0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 0xB3, 0xB3, // 70% - 79%
     0xB4, 0xB5, 0xB5, 0xB6, 0xB6, 0xB7, 0xB7, 0xB8, 0xB9, 0xB9, // 80% - 89%
     0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 0xBD, 0xBE, 0xBE, 0xBF, // 90% - 99%
-    0xBF                                                       // 100%
+    0xBF                                                        // 100%
 };
 
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
@@ -225,7 +225,7 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x15, 0x40);
 
     /* 9. Modulator dither & low-power bias configuration */
-    ret |= es8311_write_reg(0x37, 0x18); /* RAMP = 1, EQ = OFF, datasheet in error! */
+    ret |= es8311_write_reg(0x37, 0x08); /* RAMP = OFF, EQ = OFF, datasheet in error! */
     ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias override */
     ret |= es8311_write_reg(0x45, 0x00);
 
@@ -309,9 +309,7 @@ esp_err_t sub_audio_init(void)
     /* Set Volume, LOG scale, for humans ear holes */
     uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
     es8311_write_reg(0x32, vol_reg);                           /* Write initial DAC volume */
-    es8311_write_reg(0x31, (s_volume_pct == 0) ? 0x60 : 0x00); /* Unmute DAC DSM/DEM */
-
-    s_codec_in_standby = false;
+    es8311_write_reg(0x31, (s_volume_pct == 0) ? 0x60 : 0x00); /* Unmute DAC DSM/DEM       */
 
     /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) for instant click response */
     if (s_audio_queue == NULL) {
@@ -361,9 +359,9 @@ esp_err_t sub_audio_standby(void)
     es8311_write_reg(0x32, 0x00); /* Mute volume */
 
     /* 3. Power down analog stages FIRST while clocks are running */
-    es8311_write_reg(0x12, 0x02); /* Power down DAC output stage */
+    es8311_write_reg(0x12, 0x02); /* Power down DAC output stage    */
     es8311_write_reg(0x0E, 0xFF); /* Power down PGA & ADC Modulator */
-    es8311_write_reg(0x14, 0x00); /* Power down ADC PGA */
+    es8311_write_reg(0x14, 0x00); /* Power down ADC PGA             */
     es8311_write_reg(0x17, 0x00);
     es8311_write_reg(0x15, 0x00);
     es8311_write_reg(0x45, 0x00);
@@ -469,15 +467,12 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         }
     }
 
-    // standby never entered, wake from deepsleep = re-init, lightsleep = high power draw
-    // only sleep in the deep, word to your mother!.
+    // standby never entered at runtime
 
     // 2. Unmute NS4168 Class-D amplifier and stream 2 zero buffers (32 ms)
     // so the NS4168 H-bridge (~15 ms turn-on time) is fully active before the first tone sample! 
     gpio_set_level(HAL_PIN_PA_CTRL, 1);
-
-    uint32_t preload_ms = sub_audio_preload_ramp(0x18, 16000); /* kill softstart 96ms @ 0x18*/
-    sub_audio_wait_playback(0, preload_ms);
+    vTaskDelay(pdMS_TO_TICKS(25));
 
     return ESP_OK;
 }
@@ -763,45 +758,4 @@ esp_err_t sub_audio_set_low_power_mode(bool enable)
 bool sub_audio_get_low_power_mode(void)
 {
     return s_low_power_mode;
-}
-
-uint32_t sub_audio_preload_ramp(uint8_t reg_0x37_val, const uint32_t sample_rate)
-{
-    if (!s_audio_inited || s_tx_chan == NULL) return 0;
-
-    /* Extract bits [7:4] directly */
-    uint8_t rate = (reg_0x37_val >> 4) & 0x0F;
-    if (rate == 0) return 0; /* Rate 0 = disabled (e.g., 0x08) -> 0 ms preload */
-
-    /* LRCK clocks per 0.25dB step: Rate 1 = 4, Rate 2 = 8, ..., Rate 15 = 65536 */
-    uint32_t lrck_per_step = (uint32_t)(1UL << (rate + 1));
-    uint32_t total_lrck_needed = 382 * lrck_per_step; /* 95.5 dB / 0.25 dB = 382 steps */
-
-    /* Round up to integer multiples of FRAME_SIZE (256 frames) */
-    uint32_t chunks = (total_lrck_needed + FRAME_SIZE - 1) / FRAME_SIZE;
-    uint32_t total_frames_sent = chunks * FRAME_SIZE;
-
-    int16_t silence[FRAME_SIZE];
-    memset(silence, 0, sizeof(silence));
-
-    for (uint32_t i = 0; i < chunks; i++) {
-        size_t written = 0;
-        i2s_channel_write(s_tx_chan, silence, sizeof(silence), &written, portMAX_DELAY);
-    }
-
-    return (total_frames_sent * 1000) / sample_rate;
-}
-
-void sub_audio_wait_playback(uint32_t playback_duration_ms, uint32_t preload_duration_ms)
-{
-    ESP_LOGI(TAG, "Audio Runtime: %d, Preload Runtime: %d", playback_duration_ms, preload_duration_ms);
-
-    /* Total physical transmission time over LRCK pin */
-    uint32_t total_delay_ms = playback_duration_ms + preload_duration_ms;
-
-    /* Add 10ms safety margin for FreeRTOS tick granularity & final DAC interpolation */
-    total_delay_ms += 10;
-
-    ESP_LOGI(TAG, "Playback wait timeout: %d ms", total_delay_ms);
-    vTaskDelay(pdMS_TO_TICKS(total_delay_ms));
 }

@@ -129,13 +129,13 @@ esp_err_t sub_rtc_get_time(struct tm *out_time)
         return err;
     }
 
-    out_time->tm_sec  = bcd2dec(data[0] & 0x7F);
-    out_time->tm_min  = bcd2dec(data[1] & 0x7F);
-    out_time->tm_hour = bcd2dec(data[2] & 0x3F);
-    out_time->tm_mday = bcd2dec(data[3] & 0x3F);
-    out_time->tm_wday = data[4] & 0x07;
-    out_time->tm_mon  = bcd2dec(data[5] & 0x1F) - 1; /* POSIX is 0-11 */
-    out_time->tm_year = bcd2dec(data[6]) + 100;     /* POSIX is years since 1900 (2000 = 100) */
+    out_time->tm_sec   = bcd2dec(data[0] & 0x7F);
+    out_time->tm_min   = bcd2dec(data[1] & 0x7F);
+    out_time->tm_hour  = bcd2dec(data[2] & 0x3F);
+    out_time->tm_mday  = bcd2dec(data[3] & 0x3F);
+    out_time->tm_wday  = data[4] & 0x07;
+    out_time->tm_mon   = bcd2dec(data[5] & 0x1F) - 1; /* POSIX is 0-11                          */
+    out_time->tm_year  = bcd2dec(data[6]) + 100;      /* POSIX is years since 1900 (2000 = 100) */
     out_time->tm_isdst = -1;
 
     return ESP_OK;
@@ -188,13 +188,13 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 
     /* 3. Select 1Hz (seconds) or 1/60Hz (minutes) clock source */
     uint8_t timer_value = 0;
-    uint8_t clk_src = 0;
+    uint8_t clk_src     = 0;
 
     if (seconds <= 255) {
-        clk_src = TIMER_CLK_1_HZ;
+        clk_src     = TIMER_CLK_1_HZ;
         timer_value = (uint8_t)seconds;
     } else {
-        clk_src = TIMER_CLK_1_60_HZ;
+        clk_src     = TIMER_CLK_1_60_HZ;
         timer_value = (uint8_t)((seconds + 59) / 60);
     }
 

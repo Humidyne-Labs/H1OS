@@ -25,6 +25,7 @@ static const char *TAG = "sub_sensor";
 #define SHTC3_CMD_MEAS_LOWPWR_T_FIRST 0x609C
 
 static temperature_sensor_handle_t s_tsens_handle = NULL;
+
 static bool s_tsens_inited = false;
 
 /* Sensirion standard CRC-8 polynomial (x^8 + x^5 + x^4 + 1, init 0xFF) */
@@ -146,7 +147,7 @@ void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *o
     if (out_rh_pct != NULL) {
         /* RH [%] = 100 * (raw_rh / 2^16) */
         float rh = 100.0f * ((float)raw_rh / 65536.0f);
-        if (rh < 0.0f) rh = 0.0f;
+        if (rh < 0.0f)   rh = 0.0f;
         if (rh > 100.0f) rh = 100.0f;
         *out_rh_pct = rh;
     }

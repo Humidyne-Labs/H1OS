@@ -13,6 +13,7 @@ static const char *TAG = "HAL_SPI";
 
 static spi_device_handle_t s_spi_dev      = NULL;
 static spi_device_handle_t s_spi_read_dev = NULL;
+
 static bool s_is_inited = false;
 
 static inline void epd_set_cs(uint8_t level) {
@@ -32,10 +33,10 @@ esp_err_t hal_spi_init(void)
     // 1. Configure DC, RST, and CS GPIO pins as manual outputs
     gpio_config_t epd_ctrl_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_DC) | (1ULL << HAL_PIN_EPD_RST) | (1ULL << HAL_PIN_EPD_CS),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&epd_ctrl_cfg);
     gpio_set_level(HAL_PIN_EPD_RST, 1);
@@ -45,20 +46,20 @@ esp_err_t hal_spi_init(void)
     // 2. Configure BUSY GPIO pin as input
     gpio_config_t busy_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&busy_cfg);
 
     // 3. Initialize SPI Master Bus
     spi_bus_config_t buscfg = {
-        .mosi_io_num = HAL_PIN_EPD_MOSI,
-        .miso_io_num = -1,
-        .sclk_io_num = HAL_PIN_EPD_SCK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
+        .mosi_io_num     = HAL_PIN_EPD_MOSI,
+        .miso_io_num     = -1,
+        .sclk_io_num     = HAL_PIN_EPD_SCK,
+        .quadwp_io_num   = -1,
+        .quadhd_io_num   = -1,
         .max_transfer_sz = HAL_EPD_FRAME_SIZE_BYTES + 8,
     };
 
@@ -71,9 +72,9 @@ esp_err_t hal_spi_init(void)
     // 4. Fast Transmit Device (20 MHz, Mode 0)
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 20 * 1000 * 1000, // 20 MHz write speed
-        .mode = 0,                          // CPOL=0, CPHA=0
-        .spics_io_num = -1,                 // Manual CS
-        .queue_size = 7,
+        .mode           = 0,                // CPOL=0, CPHA=0
+        .spics_io_num   = -1,               // Manual CS
+        .queue_size     = 7,
     };
 
     ret = spi_bus_add_device(SPI2_HOST, &devcfg, &s_spi_dev);
@@ -86,10 +87,10 @@ esp_err_t hal_spi_init(void)
     // 5. Half-Duplex 3-Wire Read Device (2 MHz, Mode 0) for on-glass temp readout
     spi_device_interface_config_t rdevcfg = {
         .clock_speed_hz = 2 * 1000 * 1000,  // 2 MHz read speed
-        .mode = 0,
-        .spics_io_num = -1,                 // Manual CS
-        .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_3WIRE,
-        .queue_size = 1,
+        .mode           = 0,
+        .spics_io_num   = -1,               // Manual CS
+        .flags          = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_3WIRE,
+        .queue_size     = 1,
     };
 
     ret = spi_bus_add_device(SPI2_HOST, &rdevcfg, &s_spi_read_dev);
@@ -195,9 +196,11 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     epd_set_dc(0);
     spi_transaction_t t_cmd;
     memset(&t_cmd, 0, sizeof(t_cmd));
-    t_cmd.flags = SPI_TRANS_USE_TXDATA;
-    t_cmd.length = 8;
+	
+    t_cmd.flags      = SPI_TRANS_USE_TXDATA;
+    t_cmd.length     = 8;
     t_cmd.tx_data[0] = cmd;
+	
     esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t_cmd);
     if (ret != ESP_OK) {
         epd_set_cs(1);
@@ -208,8 +211,10 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     epd_set_dc(1);
     spi_transaction_t t_read;
     memset(&t_read, 0, sizeof(t_read));
-    t_read.flags = SPI_TRANS_USE_RXDATA;
+	
+    t_read.flags    = SPI_TRANS_USE_RXDATA;
     t_read.rxlength = len * 8;
+	
     ret = spi_device_polling_transmit(s_spi_read_dev, &t_read);
 
     // 4. De-assert CS#

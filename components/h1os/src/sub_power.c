@@ -20,9 +20,9 @@
 
 static const char *TAG = "sub_power";
 
-static adc_oneshot_unit_handle_t s_adc_handle = NULL;
+static adc_oneshot_unit_handle_t s_adc_handle  = NULL;
 static adc_cali_handle_t         s_cali_handle = NULL;
-static bool                      s_cali_valid = false;
+static bool                      s_cali_valid  = false;
 
 /* 13-point LiPo OCV Discharge Curve (matching legacy hardware calibration) */
 static const struct {
@@ -68,7 +68,7 @@ esp_err_t sub_power_init(void)
 
     /* 1. Initialize ADC1 Oneshot Unit */
     adc_oneshot_unit_init_cfg_t unit_cfg = {
-        .unit_id = ADC_UNIT_1,
+        .unit_id  = ADC_UNIT_1,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
     esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &s_adc_handle);
@@ -79,7 +79,7 @@ esp_err_t sub_power_init(void)
 
     /* 2. Configure Channel 3 (GPIO 4) with 12 dB Attenuation (0 - 3.1V input) */
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_12,
+        .atten    = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_3, &chan_cfg);
@@ -91,9 +91,9 @@ esp_err_t sub_power_init(void)
     /* 3. Initialize Calibration Scheme (Curve Fitting on ESP32-S3) */
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     adc_cali_curve_fitting_config_t cali_cfg = {
-        .unit_id = ADC_UNIT_1,
-        .chan = ADC_CHANNEL_3,
-        .atten = ADC_ATTEN_DB_12,
+        .unit_id  = ADC_UNIT_1,
+        .chan     = ADC_CHANNEL_3,
+        .atten    = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali_handle);
@@ -114,7 +114,7 @@ esp_err_t sub_power_deinit(void)
         adc_cali_delete_scheme_curve_fitting(s_cali_handle);
 #endif
         s_cali_handle = NULL;
-        s_cali_valid = false;
+        s_cali_valid  = false;
     }
 
     if (s_adc_handle != NULL) {
@@ -160,7 +160,7 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
         voltage_mv = (avg_raw * 3100) / 4095;
     }
 
-    /* Resistor divider is 1:2 (100k / 100k), so VBAT = V_ADC * 2 */
+    /* Resistor divider is 1:2 (200k / 200k), so VBAT = V_ADC * 2 */
     uint16_t vbat_mv = (uint16_t)(voltage_mv * 2);
 
     *out_mv = vbat_mv;
@@ -176,20 +176,20 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
     if (out_scale == NULL || out_offset_mv == NULL) return ESP_ERR_INVALID_ARG;
 
     if (s_cali_valid && s_cali_handle != NULL) {
-        int v_low = 0;
+        int v_low  = 0;
         int v_high = 0;
         adc_cali_raw_to_voltage(s_cali_handle, 1000, &v_low);
         adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_high);
 
         /* Slope m = (v_high - v_low) / (3000 - 1000) */
-        int32_t m_scale = (int32_t)(((int64_t)(v_high - v_low) * 4096) / 2000);
+        int32_t m_scale  = (int32_t)(((int64_t)(v_high - v_low) * 4096) / 2000);
         int32_t b_offset = (int32_t)(v_low - ((m_scale * 1000LL) / 4096));
 
-        *out_scale = (uint32_t)m_scale;
+        *out_scale     = (uint32_t)m_scale;
         *out_offset_mv = b_offset * 2; /* account for 1:2 divider */
     } else {
         /* Default ideal 12 dB full-scale 3100 mV */
-        *out_scale = 3100;
+        *out_scale     = 3100;
         *out_offset_mv = 0;
     }
     return ESP_OK;

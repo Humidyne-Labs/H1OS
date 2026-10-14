@@ -15,6 +15,7 @@
 #include "sub_sdcard.h"
 
 static const char *TAG = "sub_sdcard";
+
 static sdmmc_card_t *s_sd_card = NULL;
 
 esp_err_t sub_sdcard_mount(void)
@@ -82,7 +83,7 @@ bool sub_sdcard_is_mounted(void)
 
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
 {
-    if (!out_capacity_mb) return ESP_ERR_INVALID_ARG;
+    if (!out_capacity_mb)  return ESP_ERR_INVALID_ARG;
     if (s_sd_card == NULL) return ESP_ERR_INVALID_STATE;
 
     uint64_t bytes = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;

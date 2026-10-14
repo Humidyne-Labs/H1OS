@@ -16,9 +16,9 @@
 #include "soc/rtc_cntl_reg.h"
 #include "hal/gpio_ll.h"
 
-#define H1OS_PIN_POWER_HOLD 17
-#define H1OS_PIN_EPD_3V3_EN 6
-#define H1OS_PIN_PA_EN      42
+#define H1OS_PIN_POWER_HOLD  17
+#define H1OS_PIN_EPD_3V3_EN  6
+#define H1OS_PIN_PA_EN       42
 
 static const char *TAG = "H1OS_BOOT_HOOK";
 
@@ -66,6 +66,6 @@ void bootloader_after_init(void)
     uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
     uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
     uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    ESP_LOGI(TAG, "BAT_CTRL (GPIO 17) latched HIGH in 2nd-stage bootloader [out=%lu, oe=%lu, rtc_hold=%lu]",
-             (unsigned long)g17_out, (unsigned long)g17_oe, (unsigned long)g17_hold);
+    //ESP_LOGI(TAG, "BAT_CTRL (GPIO 17) latched HIGH in 2nd-stage bootloader [out=%lu, oe=%lu, rtc_hold=%lu]",
+    //         (unsigned long)g17_out, (unsigned long)g17_oe, (unsigned long)g17_hold);
 }

@@ -14,6 +14,7 @@
 #include "h1os_time.h"
 
 static const char *TAG = "h1os_time";
+
 static h1os_time_sync_cb_t s_sync_cb = NULL;
 static void *s_sync_user_data = NULL;
 

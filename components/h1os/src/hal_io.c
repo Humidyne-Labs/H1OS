@@ -25,10 +25,10 @@ esp_err_t hal_io_early_init(void)
     // 2. Ensure Audio Amplifier is muted (GPIO 46 = 0)
     gpio_config_t pa_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_PA_CTRL),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&pa_cfg);
     gpio_set_level(HAL_PIN_PA_CTRL, 0); // Standby Mute
@@ -36,31 +36,31 @@ esp_err_t hal_io_early_init(void)
     // 3. User Status LED (GPIO 3: Open-Drain, 1 = OFF)
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
-        .mode = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1); // LED OFF
 
-    // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 100k pull-ups and internal pull-ups in parallel)
+    // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 10k pull-ups)
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&btn_cfg);
 
     // 5. RTC INT (GPIO 5: Input with internal pull-up)
     gpio_config_t rtc_int_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_RTC_INT),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&rtc_int_cfg);
 

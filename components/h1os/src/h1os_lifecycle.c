@@ -36,6 +36,7 @@
 #endif
 
 static const char *TAG = "h1os_lifecycle";
+
 static h1os_lifecycle_t s_app_lifecycle = {0};
 static int64_t s_session_expiry_us = 0;
 static TaskHandle_t s_session_task_handle = NULL;
@@ -129,7 +130,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    bool is_wake = (flow != ORCH_FLOW_BOOT);
+    bool is_wake     = (flow != ORCH_FLOW_BOOT);
     bool is_rtc_wake = false;
     bool button_woke = false;
     uint32_t causes = 0;
@@ -195,14 +196,14 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             h1os_trigger_chime(H1OS_CHIME_WAKE);
         }
         h1os_wake_context_t ctx = {
-            .reset_reason = esp_reset_reason(),
-            .wakeup_causes = causes,
-            .boot_count = orch_state_get()->boot_count,
-            .deep_sleep_count = orch_state_get()->wake_count,
-            .woke_from_button = button_woke,
-            .wake_button = 0,
+            .reset_reason       = esp_reset_reason(),
+            .wakeup_causes      = causes,
+            .boot_count         = orch_state_get()->boot_count,
+            .deep_sleep_count   = orch_state_get()->wake_count,
+            .woke_from_button   = button_woke,
+            .wake_button        = 0,
             .sleep_duration_sec = orch_state_get()->sample_interval_sec,
-            .user_data = s_app_lifecycle.user_data
+            .user_data          = s_app_lifecycle.user_data
         };
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
     }
@@ -278,7 +279,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     uint16_t vbat_mv = 0;
     uint8_t  vbat_pct = 0;
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
-        out_telemetry->battery_mv = vbat_mv;
+        out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
         /* External power detection:
          *  - < 100 mV: Zero-Volt Cable Guard (no cell, charger not floating)

@@ -239,6 +239,22 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
              st->window_avg_shtc3_c, st->window_avg_die_c, st->temp_historical_c,
              t_glass, t_trinode, delta_trinode, st->trinode_confidence_pct);
 
+	/* Build internal debug arrays */
+	uint16_t shtc3RH_ring[32];	
+	int16_t  shtc3T_ring[32], mcuT_ring[32], epdT_ring[32];	
+	for(int i = 0; i < 32; i++) {
+		shtc3T_ring[i]  = st->ring[i].shtc3_temp_centi_c / 100.0f;
+		shtc3RH_ring[i] = st->ring[i].shtc3_rh_centi_pct / 100.0f;
+		mcuT_ring[i]    = st->ring[i].mcu_tsens_centi_c;
+		epdT_ring[i]    = st->ring[i].epd_glass_centi_c;
+	}
+	
+	/* dump ring buffer vars to console */
+	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer C", shtc3T_ring, sizeof(shtc3T_ring), ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH", shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer C", mcuT_ring, sizeof(mcuT_ring), ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer C", epdT_ring, sizeof(epdT_ring), ESP_LOG_INFO);
+
     if (out_temp_c) *out_temp_c = t_amb;
     if (out_rh_pct) *out_rh_pct = rh_amb;
     if (out_dew_c)  *out_dew_c  = dew;

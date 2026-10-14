@@ -23,7 +23,9 @@ static const char *TAG = "sub_display";
 /* Ping-Pong Framebuffers in DMA-capable internal SRAM */
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
+
 static SemaphoreHandle_t s_busy_sem = NULL;
+
 static bool s_inited = false;
 
 /* Factory-calibrated 159-byte Partial LUT */
@@ -134,10 +136,10 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     /* 2. Configure BUSY interrupt pin (RST is handled by hal_spi_init) */
     gpio_config_t busy_conf = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_NEGEDGE, /* High -> Low when idle */
+        .intr_type    = GPIO_INTR_NEGEDGE, /* High -> Low when idle */
     };
     gpio_config(&busy_conf);
 

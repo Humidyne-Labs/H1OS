@@ -10,6 +10,7 @@
 #include "esp_partition.h"
 
 static const char *TAG = "HAL_FLASH";
+
 static const esp_partition_t *s_part = NULL;
 
 esp_err_t hal_flash_init(void)

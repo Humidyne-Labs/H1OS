@@ -25,14 +25,14 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     for (size_t i = 0; i < sizeof(s_persisted_state); i++) {
         p[i] = 0;
     }
-    s_persisted_state.magic = ORCH_RTC_MAGIC;
-    s_persisted_state.sample_interval_sec = 60;
-    s_persisted_state.flow_b_period_sec = 120;
-    s_persisted_state.amb_floor_temp_centi_c = 2500;
-    s_persisted_state.window_low_temp_centi_c = 2500;
+    s_persisted_state.magic                    = ORCH_RTC_MAGIC;
+    s_persisted_state.sample_interval_sec      = 60;
+    s_persisted_state.flow_b_period_sec        = 120;
+    s_persisted_state.amb_floor_temp_centi_c   = 2500;
+    s_persisted_state.window_low_temp_centi_c  = 2500;
     s_persisted_state.window_high_temp_centi_c = 2500;
-    s_persisted_state.last_glass_temp_centi_c = 2500;
-    s_persisted_state.trinode_confidence_pct = 100;
+    s_persisted_state.last_glass_temp_centi_c  = 2500;
+    s_persisted_state.trinode_confidence_pct   = 100;
 }
 
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)

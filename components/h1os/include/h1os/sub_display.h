@@ -22,6 +22,7 @@ extern "C" {
 
 #define EPD_WIDTH       200
 #define EPD_HEIGHT      200
+
 #define EPD_BUFFER_SIZE ((EPD_WIDTH * EPD_HEIGHT) / 8) /* 5000 bytes */
 
 /**

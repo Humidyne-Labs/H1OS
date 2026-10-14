@@ -59,9 +59,8 @@ hal_btn_mask_t hal_io_read_buttons(void);
  * @param pin GPIO_NUM_0 (BOOT) or GPIO_NUM_18 (POWER)
  * @return true if depressed, false otherwise
  */
-static inline bool hal_io_button_is_pressed(gpio_num_t pin)
-{
-    return gpio_get_level(pin) == 0;
+static inline bool hal_io_button_is_pressed(gpio_num_t pin) {
+    return (gpio_get_level(pin) == 0) ? true : false;
 }
 
 /**

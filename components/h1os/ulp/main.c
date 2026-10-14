@@ -17,18 +17,18 @@
 #include "ulp_riscv_adc_ulp_core.h"
 
 /* Exported variables accessible by the main Xtensa core via ulp_<var> */
-uint32_t wake_counter = 0;
+uint32_t wake_counter    = 0;
 uint32_t dispatch_reason = 0; /* 0: None, 1: Sensor Sample, 2: Main Wake, 3: Critical Shutdown */
 
 /* Battery Calibration Parameters (Provided by main core from eFuses) */
-uint32_t cal_scale = 1000;
-int32_t  cal_offset = 0;
-uint32_t last_vbat_mv = 4000;
+uint32_t cal_scale        = 1000;
+int32_t  cal_offset       = 0;
+uint32_t last_vbat_mv     = 4000;
 uint32_t vbat_critical_mv = 3250; /* Critical brownout threshold (< 3.25V) */
 
 /* Button State Tracking */
 uint32_t boot_btn_events = 0;
-uint32_t last_wake_btn = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
+uint32_t last_wake_btn   = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 
 int main(void)
 {
@@ -39,7 +39,7 @@ int main(void)
     int rtc_int_level = ulp_riscv_gpio_get_level(GPIO_NUM_5);
     if (rtc_int_level == 0) {
         /* Alarm expired! Prompt main core straight into Full UI Refresh */
-        last_wake_btn = 0; /* Woken by external RTC */
+        last_wake_btn   = 0; /* Woken by external RTC  */
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         ulp_riscv_wakeup_main_processor();
         return 0;
@@ -66,7 +66,7 @@ int main(void)
     /* 3. Button Check (GPIO 0: BOOT0, GPIO 18: BAT_KEY) */
     /* Wake-on-Release Rule: Wake Xtensa strictly when the button transitions back HIGH */
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-    int pwr_btn = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
 
     if (boot_btn == 0 || pwr_btn == 0) {
         /* Button is held down. Track hold duration and wait for release. */
@@ -75,7 +75,7 @@ int main(void)
             ulp_riscv_delay_cycles(10 * ULP_RISCV_CYCLES_PER_MS); /* 10ms poll while depressed */
             hold_ms += 10;
             boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-            pwr_btn = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+            pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
             if (boot_btn != 0 && pwr_btn != 0) {
                 /* Clean release detected! */
                 break;

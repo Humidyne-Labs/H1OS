@@ -34,7 +34,8 @@
 #define I2C_ADDR_SHTC3    0x70
 #define I2C_ADDR_PCF85063 0x51
 #define RTC_REG_TIMER_VAL 0x10
-#define RTC_TIMER_TE_BIT  (1 << 2)
+
+#define RTC_TIMER_TE_BIT   (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
 #define RTC_TIMER_TCF_MIN  (3 << 3)
 
@@ -309,9 +310,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
         /* 8. Convert to Centi-Units (Pure integer arithmetic in RTC Memory) */
-        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        int16_t temp_centi_c  = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
         uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        int16_t die_centi_c   = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
 
         /* 9. Successive-Sample Thermal Delta Gate & Trend Back-Marking:
          *    - Case 0 (total_samples == 0): First sample cannot prove stability alone -> VALID_COLD = 0, valid_trend = 0.
