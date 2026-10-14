@@ -257,10 +257,10 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 	}
 	
 	/* Dump ring buffer vars to console */
-	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH", shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer  C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH",  shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer  C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
+	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer  C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
 
     if (out_temp_c) *out_temp_c = t_amb;
     if (out_rh_pct) *out_rh_pct = rh_amb;
