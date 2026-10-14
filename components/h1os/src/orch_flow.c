@@ -249,7 +249,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     memset(mcuT_ring,    0x0000, sizeof(mcuT_ring));
     memset(epdT_ring,    0x0000, sizeof(epdT_ring));
 
-    ESP_LOGI("debugging output", "RHP, TMP, DIE, EPD");
+    ESP_LOGI("debugging output", "TMP, RHP, DIE, EPD");
 	for(int i = 0; i < 32; i++) {
 		shtc3T_ring[i]  = st->ring[i].shtc3_temp_centi_c / 100.0f;
 		shtc3RH_ring[i] = st->ring[i].shtc3_rh_centi_pct / 100.0f;
