@@ -240,14 +240,14 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
              t_glass, t_trinode, delta_trinode, st->trinode_confidence_pct);
 
 	/* Build internal debug arrays */
-	uint16_t shtc3RH_ring[32];	
-	int16_t  shtc3T_ring[32], mcuT_ring[32], epdT_ring[32];
+	float shtc3RH_ring[32], shtc3T_ring[32];
+    int16_t mcuT_ring[32], epdT_ring[32];
 
     /* Set to known state */
-    memset(shtc3RH_ring, 0x0000, sizeof(shtc3RH_ring));
-    memset(shtc3T_ring,  0x0000, sizeof(shtc3T_ring));
-    memset(mcuT_ring,    0x0000, sizeof(mcuT_ring));
-    memset(epdT_ring,    0x0000, sizeof(epdT_ring));
+    memset(shtc3RH_ring, 0.0f, sizeof(shtc3RH_ring));
+    memset(shtc3T_ring,  0.0f, sizeof(shtc3T_ring));
+    memset(mcuT_ring,    0x00, sizeof(mcuT_ring));
+    memset(epdT_ring,    0x00, sizeof(epdT_ring));
 
     ESP_LOGI("debugging output", "TMP, RHP, DIE, EPD");
 	for(int i = 0; i < 32; i++) {
