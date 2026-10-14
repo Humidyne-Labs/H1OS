@@ -10,6 +10,7 @@
 
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
+#include "esp_attr.h"
 #include "soc/gpio_reg.h"
 #include "soc/io_mux_reg.h"
 #include "soc/gpio_num.h"
@@ -20,7 +21,7 @@
 #define H1OS_PIN_EPD_3V3_EN  6
 #define H1OS_PIN_PA_EN       42
 
-static const char *TAG = "H1OS_BOOT_HOOK";
+static const char *TAG __unused = "H1OS_BOOT_HOOK";
 
 /* Mandatory symbol to force the GNU linker to pull this translation unit (-u bootloader_hooks_include) */
 void bootloader_hooks_include(void)
@@ -63,9 +64,9 @@ void bootloader_before_init(void)
  */
 void bootloader_after_init(void)
 {
-    uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g17_out  __unused = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g17_oe   __unused = (REG_READ(GPIO_ENABLE_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g17_hold __unused = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
     //ESP_LOGI(TAG, "BAT_CTRL (GPIO 17) latched HIGH in 2nd-stage bootloader [out=%lu, oe=%lu, rtc_hold=%lu]",
     //         (unsigned long)g17_out, (unsigned long)g17_oe, (unsigned long)g17_hold);
 }

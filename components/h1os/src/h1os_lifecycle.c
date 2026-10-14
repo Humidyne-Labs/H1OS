@@ -64,6 +64,13 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
     }
 }
 
+static void h1os_trigger_splash(h1os_splash_type_t type)
+{
+    if (s_app_lifecycle.presentation.on_splash != NULL) {
+        s_app_lifecycle.presentation.on_splash(type, s_app_lifecycle.user_data);
+    }
+}
+
 static void h1os_session_monitor_task(void *arg)
 {
     while (s_session_running) {
@@ -188,12 +195,14 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
+        h1os_trigger_splash(H1OS_SPLASH_BOOT);
         if (s_app_lifecycle.on_boot) {
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
     } else if (s_app_lifecycle.on_wake) {
         if (is_user_wake) {
             h1os_trigger_chime(H1OS_CHIME_WAKE);
+            h1os_trigger_splash(H1OS_SPLASH_WAKE);
         }
         h1os_wake_context_t ctx = {
             .reset_reason       = esp_reset_reason(),
@@ -294,6 +303,7 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
+    h1os_trigger_splash(H1OS_SPLASH_SLEEP);
     if (s_app_lifecycle.on_pre_sleep) {
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
@@ -310,6 +320,7 @@ static void execute_system_shutdown(bool force_clean_white)
     sub_rtc_cancel_countdown();
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
+    h1os_trigger_splash(H1OS_SPLASH_SHUTDOWN);
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }

@@ -239,34 +239,36 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
              st->window_avg_shtc3_c, st->window_avg_die_c, st->temp_historical_c,
              t_glass, t_trinode, delta_trinode, st->trinode_confidence_pct);
 
-	/* Build internal debug arrays */
-	float shtc3RH_ring[32], shtc3T_ring[32];
-    int16_t mcuT_ring[32], epdT_ring[32];
+    /* Build internal debug arrays */
+    float shtc3T_ring[ORCH_RING_CAPACITY];
+    float shtc3RH_ring[ORCH_RING_CAPACITY];
+    float mcuT_ring[ORCH_RING_CAPACITY];
+    float epdT_ring[ORCH_RING_CAPACITY];
 
     /* Set to known state */
-    memset(shtc3RH_ring, 0.0f, sizeof(shtc3RH_ring));
-    memset(shtc3T_ring,  0.0f, sizeof(shtc3T_ring));
-    memset(mcuT_ring,    0x00, sizeof(mcuT_ring));
-    memset(epdT_ring,    0x00, sizeof(epdT_ring));
+    memset(shtc3T_ring,  0, sizeof(shtc3T_ring));
+    memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
+    memset(mcuT_ring,    0, sizeof(mcuT_ring));
+    memset(epdT_ring,    0, sizeof(epdT_ring));
 
-    ESP_LOGI("debugging output", "TMP, RHP, DIE, EPD");
-	for(int i = 0; i < 32; i++) {
-		shtc3T_ring[i]  = st->ring[i].shtc3_temp_centi_c / 100.0f;
-		shtc3RH_ring[i] = st->ring[i].shtc3_rh_centi_pct / 100.0f;
-		mcuT_ring[i]    = st->ring[i].mcu_tsens_centi_c;
-		epdT_ring[i]    = st->ring[i].epd_glass_centi_c;
-        ESP_LOGI("debugging output", "%.2d, %.2d, %.2d, %.2d", 
-            shtc3T_ring[i], 
-            shtc3RH_ring[i],
-            mcuT_ring[i],
-            epdT_ring[i]);
-	}
+    ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
+    for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
+        shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
+        shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
+        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c  / 100.0f;
+        epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c  / 100.0f;
+        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i,
+                                                         shtc3T_ring[i], 
+                                                         shtc3RH_ring[i],
+                                                         mcuT_ring[i],
+                                                         epdT_ring[i]);
+    }
 	
-	/* Dump ring buffer vars to console */
-	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer  C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH",  shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer  C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
-	ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer  C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
+    /* Dump ring buffer vars to console */
+    // ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer  C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
+    // ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH",  shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
+    // ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer  C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
+    // ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer  C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
 
     if (out_temp_c) *out_temp_c = t_amb;
     if (out_rh_pct) *out_rh_pct = rh_amb;

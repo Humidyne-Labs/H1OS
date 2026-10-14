@@ -2,6 +2,7 @@ idf_component_register(
     SRCS 
         "main.c"
         "battery_estimator.c"
+        "humid1_cyber_wave.c"
         "screens/screen_base.c"
         "screens/screen_env_hero.c"
         "screens/screen_psychrometrics.c"

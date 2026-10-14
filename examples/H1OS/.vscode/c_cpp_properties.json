@@ -9,7 +9,7 @@
             "intelliSenseMode": "linux-gcc-x64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/../../components/esp32-s3_bsp/include",
+                "${workspaceFolder}/../../components/esp32-s3_bsp/**",
                 "${workspaceFolder}/main",
                 "${workspaceFolder}/build/config",
                 "${workspaceFolder}/managed_components/**",

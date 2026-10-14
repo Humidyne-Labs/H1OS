@@ -26,6 +26,7 @@
 #include "h1os/sub_audio.h"
 #include "h1os/sub_sdcard.h"
 #include "screens.h"
+#include "humid1_cyber_wave.h"
 
 static const char *TAG = "h1os_demo";
 
@@ -172,6 +173,27 @@ static void app_on_shutdown(void *user_data)
     sub_sdcard_unmount();
 }
 
+static void app_on_splash(h1os_splash_type_t type, void *user_data)
+{
+    ESP_LOGI(TAG, "Lifecycle: SPLASH hook executing (Type %d)", (int)type);
+    if (type == H1OS_SPLASH_BOOT) {
+        h1os_lvgl_lock(100);
+        lv_obj_t *scr = lv_screen_active();
+        lv_obj_clean(scr);
+        lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
+
+        lv_obj_t *img = lv_image_create(scr);
+        lv_image_set_src(img, &humid1_cyber_wave);
+        lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+
+        lv_refr_now(NULL);
+        h1os_lvgl_unlock();
+
+        /* Hold splash graphic briefly so it is visible before primary UI transition */
+        vTaskDelay(pdMS_TO_TICKS(6000));
+    }
+}
+
 /* =========================================================================
  * Application Entry Point
  * ========================================================================= */
@@ -185,7 +207,7 @@ void app_main(void)
         .on_pre_sleep               = app_on_pre_sleep,
         .on_shutdown                = app_on_shutdown,
         .presentation = {
-            .on_splash              = NULL,
+            .on_splash              = app_on_splash,
             .on_chime               = NULL,
             .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
             .volume_pct             = 50, /* Vol: 50% */
