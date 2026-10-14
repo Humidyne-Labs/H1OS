@@ -102,20 +102,24 @@ def render_summary():
             pct = float(m.group(2))
             remain = int(m.group(3))
             total = int(m.group(4))
-            status = "CRITICAL (FULL)" if remain == 0 else f"{pct:.1f}% used"
+            if ram_sec == "IRAM" and remain == 0:
+                status = "100.0% (overflow into DIRAM)"
+            elif remain == 0:
+                status = "CRITICAL (FULL)"
+            else:
+                status = f"{pct:.1f}% used"
             summary_lines.append(f"   * {ram_sec:<9}: {format_bytes(used):<20} / {format_bytes(total):<18} ({status}, {format_bytes(remain)} free)")
 
-    # 3. Component Flash Attribution Top 5
+    # 3. Component Flash Attribution Top 6
     # Matches lines from archive table: │ liblvgl__lvgl.a  │  314720 │ ...
     summary_lines.append("\n3. TOP FLASH CONSUMING ARCHIVES:")
     comp_matches = re.findall(r'│\s+([\w\.\-]+)\s+│\s+(\d+)\s+│', comp_out)
     if comp_matches:
         # Sort by total size descending
         sorted_comps = sorted([(name, int(sz)) for name, sz in comp_matches], key=lambda x: x[1], reverse=True)
-        total_app_size = sorted_comps[0][1] if sorted_comps else 1
         
-        # Pull top 6 (excluding table header artifacts)
-        valid_comps = [c for c in sorted_comps if not c[0].startswith("Archive") and not c[0].startswith("Total")][:6]
+        # Pull top 6 actual static archives (*.a)
+        valid_comps = [c for c in sorted_comps if c[0].endswith(".a")][:6]
         for name, sz in valid_comps:
             summary_lines.append(f"   * {name:<26}: {format_bytes(sz):<18}")
     
