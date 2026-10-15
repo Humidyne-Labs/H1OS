@@ -213,10 +213,10 @@ void app_main(void)
             .volume_pct             = 50, /* Vol: 50% */
         },
         .session = {
-            .inactivity_timeout_sec = 30,   /* Inactivity Timeout       */
-            .enable_dfs_80mhz       = true, /* Dynamic Freq Scaling     */
-            .flow_a_period_sec      = 60,   /* SHTC3 Sensor Read Period */
-            .flow_b_period_sec      = 120,  /* Main App Wake Period     */
+            .inactivity_timeout_sec = 30,   /* Inactivity Timeout             */
+            .enable_dfs_80mhz       = true, /* Dynamic Freq Scaling           */
+            .flow_a_period_sec      = 60,   /* SHTC3 Sensor Read Period       */
+            .flow_b_period_sec      = 300,  /* Main App Wake Period (5min)    */
         },
         .user_data                  = NULL,
     };
