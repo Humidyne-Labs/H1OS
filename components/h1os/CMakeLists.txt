@@ -110,6 +110,7 @@ add_custom_command(
             --out-dir "${GEN_FONT_DIR}"
             --all
     DEPENDS "${FONT_GEN_SCRIPT}"
+            "${FONT_SRC_DIR}/Montserrat-Bold.ttf"
             "${FONT_SRC_DIR}/Montserrat-Medium.ttf"
             "${FONT_SRC_DIR}/FontAwesome5-Solid+Brands+Regular.woff"
     COMMENT "Synthesizing H1OS 1-BPP Typography & Font Licenses from Vendored Assets..."

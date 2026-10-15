@@ -182,7 +182,9 @@ def main():
 
     # Search for Montserrat-Bold.ttf for high-contrast 1-bpp EPD rendering across all sizes
     montserrat_bold_ttf = None
-    if args.bold_font and Path(args.bold_font).is_file():
+    if (lvgl_dir / "Montserrat-Bold.ttf").is_file():
+        montserrat_bold_ttf = (lvgl_dir / "Montserrat-Bold.ttf").resolve()
+    elif args.bold_font and Path(args.bold_font).is_file():
         montserrat_bold_ttf = Path(args.bold_font).resolve()
     elif args.lvgl_root:
         cand = Path(args.lvgl_root).resolve() / "tests" / "src" / "test_files" / "fonts" / "Montserrat-Bold.ttf"

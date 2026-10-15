@@ -38,6 +38,31 @@ def run_command(key, title, cmd):
         log_write(err_msg)
         OUTPUT_STREAMS[key] = err_msg
 
+def execute_size_action(key, title, action, idf_flag, build_dir):
+    cmd = f"idf.py {idf_flag} {action}"
+    run_command(key, title, cmd)
+    output = OUTPUT_STREAMS.get(key, "")
+    needs_fallback = (
+        "is currently active in the environment while the project was" in output
+        or "not recognized as an internal or external command" in output
+        or "FatalError" in output
+        or "Error executing command" in output
+    )
+    if needs_fallback:
+        map_files = list(Path(build_dir).glob("*.map"))
+        if map_files:
+            map_path = map_files[0]
+            flag = ""
+            if action == "size-components":
+                flag = "--archives"
+            elif action == "size-files":
+                flag = "--files"
+            fallback_cmd = f'"{sys.executable}" -m esp_idf_size {flag} "{map_path}"'
+            log_write(f"\n[!] Note: idf.py unavailable or environment mismatch detected with '{build_dir}'.\n"
+                      f"    Automatically falling back to direct map analysis via esp_idf_size:\n"
+                      f"    {fallback_cmd}\n")
+            run_command(key, f"{title} (Direct Map Fallback)", fallback_cmd)
+
 def find_active_build_dir():
     for folder in CANDIDATE_DIRS:
         p = Path(folder)
@@ -61,7 +86,7 @@ def format_bytes(b):
         return f"{b / 1024:.2f} KB ({b:,} B)"
     return f"{b:,} B"
 
-def render_summary():
+def render_summary(build_dir):
     size_out = OUTPUT_STREAMS.get("size", "")
     comp_out = OUTPUT_STREAMS.get("components", "")
 
@@ -89,7 +114,20 @@ def render_summary():
         summary_lines.append(f"   * Firmware Used : {format_bytes(bin_sz)} [{used_pct:.1f}%]")
         summary_lines.append(f"   * Space Left    : {format_bytes(free_sz)} [{free_pct:.1f}% FREE]")
     else:
-        summary_lines.append("1. APP PARTITION HEADROOM: [Data not detected]")
+        bin_path = find_target_bin(build_dir)
+        if bin_path and bin_path.is_file():
+            bin_sz = bin_path.stat().st_size
+            part_sz = 0x300000  # Default 3.00 MB dual-slot OTA partition from partitions.csv
+            free_sz = part_sz - bin_sz
+            free_pct = (free_sz / part_sz) * 100.0
+            used_pct = (bin_sz / part_sz) * 100.0
+
+            summary_lines.append("1. APP PARTITION HEADROOM (Flash):")
+            summary_lines.append(f"   * Partition Max : {format_bytes(part_sz)}")
+            summary_lines.append(f"   * Firmware Used : {format_bytes(bin_sz)} [{used_pct:.1f}%]")
+            summary_lines.append(f"   * Space Left    : {format_bytes(free_sz)} [{free_pct:.1f}% FREE]")
+        else:
+            summary_lines.append("1. APP PARTITION HEADROOM: [Data not detected]")
 
     # 2. Memory Section Usage Parsing
     # Matches table entries like: │ DIRAM   │   89058 │    26.06 │   252702 │   341760 │
@@ -138,9 +176,9 @@ def main():
     log_write(f"Target Build Directory: {build_dir}\n")
     idf_flag = f"-B {build_dir}"
 
-    run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"idf.py {idf_flag} size")
-    run_command("components", "2. PER-COMPONENT BREAKDOWN", f"idf.py {idf_flag} size-components")
-    run_command("files", "3. PER-FILE BREAKDOWN", f"idf.py {idf_flag} size-files")
+    execute_size_action("size", "1. OVERALL MEMORY BREAKDOWN", "size", idf_flag, build_dir)
+    execute_size_action("components", "2. PER-COMPONENT BREAKDOWN", "size-components", idf_flag, build_dir)
+    execute_size_action("files", "3. PER-FILE BREAKDOWN", "size-files", idf_flag, build_dir)
 
     bin_path = find_target_bin(build_dir)
     if bin_path:
@@ -149,7 +187,7 @@ def main():
         log_write(f"\n[WARNING] No main application binary found in {build_dir}\n")
 
     # Render metrics dashboard
-    summary_text = render_summary()
+    summary_text = render_summary(build_dir)
     log_write(summary_text)
 
     log_write(f"Diagnostics completed successfully.\nFull scroll-back log saved to: {LOG_FILE}\n")
