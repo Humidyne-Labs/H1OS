@@ -1,6 +1,6 @@
 ## Component metadata
 version:     "1.0.0-alpha"
-description: "H1OS: Class-E Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8)."
+description: "H1OS: E-Class Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8)."
 url:         "https://github.com/Humidyne-Labs/esp32-s3_bsp"
 repository:  "https://github.com/Humidyne-Labs/esp32-s3_bsp.git"
 license:     "MIT"
@@ -26,3 +26,6 @@ files:
     - ".git*"
     - "build/"
     - "docs/"
+    - "legacy_reference/"
+    - "profiles/"
+    - "partition-table/"

@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development Profile",
+      "description": "Builds using the dev configuration into build_dev/",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_dev",
+      "environment": {
+        "IDF_PATH": "C:/esp/v6.1/esp-idf",
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "PATH": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts;C:/Users/Matt/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin;C:/Users/Matt/.espressif/tools/esp32s3-ulp-elf/2.38_20240113/esp32s3-ulp-elf/bin;C:/Users/Matt/.espressif/tools/cmake/3.30.2/bin;C:/Users/Matt/.espressif/tools/ninja/1.12.1;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.dev"
+      },
+      "vendor": {
+        "espressif/vscode-esp-idf": {
+          "schemaVersion": 1,
+          "settings": [
+            {
+              "type": "openOCD",
+              "value": {
+                "debugLevel": 2,
+                "configs": [
+                  "board/esp32s3-builtin.cfg"
+                ],
+                "args": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "prod",
+      "displayName": "Production Profile",
+      "description": "Builds using the prod configuration into build_prod/",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_prod",
+      "environment": {
+        "IDF_PATH": "C:/esp/v6.1/esp-idf",
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "PATH": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts;C:/Users/Matt/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin;C:/Users/Matt/.espressif/tools/esp32s3-ulp-elf/2.38_20240113/esp32s3-ulp-elf/bin;C:/Users/Matt/.espressif/tools/cmake/3.30.2/bin;C:/Users/Matt/.espressif/tools/ninja/1.12.1;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.prod"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI Profile",
+      "description": "Builds using the ci configuration into build_ci/",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_ci",
+      "environment": {
+        "IDF_PATH": "C:/esp/v6.1/esp-idf",
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "PATH": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts;C:/Users/Matt/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin;C:/Users/Matt/.espressif/tools/esp32s3-ulp-elf/2.38_20240113/esp32s3-ulp-elf/bin;C:/Users/Matt/.espressif/tools/cmake/3.30.2/bin;C:/Users/Matt/.espressif/tools/ninja/1.12.1;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "PYTHON": "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe",
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.ci"
+      }
+    }
+  ]
+}

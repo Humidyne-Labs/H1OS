@@ -1,0 +1,110 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ESP-IDF: Build (dev Profile)",
+      "type": "shell",
+      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_dev -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.dev' build",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "detail": "Builds the H1OS project using the 'dev' profile into build_dev/."
+    },
+    {
+      "label": "ESP-IDF: Build (prod Profile)",
+      "type": "shell",
+      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_prod -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.prod' build",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": ["$gcc"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "detail": "Builds the H1OS project using the 'prod' profile into build_prod/."
+    },
+    {
+      "label": "esptool: Flash (dev Profile)",
+      "type": "shell",
+      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; Set-Location build_dev; python -m esptool -p COM3 -b 460800 --before default-reset --after hard-reset write-flash '@flash_args'",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "detail": "Flashes the 'dev' build using esptool."
+    },
+    {
+      "label": "ESP-IDF: Monitor Serial Console",
+      "type": "shell",
+      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_dev -p COM3 monitor",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      },
+      "detail": "Opens the serial monitor for the connected ESP32-S3."
+    },
+    {
+      "label": "ESP-IDF: Clean All Profile Build Directories",
+      "type": "shell",
+      "command": "if (Test-Path build_dev) { Remove-Item -Recurse -Force build_dev }; if (Test-Path build_prod) { Remove-Item -Recurse -Force build_prod }; if (Test-Path build_ci) { Remove-Item -Recurse -Force build_ci }; Get-ChildItem -Filter sdkconfig.* | Where-Object { $_.Name -notlike 'sdkconfig.defaults*' } | Remove-Item -Force",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "detail": "Removes all profile build output directories and generated sdkconfig files."
+    }
+  ]
+}

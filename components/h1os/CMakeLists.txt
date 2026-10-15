@@ -116,12 +116,13 @@ add_custom_command(
     VERBATIM
 )
 
-# Register generated sources and header to prevent build race conditions
-target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR})
-
+# Custom target ensures generators run before building component sources
+add_custom_target(generate_h1os_fonts DEPENDS ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR})
+add_dependencies(${COMPONENT_LIB} generate_h1os_fonts)
+target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS})
 
 # -----------------------------------------------------------------------------
-# ULP Junk
+# ULP CoProc 
 # -----------------------------------------------------------------------------
 
 if(CONFIG_ULP_COPROC_ENABLED)

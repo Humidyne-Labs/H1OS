@@ -1,0 +1,43 @@
+# Profile: prod (Production Release - H1OS Class-E Instrument)
+# =========================================================================
+# Compiler & Code Size / Performance Optimization
+# =========================================================================
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+
+# =========================================================================
+# Logging & Console Overhead Stripping
+# =========================================================================
+# Drop logging to WARN or ERROR to eliminate format strings and UART stalls
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_LOG_MAXIMUM_LEVEL_WARN=y
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# Disable runtime log formatting overhead
+CONFIG_LOG_COLORS=n
+CONFIG_LOG_TIMESTAMP_SOURCE_RTOS=y
+
+# =========================================================================
+# LVGL v9 Graphics Engine Production Tuning
+# =========================================================================
+CONFIG_LV_USE_LOG=n
+CONFIG_LV_USE_ASSERT_NULL=n
+CONFIG_LV_USE_ASSERT_MALLOC=n
+CONFIG_LV_USE_ASSERT_STYLE=n
+CONFIG_LV_USE_ASSERT_MEM_INTEGRITY=n
+CONFIG_LV_USE_ASSERT_OBJ=n
+
+# =========================================================================
+# FreeRTOS & System Performance
+# =========================================================================
+CONFIG_FREERTOS_USE_TRACE_FACILITY=n
+CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=n
+CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=n
+CONFIG_FREERTOS_CHECK_STACKOVERFLOW_NONE=y
+
+# =========================================================================
+# Bootloader & Startup Latency Reduction
+# =========================================================================
+# Skip the bootloader delay entirely on production units
+CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP=y
+CONFIG_BOOTLOADER_RESERVE_RTC_MEM=y
