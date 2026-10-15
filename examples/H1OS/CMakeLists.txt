@@ -10,9 +10,6 @@ elseif(NOT DEFINED IDF_PATH OR IDF_PATH STREQUAL "")
     message(FATAL_ERROR "IDF_PATH is not set. Set it to your ESP-IDF installation directory before configuring this project.")
 endif()
 
-# Force CMake to use the ESP-IDF virtual environment Python
-set(PYTHON "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe" CACHE FILEPATH "Path to Python interpreter" FORCE)
-set(ENV{PYTHON} "C:/Users/Matt/.espressif/python_env/idf6.1_py3.14_env/Scripts/python.exe")
 
 include("${IDF_PATH}/tools/cmake/project.cmake")
 project(h1os)
