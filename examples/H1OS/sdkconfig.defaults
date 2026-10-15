@@ -1,22 +1,36 @@
 # =========================================================================
 # Target Hardware: ESP32-S3-PICO-1-N8R8 (8MB Flash QIO, 8MB PSRAM Octal OPI)
-# Target Board: Waveshare ESP32-S3-Touch-ePaper-1.54 V2
-# Role: H1OS Class-E Luxury Environmental Telemetry Instrument
+# Target Board: Waveshare ESP32-S3-ePaper-1.54 V2
+# Role: Base Hardware Architecture & Invariants (H1OS Instrument)
 # =========================================================================
 
 CONFIG_IDF_TARGET="esp32s3"
+
+# CPU Frequency: Locked to 80MHz for Ultra-Low Power Draw
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=80
 
 # =========================================================================
-# Ultra Low Power (ULP) Coprocessor & RTC Memory Configuration
+# Flash & Octal PSRAM (ESP32-S3-PICO-1-N8R8 Mandatory Invariants)
 # =========================================================================
-CONFIG_ULP_COPROC_ENABLED=y
-CONFIG_ULP_COPROC_TYPE_RISCV=y
-CONFIG_ULP_COPROC_RESERVE_MEM=4096
+# 8MB Quad SPI Flash @ 80MHz
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# 8MB Octal PSRAM (OPI) @ 80MHz
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_MEMTEST=y
 
 # =========================================================================
-# Power Management & Sleep Power Domains (PD)
+# Power Management & Sleep Power Domains (Light Sleep / EPD Inactivity)
 # =========================================================================
 CONFIG_PM_ENABLE=y
 CONFIG_PM_DFS_INIT_AUTO=n
@@ -27,45 +41,70 @@ CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n
 CONFIG_RTC_CLK_SRC_INT_RC=y
 
 # =========================================================================
-# Radio & Network Stripping (Zero RF Emission, Zero Protocol Overhead)
+# Ultra Low Power (ULP) Coprocessor (Sensor Polling during Sleep)
+# =========================================================================
+CONFIG_ULP_COPROC_ENABLED=y
+CONFIG_ULP_COPROC_TYPE_RISCV=y
+CONFIG_ULP_COPROC_RESERVE_MEM=4096
+
+# =========================================================================
+# RF Hardware Stripping (Zero Emissions / Zero Bluetooth & Wi-Fi Heap)
 # =========================================================================
 CONFIG_BT_ENABLED=n
 CONFIG_ESP_WIFI_ENABLED=n
 
 # =========================================================================
-# Compiler & Performance Optimization
+# Custom Partitioning
 # =========================================================================
-CONFIG_COMPILER_OPTIMIZATION_PERF=y
-CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
-CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1
-CONFIG_LV_OS_FREERTOS=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
 # =========================================================================
-# LVGL v9 Graphics Engine (Debloated 1-Bit Monochrome SSD1681 Optimization)
+# FreeRTOS & System Core Topology
+# =========================================================================
+CONFIG_FREERTOS_HZ=1000
+CONFIG_FREERTOS_UNICORE=n
+CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# =========================================================================
+# LVGL v9 Core Setup (Monochrome SSD1681 1-Bit Optimizations)
 # =========================================================================
 CONFIG_LV_CONF_SKIP=y
+CONFIG_LV_OS_FREERTOS=y
 CONFIG_LV_COLOR_DEPTH_1=y
 CONFIG_LV_COLOR_DEPTH=1
 CONFIG_LV_DRAW_SW_SUPPORT_I1=y
 CONFIG_LV_DRAW_BUF_ALIGN=4
 CONFIG_LV_DPI_DEF=188
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1
+CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
 
+# Memory allocator mapping to standard C library
 CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_USE_CLIB_STRING=y
 
+# UI Primitive Components
 CONFIG_LV_USE_QRCODE=y
 CONFIG_LV_USE_LABEL=y
 CONFIG_LV_USE_BUTTON=y
 CONFIG_LV_USE_LINE=y
 CONFIG_LV_USE_IMAGE=y
 
-# Fonts: Montserrat 14 & 20
-CONFIG_LV_FONT_MONTSERRAT_14=y
+# Typography (H1OS has built-in 1bit fonts for LVGL9)
 CONFIG_LV_FONT_DEFAULT_MONTSERRAT_14=y
-CONFIG_LV_FONT_MONTSERRAT_20=y
 
-# Build: Disable LVGL Examples and Demos
+# Themes & Layout Engines
+CONFIG_LV_USE_THEME_DEFAULT=n
+CONFIG_LV_USE_THEME_MONO=y
+CONFIG_LV_USE_THEME_SIMPLE=y
+CONFIG_LV_USE_FLEX=y
+CONFIG_LV_USE_GRID=n
+CONFIG_LV_USE_OBSERVER=n
+
+# Disable unneeded LVGL demos/examples to accelerate build times
 CONFIG_LV_BUILD_EXAMPLES=n
 CONFIG_LV_BUILD_DEMOS=n
 CONFIG_LV_USE_DEMO_WIDGETS=n
@@ -77,45 +116,3 @@ CONFIG_LV_USE_DEMO_MUSIC=n
 CONFIG_LV_USE_DEMO_FLEX_LAYOUT=n
 CONFIG_LV_USE_DEMO_MULTILANG=n
 CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC=n
-
-# Themes & Layouts
-CONFIG_LV_USE_THEME_DEFAULT=n
-CONFIG_LV_USE_THEME_MONO=y
-CONFIG_LV_USE_THEME_SIMPLE=y
-CONFIG_LV_USE_FLEX=y
-CONFIG_LV_USE_GRID=n
-CONFIG_LV_USE_OBSERVER=n
-
-# =========================================================================
-# SPI Flash Configuration (8MB Quad SPI @ 80MHz)
-# =========================================================================
-CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
-CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
-CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
-CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
-
-# =========================================================================
-# PSRAM Configuration (8MB Octal SPI @ 80MHz)
-# =========================================================================
-CONFIG_SPIRAM=y
-CONFIG_SPIRAM_MODE_OCT=y
-CONFIG_SPIRAM_SPEED_80M=y
-CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
-CONFIG_SPIRAM_RODATA=y
-CONFIG_SPIRAM_USE_MALLOC=y
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
-
-# =========================================================================
-# Custom Dual-Slot OTA Partition Table
-# =========================================================================
-CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
-
-# =========================================================================
-# Dual-Core Task Affinity & Main Task Stack
-# =========================================================================
-CONFIG_FREERTOS_HZ=1000
-CONFIG_FREERTOS_UNICORE=n
-CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
