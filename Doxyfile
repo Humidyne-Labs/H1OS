@@ -54,7 +54,7 @@ PROJECT_NUMBER         = "2.1.0-alpha"
 # for a project that appears at the top of each page and should give viewers a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = "Class-E Luxury Environmental Telemetry Operating System for Waveshare ESP32-S3 ePaper 1.54\" V2"
+PROJECT_BRIEF          = "E Class Luxury Environmental Telemetry Operating System for Waveshare ESP32-S3 ePaper 1.54\" V2"
 
 # With the PROJECT_LOGO tag one can specify a logo or an icon that is included
 # in the documentation. The maximum height of the logo should not exceed 55
@@ -190,8 +190,10 @@ FULL_PATH_NAMES        = YES
 # will be relative from the directory where Doxygen is started.
 # This tag requires that the tag FULL_PATH_NAMES is set to YES.
 
-STRIP_FROM_PATH        = components/esp32-s3_bsp/include \
-                         components/esp32-s3_bsp/src \
+STRIP_FROM_PATH        = components/h1os/include                              \
+                         components/h1os/src                                  \
+                         components/h1os/ulp                                  \
+                         components/h1os/bootloader_components\h1os_boot_hook \
                          .
 
 # The STRIP_FROM_INC_PATH tag can be used to strip a user-defined part of the
@@ -201,7 +203,7 @@ STRIP_FROM_PATH        = components/esp32-s3_bsp/include \
 # specify the list of include paths that are normally passed to the compiler
 # using the -I flag.
 
-STRIP_FROM_INC_PATH    = components/esp32-s3_bsp/include
+STRIP_FROM_INC_PATH    = components/h1os/include
 
 # If the SHORT_NAMES tag is set to YES, Doxygen will generate much shorter (but
 # less readable) file names. This can be useful if your file system doesn't
@@ -2566,7 +2568,7 @@ SEARCH_INCLUDES        = YES
 # RECURSIVE has no effect here.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           = components/esp32-s3_bsp/include
+INCLUDE_PATH           = components/h1os/include
 
 # You can use the INCLUDE_FILE_PATTERNS tag to specify one or more wildcard
 # patterns (like *.h and *.hpp) to filter out the header-files in the
