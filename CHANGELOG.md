@@ -7,10 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.2.0-prod] - 2026-10-16
 
 ### 🚀 Added
-- **ULP-RISC-V Autonomous Reactive Coprocessor** (`components/h1os/ulp/main.c`, `sub_power.c/.h`):
-  - 24/7 reactive monitoring in RTC slow memory: coprocessor wakes autonomously on external RTC INT (GPIO 5), tactile buttons (GPIO 0 / 18), or periodic timer.
-  - Implemented Wake-on-Release debouncing: tracks hold duration and asserts `ulp_riscv_wakeup_main_processor()` strictly upon pin release (HIGH), ensuring clean LVGL keypad driver entry.
-  - Implemented exported RTC slow memory variables (`ulp_last_wake_btn`, `ulp_dispatch_reason`, `ulp_wake_counter`, `ulp_last_vbat_mv`).
+- **ULP-RISC-V Autonomous Reactive Coprocessor & Dual-Wake Engine** (`components/h1os/ulp/main.c`, `sub_power.c/.h`, `hal_io.c`):
+  - Established dual-wake architecture in `RTC_CNTL_ULP_CP_TIMER_REG` with simultaneous `RTC_CNTL_ULP_CP_SLP_TIMER_EN` (60s Flow A soft-timer) and `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` (instantaneous RTC GPIO wake).
+  - Explicitly enabled low-power IO sampling clock (`io_mux_enable_lp_io_clock()`) on ESP32-S3 for `HAL_PIN_RTC_INT` (GPIO 5), `HAL_PIN_BUTTON_BOOT` (GPIO 0), and `HAL_PIN_BUTTON_POWER` (GPIO 18) during sleep pad isolation, resolving silicon clock-gating of RTC level sampling.
+  - Implemented pure ULP wake to Xtensa CPU (`ESP_SLEEP_WAKEUP_ULP`) with zero CPU digital interrupt matrix exposure (`.intr_type = GPIO_INTR_DISABLE`), completely eliminating CPU watchdog panics.
+  - Implemented autonomous button hold classification in ULP: short tap ($30\text{ms}-2500\text{ms}$) wakes Flow B (`ULP_DISPATCH_MAIN_WAKE`), BOOT held $>2.5\text{s}$ triggers ROM bootloader jump (`ULP_DISPATCH_BOOTLOADER_JUMP`), and POWER held $>2.5\text{s}$ executes clean power-off (`ULP_DISPATCH_POWER_OFF`).
 - **Two-Stage Tactile Click Interaction** (`main.c`, `h1os_lifecycle.c`):
   - Stage 1 (Deep Sleep Wake): First click is caught by ULP, waking Flow B to toggle the inverted awake badge in the UI without advancing the page or firing an audio tone.
   - Stage 2 (Active Navigation): Second click is handled by running LVGL keypad event loop, triggering a 15ms audio tick and cycling the carousel.
