@@ -108,7 +108,11 @@ static void h1os_session_monitor_task(void *arg)
 static void debug_dump_ulp_telemetry(void)
 {
     uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
-    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), rtcio_raw=0x%06lX, btn=%lu, hold=%lu ms, samples=%lu, cycles=%lu",
+    uint32_t cycles_ms = ulp_cycles_per_ms ? ulp_cycles_per_ms : 17500;
+    uint32_t exec_ms = exec_cycles / cycles_ms;
+
+    ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), rtcio_raw=0x%06lX, btn=%lu, hold=%lu ms, samples=%lu, cycles=%lu (~%lu ms)",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
              (ulp_last_wake_cause == 1) ? "RTC_GPIO_INT" :
@@ -118,7 +122,36 @@ static void debug_dump_ulp_telemetry(void)
              (unsigned long)ulp_last_wake_btn,
              (unsigned long)ulp_hold_duration_ms,
              (unsigned long)ulp_loop_sample_count,
-             (unsigned long)exec_cycles);
+             (unsigned long)exec_cycles,
+             (unsigned long)exec_ms);
+
+    uint32_t count = ulp_trace_count;
+    if (count > 16) count = 16;
+    uint32_t *steps = (uint32_t *)&ulp_trace_step;
+    uint32_t *val1s = (uint32_t *)&ulp_trace_val1;
+    uint32_t *val2s = (uint32_t *)&ulp_trace_val2;
+
+    ESP_LOGI(TAG, "[ULP TRACE DUMP] %lu events captured in RTC Slow Memory:", (unsigned long)count);
+    for (uint32_t i = 0; i < count; i++) {
+        const char *step_name = "UNKNOWN";
+        switch (steps[i]) {
+            case 1:  step_name = "ENTRY"; break;
+            case 2:  step_name = "PINS_INIT"; break;
+            case 3:  step_name = "BTN_DETECTED"; break;
+            case 4:  step_name = "LOOP_POLL_STEP"; break;
+            case 5:  step_name = "RELEASE_DETECTED"; break;
+            case 6:  step_name = "TIMEOUT_3000MS"; break;
+            case 7:  step_name = "GLITCH_FILTERED"; break;
+            case 8:  step_name = "RTC_INT_DETECTED"; break;
+            case 9:  step_name = "ADC_MEASURED"; break;
+            case 10: step_name = "EXIT_DISPATCH"; break;
+        }
+        ESP_LOGI(TAG, "  [%02lu] %-18s | val1=0x%08lX (%ld) | val2=0x%08lX (%ld)",
+                 (unsigned long)i, step_name,
+                 (unsigned long)val1s[i], (long)val1s[i],
+                 (unsigned long)val2s[i], (long)val2s[i]);
+    }
+    ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
 #endif
 
@@ -216,6 +249,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
     h1os_log_flow_banner(flow);
 
+#if CONFIG_ULP_COPROC_ENABLED
+    /* Dump ULP execution trace and telemetry on every wake */
+    if (flow != ORCH_FLOW_BOOT) {
+        debug_dump_ulp_telemetry();
+    }
+#endif
+
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
         ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");
         h1os_shutdown();
@@ -268,8 +308,6 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             if (!button_woke) {
                 is_rtc_wake = true;
             }
-            /* [DEBUG] Diagnostic ULP wake telemetry dump — comment out for release builds */
-            debug_dump_ulp_telemetry();
 #endif
         } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
             uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();

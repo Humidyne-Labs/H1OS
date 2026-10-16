@@ -45,6 +45,23 @@ volatile uint32_t loop_sample_count = 0; /* Total loop iterations executed in wh
 volatile uint32_t entry_ccount      = 0; /* Cycle counter reading at entry to main() */
 volatile uint32_t exit_ccount       = 0; /* Cycle counter reading at exit from main() */
 
+/* In-Memory Execution Trace Buffer (Dumped by main Xtensa core over COM3 on wake) */
+#define ULP_TRACE_MAX 16
+volatile uint32_t trace_count = 0;
+volatile uint32_t trace_step[ULP_TRACE_MAX] = {0};
+volatile uint32_t trace_val1[ULP_TRACE_MAX] = {0};
+volatile uint32_t trace_val2[ULP_TRACE_MAX] = {0};
+
+static inline void record_trace(uint32_t step, uint32_t v1, uint32_t v2)
+{
+    if (trace_count < ULP_TRACE_MAX) {
+        trace_step[trace_count] = step;
+        trace_val1[trace_count] = v1;
+        trace_val2[trace_count] = v2;
+        trace_count++;
+    }
+}
+
 /*
  * ULP Execution Entry Point:
  * The ULP coprocessor is woken from deep sleep reactively:
@@ -61,6 +78,7 @@ int main(void)
     wake_counter++;
     loop_sample_count = 0;
     hold_duration_ms = 0;
+    trace_count = 0;
 
     /* Initialize and enable input buffers for RTC GPIOs in the ULP domain */
     ulp_riscv_gpio_init(GPIO_NUM_5);
@@ -94,6 +112,9 @@ int main(void)
         last_wake_cause = 3; /* Periodic ULP coprocessor sleep timer tick */
     }
 
+    record_trace(1 /* ENTRY */, rtcio_int_st, last_wake_cause);
+    record_trace(2 /* PINS_INIT */, (boot_btn & 1) | ((pwr_btn & 1) << 1) | ((rtc_int & 1) << 2), 0);
+
     /* =========================================================================
      * 1. Physical Tactile Button Arbitration (GPIO 0: BOOT0, GPIO 18: BAT_KEY)
      * ========================================================================= */
@@ -113,18 +134,27 @@ int main(void)
         }
 
         gpio_num_t active_pin = (pressed_btn == 2) ? GPIO_NUM_18 : GPIO_NUM_0;
+        record_trace(3 /* BTN_DETECTED */, pressed_btn, active_pin);
 
         /* Precise pulse duration measurement: poll while pin is held LOW (agent_help.md pattern) */
         uint32_t hold_ms = 0;
         while (ulp_riscv_gpio_get_level(active_pin) == 0) {
             loop_sample_count++;
+            if (loop_sample_count <= 3 || (hold_ms % 500 == 0)) {
+                record_trace(4 /* LOOP_TICK */, hold_ms, loop_sample_count);
+            }
             ulp_riscv_delay_cycles(cycles_per_ms * 10); /* 10 ms step */
             hold_ms += 10;
             if (hold_ms >= 3000) {
+                record_trace(6 /* TIMEOUT_3000 */, hold_ms, loop_sample_count);
                 break; /* Upper bound: Long-press threshold reached */
             }
         }
         hold_duration_ms = hold_ms;
+
+        if (hold_ms < 3000) {
+            record_trace(5 /* RELEASE_DETECTED */, hold_ms, loop_sample_count);
+        }
 
         /* Clear RTC GPIO status and ULP wakeup latch */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
@@ -132,6 +162,7 @@ int main(void)
 
         /* Glitch filter: Ignore contact bounce/transients shorter than 20 ms if no latched interrupt */
         if (hold_ms < 20 && ((rtcio_int_st & (BIT(0) | BIT(18))) == 0)) {
+            record_trace(7 /* GLITCH_FILTERED */, hold_ms, rtcio_int_st);
             exit_ccount = ULP_RISCV_GET_CCOUNT();
             ulp_riscv_halt();
             return 0;
@@ -153,6 +184,7 @@ int main(void)
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         }
 
+        record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
         exit_ccount = ULP_RISCV_GET_CCOUNT();
         ulp_riscv_wakeup_main_processor();
         ulp_riscv_halt();
@@ -168,8 +200,11 @@ int main(void)
         ulp_riscv_gpio_wakeup_clear();
         last_wake_btn   = 0; /* Woken by external RTC timer */
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+        record_trace(8 /* RTC_INT_DETECTED */, rtc_int, rtcio_int_st);
+        record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
         exit_ccount = ULP_RISCV_GET_CCOUNT();
         ulp_riscv_wakeup_main_processor();
+        ulp_riscv_halt();
         return 0;
     }
 
@@ -186,12 +221,15 @@ int main(void)
         uint32_t v_div_mv = (uint32_t)((raw_adc * (int64_t)cal_scale) / 4096);
         uint32_t v_bat_mv = (v_div_mv * 2) + cal_offset;
         last_vbat_mv = v_bat_mv;
+        record_trace(9 /* ADC_MEASURED */, raw_adc, v_bat_mv);
 
         /* Zero-Volt Cable Guard: if v_bat_mv < 100mV, powered exclusively by USB VBUS without battery */
         if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
             dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
+            record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, 0);
             exit_ccount = ULP_RISCV_GET_CCOUNT();
             ulp_riscv_wakeup_main_processor();
+            ulp_riscv_halt();
             return 0;
         }
     }
@@ -199,8 +237,10 @@ int main(void)
     /* Flow A Periodic Sensor Sample Burst */
     last_wake_btn   = 0;
     dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
+    record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
     exit_ccount = ULP_RISCV_GET_CCOUNT();
     ulp_riscv_wakeup_main_processor();
+    ulp_riscv_halt();
 
     return 0;
 }
