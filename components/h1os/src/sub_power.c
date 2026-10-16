@@ -261,24 +261,18 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 #if CONFIG_ULP_COPROC_ENABLED
     /* ULP coprocessor wakeup is enabled via ULP runtime */
     esp_sleep_enable_ulp_wakeup();
+#endif
 
-    /* Enable GPIO wakeups in the RTC domain strictly for the ULP Coprocessor:
-     * On ESP32-S3, gpio_wakeup_enable() configures the RTC IO controller.
-     * When coupled with RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA and esp_sleep_enable_ulp_wakeup(),
-     * IO transitions wake the ULP-RISC-V coprocessor, NOT the Xtensa CPU directly.
-     * The ULP coprocessor evaluates pin states, debounces transitions, and only wakes
-     * the main application (Xtensa) via ulp_riscv_wakeup_main_processor() if valid. */
-    gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
-#else
-    /* Non-ULP build: Fallback to direct EXT1 wakeup for Xtensa CPU */
+    /* Enable hardware EXT1 wakeup for RTC IOs (BOOT, POWER, RTC INT).
+     * This guarantees the device wakes up immediately when the user presses any button
+     * or when the external RTC alarm expires, preventing the system from ever becoming stuck asleep. */
     if (ext1_pins_mask != 0) {
         esp_sleep_enable_ext1_wakeup(ext1_pins_mask, ESP_EXT1_WAKEUP_ANY_LOW);
     }
-#endif
 
-    (void)sleep_seconds;
+    if (sleep_seconds > 0) {
+        esp_sleep_enable_timer_wakeup((uint64_t)sleep_seconds * 1000000ULL);
+    }
 
     /* Keep RTC domain powered so ULP and RTC pad holds remain active */
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
