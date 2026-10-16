@@ -78,25 +78,8 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
 
 static void h1os_session_monitor_task(void *arg)
 {
-    uint32_t boot_hold_ms = 0;
-
     while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        /* Runtime BOOT button hold check: > 2.5s jumps to ROM bootloader */
-        if (gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0) {
-            boot_hold_ms += 100;
-            if (boot_hold_ms >= 2500) {
-                ESP_LOGW(TAG, "BOOT button held > 2.5s during runtime. Jumping to ROM Bootloader...");
-                sub_display_wait_busy(pdMS_TO_TICKS(5000));
-                sub_audio_standby();
-                REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-                esp_restart();
-                break;
-            }
-        } else {
-            boot_hold_ms = 0;
-        }
+        vTaskDelay(pdMS_TO_TICKS(500));
 
         /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
