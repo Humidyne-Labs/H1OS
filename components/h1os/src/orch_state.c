@@ -7,17 +7,22 @@
 
 #include "h1os/orch_state.h"
 #include "esp_attr.h"
+#include "esp_system.h"
 #include <string.h>
 
-RTC_DATA_ATTR static orch_persisted_state_t s_persisted_state;
+RTC_NOINIT_ATTR static orch_persisted_state_t s_persisted_state;
+static bool s_poweron_cleared = false;
 
 orch_persisted_state_t* RTC_IRAM_ATTR orch_state_get(void)
 {
-    if (s_persisted_state.magic != ORCH_RTC_MAGIC) {
+    /* Clean slate on cold power-on (device was powered off) or invalid magic */
+    if (s_persisted_state.magic != ORCH_RTC_MAGIC || (!s_poweron_cleared && esp_reset_reason() == ESP_RST_POWERON)) {
         orch_state_reset();
+        s_poweron_cleared = true;
     }
     return &s_persisted_state;
 }
+
 
 void RTC_IRAM_ATTR orch_state_reset(void)
 {

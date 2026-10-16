@@ -34,6 +34,8 @@
 #if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
 #endif
+#include "soc/rtc_cntl_reg.h"
+
 
 static const char *TAG = "h1os_lifecycle";
 
@@ -76,8 +78,25 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
 
 static void h1os_session_monitor_task(void *arg)
 {
+    uint32_t boot_hold_ms = 0;
+
     while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        /* Runtime BOOT button hold check: > 2.5s jumps to ROM bootloader */
+        if (gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0) {
+            boot_hold_ms += 100;
+            if (boot_hold_ms >= 2500) {
+                ESP_LOGW(TAG, "BOOT button held > 2.5s during runtime. Jumping to ROM Bootloader...");
+                sub_display_wait_busy(pdMS_TO_TICKS(5000));
+                sub_audio_standby();
+                REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+                esp_restart();
+                break;
+            }
+        } else {
+            boot_hold_ms = 0;
+        }
 
         /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
@@ -137,7 +156,10 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     }
 
     if (flow == ORCH_FLOW_BOOTLOADER_JUMP) {
-        ESP_LOGW(TAG, "Entering ROM bootloader jump mode...");
+        ESP_LOGW(TAG, "Entering ROM bootloader jump mode via RTC_CNTL_FORCE_DOWNLOAD_BOOT...");
+        sub_display_wait_busy(pdMS_TO_TICKS(5000));
+        sub_audio_standby();
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
         esp_restart();
         return ESP_OK;
     }
@@ -159,8 +181,9 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
     if (flow == ORCH_FLOW_BOOT) {
         sub_power_init_ulp(st->sample_interval_sec);
-        /* Seed initial sensor sample into ring buffer so cold UI has real telemetry */
-        orch_flow_execute_sensor_sample();
+        /* Architectural Invariant: SHTC3 is NEVER sampled during Flow B or on cold boot.
+         * Ring buffer starts with 0.0 NA telemetry; true environmental acquisition begins
+         * on the first quiescent Flow A deep-sleep pulse (60s). */
     }
 
     // 4. Flow B Interactive UI Boot
