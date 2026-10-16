@@ -3,7 +3,7 @@
     {
       "name": "ESP32-S3",
       "compilerPath": "C:/Users/Matt/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc.exe",
-      "compileCommands": "c:\\Users\\Matt\\Documents\\GitHub\\H1OS\\examples\\H1OS\\build_prod\\compile_commands.json",
+      "compileCommands": "c:\\Users\\Matt\\Documents\\GitHub\\H1OS\\examples\\H1OS\\build_dev\\compile_commands.json",
       "cStandard": "gnu17",
       "cppStandard": "gnu++23",
       "intelliSenseMode": "windows-gcc-arm",

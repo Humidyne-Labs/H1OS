@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import os
 import re
@@ -5,19 +6,39 @@ import subprocess
 import sys
 from pathlib import Path
 
-CANDIDATE_DIRS = ["build_dev", "dev_build", "build", "build_prod", "prod_build"]
+CANDIDATE_DIRS = ["build_prod", "prod_build", "build_dev", "dev_build", "build"]
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+OUTPUT_STREAMS = {}
 LOG_FILE = f"size_diagnostic_{TIMESTAMP}.log"
 
-# Store output strings for post-analysis
-OUTPUT_STREAMS = {}
 
 def log_write(text):
-    print(text, end="")
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(text)
+    print(text, end="", flush=True)
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        pass
 
-def run_command(key, title, cmd):
+
+def get_idf_cmd_prefix():
+    idf_path = os.environ.get("IDF_PATH")
+    if idf_path:
+        cand = Path(idf_path) / "tools" / "idf.py"
+        if cand.exists():
+            return f'"{sys.executable}" "{cand}"'
+    candidates = [
+        Path(r"C:\esp\v6.1\esp-idf\tools\idf.py"),
+        Path(r"C:\esp\v5.3\esp-idf\tools\idf.py"),
+        Path(r"C:\Espressif\frameworks\esp-idf\tools\idf.py"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return f'"{sys.executable}" "{c}"'
+    return "idf.py"
+
+
+def run_command(key, title, cmd, cwd=None):
     banner = f"\n{'='*65}\n{title}\nCommand: {cmd}\n{'='*65}\n"
     log_write(banner)
     try:
@@ -29,7 +50,8 @@ def run_command(key, title, cmd):
             stderr=subprocess.STDOUT,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            cwd=cwd
         )
         log_write(result.stdout)
         OUTPUT_STREAMS[key] = result.stdout
@@ -38,21 +60,57 @@ def run_command(key, title, cmd):
         log_write(err_msg)
         OUTPUT_STREAMS[key] = err_msg
 
-def find_active_build_dir():
-    for folder in CANDIDATE_DIRS:
-        p = Path(folder)
-        if p.is_dir() and ((p / "compile_commands.json").exists() or any(p.glob("*.map"))):
-            return folder
-    for folder in CANDIDATE_DIRS:
-        if Path(folder).is_dir():
-            return folder
+
+def find_active_build_dir(search_roots=None):
+    if search_roots is None:
+        search_roots = [
+            Path("."),
+            Path("examples/H1OS"),
+            Path("../examples/H1OS"),
+            Path(__file__).resolve().parent.parent / "examples" / "H1OS",
+            Path(__file__).resolve().parent.parent
+        ]
+
+    valid_candidates = []
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for folder_name in CANDIDATE_DIRS:
+            candidate = root / folder_name
+            if candidate.is_dir():
+                has_artifacts = (
+                    (candidate / "compile_commands.json").exists()
+                    or any(candidate.glob("*.map"))
+                    or any(candidate.glob("*.bin"))
+                )
+                if has_artifacts:
+                    try:
+                        mtime = candidate.stat().st_mtime
+                    except Exception:
+                        mtime = 0
+                    valid_candidates.append((mtime, candidate))
+
+    if valid_candidates:
+        valid_candidates.sort(key=lambda x: x[0], reverse=True)
+        return valid_candidates[0][1]
+
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for folder_name in CANDIDATE_DIRS:
+            candidate = root / folder_name
+            if candidate.is_dir():
+                return candidate
+
     return None
 
-def find_target_bin(build_dir):
-    p = Path(build_dir)
+
+def find_target_bin(build_dir_path):
+    p = Path(build_dir_path)
     ignored = {"bootloader.bin", "partition-table.bin"}
     bins = [f for f in p.glob("*.bin") if f.name.lower() not in ignored]
     return bins[0] if bins else None
+
 
 def format_bytes(b):
     if b >= 1024 * 1024:
@@ -60,6 +118,7 @@ def format_bytes(b):
     elif b >= 1024:
         return f"{b / 1024:.2f} KB ({b:,} B)"
     return f"{b:,} B"
+
 
 def render_summary():
     size_out = OUTPUT_STREAMS.get("size", "")
@@ -71,7 +130,6 @@ def render_summary():
     summary_lines.append(f"{'='*65}\n")
 
     # 1. Partition Check Parsing
-    # Example: h1os.bin binary size 0xbf4d0 bytes. Smallest app partition is 0x300000 bytes. 0x240b30 bytes (75%) free.
     part_match = re.search(
         r'binary size\s+(0x[0-9a-fA-F]+)\s+bytes\.\s+Smallest app partition is\s+(0x[0-9a-fA-F]+)\s+bytes\.\s+(0x[0-9a-fA-F]+)\s+bytes\s+\((\d+)%\)\s+free',
         size_out
@@ -92,7 +150,6 @@ def render_summary():
         summary_lines.append("1. APP PARTITION HEADROOM: [Data not detected]")
 
     # 2. Memory Section Usage Parsing
-    # Matches table entries like: │ DIRAM   │   89058 │    26.06 │   252702 │   341760 │
     summary_lines.append("\n2. CHIP INTERNAL RAM ALLOCATION:")
     ram_targets = ["DIRAM", "IRAM", "RTC FAST", "RTC SLOW"]
     for ram_sec in ram_targets:
@@ -111,48 +168,105 @@ def render_summary():
             summary_lines.append(f"   * {ram_sec:<9}: {format_bytes(used):<20} / {format_bytes(total):<18} ({status}, {format_bytes(remain)} free)")
 
     # 3. Component Flash Attribution Top 6
-    # Matches lines from archive table: │ liblvgl__lvgl.a  │  314720 │ ...
     summary_lines.append("\n3. TOP FLASH CONSUMING ARCHIVES:")
     comp_matches = re.findall(r'│\s+([\w\.\-]+)\s+│\s+(\d+)\s+│', comp_out)
     if comp_matches:
-        # Sort by total size descending
         sorted_comps = sorted([(name, int(sz)) for name, sz in comp_matches], key=lambda x: x[1], reverse=True)
-        
-        # Pull top 6 actual static archives (*.a)
         valid_comps = [c for c in sorted_comps if c[0].endswith(".a")][:6]
         for name, sz in valid_comps:
             summary_lines.append(f"   * {name:<26}: {format_bytes(sz):<18}")
-    
+
     summary_lines.append(f"\n{'='*65}\n")
     return "\n".join(summary_lines)
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="ESP-IDF Binary Size & Memory Footprint Diagnostic Inspector",
+        epilog="Examples:\n"
+               "  python inspect_size.py -B build_prod\n"
+               "  python inspect_size.py -B examples/H1OS/build_prod\n"
+               "  python inspect_size.py build_prod\n"
+               "  python inspect_size.py  (auto-selects newest build)",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-B", "--build-dir",
+        dest="build_dir",
+        default=None,
+        help="Specify the target build directory path or name (e.g. build_prod, build_dev, build)"
+    )
+    parser.add_argument(
+        "positional_build_dir",
+        nargs="?",
+        default=None,
+        help="Optional positional build directory (fallback if -B is not provided)"
+    )
+    return parser.parse_args()
+
+
 def main():
+    global LOG_FILE
+    args = parse_args()
+
     log_write(f"ESP-IDF Binary Size Diagnostic (Windows)\nTimestamp: {datetime.datetime.now()}\n")
     log_write(f"Active Python: {sys.executable}\n")
 
-    build_dir = find_active_build_dir()
-    if not build_dir:
-        log_write(f"\n[ERROR] None of the candidate directories exist: {', '.join(CANDIDATE_DIRS)}\n")
-        sys.exit(1)
+    chosen_dir = args.build_dir or args.positional_build_dir
+    build_dir_path = None
 
-    log_write(f"Target Build Directory: {build_dir}\n")
-    idf_flag = f"-B {build_dir}"
+    if chosen_dir:
+        p = Path(chosen_dir)
+        if p.is_dir():
+            build_dir_path = p
+        else:
+            candidates = [
+                Path(".") / chosen_dir,
+                Path("examples/H1OS") / chosen_dir,
+                Path(__file__).resolve().parent.parent / "examples" / "H1OS" / chosen_dir
+            ]
+            for c in candidates:
+                if c.is_dir():
+                    build_dir_path = c
+                    break
 
-    run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"idf.py {idf_flag} size")
-    run_command("components", "2. PER-COMPONENT BREAKDOWN", f"idf.py {idf_flag} size-components")
-    run_command("files", "3. PER-FILE BREAKDOWN", f"idf.py {idf_flag} size-files")
+        if not build_dir_path:
+            log_write(f"\n[ERROR] Specified build directory does not exist: {chosen_dir}\n")
+            sys.exit(1)
+    else:
+        build_dir_path = find_active_build_dir()
+        if not build_dir_path:
+            log_write(f"\n[ERROR] None of the candidate build directories exist: {', '.join(CANDIDATE_DIRS)}\n")
+            sys.exit(1)
 
-    bin_path = find_target_bin(build_dir)
+    build_dir_path = build_dir_path.resolve()
+    log_write(f"Target Build Directory: {build_dir_path}\n")
+
+    # Determine project root from build directory
+    project_root = build_dir_path.parent if (build_dir_path.parent / "CMakeLists.txt").exists() else Path(".")
+
+    idf_py = get_idf_cmd_prefix()
+    idf_flag = f"-B \"{build_dir_path}\""
+    if project_root.resolve() != Path(".").resolve() and (project_root / "CMakeLists.txt").exists():
+        idf_flag = f"-C \"{project_root}\" -B \"{build_dir_path}\""
+
+    # Execute idf.py commands with full python path to prevent shell hanging
+    run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"{idf_py} {idf_flag} size")
+    run_command("components", "2. PER-COMPONENT BREAKDOWN", f"{idf_py} {idf_flag} size-components")
+    run_command("files", "3. PER-FILE BREAKDOWN", f"{idf_py} {idf_flag} size-files")
+
+    bin_path = find_target_bin(build_dir_path)
     if bin_path:
         run_command("headers", "4. BINARY IMAGE HEADERS (esptool)", f'"{sys.executable}" -m esptool image-info "{bin_path}"')
     else:
-        log_write(f"\n[WARNING] No main application binary found in {build_dir}\n")
+        log_write(f"\n[WARNING] No main application binary found in {build_dir_path}\n")
 
     # Render metrics dashboard
     summary_text = render_summary()
     log_write(summary_text)
 
     log_write(f"Diagnostics completed successfully.\nFull scroll-back log saved to: {LOG_FILE}\n")
+
 
 if __name__ == "__main__":
     main()

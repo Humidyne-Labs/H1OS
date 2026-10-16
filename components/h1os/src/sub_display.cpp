@@ -157,15 +157,32 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     hal_spi_write_cmd(0x12); /* Software Reset */
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
 
-    /* 4b. Pre-Display Glass Temperature Capture (Command 0x1B):
-     * Strictly read BEFORE any RAM write, LUT load, or charge-pump activation
+    /* 4b. Pre-Display Glass Temperature Capture:
+     * Strictly acquire BEFORE any RAM write, LUT load, or charge-pump activation
      * to prevent display refresh heat from offsetting the glass thermistor.
-     * Hardware Register 0x1B bitfield structure (per SSD1681 datasheet):
-     *   - Byte 0: Signed 8-bit integer temperature in deg C (1 deg C / LSB).
-     *   - Byte 1, Bit 7: 0.5 deg C fractional bit (2^-1 = 0.5 deg C = 50 centi-degrees).
-     *   - Byte 1, Bits 6:0: Reserved / unused. */
+     * Full hardware sequence per SSD1681 datasheet:
+     *   1. Select internal sensor (0x18 -> 0x80)
+     *   2. Load temp/clock (0x22 -> 0xB1)
+     *   3. Master Activation (0x20) + wait for BUSY line falling edge
+     *   4. Read 2-byte calibrated temperature from Command 0x1B with D/C held HIGH. */
     static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;
     uint8_t temp_raw[2] = {0};
+
+    /* Step 1: Select internal thermal sensor */
+    hal_spi_write_cmd(0x18);
+    uint8_t t_sel[] = { 0x80 };
+    hal_spi_write_data(t_sel, sizeof(t_sel));
+
+    /* Step 2: Load temperature and clock */
+    hal_spi_write_cmd(0x22);
+    uint8_t t_load[] = { 0xB1 };
+    hal_spi_write_data(t_load, sizeof(t_load));
+
+    /* Step 3: Master Activation to execute ADC temperature conversion */
+    hal_spi_write_cmd(0x20);
+    sub_display_wait_busy(pdMS_TO_TICKS(100));
+
+    /* Step 4: Read 2 bytes temperature with CD held HIGH */
     if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
         if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
             int8_t temp_int  = (int8_t)temp_raw[0];
@@ -173,6 +190,8 @@ esp_err_t sub_display_init(bool is_wake_cycle)
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 orch_state_get()->last_glass_temp_centi_c = glass_cc;
+                ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)",
+                         (float)glass_cc / 100.0f, temp_raw[0], temp_raw[1]);
             }
         }
     }
@@ -345,9 +364,22 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
     }
 
     uint8_t temp_raw[2] = {0};
-    /* SSD1681 Command 0x1B: Read Temperature Sensor
-     * Byte 0: Signed 8-bit integer temperature in deg C (1 deg C / LSB).
-     * Byte 1, Bit 7: 0.5 deg C fractional bit (2^-1 = 0.5 deg C). */
+
+    /* Step 1: Select internal thermal sensor */
+    hal_spi_write_cmd(0x18);
+    uint8_t t_sel[] = { 0x80 };
+    hal_spi_write_data(t_sel, sizeof(t_sel));
+
+    /* Step 2: Load temperature and clock */
+    hal_spi_write_cmd(0x22);
+    uint8_t t_load[] = { 0xB1 };
+    hal_spi_write_data(t_load, sizeof(t_load));
+
+    /* Step 3: Master Activation to execute ADC temperature conversion */
+    hal_spi_write_cmd(0x20);
+    sub_display_wait_busy(pdMS_TO_TICKS(100));
+
+    /* Step 4: Read 2 bytes temperature with CD held HIGH */
     esp_err_t err = hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw));
     if (err == ESP_OK) {
         int8_t temp_int   = (int8_t)temp_raw[0];

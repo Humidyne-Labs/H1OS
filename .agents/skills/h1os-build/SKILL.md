@@ -55,6 +55,16 @@ Reports DRAM, IRAM, DIRAM, and Flash footprint:
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod size
 ```
 
+### Comprehensive Size Diagnostic (`inspect_size.py`)
+Generates deep per-component, per-file, binary header breakdown and partition headroom summary:
+```powershell
+# From examples/H1OS:
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python inspect_size.py -B build_prod
+
+# From project root tools/:
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python tools/inspect_size.py -B examples/H1OS/build_prod
+```
+
 ### Full Clean
 Purges build artifacts if switching major SDK or toolchain versions:
 ```powershell

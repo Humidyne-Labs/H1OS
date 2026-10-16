@@ -44,6 +44,14 @@ int main(void)
 {
     wake_counter++;
 
+    /* Initialize and enable input buffers for RTC GPIOs in the ULP domain */
+    ulp_riscv_gpio_init(GPIO_NUM_5);
+    ulp_riscv_gpio_input_enable(GPIO_NUM_5);
+    ulp_riscv_gpio_init(GPIO_NUM_0);
+    ulp_riscv_gpio_input_enable(GPIO_NUM_0);
+    ulp_riscv_gpio_init(GPIO_NUM_18);
+    ulp_riscv_gpio_input_enable(GPIO_NUM_18);
+
     /* 1. Hardware RTC Arbitration (GPIO 5 / PCF85063A Alarm INT) */
     /* PCF85063A INT is Active LOW */
     int rtc_int_level = ulp_riscv_gpio_get_level(GPIO_NUM_5);

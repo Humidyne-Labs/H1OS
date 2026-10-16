@@ -4,8 +4,8 @@ CompileFlags:
     - -Wno-macro-redefined
   Remove:
     - -fno-tree-switch-conversion
-	- -f*
-	- -m*
+    - -f*
+    - -m*
 
 Diagnostics:
   UnusedIncludes: Strict

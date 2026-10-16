@@ -208,7 +208,9 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     }
 
     // 3. Data Read Phase: D/C# = 1 (Hardware SPI half-duplex 3-wire read on SDA)
+    // Hold CD line firmly HIGH before and during read data phase
     epd_set_dc(1);
+    esp_rom_delay_us(5);
     spi_transaction_t t_read;
     memset(&t_read, 0, sizeof(t_read));
 	

@@ -216,7 +216,10 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x09, 0x0C); /* SDP_IN: 16-bit Philips I2S, unmuted */
     ret |= es8311_write_reg(0x0A, 0x0C); /* SDP_OUT: 16-bit Philips I2S, unmuted */
 
-    /* 8. Power on DAC and lock low-noise analog reference (Fixes Hiss) */
+    /* 8. Allow C_VMID fast-charge (0x0D = 0xFA) to saturate to AVDD/2 (1.65V) before switching to low-noise normal mode */
+    vTaskDelay(pdMS_TO_TICKS(35));
+
+    /* Power on DAC and lock low-noise analog reference (Fixes Hiss) */
     ret |= es8311_write_reg(0x17, 0xBF); /* ALC baseline */
     ret |= es8311_write_reg(0x0E, 0x02); /* Power down Mic/ADC Modulator; keep VROI on */
     ret |= es8311_write_reg(0x12, 0x00); /* DAC analog stage power ON */
@@ -224,9 +227,16 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x0D, 0x01); /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
     ret |= es8311_write_reg(0x15, 0x40);
 
-    /* 9. Modulator dither & low-power bias configuration */
-    ret |= es8311_write_reg(0x37, 0x08); /* RAMP = OFF, EQ = OFF, datasheet in error! */
-    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias override */
+    /* 9. Modulator dither, Silicon Errata EQ bypass & low-power bias configuration:
+     * - SILICON ERRATA (Reg 0x37 = 0x08): The ES8311 datasheet incorrectly states that the digital
+     *   equalizer (EQ) is disabled by default. In physical silicon, failing to write 0x08 leaves
+     *   the digital EQ block active in the signal path without configured biquad filter coefficients,
+     *   producing catastrophic phase distortion and harsh buzzing ("sounds like death on 3 wheels").
+     *   Programming 0x08 explicitly disables the volume fade ramp and bypasses/disables the EQ.
+     * - LOW-POWER MODE (Reg 0x0F = 0x80): Standard default; the noise floor difference through the
+     *   NS4168 Class-D amplifier is completely negligible while saving dynamic battery power. */
+    ret |= es8311_write_reg(0x37, 0x08); /* SILICON ERRATA: Mandatory EQ bypass (0x08) & ramp disable */
+    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias default */
     ret |= es8311_write_reg(0x45, 0x00);
 
     /* DAC unmuted permanently (30sec + view time) for warm sessions */
@@ -469,10 +479,11 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 
     // standby never entered at runtime
 
-    // 2. Unmute NS4168 Class-D amplifier and stream 2 zero buffers (32 ms)
-    // so the NS4168 H-bridge (~15 ms turn-on time) is fully active before the first tone sample! 
-    gpio_set_level(HAL_PIN_PA_CTRL, 1);
-    vTaskDelay(pdMS_TO_TICKS(25));
+    // 2. Unmute NS4168 Class-D amplifier if not already active
+    if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
+        gpio_set_level(HAL_PIN_PA_CTRL, 1);
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
 
     return ESP_OK;
 }

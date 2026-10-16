@@ -155,3 +155,11 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - Initializing persistent memory to synthetic room temperature (`25.0°C`) created false confidence and corrupted historical EWMA baselines during early boot.
 - All telemetry structures now strictly zero-out uninitialized state (`0.0°C` / `0` centi-units), allowing UI screens and downstream logic to unambiguously recognize uninitialized/NA conditions.
 
+### 4.4 ES8311 Register 0x37 Digital Equalizer Silicon Errata & Low-Power Default
+- **The Issue:** Severe harmonic distortion and intolerable acoustic buzzing ("sounds like death on 3 wheels") during synthesized audio tone playback.
+- **Root Cause:** The Everest Semiconductor ES8311 datasheet incorrectly states that the internal digital equalizer (EQ) block defaults to disabled. In physical silicon, failing to explicitly write `0x08` to Register `0x37` leaves the hardware EQ filter active in the audio signal path. With no biquad coefficients loaded, the uncalibrated filter stages severely distort and clip the output.
+- **The Solution:** 
+  1. Register `0x37` must be explicitly written with `0x08` during codec initialization, bypassing/disabling the uncalibrated digital EQ block and disabling the digital fade-in/out ramp.
+  2. Default to Low-Power DAC mode (`0x0F = 0x80`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible while delivering valuable energy savings.
+
+

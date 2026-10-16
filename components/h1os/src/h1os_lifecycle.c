@@ -145,14 +145,15 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     if (flow == ORCH_FLOW_A_SAMPLE) {
         ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
         orch_flow_execute_sensor_sample();
-        /* Re-enter deep sleep immediately; display and audio remain untouched */
-        uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-        if (sleep_sec == 0) {
-            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 in Flow A sample. Aborting to safe shutdown.");
-            h1os_shutdown();
-            return ESP_ERR_INVALID_STATE;
-        }
-        return orch_flow_transition_to_sleep(sleep_sec);
+        /* Re-enter deep sleep immediately; display and audio remain untouched.
+         * Invariant: Do NOT call orch_flow_transition_to_sleep() here!
+         * Re-arming the external PCF85063A countdown would reset the Flow B UI timer
+         * on every 60s sample burst, permanently locking out the main application.
+         * Preserve the running external RTC countdown and return directly to deep sleep. */
+        uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
+                             (1ULL << HAL_PIN_BUTTON_POWER) |
+                             (1ULL << HAL_PIN_RTC_INT);
+        return sub_power_enter_deep_sleep(0, wake_mask);
     }
 
     /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
