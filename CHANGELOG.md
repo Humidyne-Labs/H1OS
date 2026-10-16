@@ -20,6 +20,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Upgraded MCP server with dynamic workspace detection, `build_dir` (`build_prod`/`build_dev`) support, and automatic Espressif v6.1 profile execution.
 
 ### 🛠️ Fixed & Refactored
+- **ULP Spurious 0ms Wake Elimination & Mandatory Glitch Filter** (`components/h1os/ulp/main.c`, `components/h1os/src/hal_io.c`):
+  - Added a 100 µs settling delay in `hal_io_isolate_sleep_pads()` following LP IO clock enabling (`io_mux_enable_lp_io_clock()`) before clearing `RTC_GPIO_STATUS_W1TC_REG`, ensuring input buffers synchronize the external 3.3V high level from hardware pull-up resistors and preventing `0x040001` from immediately re-latching.
+  - Made the ULP glitch filter strictly mandatory (`hold_ms < 20`): spurious wakes with 0ms hold or unheld pins are immediately recorded as `GLITCH_FILTERED`, clearing RTC interrupt flags and halting without waking the main processor.
+  - Prioritized actively held LOW levels (`boot_btn == 0` or `pwr_btn == 0`) during ULP button arbitration over stale interrupt latch status bits.
+- **Active Flow B Direct Button Monitor & Session Keepalive** (`components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/h1os_lvgl.cpp`):
+  - Integrated 50 ms direct polling of `hal_io_read_buttons()` inside `h1os_session_monitor_task`, logging hardware button transitions (`[HAL_BTN]`) and resetting the interactive session timer directly on COM3, completely decoupling button event visibility from LVGL display flush delays.
+  - Explicitly bound LVGL keypad indev to the active display (`lv_indev_set_display(s_lv_keypad_indev, s_lv_display)`).
+  - Streamlined `h1os_lvgl_port_task` loop by removing redundant outer recursive locks around `lv_timer_handler()` and clamping delay to 30 ms.
 - **Audio Codec Sleep Isolation & Thermal Mitigation** (`h1os_lifecycle.c`, `sub_audio.c`):
   - Strictly gated ES8311 codec and NS4168 amplifier initialization behind user presence (`is_user_wake = (!is_wake) || button_woke`).
   - Unattended periodic RTC wakes completely bypass audio initialization, keeping the codec in <1.0 µA standby and eliminating 26°C–32°C enclosure thermal oscillation.
