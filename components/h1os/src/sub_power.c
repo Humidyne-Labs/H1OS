@@ -242,6 +242,24 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
+        /* Configure RTC GPIO input lines for ULP reactive interrupt */
+        gpio_config_t btn_cfg = {
+            .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
+                            (1ULL << HAL_PIN_BUTTON_POWER) |
+                            (1ULL << HAL_PIN_RTC_INT),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_LOW_LEVEL,
+        };
+        gpio_config(&btn_cfg);
+        gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
+        gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+        gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
+        gpio_hold_en(HAL_PIN_BUTTON_BOOT);
+        gpio_hold_en(HAL_PIN_BUTTON_POWER);
+        gpio_hold_en(HAL_PIN_RTC_INT);
+
         /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
         SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
@@ -255,24 +273,25 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 {
+    (void)sleep_seconds;
+    (void)ext1_pins_mask;
+
     /* Latch critical rails and freeze pad states with RTC pad holds */
     hal_io_isolate_sleep_pads();
 
 #if CONFIG_ULP_COPROC_ENABLED
-    /* ULP coprocessor wakeup is enabled via ULP runtime */
+    /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();
+
+    /* Refresh GPIO wakeup enables and pad holds for the ULP Coprocessor */
+    gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
+    gpio_hold_en(HAL_PIN_BUTTON_BOOT);
+    gpio_hold_en(HAL_PIN_BUTTON_POWER);
+    gpio_hold_en(HAL_PIN_RTC_INT);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 #endif
-
-    /* Enable hardware EXT1 wakeup for RTC IOs (BOOT, POWER, RTC INT).
-     * This guarantees the device wakes up immediately when the user presses any button
-     * or when the external RTC alarm expires, preventing the system from ever becoming stuck asleep. */
-    if (ext1_pins_mask != 0) {
-        esp_sleep_enable_ext1_wakeup(ext1_pins_mask, ESP_EXT1_WAKEUP_ANY_LOW);
-    }
-
-    if (sleep_seconds > 0) {
-        esp_sleep_enable_timer_wakeup((uint64_t)sleep_seconds * 1000000ULL);
-    }
 
     /* Keep RTC domain powered so ULP and RTC pad holds remain active */
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);

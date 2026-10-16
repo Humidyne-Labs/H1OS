@@ -57,6 +57,7 @@ int main(void)
     int rtc_int_level = ulp_riscv_gpio_get_level(GPIO_NUM_5);
     if (rtc_int_level == 0) {
         /* Alarm expired! Prompt main core straight into Full UI Refresh */
+        ulp_riscv_gpio_wakeup_clear();
         last_wake_btn   = 0; /* Woken by external RTC  */
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         ulp_riscv_wakeup_main_processor();
@@ -75,6 +76,7 @@ int main(void)
         /* Zero-Volt Cable Guard: if v_bat_mv < 100mV, powered exclusively by USB VBUS without battery */
         if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
             /* Brownout threshold reached! Wake CPU immediately to show emergency screen & latch off */
+            ulp_riscv_gpio_wakeup_clear();
             dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
             ulp_riscv_wakeup_main_processor();
             return 0;
@@ -103,6 +105,8 @@ int main(void)
             }
         }
 
+        ulp_riscv_gpio_wakeup_clear();
+
         if (hold_ms >= 2500) {
             if (pressed_btn == 1) {
                 /* BOOT held > 2.5s: Prime ROM Bootloader jump */
@@ -126,6 +130,7 @@ int main(void)
     }
 
     /* Default: Sensor sample wake stub */
+    ulp_riscv_gpio_wakeup_clear();
     dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
     ulp_riscv_wakeup_main_processor();
 

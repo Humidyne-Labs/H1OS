@@ -91,25 +91,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         return ORCH_FLOW_A_SAMPLE;
     }
 
-    if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-        uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
-        if (ext1_pins & (1ULL << HAL_PIN_BUTTON_BOOT)) {
-            /* Check if BOOT button is held continuously for > 2.5s */
-            uint32_t hold_ms = 0;
-            while (gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0 && hold_ms < 2600) {
-                esp_rom_delay_us(10000); /* 10ms */
-                hold_ms += 10;
-            }
-            if (hold_ms >= 2500) {
-                ESP_LOGW(TAG, "BOOT button held > 2.5s on wake! Priming ROM Bootloader Jump...");
-                st->ulp_dispatch_reason = ULP_DISPATCH_BOOTLOADER_JUMP;
-                return ORCH_FLOW_BOOTLOADER_JUMP;
-            }
-        }
-        return ORCH_FLOW_B_MAIN_WAKE;
-    }
-
-    /* All non-boot wakeups reaching the OS from buttons or external RTC are Flow B Main Wakes */
+    /* All non-boot wakeups reaching the OS are Flow B Main Wakes */
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
