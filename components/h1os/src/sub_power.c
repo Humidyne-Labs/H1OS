@@ -227,7 +227,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ulp_last_vbat_mv     = 4000;
         ulp_dispatch_reason  = 0;
         ulp_last_wake_btn    = 0;
-        ulp_cycles_per_ms    = 2188;
+        ulp_cycles_per_ms    = 17500;
 
         /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
@@ -267,7 +267,7 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     /* Reset exported ULP dispatch and button variables before entering sleep */
     ulp_dispatch_reason  = 0;
     ulp_last_wake_btn    = 0;
-    ulp_cycles_per_ms    = 2188;
+    ulp_cycles_per_ms    = 17500;
     ulp_last_wake_cause  = 0;
     ulp_hold_duration_ms = 0;
 

@@ -97,6 +97,12 @@ esp_err_t hal_led_pwm_init(void)
         return ESP_OK;
     }
 
+    /* Silence repetitive LEDC fade/duty debug spam */
+    esp_log_level_set("ledc", ESP_LOG_WARN);
+
+    /* Cleanly unbind pin matrix before attaching to LEDC peripheral */
+    gpio_reset_pin(HAL_PIN_STATUS_LED);
+
     ledc_timer_config_t timer_cfg = {
         .speed_mode      = HAL_LEDC_MODE,
         .duty_resolution = HAL_LEDC_DUTY_RES,
@@ -251,6 +257,9 @@ esp_err_t hal_led_pwm_deinit(void)
     ledc_stop(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, 0);
     ledc_fade_func_uninstall();
     s_led_pwm_active = false;
+
+    // Reset pin matrix to cleanly unbind from LEDC peripheral before reconfiguring as static GPIO
+    gpio_reset_pin(HAL_PIN_STATUS_LED);
 
     // Restore to static open-drain GPIO
     gpio_config_t led_cfg = {

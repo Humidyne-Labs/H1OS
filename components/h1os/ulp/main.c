@@ -32,10 +32,10 @@ volatile uint32_t vbat_critical_mv = 3250; /* Critical brownout threshold (< 3.2
 volatile uint32_t boot_btn_events = 0;
 volatile uint32_t last_wake_btn   = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 
-/* Clock/Delay calibration: ESP32-S3 ULP multi-cycle instruction execution requires ~8 clock cycles
- * per rdcycle loop iteration. 17500 / 8 = 2188 cycles per millisecond.
+/* Clock/Delay calibration: ESP32-S3 ULP-RISC-V runs on RTC_FAST_CLK (~17.5 MHz).
+ * 17,500,000 cycles / 1,000 ms = 17,500 cycles per millisecond.
  */
-volatile uint32_t cycles_per_ms   = 2188;
+volatile uint32_t cycles_per_ms   = 17500;
 
 /* Telemetry & Debug Observability */
 volatile uint32_t last_wake_cause   = 0; /* 0: None, 1: RTC GPIO INT status, 2: Live LOW level, 3: Soft timer, 4: RTC Alarm */
@@ -106,9 +106,9 @@ int main(void)
             pressed_btn = (pwr_btn == 0 && boot_btn != 0) ? 2 : 1;
         }
 
-        /* If button is still held down, measure hold duration up to 2.5s */
+        /* If button is still held down, measure hold duration up to 3.0s */
         uint32_t hold_ms = 0;
-        while (hold_ms < 2500) {
+        while (hold_ms < 3000) {
             loop_sample_count++;
             boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
             pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
@@ -136,12 +136,12 @@ int main(void)
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
 
-        if (hold_ms >= 2500) {
+        if (hold_ms >= 3000) {
             if (pressed_btn == 1) {
-                /* BOOT held >= 2.5s: Prime ROM Bootloader jump */
+                /* BOOT held >= 3.0s: Prime ROM Bootloader jump */
                 dispatch_reason = 4; /* ULP_DISPATCH_BOOTLOADER_JUMP */
             } else {
-                /* POWER held >= 2.5s: Prime Power Off */
+                /* POWER held >= 3.0s: Prime Power Off */
                 dispatch_reason = 5; /* ULP_DISPATCH_POWER_OFF */
             }
             last_wake_btn = pressed_btn;
@@ -149,7 +149,7 @@ int main(void)
             ulp_riscv_wakeup_main_processor();
             return 0;
         } else {
-            /* Any tap released < 2.5s: Wake Flow B Interactive Session */
+            /* Any tap released < 3.0s: Wake Flow B Interactive Session */
             boot_btn_events++;
             last_wake_btn   = pressed_btn;
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */

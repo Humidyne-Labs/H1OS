@@ -25,6 +25,13 @@ static TaskHandle_t  s_mount_task = NULL;
 static void sdcard_mount_worker_task(void *pvParameters)
 {
     (void)pvParameters;
+    if (!sub_sdcard_probe()) {
+        ESP_LOGD(TAG, "MicroSD pre-flight check: No card detected in slot. Skipping mount.");
+        s_mount_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
     esp_err_t err = sub_sdcard_mount();
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Asynchronous MicroSD mount successful.");
@@ -86,6 +93,12 @@ esp_err_t sub_sdcard_mount(void)
     if (s_sd_card != NULL) {
         ESP_LOGW(TAG, "SD Card already mounted");
         return ESP_OK;
+    }
+
+    /* Fast pre-flight check: don't touch SDMMC peripheral if slot is empty */
+    if (!sub_sdcard_probe()) {
+        ESP_LOGD(TAG, "MicroSD pre-flight check: No card detected. Skipping SDMMC bus init.");
+        return ESP_ERR_NOT_FOUND;
     }
 
     /* FatFS Mount Configuration:
