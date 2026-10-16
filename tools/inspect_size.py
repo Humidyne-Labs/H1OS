@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+ESP-IDF Binary Size & Memory Footprint Diagnostic Inspector
+Version: 2.2.0
+"""
 import argparse
 import datetime
 import os
@@ -6,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+VERSION = "2.2.0"
 CANDIDATE_DIRS = ["build_prod", "prod_build", "build_dev", "dev_build", "build"]
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_STREAMS = {}
@@ -21,12 +27,36 @@ def log_write(text):
         pass
 
 
-def get_idf_cmd_prefix():
+def get_idf_python_exe():
+    """Locate the Python executable within the active or canonical ESP-IDF virtual environment."""
+    env_path = os.environ.get("IDF_PYTHON_ENV_PATH")
+    if env_path:
+        p = Path(env_path) / "Scripts" / "python.exe"
+        if p.exists():
+            return str(p)
+        p = Path(env_path) / "bin" / "python"
+        if p.exists():
+            return str(p)
+
+    candidates = [
+        Path(r"C:\Espressif\tools\python\v6.1\venv\Scripts\python.exe"),
+        Path(r"C:\Espressif\tools\python\v5.3\venv\Scripts\python.exe"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+
+    return sys.executable
+
+
+def get_idf_cmd_prefix(py_exe):
+    """Resolve the idf.py launcher prefix with explicit python interpreter."""
     idf_path = os.environ.get("IDF_PATH")
     if idf_path:
         cand = Path(idf_path) / "tools" / "idf.py"
         if cand.exists():
-            return f'"{sys.executable}" "{cand}"'
+            return f'"{py_exe}" "{cand}"'
+
     candidates = [
         Path(r"C:\esp\v6.1\esp-idf\tools\idf.py"),
         Path(r"C:\esp\v5.3\esp-idf\tools\idf.py"),
@@ -34,8 +64,29 @@ def get_idf_cmd_prefix():
     ]
     for c in candidates:
         if c.exists():
-            return f'"{sys.executable}" "{c}"'
+            return f'"{py_exe}" "{c}"'
+
     return "idf.py"
+
+
+def find_check_sizes_script():
+    """Locate ESP-IDF partition size verification script."""
+    idf_path = os.environ.get("IDF_PATH")
+    if idf_path:
+        p = Path(idf_path) / "components" / "partition_table" / "check_sizes.py"
+        if p.exists():
+            return p
+
+    candidates = [
+        Path(r"C:\esp\v6.1\esp-idf\components\partition_table\check_sizes.py"),
+        Path(r"C:\esp\v5.3\esp-idf\components\partition_table\check_sizes.py"),
+        Path(r"C:\Espressif\frameworks\esp-idf\components\partition_table\check_sizes.py"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+
+    return None
 
 
 def run_command(key, title, cmd, cwd=None):
@@ -55,13 +106,16 @@ def run_command(key, title, cmd, cwd=None):
         )
         log_write(result.stdout)
         OUTPUT_STREAMS[key] = result.stdout
+        return result.returncode
     except Exception as e:
         err_msg = f"Error executing command: {e}\n"
         log_write(err_msg)
         OUTPUT_STREAMS[key] = err_msg
+        return 1
 
 
 def find_active_build_dir(search_roots=None):
+    """Find the most recently modified active build directory among candidate paths."""
     if search_roots is None:
         search_roots = [
             Path("."),
@@ -112,6 +166,15 @@ def find_target_bin(build_dir_path):
     return bins[0] if bins else None
 
 
+def find_target_map(build_dir_path):
+    p = Path(build_dir_path)
+    maps = [f for f in p.glob("*.map") if not f.name.startswith(".")]
+    if not maps:
+        return None
+    maps.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    return maps[0]
+
+
 def format_bytes(b):
     if b >= 1024 * 1024:
         return f"{b / (1024*1024):.2f} MB ({b:,} B)"
@@ -121,6 +184,7 @@ def format_bytes(b):
 
 
 def render_summary():
+    part_str = OUTPUT_STREAMS.get("partition", "") + "\n" + OUTPUT_STREAMS.get("size", "")
     size_out = OUTPUT_STREAMS.get("size", "")
     comp_out = OUTPUT_STREAMS.get("components", "")
 
@@ -132,7 +196,7 @@ def render_summary():
     # 1. Partition Check Parsing
     part_match = re.search(
         r'binary size\s+(0x[0-9a-fA-F]+)\s+bytes\.\s+Smallest app partition is\s+(0x[0-9a-fA-F]+)\s+bytes\.\s+(0x[0-9a-fA-F]+)\s+bytes\s+\((\d+)%\)\s+free',
-        size_out
+        part_str
     )
 
     if part_match:
@@ -182,19 +246,30 @@ def render_summary():
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="ESP-IDF Binary Size & Memory Footprint Diagnostic Inspector",
+        description=f"ESP-IDF Binary Size & Memory Footprint Diagnostic Inspector v{VERSION}",
         epilog="Examples:\n"
-               "  python inspect_size.py -B build_prod\n"
+               "  python inspect_size.py -B build_prod              (instant direct inspection)\n"
+               "  python inspect_size.py -B build_prod --rebuild    (rebuild target then inspect)\n"
                "  python inspect_size.py -B examples/H1OS/build_prod\n"
-               "  python inspect_size.py build_prod\n"
-               "  python inspect_size.py  (auto-selects newest build)",
+               "  python inspect_size.py                            (auto-selects newest build)",
         formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"%(prog)s {VERSION}"
     )
     parser.add_argument(
         "-B", "--build-dir",
         dest="build_dir",
         default=None,
         help="Specify the target build directory path or name (e.g. build_prod, build_dev, build)"
+    )
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        default=False,
+        help="Force rebuilding firmware via 'idf.py build' before running size diagnostics"
     )
     parser.add_argument(
         "positional_build_dir",
@@ -209,8 +284,8 @@ def main():
     global LOG_FILE
     args = parse_args()
 
-    log_write(f"ESP-IDF Binary Size Diagnostic (Windows)\nTimestamp: {datetime.datetime.now()}\n")
-    log_write(f"Active Python: {sys.executable}\n")
+    log_write(f"ESP-IDF Binary Size Diagnostic v{VERSION} (Windows)\n")
+    log_write(f"Timestamp: {datetime.datetime.now()}\n")
 
     chosen_dir = args.build_dir or args.positional_build_dir
     build_dir_path = None
@@ -242,24 +317,67 @@ def main():
     build_dir_path = build_dir_path.resolve()
     log_write(f"Target Build Directory: {build_dir_path}\n")
 
-    # Determine project root from build directory
     project_root = build_dir_path.parent if (build_dir_path.parent / "CMakeLists.txt").exists() else Path(".")
 
-    idf_py = get_idf_cmd_prefix()
+    py_exe = get_idf_python_exe()
+    log_write(f"Active Python: {py_exe}\n")
+
+    idf_py = get_idf_cmd_prefix(py_exe)
     idf_flag = f"-B \"{build_dir_path}\""
     if project_root.resolve() != Path(".").resolve() and (project_root / "CMakeLists.txt").exists():
         idf_flag = f"-C \"{project_root}\" -B \"{build_dir_path}\""
 
-    # Execute idf.py commands with full python path to prevent shell hanging
-    run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"{idf_py} {idf_flag} size")
-    run_command("components", "2. PER-COMPONENT BREAKDOWN", f"{idf_py} {idf_flag} size-components")
-    run_command("files", "3. PER-FILE BREAKDOWN", f"{idf_py} {idf_flag} size-files")
+    # 1. Optional explicit rebuild
+    if args.rebuild:
+        log_write("\n[REBUILD] Executing full firmware build as requested...\n")
+        run_command("build", "0. REBUILD FIRMWARE", f"{idf_py} {idf_flag} build")
 
+    # 2. Check for existing map and bin artifacts
+    map_path = find_target_map(build_dir_path)
     bin_path = find_target_bin(build_dir_path)
-    if bin_path:
-        run_command("headers", "4. BINARY IMAGE HEADERS (esptool)", f'"{sys.executable}" -m esptool image-info "{bin_path}"')
+    part_bin = build_dir_path / "partition_table" / "partition-table.bin"
+    check_sizes_script = find_check_sizes_script()
+
+    # Fast Mode: directly parse map and bin files without invoking Ninja
+    if map_path and not args.rebuild:
+        log_write("\n[MODE] Instant Direct Inspection (0% CPU, no Ninja dependency check)\n")
+
+        # Step A: Partition table check
+        if check_sizes_script and part_bin.exists() and bin_path:
+            cmd = f'"{py_exe}" "{check_sizes_script}" --offset 0x8000 partition --type app "{part_bin}" "{bin_path}"'
+            run_command("partition", "1. APP PARTITION HEADROOM CHECK", cmd)
+
+        # Step B: Overall memory breakdown
+        cmd_size = f'"{py_exe}" -m esp_idf_size "{map_path}"'
+        run_command("size", "2. OVERALL MEMORY BREAKDOWN", cmd_size)
+
+        # Step C: Per-component breakdown
+        cmd_comp = f'"{py_exe}" -m esp_idf_size --archives "{map_path}"'
+        run_command("components", "3. PER-COMPONENT BREAKDOWN", cmd_comp)
+
+        # Step D: Per-file breakdown
+        cmd_files = f'"{py_exe}" -m esp_idf_size --files "{map_path}"'
+        run_command("files", "4. PER-FILE BREAKDOWN", cmd_files)
+
+        # Step E: Binary image headers
+        if bin_path:
+            cmd_hdr = f'"{py_exe}" -m esptool image-info "{bin_path}"'
+            run_command("headers", "5. BINARY IMAGE HEADERS (esptool)", cmd_hdr)
+        else:
+            log_write(f"\n[WARNING] No application binary found in {build_dir_path}\n")
+
     else:
-        log_write(f"\n[WARNING] No main application binary found in {build_dir_path}\n")
+        # Fallback Mode: idf.py commands
+        log_write("\n[MODE] Full idf.py Execution Mode\n")
+        run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"{idf_py} {idf_flag} size")
+        run_command("components", "2. PER-COMPONENT BREAKDOWN", f"{idf_py} {idf_flag} size-components")
+        run_command("files", "3. PER-FILE BREAKDOWN", f"{idf_py} {idf_flag} size-files")
+
+        bin_path = find_target_bin(build_dir_path)
+        if bin_path:
+            run_command("headers", "4. BINARY IMAGE HEADERS (esptool)", f'"{py_exe}" -m esptool image-info "{bin_path}"')
+        else:
+            log_write(f"\n[WARNING] No main application binary found in {build_dir_path}\n")
 
     # Render metrics dashboard
     summary_text = render_summary()
