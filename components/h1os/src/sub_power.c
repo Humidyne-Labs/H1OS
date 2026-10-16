@@ -242,24 +242,6 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* Configure RTC GPIO input lines for ULP reactive interrupt */
-        gpio_config_t btn_cfg = {
-            .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
-                            (1ULL << HAL_PIN_BUTTON_POWER) |
-                            (1ULL << HAL_PIN_RTC_INT),
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_ENABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_LOW_LEVEL,
-        };
-        gpio_config(&btn_cfg);
-        gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
-        gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
-        gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
-        gpio_hold_en(HAL_PIN_BUTTON_BOOT);
-        gpio_hold_en(HAL_PIN_BUTTON_POWER);
-        gpio_hold_en(HAL_PIN_RTC_INT);
-
         /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
         SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
@@ -276,20 +258,14 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     (void)sleep_seconds;
     (void)ext1_pins_mask;
 
-    /* Latch critical rails and freeze pad states with RTC pad holds */
+    /* Latch critical rails, isolate sleep pads, and configure RTC IO wakeups strictly in RTC domain */
     hal_io_isolate_sleep_pads();
 
 #if CONFIG_ULP_COPROC_ENABLED
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Refresh GPIO wakeup enables and pad holds for the ULP Coprocessor */
-    gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
-    gpio_hold_en(HAL_PIN_BUTTON_BOOT);
-    gpio_hold_en(HAL_PIN_BUTTON_POWER);
-    gpio_hold_en(HAL_PIN_RTC_INT);
+    /* Arm ULP GPIO wakeup in RTC_CNTL alongside periodic sleep timer */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 #endif
 

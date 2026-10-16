@@ -112,23 +112,26 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
-    // 3. Configure RTC IO domain pull-ups for EXT1 wake sources.
+    // 3. Configure RTC IO domain pull-ups and ULP wakeup triggers.
     // Digital domain pull-ups vanish when VDD3P3_CPU powers down in deep sleep.
-    // RTC IO pull-ups maintain HIGH level so floating pads do not trigger false EXT1 wakes.
+    // RTC IO pull-ups maintain HIGH level so floating pads do not trigger false wakes.
     rtc_gpio_init(HAL_PIN_RTC_INT);
     rtc_gpio_set_direction(HAL_PIN_RTC_INT, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(HAL_PIN_RTC_INT);
     rtc_gpio_pulldown_dis(HAL_PIN_RTC_INT);
+    rtc_gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
 
     rtc_gpio_init(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_set_direction(HAL_PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
 
     rtc_gpio_init(HAL_PIN_BUTTON_POWER);
     rtc_gpio_set_direction(HAL_PIN_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
 
     // 4. Enable deep sleep hold on all held pads
     gpio_deep_sleep_hold_en();
@@ -142,7 +145,10 @@ esp_err_t hal_io_isolate_sleep_pads(void)
 
 esp_err_t hal_io_release_pad_holds(void)
 {
-    // De-init RTC GPIO function to return wake pins to standard digital GPIO domain
+    // Disable RTC wakeup triggers and de-init RTC GPIO function to return wake pins to standard digital GPIO domain
+    rtc_gpio_wakeup_disable(HAL_PIN_RTC_INT);
+    rtc_gpio_wakeup_disable(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_wakeup_disable(HAL_PIN_BUTTON_POWER);
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
