@@ -13,6 +13,7 @@
 #include "esp_sleep.h"
 #include "esp_rom_sys.h"
 #include "esp_private/io_mux.h"
+#include "soc/rtc_io_reg.h"
 
 static const char *TAG = "HAL_IO";
 
@@ -137,6 +138,9 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+
+    // Clear any pending/stale RTC GPIO interrupt status flags before sleeping
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 
     // 4. Enable deep sleep hold on all held pads
     gpio_deep_sleep_hold_en();

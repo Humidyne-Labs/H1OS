@@ -262,6 +262,10 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     hal_io_isolate_sleep_pads();
 
 #if CONFIG_ULP_COPROC_ENABLED
+    /* Reset exported ULP dispatch and button variables before entering sleep */
+    ulp_dispatch_reason = 0;
+    ulp_last_wake_btn   = 0;
+
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();
 
