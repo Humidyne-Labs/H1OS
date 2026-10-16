@@ -92,21 +92,28 @@ if ($totalFound -eq 0) {
 
         Write-Host "`n[*] Recovering Unknown / Faulted device(s)..." -ForegroundColor Cyan
         foreach ($dev in $unknownDevices) {
-            Write-Host "  Resetting: $($dev.FriendlyName)..." -NoNewline
+            Write-Host "  Recovering: $($dev.FriendlyName)..." -NoNewline
             
-            # Step 1: Try soft restart
-            $result = pnputil /restart-device "$($dev.InstanceId)" 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host " [RESTARTED]" -ForegroundColor Green
-            } else {
-                # Step 2: If soft restart fails (e.g. Code 43 descriptor request failed), remove node to force hub bus re-enumeration
-                Write-Host " [RESTART FAILED -> REMOVING NODE]..." -NoNewline -ForegroundColor Yellow
+            # For Code 43 (Descriptor Request Failed), restarting keeps the broken descriptor.
+            # Removing the node forces the USB hub to cut port power and renegotiate hardware enumeration.
+            if ($dev.Problem -eq 'CM_PROB_FAILED_POST_START' -or $dev.FriendlyName -match 'Descriptor Request Failed') {
+                Write-Host " [REMOVING FAULTED NODE]..." -NoNewline -ForegroundColor Yellow
                 $removeRes = pnputil /remove-device "$($dev.InstanceId)" 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host " [REMOVED]" -ForegroundColor Green
                     $needsRescan = $true
                 } else {
                     Write-Host " [FAILED: $removeRes]" -ForegroundColor Red
+                }
+            } else {
+                # Try soft restart first
+                $result = pnputil /restart-device "$($dev.InstanceId)" 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host " [RESTARTED]" -ForegroundColor Green
+                } else {
+                    Write-Host " [RESTART FAILED -> REMOVING NODE]..." -NoNewline -ForegroundColor Yellow
+                    pnputil /remove-device "$($dev.InstanceId)" 2>&1 | Out-Null
+                    $needsRescan = $true
                 }
             }
         }
