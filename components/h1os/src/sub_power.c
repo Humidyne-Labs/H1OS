@@ -265,8 +265,9 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Arm ULP GPIO wakeup in RTC_CNTL alongside periodic sleep timer */
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    /* Arm both ULP periodic sleep timer AND ULP RTC GPIO wakeup in RTC_CNTL_ULP_CP_TIMER_REG */
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG,
+                      RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 #endif
 
     /* Keep RTC domain powered so ULP and RTC pad holds remain active */
