@@ -11,14 +11,16 @@
 #include <string.h>
 
 RTC_NOINIT_ATTR static orch_persisted_state_t s_persisted_state;
-static bool s_poweron_cleared = false;
+static bool s_boot_cleared = false;
 
 orch_persisted_state_t* RTC_IRAM_ATTR orch_state_get(void)
 {
-    /* Clean slate on cold power-on (device was powered off) or invalid magic */
-    if (s_persisted_state.magic != ORCH_RTC_MAGIC || (!s_poweron_cleared && esp_reset_reason() == ESP_RST_POWERON)) {
+    /* Clean slate on any boot (cold power-on, USB reset, external reset) or invalid magic.
+     * Only deep sleep wakeups (ESP_RST_DEEPSLEEP) preserve the ring buffer across sleep cycles. */
+    if (s_persisted_state.magic != ORCH_RTC_MAGIC || 
+        (!s_boot_cleared && esp_reset_reason() != ESP_RST_DEEPSLEEP)) {
         orch_state_reset();
-        s_poweron_cleared = true;
+        s_boot_cleared = true;
     }
     return &s_persisted_state;
 }
