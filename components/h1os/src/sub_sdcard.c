@@ -10,13 +10,76 @@
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "hal_types.h"
 #include "sub_sdcard.h"
 
 static const char *TAG = "sub_sdcard";
 
 static sdmmc_card_t *s_sd_card = NULL;
+static TaskHandle_t  s_mount_task = NULL;
+
+static void sdcard_mount_worker_task(void *pvParameters)
+{
+    (void)pvParameters;
+    esp_err_t err = sub_sdcard_mount();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Asynchronous MicroSD mount successful.");
+    } else {
+        ESP_LOGD(TAG, "Asynchronous MicroSD mount failed: %s (no card inserted or unformatted)", esp_err_to_name(err));
+    }
+    s_mount_task = NULL;
+    vTaskDelete(NULL);
+}
+
+bool sub_sdcard_probe(void)
+{
+    if (s_sd_card != NULL) {
+        return true;
+    }
+
+    /* Fast electrical check on DAT0 (GPIO 40) and CMD (GPIO 41):
+     * Pull down briefly. SD cards actively pull DAT0/CMD high on power-up.
+     * If floating or pulled down, no card is physically attached. */
+    gpio_config_t probe_cfg = {
+        .pin_bit_mask = (1ULL << HAL_PIN_SD_MISO) | (1ULL << HAL_PIN_SD_MOSI),
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&probe_cfg);
+    esp_rom_delay_us(100);
+
+    int miso_lvl = gpio_get_level(HAL_PIN_SD_MISO);
+    int mosi_lvl = gpio_get_level(HAL_PIN_SD_MOSI);
+
+    /* Release pull-downs and de-init pins back to default reset state so SDMMC host receives pristine pads */
+    gpio_pulldown_dis(HAL_PIN_SD_MISO);
+    gpio_pulldown_dis(HAL_PIN_SD_MOSI);
+    gpio_reset_pin(HAL_PIN_SD_MISO);
+    gpio_reset_pin(HAL_PIN_SD_MOSI);
+
+    /* If either pin was pulled high against the internal pulldown, card is detected */
+    return (miso_lvl != 0 || mosi_lvl != 0);
+}
+
+esp_err_t sub_sdcard_mount_async(void)
+{
+    if (s_sd_card != NULL) {
+        return ESP_OK;
+    }
+    if (s_mount_task != NULL) {
+        /* Mount already in progress */
+        return ESP_OK;
+    }
+
+    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
+    return (res == pdPASS) ? ESP_OK : ESP_FAIL;
+}
 
 esp_err_t sub_sdcard_mount(void)
 {
@@ -59,6 +122,9 @@ esp_err_t sub_sdcard_mount(void)
 
     if (ret != ESP_OK) {
         s_sd_card = NULL;
+        gpio_reset_pin(HAL_PIN_SD_CLK);
+        gpio_reset_pin(HAL_PIN_SD_MOSI);
+        gpio_reset_pin(HAL_PIN_SD_MISO);
         return ret;
     }
 
@@ -74,6 +140,9 @@ esp_err_t sub_sdcard_unmount(void)
 
     esp_err_t ret = esp_vfs_fat_sdcard_unmount(SUB_SDCARD_MOUNT_POINT, s_sd_card);
     s_sd_card = NULL;
+    gpio_reset_pin(HAL_PIN_SD_CLK);
+    gpio_reset_pin(HAL_PIN_SD_MOSI);
+    gpio_reset_pin(HAL_PIN_SD_MISO);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "MicroSD card unmounted");
     }

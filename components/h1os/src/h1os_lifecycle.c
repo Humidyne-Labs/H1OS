@@ -100,6 +100,38 @@ static void h1os_session_monitor_task(void *arg)
     vTaskDelete(NULL);
 }
 
+#if CONFIG_ULP_COPROC_ENABLED
+/**
+ * @brief Diagnostic dump of ULP wake telemetry and execution performance.
+ *        Isolated helper function for development; comment out the call in h1os_start() for release builds.
+ */
+static void debug_dump_ulp_telemetry(void)
+{
+    uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), rtcio_raw=0x%06lX, btn=%lu, hold=%lu ms, samples=%lu, cycles=%lu",
+             (unsigned long)ulp_wake_counter,
+             (unsigned long)ulp_last_wake_cause,
+             (ulp_last_wake_cause == 1) ? "RTC_GPIO_INT" :
+             (ulp_last_wake_cause == 2) ? "LIVE_GPIO_LOW" :
+             (ulp_last_wake_cause == 4) ? "RTC_ALARM_INT" : "SOFT_TIMER_TICK",
+             (unsigned long)ulp_gpio_status_raw,
+             (unsigned long)ulp_last_wake_btn,
+             (unsigned long)ulp_hold_duration_ms,
+             (unsigned long)ulp_loop_sample_count,
+             (unsigned long)exec_cycles);
+}
+#endif
+
+/**
+ * @brief Diagnostic dump of EXT1 wake pin status and RTC interrupt flags.
+ *        Isolated helper function for development; comment out the call in h1os_start() for release builds.
+ */
+static void debug_dump_ext1_wake_status(uint64_t ext1_pins, bool button_woke, bool timer_f, bool alarm_f, bool is_rtc_wake)
+{
+    ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
+             (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
+}
+
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
 {
     if (config != NULL) {
@@ -184,6 +216,8 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             if (!button_woke) {
                 is_rtc_wake = true;
             }
+            /* [DEBUG] Diagnostic ULP wake telemetry dump — comment out for release builds */
+            debug_dump_ulp_telemetry();
 #endif
         } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
             uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
@@ -194,8 +228,8 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
                 is_rtc_wake = true;
             }
-            ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
-                     (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
+            /* [DEBUG] Diagnostic EXT1 wake status dump — comment out for release builds */
+            debug_dump_ext1_wake_status(ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
         } else {
             /* Internal timer or other unattended wake */
             is_rtc_wake = true;

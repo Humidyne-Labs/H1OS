@@ -178,7 +178,8 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
     t.length = HAL_EPD_FRAME_SIZE_BYTES * 8;
     t.tx_buffer = frame_buffer;
 
-    esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t);
+    /* Use interrupt-driven GDMA transmit so FreeRTOS yields CPU during 2ms 5KB transfer */
+    esp_err_t ret = spi_device_transmit(s_spi_dev, &t);
     epd_set_cs(1);
     return ret;
 }

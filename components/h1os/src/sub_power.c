@@ -227,6 +227,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ulp_last_vbat_mv     = 4000;
         ulp_dispatch_reason  = 0;
         ulp_last_wake_btn    = 0;
+        ulp_cycles_per_ms    = 2188;
 
         /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
@@ -245,7 +246,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
         SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-        ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized and running (Period: %lu s)", (unsigned long)period_sec);
+        ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized and running (Period: %lu s, Timing: %lu cycles/ms)",
+                 (unsigned long)period_sec, (unsigned long)ulp_cycles_per_ms);
     }
     return ESP_OK;
 #else
@@ -263,8 +265,11 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 
 #if CONFIG_ULP_COPROC_ENABLED
     /* Reset exported ULP dispatch and button variables before entering sleep */
-    ulp_dispatch_reason = 0;
-    ulp_last_wake_btn   = 0;
+    ulp_dispatch_reason  = 0;
+    ulp_last_wake_btn    = 0;
+    ulp_cycles_per_ms    = 2188;
+    ulp_last_wake_cause  = 0;
+    ulp_hold_duration_ms = 0;
 
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();

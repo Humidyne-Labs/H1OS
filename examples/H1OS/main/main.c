@@ -22,6 +22,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "h1os/h1os.h"
+#include "h1os/hal_io.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/sub_audio.h"
 #include "h1os/sub_sdcard.h"
@@ -141,8 +142,10 @@ static void app_on_boot(void *user_data)
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
     screen_base_set_awake_badge(true);
-    // Probe MicroSD card on initial cold boot
-    sub_sdcard_mount();
+    // Probe MicroSD card asynchronously on initial cold boot
+    sub_sdcard_mount_async();
+    // Gentle status LED heartbeat breathing during active interactive session
+    hal_led_start_breathing(2000);
     update_active_display();
 }
 
@@ -160,7 +163,8 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
         /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
         ESP_LOGI(TAG, "First click intercepted by ULP: Inverting awake status badge.");
         screen_base_set_awake_badge(true);
-        sub_sdcard_mount();
+        sub_sdcard_mount_async();
+        hal_led_start_breathing(2000);
     } else {
         /* Unattended external RTC countdown wake: Keep sleep badge */
         screen_base_set_awake_badge(false);
@@ -173,12 +177,14 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: PRE-SLEEP hook (Duration: %lu s)", (unsigned long)sleep_sec);
     screen_base_set_awake_badge(false);
+    hal_led_stop_breathing();
     sub_sdcard_unmount();
 }
 
 static void app_on_shutdown(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: SHUTDOWN hook executing");
+    hal_led_stop_breathing();
     sub_sdcard_unmount();
 }
 
