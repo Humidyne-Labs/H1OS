@@ -356,6 +356,9 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
 
+    // Allow LP IO clock synchronizers to sample the external 3.3V high level (at least 50-100 µs)
+    esp_rom_delay_us(100);
+
     // Clear any pending/stale RTC GPIO interrupt status flags before sleeping
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 

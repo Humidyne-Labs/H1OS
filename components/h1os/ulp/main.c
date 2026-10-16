@@ -137,13 +137,17 @@ int main(void)
 
     if (boot_pressed || pwr_pressed) {
         int pressed_btn = 0;
-        if (boot_pressed && !pwr_pressed) {
+        if (boot_btn == 0 && pwr_btn != 0) {
+            pressed_btn = 1;
+        } else if (pwr_btn == 0 && boot_btn != 0) {
+            pressed_btn = 2;
+        } else if (boot_pressed && !pwr_pressed) {
             pressed_btn = 1;
         } else if (pwr_pressed && !boot_pressed) {
             pressed_btn = 2;
         } else {
-            /* Both flagged: prioritize whichever is actively held LOW, default to BOOT */
-            pressed_btn = (pwr_btn == 0 && boot_btn != 0) ? 2 : 1;
+            /* Both flagged: prioritize whichever is actively LOW, default to BOOT */
+            pressed_btn = (pwr_btn == 0) ? 2 : 1;
         }
 
         gpio_num_t active_pin = (pressed_btn == 2) ? GPIO_NUM_18 : GPIO_NUM_0;
@@ -173,8 +177,9 @@ int main(void)
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
 
-        /* Glitch filter: Ignore contact bounce/transients shorter than 20 ms if no latched interrupt */
-        if (hold_ms < 20 && ((rtcio_int_st & (BIT(0) | BIT(18))) == 0)) {
+        /* Glitch filter: A valid tactile button press MUST be held for at least 20 ms.
+         * Filter out transient spikes, contact bounce, and spurious unpressed wakes (<20 ms). */
+        if (hold_ms < 20) {
             record_trace(7 /* GLITCH_FILTERED */, hold_ms, rtcio_int_st);
             exit_ccount = ULP_RISCV_GET_CCOUNT();
             ulp_riscv_halt();

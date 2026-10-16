@@ -197,6 +197,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
     s_lv_keypad_indev = lv_indev_create();
     if (s_lv_keypad_indev != NULL) {
         lv_indev_set_type(s_lv_keypad_indev, LV_INDEV_TYPE_KEYPAD);
+        lv_indev_set_display(s_lv_keypad_indev, s_lv_display);
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
         lv_indev_set_long_press_time(s_lv_keypad_indev, 2000); /* 2.0s hold for shutdown */
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
@@ -288,12 +289,8 @@ static void h1os_lvgl_port_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());
     while (s_lvgl_task_running) {
-        uint32_t delay_ms = LV_DEF_REFR_PERIOD;
-        if (h1os_lvgl_lock(100)) {
-            delay_ms = lv_timer_handler();
-            h1os_lvgl_unlock();
-        }
-        delay_ms = (delay_ms == LV_NO_TIMER_READY) ? LV_DEF_REFR_PERIOD : delay_ms;
+        uint32_t delay_ms = lv_timer_handler();
+        delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD) ? LV_DEF_REFR_PERIOD : delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
     s_lvgl_task_handle = NULL;
