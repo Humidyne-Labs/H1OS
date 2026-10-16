@@ -30,6 +30,16 @@ uint32_t vbat_critical_mv = 3250; /* Critical brownout threshold (< 3.25V) */
 uint32_t boot_btn_events = 0;
 uint32_t last_wake_btn   = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 
+/*
+ * ULP Execution Entry Point:
+ * The ULP coprocessor is woken from deep sleep reactively:
+ *   - On external RTC Alarm / Timer INT (GPIO 5 falling edge / LOW)
+ *   - On external Button Press (GPIO 0 BOOT or GPIO 18 POWER falling edge / LOW)
+ *   - On periodic ULP coprocessor sleep timer (configured by sub_power_init_ulp)
+ *
+ * Once woken, main() runs autonomously in RTC slow SRAM to arbitrate the wake cause,
+ * debounce button presses, and only wake the main Xtensa processor when a valid event occurs.
+ */
 int main(void)
 {
     wake_counter++;
@@ -69,6 +79,9 @@ int main(void)
     int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
 
     if (boot_btn == 0 || pwr_btn == 0) {
+        /* Record which button was depressed initially */
+        int pressed_btn = (boot_btn == 0) ? 1 : 2;
+
         /* Button is held down. Track hold duration and wait for release. */
         uint32_t hold_ms = 0;
         while (hold_ms < 2600) {
@@ -83,7 +96,7 @@ int main(void)
         }
 
         if (hold_ms >= 2500) {
-            if (boot_btn == 0) {
+            if (pressed_btn == 1) {
                 /* BOOT held > 2.5s: Prime ROM Bootloader jump */
                 dispatch_reason = 4; /* ULP_DISPATCH_BOOTLOADER_JUMP */
             } else {
@@ -95,7 +108,7 @@ int main(void)
         } else if (hold_ms >= 30) {
             /* Valid short tap released between 30ms and 2500ms -> Wake Flow B with clean released state */
             boot_btn_events++;
-            last_wake_btn = (boot_btn == 0) ? 1 : 2;
+            last_wake_btn   = pressed_btn;
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
             ulp_riscv_wakeup_main_processor();
             return 0;

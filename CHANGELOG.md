@@ -4,6 +4,33 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-prod] - 2026-10-16
+
+### 🚀 Added
+- **ULP-RISC-V Autonomous Reactive Coprocessor** (`components/h1os/ulp/main.c`, `sub_power.c/.h`):
+  - 24/7 reactive monitoring in RTC slow memory: coprocessor wakes autonomously on external RTC INT (GPIO 5), tactile buttons (GPIO 0 / 18), or periodic timer.
+  - Implemented Wake-on-Release debouncing: tracks hold duration and asserts `ulp_riscv_wakeup_main_processor()` strictly upon pin release (HIGH), ensuring clean LVGL keypad driver entry.
+  - Implemented exported RTC slow memory variables (`ulp_last_wake_btn`, `ulp_dispatch_reason`, `ulp_wake_counter`, `ulp_last_vbat_mv`).
+- **Two-Stage Tactile Click Interaction** (`main.c`, `h1os_lifecycle.c`):
+  - Stage 1 (Deep Sleep Wake): First click is caught by ULP, waking Flow B to toggle the inverted awake badge in the UI without advancing the page or firing an audio tone.
+  - Stage 2 (Active Navigation): Second click is handled by running LVGL keypad event loop, triggering a 15ms audio tick and cycling the carousel.
+- **Canonical Build Skill & Tooling Harness Upgrade** (`.agents/skills/h1os-build/SKILL.md`, `idf_build_mcp_server.py`):
+  - Created `.agents/skills/h1os-build/SKILL.md` eliminating environment discovery loops and standardizing one-liner builds via `Microsoft.v6.1.PowerShell_profile.ps1`.
+  - Upgraded MCP server with dynamic workspace detection, `build_dir` (`build_prod`/`build_dev`) support, and automatic Espressif v6.1 profile execution.
+
+### 🛠️ Fixed & Refactored
+- **Audio Codec Sleep Isolation & Thermal Mitigation** (`h1os_lifecycle.c`, `sub_audio.c`):
+  - Strictly gated ES8311 codec and NS4168 amplifier initialization behind user presence (`is_user_wake = (!is_wake) || button_woke`).
+  - Unattended periodic RTC wakes completely bypass audio initialization, keeping the codec in <1.0 µA standby and eliminating 26°C–32°C enclosure thermal oscillation.
+  - Bound audio volume strictly to lifecycle presentation settings (`volume_pct`), defaulting to `0` (muted) until explicitly initialized.
+- **Telemetry NA Standard & Elimination of Hardcoded Fallbacks** (`orch_state.c`, `sub_sensor.c`, `h1os_lifecycle.c`):
+  - Zeroed out all persistent metrics on cold boot (`amb_floor_temp_centi_c`, `window_low_temp_centi_c`, `window_high_temp_centi_c`, `last_glass_temp_centi_c` set to `0`), establishing `0.0°C` / `0%` as the unambiguous indicator for uninitialized / NA telemetry.
+  - Changed `sub_sensor_read_mcu_die_temp()` error fallback from synthetic `25.0f` to `0.0f`.
+  - Removed silent fallback timeouts (`300s`, `120s`, `30s`, `60%`) in `h1os_lifecycle.c`, enforcing strict error logging (`ESP_LOGE`) and clean aborts on unconfigured contract parameters.
+- **Diagnostic Modularity & Target-Scoped Build Cleanliness** (`orch_flow.c`, `examples/H1OS/CMakeLists.txt`):
+  - Extracted inline ring buffer serial hexdump into a modular static helper: `orch_flow_dump_ring_debug()`.
+  - Added target-scoped compiler warning suppression for `__idf_lvgl__lvgl` (`PRIVATE -w` and `SYSTEM TRUE`), eliminating FreeRTOS atomic header unused function warnings without relaxing diagnostics on application code.
+
 ---
 
 ## [2.1.0-alpha] - 2026-10-12

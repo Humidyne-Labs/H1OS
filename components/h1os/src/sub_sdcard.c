@@ -25,10 +25,14 @@ esp_err_t sub_sdcard_mount(void)
         return ESP_OK;
     }
 
+    /* FatFS Mount Configuration:
+     * .allocation_unit_size specifies cluster size in bytes ONLY if the card is formatted
+     * by FatFS (i.e. format_if_mount_failed == true). Setting to 0 enables FatFS auto-allocation
+     * based on SD card volume geometry and sector count. */
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files              = 5,
-        .allocation_unit_size   = 16 * 1024,
+        .allocation_unit_size   = 0, /* 0 = Auto-determine cluster allocation unit */
     };
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();

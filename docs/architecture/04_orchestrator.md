@@ -177,4 +177,20 @@ bool             orch_flow_is_thermal_lockout(void);
 void             orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 esp_err_t        orch_flow_query_telemetry(float *out_t, float *out_rh, float *out_dew);
 esp_err_t        orch_flow_transition_to_sleep(uint32_t sleep_seconds);
+
+---
+
+## 4. Telemetry Standards & Diagnostic Modularity
+
+### 4.1 Telemetry NA Convention (0.0°C / 0% Standard)
+- Synthetic seed values (e.g. `2500` centi-°C / `25.0°C`) on cold boot have been completely eradicated.
+- `orch_state_reset()` initializes all temperature and humidity metrics (`amb_floor_temp_centi_c`, `window_low_temp_centi_c`, `window_high_temp_centi_c`, `last_glass_temp_centi_c`) to `0`.
+- Display screens and telemetry structures interpret `0.0` as uninitialized / Not Available (NA), preventing synthetic baselines from skewing algorithms or misinforming users.
+
+### 4.2 Modular Diagnostic Ring Hexdump
+To preserve code cleanliness and modularity in `orch_flow_query_telemetry()`, ring buffer diagnostics are encapsulated in a dedicated helper:
+```c
+static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st);
 ```
+This formats and dumps the multi-channel ring buffer (`SHTC3`, `RH`, `DIE TSENS`, `EPD GLASS`) without polluting the core psychrometric reconstruction pipeline.
+

@@ -49,6 +49,16 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct);
 esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_mv);
 
 /**
+ * @brief Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
+ * Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration,
+ * configures the periodic wake timer (Flow A period), and arms the coprocessor.
+ *
+ * @param[in] flow_a_period_sec Periodic wake interval for Flow A telemetry in seconds.
+ * @return ESP_OK on success, or an error code.
+ */
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec);
+
+/**
  * @brief Configure EXT1 wake sources and enter deep sleep.
  * Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
  *

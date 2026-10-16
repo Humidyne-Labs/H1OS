@@ -79,7 +79,7 @@ static bool s_low_power_mode       = true; /* Default initialization mode is Low
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
-static uint8_t           s_volume_pct        = 50; /* Default 50% perceptual volume */
+static uint8_t           s_volume_pct        = 0; /* Unconfigured/muted (0%) until set by lifecycle presentation */
 
 /*
  * Perceptual Volume Lookup Table (0% to 100%)

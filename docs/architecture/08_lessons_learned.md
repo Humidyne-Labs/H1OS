@@ -136,3 +136,22 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 | **Flash Write Timing** | On every partial/full flush | **Deferred** to sleep and shutdown only |
 | **Sub-Execution Budget** | ~15–25 ms (checking locks & math) | **Fast burst** (pure HAL raw read + integer gate) |
 | **Public API** | Fragmented across `bsp_*.h` headers | Unified `h1os.h` (`h1os_app_start`, `sleep`, `shutdown`) |
+
+---
+
+## 4. Production Lessons Learned: Thermal & Silicon Invariants
+
+### 4.1 Audio Codec Thermal Oscillation (26°C – 32°C)
+- **The Issue:** Overnight thermal imaging revealed periodic temperature cycling oscillating between 26°C and 32°C across the PCB enclosure.
+- **Root Cause:** When periodic wakes did not differentiate between unattended RTC updates and physical user button taps, the audio codec (ES8311) and Class-D amplifier (NS4168) were repeatedly initialized and taken out of standby. Even with zero audio output, powering the amplifier rails dissipates quiescent current directly into the internal enclosure volume.
+- **The Solution:** Audio initialization is strictly gated behind physical user presence (`is_user_wake = (!is_wake) || button_woke`). Unattended RTC countdown wakeups leave the audio hardware in complete <1 µA standby.
+
+### 4.2 The Danger of Silent Fallback Defaults
+- **The Issue:** Functions in the lifecycle engine contained silent magic fallback defaults (e.g. `if (sleep_sec == 0) sleep_sec = 300;` or `if (timeout_sec == 0) timeout_sec = 30;`).
+- **Why It Fails:** Silent fallbacks hide contract violations and configuration errors from the developer. If an application fails to configure a timer, silently substituting synthetic delays masks broken state machines and prevents proper testing.
+- **The Standard:** All silent fallbacks have been replaced with strict error logs (`ESP_LOGE`) and clean aborts (`ESP_ERR_INVALID_ARG`), forcing explicit contractual configuration at the application layer.
+
+### 4.3 Telemetry Cold Boot Conventions
+- Initializing persistent memory to synthetic room temperature (`25.0°C`) created false confidence and corrupted historical EWMA baselines during early boot.
+- All telemetry structures now strictly zero-out uninitialized state (`0.0°C` / `0` centi-units), allowing UI screens and downstream logic to unambiguously recognize uninitialized/NA conditions.
+

@@ -76,3 +76,23 @@ For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.
 | **`0x37`**      | `DAC_RAMP`        | `0x08`             | Disables DAC EQ and/or fade in/out ramp rate. Datasheet/User Guide in repo has error, EQ Default = Disabled, Ramp Default = Disabled                                                           |
 | **`0x44`**      | `GPIO_CFG`        | `0x08` then `0x58` | Silicon errata noise filter lock (written `0x08` twice), then internal routing set to `0x58`.                                                           |
 | **`0x45`**      | `GPIO_PULL`       | `0x00`             | Internal I2S clock line pull-up/pull-downs disabled.                                                                                                    |
+
+---
+
+## 7. Power Management & Sleep Gating Policy
+
+### 7.1 Unattended Wake Isolation (<1 µA Invariant)
+To prevent quiescent current dissipation and thermal contamination of the enclosure:
+- **Unattended Periodic Wakes (RTC Countdown Timer):**
+  - The ES8311 codec and NS4168 amplifier are **never initialized or taken out of standby**.
+  - `sub_audio_init()` is strictly bypassed during Flow A and unattended Flow B display refreshes.
+  - The entire audio subsystem remains in low-leakage hardware standby (<1.0 µA).
+- **Interactive User Wakes (Cold Boot or Physical Button Tap):**
+  - When the user presses `BOOT` or `POWER` to interact with the device, `is_user_wake` is asserted.
+  - `sub_audio_init()` executes to configure clock dividers and prepare the FreeRTOS audio worker task.
+
+### 7.2 Volume Initialization Contract
+- The internal volume variable `s_volume_pct` is initialized to `0` (muted / unconfigured).
+- Upon user wake, volume is configured strictly from `lifecycle.presentation.volume_pct`.
+- Hardcoded fallback defaults (e.g. `50%` or `60%`) have been removed; audio levels are contractual and developer-defined.
+

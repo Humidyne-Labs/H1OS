@@ -159,12 +159,17 @@ esp_err_t sub_display_init(bool is_wake_cycle)
 
     /* 4b. Pre-Display Glass Temperature Capture (Command 0x1B):
      * Strictly read BEFORE any RAM write, LUT load, or charge-pump activation
-     * to prevent display refresh heat from offsetting the glass thermistor. */
+     * to prevent display refresh heat from offsetting the glass thermistor.
+     * Hardware Register 0x1B bitfield structure (per SSD1681 datasheet):
+     *   - Byte 0: Signed 8-bit integer temperature in deg C (1 deg C / LSB).
+     *   - Byte 1, Bit 7: 0.5 deg C fractional bit (2^-1 = 0.5 deg C = 50 centi-degrees).
+     *   - Byte 1, Bits 6:0: Reserved / unused. */
+    static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;
     uint8_t temp_raw[2] = {0};
     if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
         if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
             int8_t temp_int  = (int8_t)temp_raw[0];
-            int16_t frac_c   = (temp_raw[1] & 0x80) ? 50 : 0;
+            int16_t frac_c   = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 orch_state_get()->last_glass_temp_centi_c = glass_cc;
@@ -340,11 +345,13 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
     }
 
     uint8_t temp_raw[2] = {0};
-    /* SSD1681 Command 0x1B: Read Temperature Sensor */
+    /* SSD1681 Command 0x1B: Read Temperature Sensor
+     * Byte 0: Signed 8-bit integer temperature in deg C (1 deg C / LSB).
+     * Byte 1, Bit 7: 0.5 deg C fractional bit (2^-1 = 0.5 deg C). */
     esp_err_t err = hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw));
     if (err == ESP_OK) {
         int8_t temp_int   = (int8_t)temp_raw[0];
-        float  temp_frac  = (temp_raw[1] & 0x80) ? 0.5f : 0.0f;
+        float  temp_frac  = (temp_raw[1] & 0x80) ? 0.5f : 0.0f; /* Bit 7 = 0.5 deg C */
         float  glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
 
         if (glass_temp < -40.0f || glass_temp > 85.0f || temp_raw[0] == 0xFF || temp_raw[0] == 0x00) {

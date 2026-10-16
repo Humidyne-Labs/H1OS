@@ -91,17 +91,36 @@ typedef enum {
     ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery brownout threshold (<3.25V)
 } ulp_dispatch_reason_t;
 
-typedef struct {
-    ulp_dispatch_reason_t dispatch_reason;
-    uint32_t              ulp_wake_counter;
-    
-    // Battery Calibration & Health
-    uint16_t              adc_cal_scale;
-    int16_t               adc_cal_offset;
-    uint16_t              filtered_vbat_mv;
-    
-    // Button Tracking
-    uint32_t              boot_hold_ms;
-    uint32_t              power_hold_ms;
-} ulp_shared_data_t;
+/* Exported variables accessible by the main Xtensa core via ulp_<var> */
+extern uint32_t ulp_wake_counter;
+extern uint32_t ulp_dispatch_reason;
+extern uint32_t ulp_cal_scale;
+extern int32_t  ulp_cal_offset;
+extern uint32_t ulp_last_vbat_mv;
+extern uint32_t ulp_vbat_critical_mv;
+extern uint32_t ulp_boot_btn_events;
+extern uint32_t ulp_last_wake_btn; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 ```
+
+---
+
+## 5. Silicon GPIO Wakeup Routing
+
+On ESP32-S3, waking the coprocessor from deep sleep via IO edges requires routing through the RTC IO domain:
+
+1. **RTC IO Interrupt Arming:**
+   ```c
+   /* Enable GPIO wakeups in the RTC domain for the ULP Coprocessor */
+   gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
+   gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+   gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
+
+   /* Arm ULP coprocessor GPIO wakeup in RTC_CNTL */
+   SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+   ```
+
+2. **Coprocessor vs. CPU Wake Separation:**
+   - When a button transitions LOW or the PCF85063A pulls INT LOW, the hardware wakes the **ULP-RISC-V core**.
+   - The dual-core Xtensa CPU **remains powered down** in deep sleep.
+   - The ULP RISC-V program executes `main()`, determines the wake cause, debounces button hold/release transitions, updates shared RTC slow memory, and only wakes the Xtensa CPU via `ulp_riscv_wakeup_main_processor()` if a valid user event or RTC expiration occurs.
+

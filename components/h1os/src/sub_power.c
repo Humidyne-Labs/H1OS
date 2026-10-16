@@ -16,7 +16,16 @@
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
+#include "soc/rtc_cntl_reg.h"
 #include <stdlib.h>
+
+#if CONFIG_ULP_COPROC_ENABLED
+#include "ulp_riscv.h"
+#include "ulp_h1os.h"
+
+extern const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start");
+extern const uint8_t ulp_h1os_bin_end[]   asm("_binary_ulp_h1os_bin_end");
+#endif
 
 static const char *TAG = "sub_power";
 
@@ -195,26 +204,84 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
     return ESP_OK;
 }
 
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
+{
+#if CONFIG_ULP_COPROC_ENABLED
+    /* Load binary on cold boot or if ULP memory was reset */
+    uint32_t causes = esp_sleep_get_wakeup_causes();
+    if (!(causes & BIT(ESP_SLEEP_WAKEUP_ULP))) {
+        ESP_LOGI(TAG, "Loading ULP-RISC-V Coprocessor binary...");
+        esp_err_t err = ulp_riscv_load_binary(ulp_h1os_bin_start, (size_t)(ulp_h1os_bin_end - ulp_h1os_bin_start));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "ulp_riscv_load_binary failed: %s", esp_err_to_name(err));
+            return err;
+        }
+
+        /* Pass battery calibration parameters into ULP exported symbols */
+        uint32_t scale = 3100;
+        int32_t offset = 0;
+        sub_power_get_ulp_cal_params(&scale, &offset);
+        ulp_cal_scale        = scale;
+        ulp_cal_offset       = offset;
+        ulp_vbat_critical_mv = 3250;
+        ulp_last_vbat_mv     = 4000;
+        ulp_dispatch_reason  = 0;
+        ulp_last_wake_btn    = 0;
+
+        /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
+        uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
+        ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
+
+        /* Configure ULP to wake on periodic timer */
+        ulp_riscv_cfg_t cfg = {
+            .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_TIMER,
+        };
+        err = ulp_riscv_config_and_run(&cfg);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "ulp_riscv_config_and_run failed: %s", esp_err_to_name(err));
+            return err;
+        }
+
+        /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
+        ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized and running (Period: %lu s)", (unsigned long)period_sec);
+    }
+    return ESP_OK;
+#else
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 {
+    (void)sleep_seconds;
+
     /* Latch critical rails and freeze pad states with RTC pad holds */
     hal_io_isolate_sleep_pads();
-
-    if (ext1_pins_mask != 0) {
-        esp_sleep_enable_ext1_wakeup(ext1_pins_mask, ESP_EXT1_WAKEUP_ANY_LOW);
-    }
-
-    if (sleep_seconds > 0) {
-        esp_sleep_enable_timer_wakeup((uint64_t)sleep_seconds * 1000000ULL);
-    }
 
     /* ULP coprocessor wakeup is enabled via ULP runtime */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Install RTC Wake Stub for <3ms Flow A autonomous sensor sampling */
-    orch_wake_stub_install();
+    /* Fallback EXT1 wakeup for pins in case ULP is idle */
+    if (ext1_pins_mask != 0) {
+        esp_sleep_enable_ext1_wakeup(ext1_pins_mask, ESP_EXT1_WAKEUP_ANY_LOW);
+    }
 
-    ESP_LOGI(TAG, "Entering deep sleep (%lu sec)...", (unsigned long)sleep_seconds);
+    /* Enable GPIO wakeups in the RTC domain for the ULP Coprocessor:
+     * On ESP32-S3, gpio_wakeup_enable() configures the RTC IO controller.
+     * When coupled with RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA and esp_sleep_enable_ulp_wakeup(),
+     * these IO transitions wake the ULP-RISC-V coprocessor, NOT the Xtensa CPU directly.
+     * The ULP coprocessor evaluates the pin state, debounces transitions, and only wakes
+     * the main application (Xtensa) via ulp_riscv_wakeup_main_processor() if valid. */
+    gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
+
+    /* Keep RTC domain powered so ULP and RTC pad holds remain active */
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+
+    ESP_LOGI(TAG, "Entering deep sleep with ULP Coprocessor reactive monitor...");
     esp_deep_sleep_start();
     return ESP_OK;
 }

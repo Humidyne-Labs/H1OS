@@ -45,7 +45,10 @@ static bool s_session_running = false;
 void h1os_reset_session_timer(void)
 {
     uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
-    if (timeout_sec == 0) timeout_sec = 30;
+    if (timeout_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting session timer reset.");
+        return;
+    }
     s_session_expiry_us = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
@@ -82,7 +85,11 @@ static void h1os_session_monitor_task(void *arg)
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
             uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-            if (sleep_sec == 0) sleep_sec = 120;
+            if (sleep_sec == 0) {
+                ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
+                h1os_shutdown();
+                break;
+            }
             h1os_sleep(sleep_sec); /* Enter deep sleep */
             break;
         }
@@ -135,6 +142,26 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         return ESP_OK;
     }
 
+    if (flow == ORCH_FLOW_A_SAMPLE) {
+        ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
+        orch_flow_execute_sensor_sample();
+        /* Re-enter deep sleep immediately; display and audio remain untouched */
+        uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+        if (sleep_sec == 0) {
+            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 in Flow A sample. Aborting to safe shutdown.");
+            h1os_shutdown();
+            return ESP_ERR_INVALID_STATE;
+        }
+        return orch_flow_transition_to_sleep(sleep_sec);
+    }
+
+    /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
+    if (flow == ORCH_FLOW_BOOT) {
+        sub_power_init_ulp(st->sample_interval_sec);
+        /* Seed initial sensor sample into ring buffer so cold UI has real telemetry */
+        orch_flow_execute_sensor_sample();
+    }
+
     // 4. Flow B Interactive UI Boot
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
     bool is_wake     = (flow != ORCH_FLOW_BOOT);
@@ -181,7 +208,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
      * (Cold Boot or physical Button Wake). Unattended RTC/timer wakes keep the codec in <1uA sleep! */
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
-        uint8_t init_vol = (s_app_lifecycle.presentation.volume_pct > 0) ? s_app_lifecycle.presentation.volume_pct : 60;
+        uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
         sub_audio_set_volume(init_vol);
         sub_audio_init();
     } else {
@@ -225,12 +252,22 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     //    - If Boot or User Button Wake: wait configured inactivity session timeout for user interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
+        bool alarm_f = false, timer_f = false;
+        sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-        if (sleep_sec == 0) sleep_sec = 120;
+        if (sleep_sec == 0) {
+            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
+            h1os_shutdown();
+            return ESP_ERR_INVALID_STATE;
+        }
         return h1os_sleep(sleep_sec);
     } else {
         uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
-        if (timeout_sec == 0) timeout_sec = 30;
+        if (timeout_sec == 0) {
+            ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0 for interactive session. Aborting to safe shutdown.");
+            h1os_shutdown();
+            return ESP_ERR_INVALID_ARG;
+        }
         ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
         xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 3072, NULL, 3, &s_session_task_handle, 0);
@@ -301,6 +338,10 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
+    if (sleep_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle error: h1os_sleep received sleep_sec = 0. Aborting sleep transition.");
+        return ESP_ERR_INVALID_ARG;
+    }
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
     h1os_trigger_splash(H1OS_SPLASH_SLEEP);

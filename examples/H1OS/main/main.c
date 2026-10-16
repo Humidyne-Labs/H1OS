@@ -140,7 +140,8 @@ static void app_on_boot(void *user_data)
     s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
-    // Probe MicroSD card
+    screen_base_set_awake_badge(true);
+    // Probe MicroSD card on initial cold boot
     sub_sdcard_mount();
     update_active_display();
 }
@@ -152,11 +153,19 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     if (s_app_state.boot_epoch_sec > 0 && now >= (time_t)s_app_state.boot_epoch_sec) {
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
-    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx)",
-             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes);
+    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx, ButtonWake: %d)",
+             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes, ctx->woke_from_button);
 
-    // Probe MicroSD card
-    sub_sdcard_mount();
+    if (ctx->woke_from_button) {
+        /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
+        ESP_LOGI(TAG, "First click intercepted by ULP: Inverting awake status badge.");
+        screen_base_set_awake_badge(true);
+        sub_sdcard_mount();
+    } else {
+        /* Unattended external RTC countdown wake: Keep sleep badge */
+        screen_base_set_awake_badge(false);
+    }
+
     update_active_display();
 }
 

@@ -162,10 +162,14 @@ esp_err_t sub_sensor_read_mcu_die_temp(float *out_die_temp_c)
     if (!s_tsens_inited || s_tsens_handle == NULL) {
         esp_err_t err = sub_sensor_init();
         if (err != ESP_OK) {
-            *out_die_temp_c = 25.0f;
+            *out_die_temp_c = 0.0f; /* 0.0 C indicates sensor uninitialized / NA */
             return err;
         }
     }
 
-    return temperature_sensor_get_celsius(s_tsens_handle, out_die_temp_c);
+    esp_err_t ret = temperature_sensor_get_celsius(s_tsens_handle, out_die_temp_c);
+    if (ret != ESP_OK) {
+        *out_die_temp_c = 0.0f; /* 0.0 C indicates sensor uninitialized / NA */
+    }
+    return ret;
 }
