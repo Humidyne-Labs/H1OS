@@ -66,7 +66,7 @@ esp_err_t hal_io_early_init(void)
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1); // LED OFF
 
-    // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 10k pull-ups)
+    // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 10k pull-ups on hardware; internal pull-ups disabled to prevent parallel leakage)
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
         .mode         = GPIO_MODE_INPUT,
@@ -344,14 +344,14 @@ esp_err_t hal_io_isolate_sleep_pads(void)
 
     rtc_gpio_init(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_set_direction(HAL_PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_pullup_dis(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_BOOT);
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_BOOT, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
 
     rtc_gpio_init(HAL_PIN_BUTTON_POWER);
     rtc_gpio_set_direction(HAL_PIN_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_pullup_dis(HAL_PIN_BUTTON_POWER);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);

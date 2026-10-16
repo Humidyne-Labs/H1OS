@@ -246,6 +246,11 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
         SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
+        /* Release RTC domain GPIO control back to HP digital matrix so HP application can read buttons during active boot session */
+        rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
+        rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+        rtc_gpio_deinit(HAL_PIN_RTC_INT);
+
         ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized and running (Period: %lu s, Timing: %lu cycles/ms)",
                  (unsigned long)period_sec, (unsigned long)ulp_cycles_per_ms);
     }

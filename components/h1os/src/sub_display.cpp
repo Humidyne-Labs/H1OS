@@ -24,8 +24,6 @@ static const char *TAG = "sub_display";
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
-static SemaphoreHandle_t s_busy_sem = NULL;
-
 static bool s_inited = false;
 
 /* Factory-calibrated 159-byte Partial LUT */
@@ -51,15 +49,6 @@ static const uint8_t WF_PARTIAL_1IN54[159] = {
     0x02, 0x17, 0x41, 0xB0, 0x32, 0x28
 };
 
-static void IRAM_ATTR epd_busy_isr_handler(void* arg)
-{
-    BaseType_t high_task_wakeup = pdFALSE;
-    if (s_busy_sem != NULL) {
-        xSemaphoreGiveFromISR(s_busy_sem, &high_task_wakeup);
-        portYIELD_FROM_ISR(high_task_wakeup);
-    }
-}
-
 static void epd_reset_pulse(void)
 {
     gpio_set_level(HAL_PIN_EPD_RST, 0);
@@ -80,19 +69,7 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
             ESP_LOGW(TAG, "SSD1681 BUSY wait timed out");
             return ESP_ERR_TIMEOUT;
         }
-        if (s_busy_sem != NULL) {
-            TickType_t remain = timeout_ticks - elapsed;
-            TickType_t step = pdMS_TO_TICKS(20);
-            if (step == 0) step = 1;
-            if (remain < step) step = remain;
-            if (xSemaphoreTake(s_busy_sem, step) == pdTRUE && gpio_get_level(HAL_PIN_EPD_BUSY) == 0) {
-                /* Re-give token so any concurrent waiter (e.g. sleep transition waiting on LVGL flush) wakes immediately */
-                xSemaphoreGive(s_busy_sem);
-                return ESP_OK;
-            }
-        } else {
-            esp_rom_delay_us(1000);
-        }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     return ESP_OK;
@@ -139,15 +116,9 @@ esp_err_t sub_display_init(bool is_wake_cycle)
         .mode         = GPIO_MODE_INPUT,
         .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_NEGEDGE, /* High -> Low when idle */
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&busy_conf);
-
-    if (s_busy_sem == NULL) {
-        s_busy_sem = xSemaphoreCreateBinary();
-    }
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(HAL_PIN_EPD_BUSY, epd_busy_isr_handler, NULL);
 
     /* 3. Hardware Reset Pulse */
     epd_reset_pulse();

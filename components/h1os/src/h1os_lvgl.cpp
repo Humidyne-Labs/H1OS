@@ -54,6 +54,15 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
 
     uint32_t btns = (uint32_t)hal_io_read_buttons();
 
+    static uint32_t s_prev_logged_btns = 0;
+    if (btns != s_prev_logged_btns) {
+        ESP_LOGI(TAG, "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)",
+                 (unsigned long)btns,
+                 (btns & HAL_BTN_BOOT) ? 1 : 0,
+                 (btns & HAL_BTN_POWER) ? 1 : 0);
+        s_prev_logged_btns = btns;
+    }
+
     if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key   = LV_KEY_RIGHT;
@@ -191,7 +200,14 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
         lv_indev_set_long_press_time(s_lv_keypad_indev, 2000); /* 2.0s hold for shutdown */
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
-        ESP_LOGI(TAG, "Registered LVGL keypad indev handler (Long-press: 2000ms)");
+
+        lv_group_t *def_grp = lv_group_get_default();
+        if (def_grp == NULL) {
+            def_grp = lv_group_create();
+            lv_group_set_default(def_grp);
+        }
+        lv_indev_set_group(s_lv_keypad_indev, def_grp);
+        ESP_LOGI(TAG, "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
     }
 
     ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode (first flush: %s)",
@@ -214,6 +230,10 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
     task_priority = (task_priority > 0) ? task_priority : 5;
     core_id       = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
 
+    /* Architectural Invariant: Must set running flag BEFORE spawning task on Core 1
+     * to eliminate task creation race where the port task exits on its first loop! */
+    s_lvgl_task_running = true;
+
     BaseType_t res = xTaskCreatePinnedToCore(
         h1os_lvgl_port_task,
         "h1os_lvgl",
@@ -224,8 +244,12 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
         core_id
     );
 
-    s_lvgl_task_running = (res == pdPASS);
-    return s_lvgl_task_running ? ESP_OK : ESP_FAIL;
+    if (res != pdPASS) {
+        s_lvgl_task_running = false;
+        ESP_LOGE(TAG, "Failed to spawn LVGL port task on Core %d", core_id);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
 }
 
 esp_err_t h1os_lvgl_stop(void)

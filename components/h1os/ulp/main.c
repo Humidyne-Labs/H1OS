@@ -62,6 +62,17 @@ static inline void record_trace(uint32_t step, uint32_t v1, uint32_t v2)
     }
 }
 
+static inline void ulp_release_gpios_and_wakeup_main(void)
+{
+    /* Release RTC IO ownership back to HP digital GPIO matrix before waking main CPU */
+    ulp_riscv_gpio_deinit(GPIO_NUM_0);
+    ulp_riscv_gpio_deinit(GPIO_NUM_18);
+    ulp_riscv_gpio_deinit(GPIO_NUM_5);
+    exit_ccount = ULP_RISCV_GET_CCOUNT();
+    ulp_riscv_wakeup_main_processor();
+    ulp_riscv_halt();
+}
+
 /*
  * ULP Execution Entry Point:
  * The ULP coprocessor is woken from deep sleep reactively:
@@ -87,11 +98,13 @@ int main(void)
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_5);
 
     ulp_riscv_gpio_init(GPIO_NUM_0);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_0); /* BOOT0 has external 10k pull-up to 3.3V */
+    ulp_riscv_gpio_input_enable(GPIO_NUM_0); /* BOOT0 has external 10k pull-up on hardware */
+    ulp_riscv_gpio_pullup_disable(GPIO_NUM_0);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_0);
 
     ulp_riscv_gpio_init(GPIO_NUM_18);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_18); /* BAT_KEY has external 10k pull-up to 3.3V */
+    ulp_riscv_gpio_input_enable(GPIO_NUM_18); /* BAT_KEY has external 10k pull-up on hardware */
+    ulp_riscv_gpio_pullup_disable(GPIO_NUM_18);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_18);
 
     /* Read RTC GPIO interrupt status and live pin levels immediately */
@@ -185,9 +198,7 @@ int main(void)
         }
 
         record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
-        exit_ccount = ULP_RISCV_GET_CCOUNT();
-        ulp_riscv_wakeup_main_processor();
-        ulp_riscv_halt();
+        ulp_release_gpios_and_wakeup_main();
         return 0;
     }
 
@@ -202,9 +213,7 @@ int main(void)
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         record_trace(8 /* RTC_INT_DETECTED */, rtc_int, rtcio_int_st);
         record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
-        exit_ccount = ULP_RISCV_GET_CCOUNT();
-        ulp_riscv_wakeup_main_processor();
-        ulp_riscv_halt();
+        ulp_release_gpios_and_wakeup_main();
         return 0;
     }
 
@@ -227,9 +236,7 @@ int main(void)
         if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
             dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
             record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, 0);
-            exit_ccount = ULP_RISCV_GET_CCOUNT();
-            ulp_riscv_wakeup_main_processor();
-            ulp_riscv_halt();
+            ulp_release_gpios_and_wakeup_main();
             return 0;
         }
     }
@@ -238,9 +245,7 @@ int main(void)
     last_wake_btn   = 0;
     dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
     record_trace(10 /* EXIT_DISPATCH */, dispatch_reason, last_wake_btn);
-    exit_ccount = ULP_RISCV_GET_CCOUNT();
-    ulp_riscv_wakeup_main_processor();
-    ulp_riscv_halt();
+    ulp_release_gpios_and_wakeup_main();
 
     return 0;
 }
