@@ -22,6 +22,23 @@ static const char *TAG = "HAL_IO";
 
 esp_err_t hal_io_early_init(void)
 {
+    /* Configure runtime log levels:
+     * Keep default log level at INFO to silence internal driver ESP_EARLY_LOGD spam (e.g. ledc, SD_HOST),
+     * while explicitly elevating all H1OS application component tags to DEBUG.
+     * This preserves CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y in sdkconfig.defaults.dev without driver flooding. */
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("ledc", ESP_LOG_WARN);
+    esp_log_level_set("h1os_lifecycle", ESP_LOG_DEBUG);
+    esp_log_level_set("orch_flow", ESP_LOG_DEBUG);
+    esp_log_level_set("orch_display_sync", ESP_LOG_DEBUG);
+    esp_log_level_set("HAL_IO", ESP_LOG_DEBUG);
+    esp_log_level_set("HAL_FLASH", ESP_LOG_DEBUG);
+    esp_log_level_set("sub_power", ESP_LOG_DEBUG);
+    esp_log_level_set("sub_sdcard", ESP_LOG_DEBUG);
+    esp_log_level_set("sub_audio", ESP_LOG_DEBUG);
+    esp_log_level_set("sub_display", ESP_LOG_DEBUG);
+    esp_log_level_set("h1os_demo", ESP_LOG_DEBUG);
+
     // 1. Release sleep pad holds on dynamic peripheral & wake inputs
     // Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
     // are latched exclusively in the 2nd-stage bootloader (h1os_boot_hook.c).

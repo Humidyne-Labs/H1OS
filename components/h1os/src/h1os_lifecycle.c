@@ -132,6 +132,57 @@ static void debug_dump_ext1_wake_status(uint64_t ext1_pins, bool button_woke, bo
              (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
 }
 
+/**
+ * @brief Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
+ */
+static void h1os_log_flow_banner(orch_flow_type_t flow)
+{
+    orch_persisted_state_t *st = orch_state_get();
+    const char *flow_title = "UNKNOWN FLOW";
+    const char *trigger_desc = "None";
+
+    switch (flow) {
+    case ORCH_FLOW_BOOT:
+        flow_title = "[COLD BOOT INITIALIZATION]";
+        trigger_desc = "Power-On Reset / Hard Reset";
+        break;
+    case ORCH_FLOW_A_SAMPLE:
+        flow_title = "[FLOW A - QUIESCENT SENSOR SAMPLE BURST]";
+        trigger_desc = "ULP Periodic Sleep Timer (60s tick)";
+        break;
+    case ORCH_FLOW_B_MAIN_WAKE:
+        flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
+#if CONFIG_ULP_COPROC_ENABLED
+        if (ulp_last_wake_btn == 1) {
+            trigger_desc = "ULP Tactile Press (BOOT / GPIO 0)";
+        } else if (ulp_last_wake_btn == 2) {
+            trigger_desc = "ULP Tactile Press (POWER / GPIO 18)";
+        } else {
+            trigger_desc = "External RTC Alarm / Timer Tick";
+        }
+#else
+        trigger_desc = "Direct Hardware Wake Event";
+#endif
+        break;
+    case ORCH_FLOW_CRITICAL_OFF:
+        flow_title = "[CRITICAL LOW POWER SHUTDOWN]";
+        trigger_desc = "Battery Brownout Guard (< 3.25V)";
+        break;
+    case ORCH_FLOW_BOOTLOADER_JUMP:
+        flow_title = "[ROM BOOTLOADER JUMP MODE]";
+        trigger_desc = "BOOT Button Long-Press (>= 3.0s)";
+        break;
+    }
+
+    ESP_LOGI(TAG, "================================================================================");
+    ESP_LOGI(TAG, ">>> H1OS ACTIVE FLOW: %s <<<", flow_title);
+    ESP_LOGI(TAG, ">>> Trigger Source  : %s", trigger_desc);
+    ESP_LOGI(TAG, ">>> Boot Count      : %lu | Wake Count: %lu | Session Inactivity: %lu s",
+             (unsigned long)st->boot_count, (unsigned long)st->wake_count,
+             (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+    ESP_LOGI(TAG, "================================================================================");
+}
+
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
 {
     if (config != NULL) {
@@ -163,6 +214,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 3. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
+    h1os_log_flow_banner(flow);
 
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
         ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");

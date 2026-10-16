@@ -21,12 +21,13 @@ static const char *TAG = "sub_sdcard";
 
 static sdmmc_card_t *s_sd_card = NULL;
 static TaskHandle_t  s_mount_task = NULL;
+static bool          s_card_absent_latched = false;
 
 static void sdcard_mount_worker_task(void *pvParameters)
 {
     (void)pvParameters;
-    if (!sub_sdcard_probe()) {
-        ESP_LOGD(TAG, "MicroSD pre-flight check: No card detected in slot. Skipping mount.");
+    if (s_card_absent_latched) {
+        ESP_LOGD(TAG, "MicroSD slot known empty (latched). Bypassing async mount.");
         s_mount_task = NULL;
         vTaskDelete(NULL);
         return;
@@ -36,7 +37,7 @@ static void sdcard_mount_worker_task(void *pvParameters)
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Asynchronous MicroSD mount successful.");
     } else {
-        ESP_LOGD(TAG, "Asynchronous MicroSD mount failed: %s (no card inserted or unformatted)", esp_err_to_name(err));
+        ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)", esp_err_to_name(err));
     }
     s_mount_task = NULL;
     vTaskDelete(NULL);
@@ -47,10 +48,14 @@ bool sub_sdcard_probe(void)
     if (s_sd_card != NULL) {
         return true;
     }
+    if (s_card_absent_latched) {
+        return false;
+    }
 
     /* Fast electrical check on DAT0 (GPIO 40) and CMD (GPIO 41):
      * Pull down briefly. SD cards actively pull DAT0/CMD high on power-up.
-     * If floating or pulled down, no card is physically attached. */
+     * Note: Waveshare PCB has external 10k pull-ups, so electrical pull-down probe
+     * may read high even without a card. Initial mount timeout confirms true presence. */
     gpio_config_t probe_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_SD_MISO) | (1ULL << HAL_PIN_SD_MOSI),
         .mode         = GPIO_MODE_INPUT,
@@ -70,7 +75,7 @@ bool sub_sdcard_probe(void)
     gpio_reset_pin(HAL_PIN_SD_MISO);
     gpio_reset_pin(HAL_PIN_SD_MOSI);
 
-    /* If either pin was pulled high against the internal pulldown, card is detected */
+    /* If both pins were pulled to ground, definitely no card attached */
     return (miso_lvl != 0 || mosi_lvl != 0);
 }
 
@@ -78,6 +83,9 @@ esp_err_t sub_sdcard_mount_async(void)
 {
     if (s_sd_card != NULL) {
         return ESP_OK;
+    }
+    if (s_card_absent_latched) {
+        return ESP_ERR_NOT_FOUND;
     }
     if (s_mount_task != NULL) {
         /* Mount already in progress */
@@ -93,6 +101,9 @@ esp_err_t sub_sdcard_mount(void)
     if (s_sd_card != NULL) {
         ESP_LOGW(TAG, "SD Card already mounted");
         return ESP_OK;
+    }
+    if (s_card_absent_latched) {
+        return ESP_ERR_NOT_FOUND;
     }
 
     /* Fast pre-flight check: don't touch SDMMC peripheral if slot is empty */
@@ -123,21 +134,33 @@ esp_err_t sub_sdcard_mount(void)
     slot_config.cd    = SDMMC_SLOT_NO_CD;
     slot_config.wp    = SDMMC_SLOT_NO_WP;
 
-    esp_log_level_t prev_sdmmc_log = esp_log_level_get("sdmmc_common");
-    esp_log_level_t prev_vfs_log   = esp_log_level_get("vfs_fat_sdmmc");
-    esp_log_level_set("sdmmc_common",  ESP_LOG_WARN);
-    esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_WARN);
+    /* Temporarily silence low-level SD driver error noise during card discovery */
+    esp_log_level_set("sdmmc_common",  ESP_LOG_NONE);
+    esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_cmd",     ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_sd",      ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_io",      ESP_LOG_NONE);
+    esp_log_level_set("SD_HOST",       ESP_LOG_NONE);
+    esp_log_level_set("SD_TRANS",      ESP_LOG_NONE);
 
     esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config, &mount_config, &s_sd_card);
 
-    esp_log_level_set("sdmmc_common",  prev_sdmmc_log);
-    esp_log_level_set("vfs_fat_sdmmc", prev_vfs_log);
+    /* Restore normal warning level for future operations */
+    esp_log_level_set("sdmmc_common",  ESP_LOG_WARN);
+    esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_cmd",     ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_sd",      ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_io",      ESP_LOG_WARN);
+    esp_log_level_set("SD_HOST",       ESP_LOG_WARN);
+    esp_log_level_set("SD_TRANS",      ESP_LOG_WARN);
 
     if (ret != ESP_OK) {
         s_sd_card = NULL;
+        s_card_absent_latched = true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
         gpio_reset_pin(HAL_PIN_SD_CLK);
         gpio_reset_pin(HAL_PIN_SD_MOSI);
         gpio_reset_pin(HAL_PIN_SD_MISO);
+        ESP_LOGD(TAG, "MicroSD card not detected in slot (%s). Absent state latched.", esp_err_to_name(ret));
         return ret;
     }
 

@@ -65,10 +65,16 @@ int main(void)
     /* Initialize and enable input buffers for RTC GPIOs in the ULP domain */
     ulp_riscv_gpio_init(GPIO_NUM_5);
     ulp_riscv_gpio_input_enable(GPIO_NUM_5);
+    ulp_riscv_gpio_pullup(GPIO_NUM_5); /* PCF85063A INT is open-drain; internal pull-up required */
+    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_5);
+
     ulp_riscv_gpio_init(GPIO_NUM_0);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_0);
+    ulp_riscv_gpio_input_enable(GPIO_NUM_0); /* BOOT0 has external 10k pull-up to 3.3V */
+    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_0);
+
     ulp_riscv_gpio_init(GPIO_NUM_18);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_18);
+    ulp_riscv_gpio_input_enable(GPIO_NUM_18); /* BAT_KEY has external 10k pull-up to 3.3V */
+    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_18);
 
     /* Read RTC GPIO interrupt status and live pin levels immediately */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
@@ -106,35 +112,32 @@ int main(void)
             pressed_btn = (pwr_btn == 0 && boot_btn != 0) ? 2 : 1;
         }
 
-        /* If button is still held down, measure hold duration up to 3.0s */
+        gpio_num_t active_pin = (pressed_btn == 2) ? GPIO_NUM_18 : GPIO_NUM_0;
+
+        /* Precise pulse duration measurement: poll while pin is held LOW (agent_help.md pattern) */
         uint32_t hold_ms = 0;
-        while (hold_ms < 3000) {
+        while (ulp_riscv_gpio_get_level(active_pin) == 0) {
             loop_sample_count++;
-            boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-            pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-            if ((pressed_btn == 1 && boot_btn != 0) || (pressed_btn == 2 && pwr_btn != 0)) {
-                /* Confirm button is truly released with a 2nd sample after 5ms to reject contact bounce */
-                ulp_riscv_delay_cycles(cycles_per_ms * 5);
-                int confirm_level = (pressed_btn == 1) ? ulp_riscv_gpio_get_level(GPIO_NUM_0)
-                                                       : ulp_riscv_gpio_get_level(GPIO_NUM_18);
-                if (confirm_level != 0) {
-                    /* Confirmed release: User released the button */
-                    break;
-                }
-            }
-            ulp_riscv_delay_cycles(cycles_per_ms * 10);
+            ulp_riscv_delay_cycles(cycles_per_ms * 10); /* 10 ms step */
             hold_ms += 10;
+            if (hold_ms >= 3000) {
+                break; /* Upper bound: Long-press threshold reached */
+            }
         }
         hold_duration_ms = hold_ms;
-
-        /* Debounce stabilization: if pin is still depressed, wait briefly */
-        if (boot_btn == 0 || pwr_btn == 0) {
-            ulp_riscv_delay_cycles(cycles_per_ms * 20);
-        }
 
         /* Clear RTC GPIO status and ULP wakeup latch */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
+
+        /* Glitch filter: Ignore contact bounce/transients shorter than 20 ms if no latched interrupt */
+        if (hold_ms < 20 && ((rtcio_int_st & (BIT(0) | BIT(18))) == 0)) {
+            exit_ccount = ULP_RISCV_GET_CCOUNT();
+            ulp_riscv_halt();
+            return 0;
+        }
+
+        last_wake_btn = pressed_btn;
 
         if (hold_ms >= 3000) {
             if (pressed_btn == 1) {
@@ -144,19 +147,16 @@ int main(void)
                 /* POWER held >= 3.0s: Prime Power Off */
                 dispatch_reason = 5; /* ULP_DISPATCH_POWER_OFF */
             }
-            last_wake_btn = pressed_btn;
-            exit_ccount = ULP_RISCV_GET_CCOUNT();
-            ulp_riscv_wakeup_main_processor();
-            return 0;
         } else {
-            /* Any tap released < 3.0s: Wake Flow B Interactive Session */
+            /* Normal User Tap released < 3.0s: Wake Flow B Interactive Session */
             boot_btn_events++;
-            last_wake_btn   = pressed_btn;
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-            exit_ccount = ULP_RISCV_GET_CCOUNT();
-            ulp_riscv_wakeup_main_processor();
-            return 0;
         }
+
+        exit_ccount = ULP_RISCV_GET_CCOUNT();
+        ulp_riscv_wakeup_main_processor();
+        ulp_riscv_halt();
+        return 0;
     }
 
     /* =========================================================================
