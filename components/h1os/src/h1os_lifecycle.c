@@ -78,23 +78,8 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
 
 static void h1os_session_monitor_task(void *arg)
 {
-    hal_btn_mask_t last_btn_state = HAL_BTN_NONE;
-
     while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(50));
-
-        /* Direct Hardware Button Diagnostic & Session Keepalive */
-        hal_btn_mask_t current_btns = hal_io_read_buttons();
-        if (current_btns != last_btn_state) {
-            ESP_LOGI("HAL_BTN", "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)",
-                     (unsigned long)current_btns,
-                     (current_btns & HAL_BTN_BOOT) ? 1 : 0,
-                     (current_btns & HAL_BTN_POWER) ? 1 : 0);
-            last_btn_state = current_btns;
-            if (current_btns != HAL_BTN_NONE) {
-                h1os_reset_session_timer();
-            }
-        }
+        vTaskDelay(pdMS_TO_TICKS(500));
 
         /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
