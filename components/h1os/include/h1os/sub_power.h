@@ -82,6 +82,13 @@ void sub_power_cut_power_latch(void);
  */
 bool sub_power_connected_usb(void); 
 
+/**
+ * @brief Run minimal proof-of-life test: validates ULP dual wake (timer + external GPIO interrupts).
+ * Completely bypasses higher-level OS lifecycle.
+ * @return ESP_OK or error.
+ */
+esp_err_t sub_power_proof_of_life_test(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -18,6 +18,8 @@
 #include "driver/rtc_io.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <stdlib.h>
 
 #if CONFIG_ULP_COPROC_ENABLED
@@ -332,3 +334,92 @@ bool sub_power_connected_usb(void)
     ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
     return usb_state;
 }
+
+#if CONFIG_ULP_COPROC_ENABLED
+esp_err_t sub_power_proof_of_life_test(void)
+{
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    uint32_t causes_mask = esp_sleep_get_wakeup_causes();
+
+    ESP_LOGI("PROOF_OF_LIFE", "================================================================================");
+    ESP_LOGI("PROOF_OF_LIFE", "                     H1OS HARDWARE PROOF-OF-LIFE CHECK                          ");
+    ESP_LOGI("PROOF_OF_LIFE", "================================================================================");
+    ESP_LOGI("PROOF_OF_LIFE", "Boot / Wakeup Cause from SoC: %d (mask=0x%08" PRIx32 ")", (int)cause, causes_mask);
+
+    if (cause == ESP_SLEEP_WAKEUP_ULP || (causes_mask & BIT(ESP_SLEEP_WAKEUP_ULP))) {
+        const char *cause_str = "UNKNOWN";
+        if (ulp_last_wake_cause == 1) cause_str = "BOOT BUTTON (GPIO 0)";
+        else if (ulp_last_wake_cause == 2) cause_str = "POWER BUTTON (GPIO 18)";
+        else if (ulp_last_wake_cause == 3) cause_str = "PERIODIC TIMER TICK (10s)";
+        else if (ulp_last_wake_cause == 4) cause_str = "RTC ALARM (GPIO 5)";
+
+        ESP_LOGI("PROOF_OF_LIFE", ">>> MAIN CPU WOKEN BY ULP COPICROPROCESSOR! <<<");
+        ESP_LOGI("PROOF_OF_LIFE", "ULP Wake Counter:   %" PRIu32, (uint32_t)ulp_wake_counter);
+        ESP_LOGI("PROOF_OF_LIFE", "ULP Detected Cause: %s (%" PRIu32 ")", cause_str, (uint32_t)ulp_last_wake_cause);
+        ESP_LOGI("PROOF_OF_LIFE", "ULP Latched Status: 0x%08" PRIx32, (uint32_t)ulp_gpio_status_raw);
+        ESP_LOGI("PROOF_OF_LIFE", "ULP Button ID:      %" PRIu32, (uint32_t)ulp_last_wake_btn);
+        ESP_LOGI("PROOF_OF_LIFE", "================================================================================");
+        vTaskDelay(pdMS_TO_TICKS(2500));
+    } else {
+        ESP_LOGI("PROOF_OF_LIFE", "Cold boot detected. Loading ULP binary into RTC Slow SRAM...");
+        esp_err_t err = ulp_riscv_load_binary(ulp_h1os_bin_start, (size_t)(ulp_h1os_bin_end - ulp_h1os_bin_start));
+        if (err != ESP_OK) {
+            ESP_LOGE("PROOF_OF_LIFE", "Failed to load ULP binary: %s", esp_err_to_name(err));
+            return err;
+        }
+    }
+
+    /* 1. Configure RTC wake pins:
+     * Strict Rule: DO NOT call rtc_gpio_hold_en() on input pins! */
+    const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
+    for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
+        gpio_num_t pin = wake_pins[i];
+        rtc_gpio_init(pin);                                    /* MUX_SEL = 1, LP clock enabled */
+        rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY); /* FUN_IE = 1 */
+        if (pin == HAL_PIN_RTC_INT) {
+            rtc_gpio_pullup_en(pin);                           /* Open-drain PCF85063A INT */
+            rtc_gpio_pulldown_dis(pin);
+        } else {
+            rtc_gpio_pullup_dis(pin);                          /* Hardware 10k pull-up on PCB */
+            rtc_gpio_pulldown_dis(pin);
+        }
+
+        /* Arm comparator: WAKEUP_ENABLE = 1, INT_TYPE = 4 (LOW_LEVEL) */
+        SET_PERI_REG_MASK(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_WAKEUP_ENABLE);
+        REG_SET_FIELD(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_INT_TYPE, 4);
+    }
+
+    /* 2. Program 10-second periodic timer */
+    ulp_set_wakeup_period(0, 10000000ULL); // 10 seconds in microseconds
+
+    /* 3. Arm dual wakeup: GPIO wakeup + Sleep timer */
+    ulp_riscv_cfg_t cfg = {
+        .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO,
+    };
+    ulp_riscv_config_and_run(&cfg);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG,
+                      RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
+    /* 4. Allow ULP to wake the main CPU */
+    esp_sleep_enable_ulp_wakeup();
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+
+    ESP_LOGI("PROOF_OF_LIFE", "--------------------------------------------------------------------------------");
+    ESP_LOGI("PROOF_OF_LIFE", "Armed dual-wake: PIN0=0x%08" PRIx32 ", PIN18=0x%08" PRIx32 ", PIN5=0x%08" PRIx32 ", TIMER_REG=0x%08" PRIx32,
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG),
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG + 4 * HAL_PIN_BUTTON_POWER),
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG + 4 * HAL_PIN_RTC_INT),
+             (uint32_t)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG));
+    ESP_LOGI("PROOF_OF_LIFE", "Entering deep sleep NOW. Tap BOOT/POWER to test GPIO wake, or wait 10s for TIMER wake!");
+    ESP_LOGI("PROOF_OF_LIFE", "--------------------------------------------------------------------------------");
+
+    esp_deep_sleep_start();
+    return ESP_OK;
+}
+#else
+esp_err_t sub_power_proof_of_life_test(void)
+{
+    ESP_LOGE("PROOF_OF_LIFE", "ULP Coprocessor not enabled in sdkconfig!");
+    return ESP_ERR_NOT_SUPPORTED;
+}
+#endif

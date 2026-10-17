@@ -25,6 +25,7 @@
 #include "h1os/hal_io.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/sub_audio.h"
+#include "h1os/sub_power.h"
 #include "h1os/sub_sdcard.h"
 #include "screens.h"
 #include "humid1_cyber_wave.h"
@@ -202,34 +203,10 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
 }
 
 /* =========================================================================
- * Application Entry Point
+ * Application Entry Point (Hardware Proof-of-Life Mode)
  * ========================================================================= */
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Starting %s (%s v%s)", H1OS_NAME, H1OS_SUBTITLE, H1OS_VERSION_STRING);
-
-    h1os_lifecycle_t lifecycle = {
-        .on_boot                    = app_on_boot,
-        .on_wake                    = app_on_wake,
-        .on_pre_sleep               = app_on_pre_sleep,
-        .on_shutdown                = app_on_shutdown,
-        .presentation = {
-            .on_splash              = app_on_splash,
-            .on_chime               = NULL,
-            .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
-            .volume_pct             = 50, /* Vol: 50% */
-        },
-        .session = {
-            .inactivity_timeout_sec = 30,   /* Inactivity Timeout             */
-            .enable_dfs_80mhz       = true, /* Dynamic Freq Scaling           */
-            .flow_a_period_sec      = 60,   /* SHTC3 Sensor Read Period       */
-            .flow_b_period_sec      = 300,  /* Main App Wake Period (5min)    */
-        },
-        .user_data                  = NULL,
-    };
-
-    esp_err_t ret = h1os_start(&lifecycle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "H1OS Startup Failed: %s", esp_err_to_name(ret));
-    }
+    /* Bypassing full H1OS lifecycle to run isolated hardware proof-of-life test */
+    sub_power_proof_of_life_test();
 }
