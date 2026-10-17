@@ -308,6 +308,13 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     /* Keep RTC domain powered so ULP and RTC pad holds remain active */
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
+    ESP_LOGI(TAG, "RTC Wake Armed: PIN0=0x%08" PRIx32 ", PIN18=0x%08" PRIx32 ", PIN5=0x%08" PRIx32 ", TIMER_REG=0x%08" PRIx32 ", STATUS=0x%08" PRIx32,
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG),
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG + 4 * HAL_PIN_BUTTON_POWER),
+             (uint32_t)REG_READ(RTC_GPIO_PIN0_REG + 4 * HAL_PIN_RTC_INT),
+             (uint32_t)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
+             (uint32_t)REG_READ(RTC_GPIO_STATUS_REG));
+
     ESP_LOGI(TAG, "Entering deep sleep with ULP Coprocessor reactive monitor...");
     esp_deep_sleep_start();
     return ESP_OK;

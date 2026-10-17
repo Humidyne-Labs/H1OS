@@ -101,34 +101,35 @@ static inline void ulp_release_gpios_and_wakeup_main(void)
  */
 int main(void)
 {
+    /* 1. IMMEDIATELY snapshot RTC GPIO interrupt status upon core wake */
+    uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
+    gpio_status_raw = rtcio_int_st;
+
     entry_ccount = ULP_RISCV_GET_CCOUNT();
     wake_counter++;
     loop_sample_count = 0;
     hold_duration_ms = 0;
     trace_count = 0;
 
-    /* Initialize and enable input buffers for RTC GPIOs in the ULP domain */
+    /* Initialize and enable input buffers for RTC GPIOs in the ULP domain.
+     * Note: Wakeup comparators were already armed on Main CPU before sleep.
+     * Re-arming only occurs during glitch-filter aborts before halting. */
     ulp_riscv_gpio_init(GPIO_NUM_5);
     ulp_riscv_gpio_input_enable(GPIO_NUM_5);
     ulp_riscv_gpio_pullup(GPIO_NUM_5); /* PCF85063A INT is open-drain; internal pull-up required */
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_5);
-    ulp_arm_gpio_wakeup_pin(GPIO_NUM_5);
 
     ulp_riscv_gpio_init(GPIO_NUM_0);
     ulp_riscv_gpio_input_enable(GPIO_NUM_0); /* BOOT0 has external 10k pull-up on hardware */
     ulp_riscv_gpio_pullup_disable(GPIO_NUM_0);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_0);
-    ulp_arm_gpio_wakeup_pin(GPIO_NUM_0);
 
     ulp_riscv_gpio_init(GPIO_NUM_18);
     ulp_riscv_gpio_input_enable(GPIO_NUM_18); /* BAT_KEY has external 10k pull-up on hardware */
     ulp_riscv_gpio_pullup_disable(GPIO_NUM_18);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_18);
-    ulp_arm_gpio_wakeup_pin(GPIO_NUM_18);
 
-    /* Read RTC GPIO interrupt status and live pin levels immediately */
-    uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
-    gpio_status_raw = rtcio_int_st;
+    /* Read live pin levels */
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
     int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
     int rtc_int  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
