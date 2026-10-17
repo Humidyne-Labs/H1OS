@@ -317,10 +317,10 @@ hal_btn_mask_t hal_io_read_buttons(void)
 
 esp_err_t hal_io_isolate_sleep_pads(void)
 {
-    // Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
-    // remain untouched and held by the 2nd-stage bootloader.
+    // Note: Master power rails (BAT_CTRL, EPD_3V3_EN, PA_EN) 
+    // remain untouched and held by bootloader/BSP config.
 
-    // 1. Display SPI line isolation: Hold CS and RST HIGH
+    // 1. Display SPI line isolation: Hold CS and RST HIGH to prevent leakage
     gpio_set_level(HAL_PIN_EPD_CS, 1);
     gpio_hold_en(HAL_PIN_EPD_CS);
 
@@ -331,80 +331,46 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
-    // 3. Configure RTC IO domain pull-ups, LP IO sampling clock, and ULP wakeup triggers.
-    // Digital domain pull-ups vanish when VDD3P3_CPU powers down in deep sleep.
-    // RTC IO pull-ups maintain HIGH level so floating pads do not trigger false wakes.
-    // On ESP32-S3, LP IO clock must be explicitly enabled to sample RTC IO wake signals.
-    rtc_gpio_init(HAL_PIN_RTC_INT);
-    rtc_gpio_set_direction(HAL_PIN_RTC_INT, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(HAL_PIN_RTC_INT);
-    rtc_gpio_pulldown_dis(HAL_PIN_RTC_INT);
-    rtc_gpio_hold_en(HAL_PIN_RTC_INT);
-    io_mux_enable_lp_io_clock(HAL_PIN_RTC_INT, true);
-    rtc_gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
-
-    rtc_gpio_init(HAL_PIN_BUTTON_BOOT);
-    rtc_gpio_set_direction(HAL_PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_dis(HAL_PIN_BUTTON_BOOT);
-    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_BOOT);
-    rtc_gpio_hold_en(HAL_PIN_BUTTON_BOOT);
-    io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_BOOT, true);
-    rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
-
-    rtc_gpio_init(HAL_PIN_BUTTON_POWER);
-    rtc_gpio_set_direction(HAL_PIN_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_dis(HAL_PIN_BUTTON_POWER);
-    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
-    rtc_gpio_hold_en(HAL_PIN_BUTTON_POWER);
-    io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, true);
-    rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
-
-    // Allow LP IO clock synchronizers to sample the external 3.3V high level (at least 50-100 µs)
-    esp_rom_delay_us(100);
-
-    // Clear any pending/stale RTC GPIO interrupt status flags before sleeping
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-
-    // 4. Ensure User Status LED is turned OFF and latched in deep sleep
+    // 3. Ensure User Status LED is turned OFF and latched
     if (s_led_pwm_active) {
         hal_led_pwm_deinit();
     }
     gpio_set_level(HAL_PIN_STATUS_LED, 1);
     gpio_hold_en(HAL_PIN_STATUS_LED);
 
-    // 5. Enable deep sleep hold on all held pads
+    // 4. Latch digital pad states across deep sleep reset
     gpio_deep_sleep_hold_en();
 
-    // 5. Force RTC Peripherals domain to remain powered ON during deep sleep so RTC pad holds stay active
+    // 5. Keep RTC Peripherals powered so RTC pad configs and ULP stay alive
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
-    ESP_LOGD(TAG, "Sleep pads isolated and latched.");
+    ESP_LOGD(TAG, "Static sleep pads isolated and latched.");
     return ESP_OK;
 }
 
 esp_err_t hal_io_release_pad_holds(void)
 {
-    // Disable RTC wakeup triggers, release LP IO clock, and de-init RTC GPIO function to return wake pins to standard digital GPIO domain
-    rtc_gpio_wakeup_disable(HAL_PIN_RTC_INT);
-    rtc_gpio_wakeup_disable(HAL_PIN_BUTTON_BOOT);
-    rtc_gpio_wakeup_disable(HAL_PIN_BUTTON_POWER);
-    io_mux_enable_lp_io_clock(HAL_PIN_RTC_INT, false);
-    io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_BOOT, false);
-    io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, false);
+    // 1. Clear the global deep sleep hold latch.
+    // MUST be executed first; otherwise, individual gpio_hold_dis() calls have no effect.
+    gpio_deep_sleep_hold_dis();
+
+    // 2. Return wake pins to standard digital GPIO matrix
+    // Clears RTC MUX_SEL so the Xtensa core can use standard digital GPIO drivers/ISRs
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
 
-    // Release holds only on dynamic peripheral/wake pins (never touch GPIO 17, GPIO 6, or GPIO 42)
-    gpio_hold_dis(HAL_PIN_BUTTON_BOOT);
-    gpio_hold_dis(HAL_PIN_BUTTON_POWER);
-    gpio_hold_dis(HAL_PIN_RTC_INT);
+    // 3. Release individual holds on dynamic peripheral pins
+    // Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) 
+    // are deliberately omitted so their bootloader-latched states remain intact.
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);
     gpio_hold_dis(HAL_PIN_PA_CTRL);
     gpio_hold_dis(HAL_PIN_STATUS_LED);
+
     return ESP_OK;
 }
+
 
 bool hal_check_usb_ll(void)
 {

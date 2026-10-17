@@ -203,10 +203,31 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
 }
 
 /* =========================================================================
- * Application Entry Point (Hardware Proof-of-Life Mode)
+ * Application Entry Point
  * ========================================================================= */
 void app_main(void)
 {
-    /* Bypassing full H1OS lifecycle to run isolated hardware proof-of-life test */
-    sub_power_proof_of_life_test();
+    h1os_lifecycle_t lifecycle = {
+        .session = {
+            .inactivity_timeout_sec = 30,
+            .flow_a_period_sec      = 60,
+            .flow_b_period_sec      = 300,
+        },
+        .presentation = {
+            .chime_mask = (1 << H1OS_CHIME_BOOT) |
+                          (1 << H1OS_CHIME_WAKE) |
+                          (1 << H1OS_CHIME_SHUTDOWN),
+
+            .on_chime   = NULL,
+            .on_splash  = app_on_splash,
+        },
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_pre_sleep = app_on_pre_sleep,
+        .on_shutdown  = app_on_shutdown,
+        .user_data    = NULL,
+    };
+
+    h1os_start(&lifecycle);
 }
+

@@ -48,6 +48,8 @@ static const char *TAG = "sub_rtc";
 #define TIMER_CLK_1_60_HZ      (3 << 3)
 #define TIMER_ENABLE_BIT       (1 << 2)
 #define TIMER_INT_ENABLE_BIT   (1 << 1)
+#define TIMER_PULSE_MODE_BIT   (1 << 0)
+
 
 /* BCD Conversion Helpers */
 static inline uint8_t bcd2dec(uint8_t val) {
@@ -202,9 +204,10 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
     esp_err_t err = pcf85063_write_reg_u8(RTC_REG_TIMER_VALUE, timer_value);
     if (err != ESP_OK) return err;
 
-    /* 5. Start timer in Timer_mode (0x11): TE = 1, TIE = 1 */
-    uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT;
+    /* 5. Start timer in Timer_mode (0x11): TE = 1, TIE = 1, TI_TP = 1 (Repetitive Pulsed Mode) */
+    uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
     return pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, timer_mode);
+
 }
 
 esp_err_t sub_rtc_cancel_countdown(void)

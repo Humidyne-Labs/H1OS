@@ -5,9 +5,13 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 
 > **The Sleep-Gating Rule:** The ULP Coprocessor is gated strictly by the main application. It executes **only while the system is in deep sleep**. Once Flow B wakes, the dual-core Xtensa processor and LVGL take complete, exclusive control of the hardware. The ULP is completely idle and suppressed to ensure Flow B is never interrupted.
 
-> **The Reactive Rule:** The ULP **never polls in loops**. It wakes ONLY on two deterministic hardware conditions: an internal timer expiration or an external hardware interrupt (`EXTINT`).
+> **The Reactive Rule:** The ULP **never polls in loops**. It wakes ONLY on deterministic hardware conditions.
+>
+> > [!IMPORTANT]
+> > **ERR-001 Mitigation & Pure Event Mode:** As documented in [`errata.md`](file:///c:/Users/Matt/Documents/GitHub/H1OS/docs/architecture/errata.md), enabling both internal PMU sleep timer (`RTC_CNTL_ULP_CP_SLP_TIMER_EN`) and RTC GPIO wakeup (`RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA`) concurrently triggers silicon arbitration lockup on ESP32-S3. H1OS operates the ULP exclusively in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`). Periodic timing is delegated to the external PCF85063A RTC on `GPIO 5` in repetitive pulsed mode (`TI_TP = 1`). A ULP slice counter arbitrates between sensor sampling (`overflow - 1`) and main UI wake (`overflow`).
 
 ---
+
 
 ## 2. Core Responsibilities & Silicon Boundaries
 

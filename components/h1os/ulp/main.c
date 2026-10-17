@@ -1,10 +1,13 @@
 /*
  * SPDX-License-Identifier: MIT
- * ESP32-S3 ePaper BSP - Minimal Proof-of-Life ULP Coprocessor
+ * ESP32-S3 ePaper BSP - Pure Event Mode ULP Coprocessor
  *
- * Dedicated proof-of-life test:
- * Validates dual-wake arbitration (GPIO interrupts + periodic sleep timer)
- * without complex application dependencies.
+ * Implements deterministic time slicing using external PCF85063A 10s pulsed ticks on GPIO 5:
+ *   - Tactile Buttons (GPIO 0 / GPIO 18): Immediate wake of Main CPU into Flow B (Interactive UI).
+ *   - RTC INT Pulse (GPIO 5):
+ *       * slice_counter == (SLICES_OVERFLOW - 1): Pre-main sensor reading (Flow A prep), halt without waking CPU.
+ *       * slice_counter >= SLICES_OVERFLOW: Wake Main CPU (Flow A orchestrator / screen refresh).
+ *       * Intermediary slices: Clear wake latches and halt; Main CPU stays asleep.
  */
 
 #include <stdint.h>
@@ -12,105 +15,89 @@
 #include "ulp_riscv.h"
 #include "ulp_riscv_utils.h"
 #include "ulp_riscv_gpio.h"
-#include "ulp_riscv_adc_ulp_core.h"
 #include "soc/rtc_io_reg.h"
 #include "soc/rtc_cntl_reg.h"
 
-/* Exported variables accessible by the main Xtensa core via ulp_<var> */
-volatile uint32_t wake_counter    = 0;
-volatile uint32_t dispatch_reason = 0;
+#define SLICES_OVERFLOW 6 /* 6 slices of 10s = 60s Flow A interval */
 
-/* Battery Calibration Parameters (Preserved for linker compatibility) */
-volatile uint32_t cal_scale        = 1000;
-volatile int32_t  cal_offset       = 0;
-volatile uint32_t last_vbat_mv     = 4000;
-volatile uint32_t vbat_critical_mv = 3250;
-
-/* Button State Tracking */
-volatile uint32_t boot_btn_events = 0;
-volatile uint32_t last_wake_btn   = 0; /* 0: None/RTC/Timer, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
-volatile uint32_t cycles_per_ms   = 17500;
-
-/* Telemetry & Observability */
-volatile uint32_t last_wake_cause   = 0; /* 1: BOOT, 2: POWER, 3: TIMER, 4: RTC INT */
-volatile uint32_t gpio_status_raw   = 0; /* RTC_GPIO_STATUS_INT */
-volatile uint32_t hold_duration_ms  = 0;
-volatile uint32_t loop_sample_count = 0;
-volatile uint32_t entry_ccount      = 0;
-volatile uint32_t exit_ccount       = 0;
-
-#define ULP_TRACE_MAX 16
-volatile uint32_t trace_count = 0;
-volatile uint32_t trace_step[ULP_TRACE_MAX] = {0};
-volatile uint32_t trace_val1[ULP_TRACE_MAX] = {0};
-volatile uint32_t trace_val2[ULP_TRACE_MAX] = {0};
+/* Exported symbols accessible by Main CPU via ulp_h1os.h */
+volatile uint32_t wake_counter     = 0;
+volatile uint32_t slice_counter    = 0;
+volatile uint32_t dispatch_reason  = 0;
+volatile uint32_t last_wake_cause  = 0; /* 1: BOOT, 2: POWER, 3: SENSOR_BURST, 4: MAIN_WAKE */
+volatile uint32_t last_wake_btn    = 0;
+volatile uint32_t gpio_status_raw  = 0;
+volatile uint32_t entry_ccount     = 0;
+volatile uint32_t exit_ccount      = 0;
 
 int main(void)
 {
-    /* 1. IMMEDIATELY snapshot RTC GPIO interrupt status upon core wake */
+    /* 1. Snapshot interrupt status register immediately */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     gpio_status_raw = rtcio_int_st;
     wake_counter++;
     entry_ccount = ULP_RISCV_GET_CCOUNT();
-    cycles_per_ms = 17500;
-    hold_duration_ms = 0;
-    loop_sample_count = 0;
-    cal_scale = 1000;
-    cal_offset = 0;
-    vbat_critical_mv = 3250;
-    last_vbat_mv = 4000;
-    trace_count = 0;
-    trace_step[0] = 0;
-    trace_val1[0] = 0;
-    trace_val2[0] = 0;
 
-    /* 2. Configure input buffers to read live pin levels */
-    ulp_riscv_gpio_init(GPIO_NUM_0);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_0);
-    ulp_riscv_gpio_pullup_disable(GPIO_NUM_0);
-    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_0);
-
-    ulp_riscv_gpio_init(GPIO_NUM_18);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_18);
-    ulp_riscv_gpio_pullup_disable(GPIO_NUM_18);
-    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_18);
-
-    ulp_riscv_gpio_init(GPIO_NUM_5);
-    ulp_riscv_gpio_input_enable(GPIO_NUM_5);
-    ulp_riscv_gpio_pullup(GPIO_NUM_5);
-    ulp_riscv_gpio_pulldown_disable(GPIO_NUM_5);
-
+    /* 2. Sample live levels (pads already configured by main CPU) */
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
     int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
     int rtc_int  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
 
-    /* 3. Determine wake cause */
+    bool wake_main = false;
+
+    /* 3. Determine wake cause & dispatch logic */
     if (((rtcio_int_st & BIT(0)) != 0) || boot_btn == 0) {
-        last_wake_cause = 1; /* BOOT Button (GPIO 0) */
+        /* BOOT Button (GPIO 0) pressed: Immediate tactile wake */
+        last_wake_cause = 1;
         last_wake_btn   = 1;
-        dispatch_reason = 2;
+        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+        wake_main       = true;
     } else if (((rtcio_int_st & BIT(18)) != 0) || pwr_btn == 0) {
-        last_wake_cause = 2; /* POWER Button (GPIO 18) */
+        /* POWER Button (GPIO 18) pressed: Immediate tactile wake */
+        last_wake_cause = 2;
         last_wake_btn   = 2;
-        dispatch_reason = 2;
+        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+        wake_main       = true;
     } else if (((rtcio_int_st & BIT(5)) != 0) || rtc_int == 0) {
-        last_wake_cause = 4; /* RTC Alarm (GPIO 5) */
-        last_wake_btn   = 0;
-        dispatch_reason = 2;
+        /* External PCF85063A Periodic Pulse Tick (GPIO 5) */
+        slice_counter++;
+
+        if (slice_counter == (SLICES_OVERFLOW - 1)) {
+            /* Overflow - 1: Final sensor sample before main screen refresh */
+            last_wake_cause = 3; /* Flow A sensor sample / prep */
+            last_wake_btn   = 0;
+            dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
+            /* ULP completes preparatory housekeeping and halts without disturbing Main CPU */
+            wake_main       = false;
+        } else if (slice_counter >= SLICES_OVERFLOW) {
+            /* Overflow: Periodic cycle complete (60s), wake Main CPU for display update */
+            slice_counter   = 0;
+            last_wake_cause = 4; /* Main UI Wake */
+            last_wake_btn   = 0;
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            wake_main       = true;
+        } else {
+            /* Intermediary time slices: Quiescent, Main CPU remains deep asleep */
+            wake_main       = false;
+        }
     } else {
-        last_wake_cause = 3; /* Periodic Timer Wake */
-        last_wake_btn   = 0;
-        dispatch_reason = 1;
+        /* Spurious or unlatched trigger: clear and sleep */
+        wake_main = false;
     }
 
-    /* 4. Clear status latch and ULP GPIO wake trigger */
+    /* 4. Clear status latch and re-arm GPIO wakeup option */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    /* 5. Wake Main CPU to verify proof-of-life */
     exit_ccount = ULP_RISCV_GET_CCOUNT();
-    ulp_riscv_wakeup_main_processor();
-    ulp_riscv_halt();
+
+    /* 5. Conditionally wake Main CPU and cleanly shut down ULP */
+    if (wake_main) {
+        ulp_riscv_wakeup_main_processor();
+    }
+
+    ulp_riscv_shutdown();
     return 0;
 }
