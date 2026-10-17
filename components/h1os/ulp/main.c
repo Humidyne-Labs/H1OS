@@ -90,42 +90,47 @@ int main(void)
         last_wake_btn   = 0;
         dispatch_reason = 5; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
         wake_main       = true;
-    } else if (((rtcio_int_st & BIT(0)) != 0) || boot_btn == 0) {
-        /* BOOT Button (GPIO 0) pressed: Immediate tactile wake */
-        last_wake_cause = 1;
-        last_wake_btn   = 1;
-        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-        wake_main       = true;
-    } else if (((rtcio_int_st & BIT(18)) != 0) || pwr_btn == 0) {
-        /* POWER Button (GPIO 18) pressed: Immediate tactile wake */
-        last_wake_cause = 2;
-        last_wake_btn   = 2;
-        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-        wake_main       = true;
-    } else if (((rtcio_int_st & BIT(5)) != 0) || rtc_int == 0) {
-        /* External PCF85063A Periodic Pulse Tick (GPIO 5) */
-        slice_counter++;
+    }
 
-        if (slice_counter < overflow_limit) {
-            /* Short period: Sensor poll tick, wake Main CPU for Flow A sample */
-            last_wake_cause = 4; /* SENSOR TICK */
-            last_wake_btn   = 0;
-            dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
-            wake_main       = true;
-        } else if (slice_counter == overflow_limit) {
-            /* Long period reached: Main app overflow wake for Flow B */
-            slice_counter   = 0;
-            last_wake_cause = 3; /* LONG OVERFLOW WAKE */
-            last_wake_btn   = 0;
+    /* 5. Process Tactile Button and RTC Wake Triggers */
+    if (!wake_main) {
+        if (((rtcio_int_st & BIT(0)) != 0) || boot_btn == 0) {
+            /* BOOT Button (GPIO 0) pressed: Immediate tactile wake */
+            last_wake_cause = 1;
+            last_wake_btn   = 1;
             dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
             wake_main       = true;
+        } else if (((rtcio_int_st & BIT(18)) != 0) || pwr_btn == 0) {
+            /* POWER Button (GPIO 18) pressed: Immediate tactile wake */
+            last_wake_cause = 2;
+            last_wake_btn   = 2;
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            wake_main       = true;
+        } else if (((rtcio_int_st & BIT(5)) != 0) || rtc_int == 0) {
+            /* External PCF85063A Periodic Pulse Tick (GPIO 5) */
+            slice_counter++;
+
+            if (slice_counter < overflow_limit) {
+                /* Short period: Sensor poll tick, wake Main CPU for Flow A sample */
+                last_wake_cause = 4; /* SENSOR TICK */
+                last_wake_btn   = 0;
+                dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
+                wake_main       = true;
+            } else if (slice_counter == overflow_limit) {
+                /* Long period reached: Main app overflow wake for Flow B */
+                slice_counter   = 0;
+                last_wake_cause = 3; /* LONG OVERFLOW WAKE */
+                last_wake_btn   = 0;
+                dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+                wake_main       = true;
+            } else {
+                /* Post-overflow clamp: Discard trailing wakes until Main CPU re-arms */
+                wake_main       = false;
+            }
         } else {
-            /* Post-overflow clamp: Discard trailing wakes until Main CPU re-arms */
-            wake_main       = false;
+            /* Spurious or unlatched trigger: clear and sleep */
+            wake_main = false;
         }
-    } else {
-        /* Spurious or unlatched trigger: clear and sleep */
-        wake_main = false;
     }
 
     exit_ccount = ULP_RISCV_GET_CCOUNT();
