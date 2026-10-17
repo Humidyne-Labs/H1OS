@@ -66,7 +66,7 @@ typedef struct {
         } pcm;
     } params;
     SemaphoreHandle_t done_sem; /* Set for synchronous caller, NULL for async */
-    esp_err_t        *result;   /* Pointer to store execution result          */
+    esp_err_t        *result;   ///< Pointer to store execution result
 } audio_cmd_t;
 
 static i2s_chan_handle_t s_tx_chan = NULL;
@@ -74,12 +74,17 @@ static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited         = false;
 static bool s_i2s_chan_enabled     = false;
 static bool s_codec_in_standby     = false;
-static bool s_low_power_mode       = true; /* Default initialization mode is Low-Power (LPDAC enabled) */
+/** @brief Low power */
+static bool s_low_power_mode       = true;
 
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
-static uint8_t           s_volume_pct        = 0; /* Unconfigured/muted (0%) until set by lifecycle presentation */
+/** @brief Volume percentage (0% unconfigured/muted until set by lifecycle presentation) */
+static uint8_t           s_volume_pct        = 0;
+
+
+
 
 /*
  * Perceptual Volume Lookup Table (0% to 100%)
@@ -88,6 +93,7 @@ static uint8_t           s_volume_pct        = 0; /* Unconfigured/muted (0%) unt
  *   -   1% =  58 (0x3A) -> -66.5 dB (Barely audible)
  *   -   0% =   0 (0x00) -> -95.5 dB (Digital Mute)
  */
+/** @brief Vol table */
 static const uint8_t es8311_perceptual_vol_table[101] = {
     0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 0x61, 0x65, 0x68, 0x6B, //  0% -  9%
     0x6E, 0x71, 0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D, 0x7E, 0x80, // 10% - 19%
