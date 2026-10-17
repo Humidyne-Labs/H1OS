@@ -80,10 +80,10 @@ static inline void clear_ulp_gpio_wake_latch(void)
 
 static inline void ulp_release_gpios_and_wakeup_main(void)
 {
-    /* Release RTC IO ownership back to HP digital GPIO matrix before waking main CPU */
-    ulp_riscv_gpio_deinit(GPIO_NUM_0);
-    ulp_riscv_gpio_deinit(GPIO_NUM_18);
-    ulp_riscv_gpio_deinit(GPIO_NUM_5);
+    /* Note: We intentionally do NOT call ulp_riscv_gpio_deinit() here.
+     * De-initializing clears RTC_IO_TOUCH_PADx_MUX_SEL, disconnecting the pads from
+     * the RTC domain and disabling the wake comparator for subsequent sleep intervals.
+     * The Main CPU cleanly resets and reconfigures digital peripherals upon wake. */
     exit_ccount = ULP_RISCV_GET_CCOUNT();
     ulp_riscv_wakeup_main_processor();
     ulp_riscv_halt();

@@ -281,6 +281,16 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
         gpio_num_t pin = wake_pins[i];
+        rtc_gpio_init(pin);                                    /* sets MUX_SEL, routes pad to RTC domain */
+        rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY); /* enables FUN_IE in RTC domain */
+        if (pin == HAL_PIN_RTC_INT) {
+            rtc_gpio_pullup_en(pin);                           /* open-drain PCF85063A INT line requires pull-up */
+            rtc_gpio_pulldown_dis(pin);
+        } else {
+            rtc_gpio_pullup_dis(pin);                          /* buttons have external 10k pull-ups on PCB */
+            rtc_gpio_pulldown_dis(pin);
+        }
+        rtc_gpio_hold_en(pin);                                 /* preserve pad configuration across sleep */
         SET_PERI_REG_MASK(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_WAKEUP_ENABLE);
         REG_SET_FIELD    (RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_INT_TYPE, 4 /* ULP_RISCV_GPIO_INTR_LOW_LEVEL */);
     }
