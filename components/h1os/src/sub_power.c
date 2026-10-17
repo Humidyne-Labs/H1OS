@@ -281,6 +281,7 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 
     /* Clear any lingering GPIO wakeup latch and arm both ULP periodic sleep timer AND RTC GPIO wakeup */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG,
                       RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 #endif

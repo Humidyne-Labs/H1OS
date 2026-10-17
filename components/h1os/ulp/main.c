@@ -62,6 +62,22 @@ static inline void record_trace(uint32_t step, uint32_t v1, uint32_t v2)
     }
 }
 
+static inline void ulp_arm_gpio_wakeup_pin(gpio_num_t pin)
+{
+    /* Enable wakeup comparator for this RTC GPIO pin */
+    SET_PERI_REG_MASK(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_WAKEUP_ENABLE);
+    /* Set interrupt trigger type to LOW LEVEL (active LOW buttons & open-drain INT) */
+    REG_SET_FIELD(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_INT_TYPE, ULP_RISCV_GPIO_INTR_LOW_LEVEL);
+}
+
+static inline void clear_ulp_gpio_wake_latch(void)
+{
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    /* Strobe GPIO_WAKEUP_CLR: set then immediately clear to avoid suppressing future wakeups */
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+}
+
 static inline void ulp_release_gpios_and_wakeup_main(void)
 {
     /* Release RTC IO ownership back to HP digital GPIO matrix before waking main CPU */
@@ -96,16 +112,19 @@ int main(void)
     ulp_riscv_gpio_input_enable(GPIO_NUM_5);
     ulp_riscv_gpio_pullup(GPIO_NUM_5); /* PCF85063A INT is open-drain; internal pull-up required */
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_5);
+    ulp_arm_gpio_wakeup_pin(GPIO_NUM_5);
 
     ulp_riscv_gpio_init(GPIO_NUM_0);
     ulp_riscv_gpio_input_enable(GPIO_NUM_0); /* BOOT0 has external 10k pull-up on hardware */
     ulp_riscv_gpio_pullup_disable(GPIO_NUM_0);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_0);
+    ulp_arm_gpio_wakeup_pin(GPIO_NUM_0);
 
     ulp_riscv_gpio_init(GPIO_NUM_18);
     ulp_riscv_gpio_input_enable(GPIO_NUM_18); /* BAT_KEY has external 10k pull-up on hardware */
     ulp_riscv_gpio_pullup_disable(GPIO_NUM_18);
     ulp_riscv_gpio_pulldown_disable(GPIO_NUM_18);
+    ulp_arm_gpio_wakeup_pin(GPIO_NUM_18);
 
     /* Read RTC GPIO interrupt status and live pin levels immediately */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
@@ -174,13 +193,15 @@ int main(void)
         }
 
         /* Clear RTC GPIO status and ULP wakeup latch */
-        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-        ulp_riscv_gpio_wakeup_clear();
+        clear_ulp_gpio_wake_latch();
 
         /* Glitch filter: A valid tactile button press MUST be held for at least 20 ms.
          * Filter out transient spikes, contact bounce, and spurious unpressed wakes (<20 ms). */
         if (hold_ms < 20) {
             record_trace(7 /* GLITCH_FILTERED */, hold_ms, rtcio_int_st);
+            ulp_arm_gpio_wakeup_pin(GPIO_NUM_0);
+            ulp_arm_gpio_wakeup_pin(GPIO_NUM_18);
+            ulp_arm_gpio_wakeup_pin(GPIO_NUM_5);
             exit_ccount = ULP_RISCV_GET_CCOUNT();
             ulp_riscv_halt();
             return 0;
@@ -212,8 +233,7 @@ int main(void)
      * ========================================================================= */
     /* PCF85063A INT is Active LOW, open-drain */
     if (((rtcio_int_st & BIT(5)) != 0) || (rtc_int == 0)) {
-        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-        ulp_riscv_gpio_wakeup_clear();
+        clear_ulp_gpio_wake_latch();
         last_wake_btn   = 0; /* Woken by external RTC timer */
         dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
         record_trace(8 /* RTC_INT_DETECTED */, rtc_int, rtcio_int_st);
@@ -223,8 +243,7 @@ int main(void)
     }
 
     /* Clear any other stray RTC GPIO status bits */
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-    ulp_riscv_gpio_wakeup_clear();
+    clear_ulp_gpio_wake_latch();
 
     /* =========================================================================
      * 3. Periodic Soft-Timer Telemetry & Guard (Flow A, e.g. 60s)
