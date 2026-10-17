@@ -443,9 +443,11 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
 
     /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
      * cleanly through the DAC interpolation pipeline before worker goes idle */
+    /*
     int16_t postroll[FRAME_SIZE] = {0};
     size_t postroll_written = 0;
     i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
+    */ // Pipe flush not needed here, all it does is burn compute cycles.
 }
 
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
@@ -539,10 +541,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(1046, 150);
             break;
 
-        case 1: /* H1OS_CHIME_WAKE: 2-tone crisp wake (784 -> 1046 Hz) */
-            sub_audio_render_tone_samples(784, 60);
-            vTaskDelay(pdMS_TO_TICKS(10));
-            sub_audio_render_tone_samples(1046, 120);
+        case 1: /* H1OS_CHIME_WAKE: Stripped to prevent cavity heating and power draw */
             break;
 
         case 2: /* H1OS_CHIME_SLEEP: 3-tone descending sequence (1046 -> 784 -> 659 Hz) */

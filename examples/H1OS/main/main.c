@@ -215,12 +215,11 @@ void app_main(void)
         },
         .presentation = {
             .chime_mask = (1 << H1OS_CHIME_BOOT) |
-                          //(1 << H1OS_CHIME_WAKE) |
                           (1 << H1OS_CHIME_SHUTDOWN),
 
             .on_chime   = NULL,
             .on_splash  = app_on_splash,
-            .volume_pct = 50,
+            .volume_pct = 40,
         },
         .on_boot      = app_on_boot,
         .on_wake      = app_on_wake,
