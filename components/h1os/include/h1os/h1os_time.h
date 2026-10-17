@@ -17,6 +17,7 @@
 extern "C" {
 #endif
 
+/** @brief Time Format */
 typedef enum {
     H1OS_TIME_FMT_24H_SEC = 0, ///< "14:35:08"
     H1OS_TIME_FMT_24H_MIN = 1, ///< "14:35"
@@ -24,6 +25,7 @@ typedef enum {
     H1OS_TIME_FMT_12H_MIN = 3, ///< "02:35 PM"
 } h1os_time_format_t;
 
+/** @brief Date Format */
 typedef enum {
     H1OS_DATE_FMT_MM_DD_YY     = 0, ///< "09/26/26"
     H1OS_DATE_FMT_DOW          = 1, ///< "Saturday"

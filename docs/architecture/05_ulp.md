@@ -5,9 +5,14 @@ The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP3
 
 > **The Sleep-Gating Rule:** The ULP Coprocessor is gated strictly by the main application. It executes **only while the system is in deep sleep**. Once Flow B wakes, the dual-core Xtensa processor and LVGL take complete, exclusive control of the hardware. The ULP is completely idle and suppressed to ensure Flow B is never interrupted.
 
-> **The Reactive Rule:** The ULP **never polls in loops**. It wakes ONLY on two deterministic hardware conditions: an internal timer expiration or an external hardware interrupt (`EXTINT`).
+> **The Reactive Rule:** The ULP **never polls in loops**. It wakes ONLY on deterministic hardware conditions.
+>
+> > [!IMPORTANT]
+> > **ERR-001 Mitigation & Pure Event Mode:** As documented in [`errata.md`](file:///c:/Users/Matt/Documents/GitHub/H1OS/docs/architecture/errata.md), enabling both internal PMU sleep timer (`RTC_CNTL_ULP_CP_SLP_TIMER_EN`) and RTC GPIO wakeup (`RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA`) concurrently triggers silicon arbitration lockup on ESP32-S3. H1OS operates the ULP exclusively in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`). Periodic timing is delegated to the external PCF85063A RTC on `GPIO 5` in repetitive pulsed mode (`TI_TP = 1`). A dynamic integer division slice counter ($N_{\text{overflow}} = \lfloor T_{\text{flow\_b}} / T_{\text{flow\_a}} \rfloor$) arbitrates between sensor polling ticks ($x < N_{\text{overflow}}$) and main UI wake ($x = N_{\text{overflow}}$), cleanly discarding remainder fractions and clamping post-overflow wakes.
 
 ---
+
+
 
 ## 2. Core Responsibilities & Silicon Boundaries
 
@@ -91,17 +96,39 @@ typedef enum {
     ULP_DISPATCH_CRITICAL_SHUTDOWN  // Battery brownout threshold (<3.25V)
 } ulp_dispatch_reason_t;
 
-typedef struct {
-    ulp_dispatch_reason_t dispatch_reason;
-    uint32_t              ulp_wake_counter;
-    
-    // Battery Calibration & Health
-    uint16_t              adc_cal_scale;
-    int16_t               adc_cal_offset;
-    uint16_t              filtered_vbat_mv;
-    
-    // Button Tracking
-    uint32_t              boot_hold_ms;
-    uint32_t              power_hold_ms;
-} ulp_shared_data_t;
+/* Exported variables accessible by the main Xtensa core via ulp_<var> */
+extern uint32_t ulp_wake_counter;
+extern uint32_t ulp_dispatch_reason;
+extern uint32_t ulp_cal_scale;
+extern int32_t  ulp_cal_offset;
+extern uint32_t ulp_last_vbat_mv;
+extern uint32_t ulp_vbat_critical_mv;
+extern uint32_t ulp_boot_btn_events;
+extern uint32_t ulp_last_wake_btn; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
 ```
+
+---
+
+## 5. Silicon GPIO Wakeup Routing
+
+On ESP32-S3, waking the coprocessor from deep sleep via IO edges requires routing through the RTC IO domain:
+
+1. **RTC IO Interrupt Arming & Pad Holds:**
+   ```c
+   /* Configure RTC GPIO input lines for ULP reactive interrupt */
+   gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
+   gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
+   gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
+   gpio_hold_en(HAL_PIN_BUTTON_BOOT);
+   gpio_hold_en(HAL_PIN_BUTTON_POWER);
+   gpio_hold_en(HAL_PIN_RTC_INT);
+
+   /* Arm ULP coprocessor GPIO wakeup in RTC_CNTL alongside periodic sleep timer */
+   SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+   ```
+
+2. **Coprocessor vs. CPU Wake Separation:**
+   - When a button transitions LOW or the PCF85063A pulls INT LOW, the hardware wakes the **ULP-RISC-V core**.
+   - The dual-core Xtensa CPU **remains powered down** in deep sleep (`esp_sleep_enable_ext1_wakeup()` is NEVER invoked; only `esp_sleep_enable_ulp_wakeup()` is enabled).
+   - The ULP RISC-V program executes `main()`, determines the wake cause, debounces button hold/release transitions, clears the hardware interrupt latch via `ulp_riscv_gpio_wakeup_clear()`, updates shared RTC slow memory, and only wakes the Xtensa CPU via `ulp_riscv_wakeup_main_processor()` if a valid user event or RTC expiration occurs.
+

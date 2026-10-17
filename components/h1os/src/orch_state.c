@@ -7,17 +7,24 @@
 
 #include "h1os/orch_state.h"
 #include "esp_attr.h"
+#include "esp_system.h"
 #include <string.h>
 
-RTC_DATA_ATTR static orch_persisted_state_t s_persisted_state;
+RTC_NOINIT_ATTR static orch_persisted_state_t s_persisted_state;
+static bool s_boot_cleared = false;
 
 orch_persisted_state_t* RTC_IRAM_ATTR orch_state_get(void)
 {
-    if (s_persisted_state.magic != ORCH_RTC_MAGIC) {
+    /* Clean slate on any boot (cold power-on, USB reset, external reset) or invalid magic.
+     * Only deep sleep wakeups (ESP_RST_DEEPSLEEP) preserve the ring buffer across sleep cycles. */
+    if (s_persisted_state.magic != ORCH_RTC_MAGIC || 
+        (!s_boot_cleared && esp_reset_reason() != ESP_RST_DEEPSLEEP)) {
         orch_state_reset();
+        s_boot_cleared = true;
     }
     return &s_persisted_state;
 }
+
 
 void RTC_IRAM_ATTR orch_state_reset(void)
 {
@@ -26,13 +33,13 @@ void RTC_IRAM_ATTR orch_state_reset(void)
         p[i] = 0;
     }
     s_persisted_state.magic                    = ORCH_RTC_MAGIC;
-    s_persisted_state.sample_interval_sec      = 60;
-    s_persisted_state.flow_b_period_sec        = 120;
-    s_persisted_state.amb_floor_temp_centi_c   = 2500;
-    s_persisted_state.window_low_temp_centi_c  = 2500;
-    s_persisted_state.window_high_temp_centi_c = 2500;
-    s_persisted_state.last_glass_temp_centi_c  = 2500;
-    s_persisted_state.trinode_confidence_pct   = 100;
+    s_persisted_state.sample_interval_sec      = 0;
+    s_persisted_state.flow_b_period_sec        = 0;
+    s_persisted_state.amb_floor_temp_centi_c   = 0; /* 0 indicates uninitialized / NA */
+    s_persisted_state.window_low_temp_centi_c  = 0; /* 0 indicates uninitialized / NA */
+    s_persisted_state.window_high_temp_centi_c = 0; /* 0 indicates uninitialized / NA */
+    s_persisted_state.last_glass_temp_centi_c  = 0; /* 0 indicates uninitialized / NA */
+    s_persisted_state.trinode_confidence_pct   = 0; /* 0 indicates uninitialized / NA */
 }
 
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)

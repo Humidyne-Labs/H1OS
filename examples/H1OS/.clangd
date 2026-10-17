@@ -1,11 +1,14 @@
 CompileFlags:
+  CompilationDatabase:
+    - build_dev
+    - build_prod
   Add:
     - -Wno-unknown-attributes
     - -Wno-macro-redefined
   Remove:
     - -fno-tree-switch-conversion
-	- -f*
-	- -m*
+    - -f*
+    - -m*
 
 Diagnostics:
   UnusedIncludes: Strict

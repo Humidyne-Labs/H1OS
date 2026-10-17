@@ -178,7 +178,8 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
     t.length = HAL_EPD_FRAME_SIZE_BYTES * 8;
     t.tx_buffer = frame_buffer;
 
-    esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t);
+    /* Use interrupt-driven GDMA transmit so FreeRTOS yields CPU during 2ms 5KB transfer */
+    esp_err_t ret = spi_device_transmit(s_spi_dev, &t);
     epd_set_cs(1);
     return ret;
 }
@@ -208,7 +209,9 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     }
 
     // 3. Data Read Phase: D/C# = 1 (Hardware SPI half-duplex 3-wire read on SDA)
+    // Hold CD line firmly HIGH before and during read data phase
     epd_set_dc(1);
+    esp_rom_delay_us(5);
     spi_transaction_t t_read;
     memset(&t_read, 0, sizeof(t_read));
 	

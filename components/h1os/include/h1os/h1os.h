@@ -7,7 +7,7 @@
  * Role: E-Class Environmental Telemetry Executive Engine
  *
  * @version 2.0.0-dev
- * @attribution
+ * @par Attribution:
  * - Architecture & System Design: HUMIDYNE LABS / Humiditron
  * - AI Systems Co-Developer: Gemini (Google DeepMind)
  *
@@ -42,31 +42,31 @@ extern "C" {
  * Lifecycle Types & Contexts
  * ========================================================================= */
 typedef struct {
-    esp_reset_reason_t       reset_reason;
+    esp_reset_reason_t       reset_reason;       ///< Reset reason
     uint32_t                 wakeup_causes;      ///< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes)
-    uint32_t                 boot_count;
-    uint32_t                 deep_sleep_count;
-    bool                     woke_from_button;
-    uint8_t                  wake_button;
-    uint32_t                 sleep_duration_sec;
-    void                     *user_data;
+    uint32_t                 boot_count;         ///< Boot count
+    uint32_t                 deep_sleep_count;   ///< Deep sleep count
+    bool                     woke_from_button;   ///< Woke from button
+    uint8_t                  wake_button;        ///< Wake button GPIO
+    uint32_t                 sleep_duration_sec; ///< Sleep duration in seconds
+    void                     *user_data;         ///< User data
 } h1os_wake_context_t;
 
+/** @brief Splash screens */
 typedef enum {
-    H1OS_SPLASH_BOOT = 0,
-    H1OS_SPLASH_WAKE,
-    H1OS_SPLASH_SLEEP,
-    H1OS_SPLASH_SHUTDOWN,
-    H1OS_SPLASH_MAX
+    H1OS_SPLASH_BOOT = 0, ///< Boot
+    H1OS_SPLASH_SLEEP,    ///< Sleep
+    H1OS_SPLASH_SHUTDOWN, ///< Shutdown
+    H1OS_SPLASH_MAX       ///< Max
 } h1os_splash_type_t;
 
+/** @brief Chime Types */
 typedef enum {
-    H1OS_CHIME_BOOT = 0,
-    H1OS_CHIME_WAKE,
-    H1OS_CHIME_SLEEP,
-    H1OS_CHIME_SHUTDOWN,
-    H1OS_CHIME_ALARM,
-    H1OS_CHIME_MAX
+    H1OS_CHIME_BOOT = 0,  ///< Boot
+    H1OS_CHIME_SLEEP,     ///< Sleep
+    H1OS_CHIME_SHUTDOWN,  ///< Shutdown
+    H1OS_CHIME_ALARM,     ///< Alarm
+    H1OS_CHIME_MAX        ///< Max
 } h1os_chime_type_t;
 
 typedef void (*h1os_boot_cb_t)     (void *user_data);
@@ -107,12 +107,12 @@ typedef struct {
  * ========================================================================= */
 typedef struct {
     // Active Ambient & Psychrometric Readings (Current Valid Sample or Promoted Reference)
-    float    ambient_temp_c;
-    float    ambient_temp_f;
-    float    ambient_rh_pct;
-    float    dew_point_c;
-    float    dew_point_f;
-    float    absolute_humidity_g;
+    float    ambient_temp_c;          ///< Ambient temp C
+    float    ambient_temp_f;          ///< Ambient temp F
+    float    ambient_rh_pct;          ///< Ambient RH %
+    float    dew_point_c;             ///< Dew point C
+    float    dew_point_f;             ///< Dew point F
+    float    absolute_humidity_g;     ///< Absolute humidity g
 
     // Three-Tier Temporal Hierarchy Metrics
     float    window_low_c;            ///< Valid Window Floor (min over valid 32-sample window)
@@ -123,20 +123,20 @@ typedef struct {
     float    rh_historical_pct;       ///< Long-term light EWMA relative humidity history
 
     // Multi-Node & Tri-Node Confidence Diagnostics
-    float    raw_shtc3_temp_c;
-    float    mcu_die_temp_c;
-    float    epd_glass_temp_c;
+    float    raw_shtc3_temp_c;        ///< Raw SHTC3 temp C
+    float    mcu_die_temp_c;          ///< MCU die temp C
+    float    epd_glass_temp_c;        ///< EPD glass temp C
     float    trinode_temp_c;          ///< (T_valid + T_die + T_glass) / 3.0
     float    trinode_delta_c;         ///< T_valid - T_trinode
     uint8_t  trinode_confidence_pct;  ///< 0-100% linear confidence score
 
     // Quality & Stability Metrics
-    bool     is_thermally_settled;
+    bool     is_thermally_settled;    ///< Is thermally settled
     uint16_t valid_trend;             ///< Consecutive thermally settled Flow A samples
-    uint32_t sample_count;
-    uint16_t battery_mv;
-    uint8_t  battery_percent;
-    bool     is_usb_powered;
+    uint32_t sample_count;            ///< Sample count
+    uint16_t battery_mv;              ///< Battery mV
+    uint8_t  battery_percent;         ///< Battery percent
+    bool     is_usb_powered;          ///< Is USB powered
 } h1os_telemetry_t;
 
 /* =========================================================================

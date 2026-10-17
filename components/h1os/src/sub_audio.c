@@ -16,6 +16,7 @@
  */
 
 #include "h1os/sub_audio.h"
+#include "h1os/h1os.h"
 #include "h1os/hal_i2c.h"
 #include "h1os/hal_types.h"
 #include "driver/gpio.h"
@@ -66,7 +67,7 @@ typedef struct {
         } pcm;
     } params;
     SemaphoreHandle_t done_sem; /* Set for synchronous caller, NULL for async */
-    esp_err_t        *result;   /* Pointer to store execution result          */
+    esp_err_t        *result;   ///< Pointer to store execution result
 } audio_cmd_t;
 
 static i2s_chan_handle_t s_tx_chan = NULL;
@@ -74,12 +75,17 @@ static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited         = false;
 static bool s_i2s_chan_enabled     = false;
 static bool s_codec_in_standby     = false;
-static bool s_low_power_mode       = true; /* Default initialization mode is Low-Power (LPDAC enabled) */
+/** @brief Low power */
+static bool s_low_power_mode       = true;
 
 static QueueHandle_t     s_audio_queue       = NULL;
 static TaskHandle_t      s_audio_task_handle = NULL;
 static volatile bool     s_audio_is_busy     = false;
-static uint8_t           s_volume_pct        = 50; /* Default 50% perceptual volume */
+/** @brief Volume percentage (0% unconfigured/muted until set by lifecycle presentation) */
+static uint8_t           s_volume_pct        = 0;
+
+
+
 
 /*
  * Perceptual Volume Lookup Table (0% to 100%)
@@ -88,6 +94,7 @@ static uint8_t           s_volume_pct        = 50; /* Default 50% perceptual vol
  *   -   1% =  58 (0x3A) -> -66.5 dB (Barely audible)
  *   -   0% =   0 (0x00) -> -95.5 dB (Digital Mute)
  */
+/** @brief Vol table */
 static const uint8_t es8311_perceptual_vol_table[101] = {
     0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 0x61, 0x65, 0x68, 0x6B, //  0% -  9%
     0x6E, 0x71, 0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D, 0x7E, 0x80, // 10% - 19%
@@ -216,7 +223,10 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x09, 0x0C); /* SDP_IN: 16-bit Philips I2S, unmuted */
     ret |= es8311_write_reg(0x0A, 0x0C); /* SDP_OUT: 16-bit Philips I2S, unmuted */
 
-    /* 8. Power on DAC and lock low-noise analog reference (Fixes Hiss) */
+    /* 8. Allow C_VMID fast-charge (0x0D = 0xFA) to saturate to AVDD/2 (1.65V) before switching to low-noise normal mode */
+    vTaskDelay(pdMS_TO_TICKS(35));
+
+    /* Power on DAC and lock low-noise analog reference (Fixes Hiss) */
     ret |= es8311_write_reg(0x17, 0xBF); /* ALC baseline */
     ret |= es8311_write_reg(0x0E, 0x02); /* Power down Mic/ADC Modulator; keep VROI on */
     ret |= es8311_write_reg(0x12, 0x00); /* DAC analog stage power ON */
@@ -224,9 +234,16 @@ static esp_err_t es8311_init_dac_registers(void)
     ret |= es8311_write_reg(0x0D, 0x01); /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
     ret |= es8311_write_reg(0x15, 0x40);
 
-    /* 9. Modulator dither & low-power bias configuration */
-    ret |= es8311_write_reg(0x37, 0x08); /* RAMP = OFF, EQ = OFF, datasheet in error! */
-    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias override */
+    /* 9. Modulator dither, Silicon Errata EQ bypass & low-power bias configuration:
+     * - SILICON ERRATA (Reg 0x37 = 0x08): The ES8311 datasheet incorrectly states that the digital
+     *   equalizer (EQ) is disabled by default. In physical silicon, failing to write 0x08 leaves
+     *   the digital EQ block active in the signal path without configured biquad filter coefficients,
+     *   producing catastrophic phase distortion and harsh buzzing ("sounds like death on 3 wheels").
+     *   Programming 0x08 explicitly disables the volume fade ramp and bypasses/disables the EQ.
+     * - LOW-POWER MODE (Reg 0x0F = 0x80): Standard default; the noise floor difference through the
+     *   NS4168 Class-D amplifier is completely negligible while saving dynamic battery power. */
+    ret |= es8311_write_reg(0x37, 0x08); /* SILICON ERRATA: Mandatory EQ bypass (0x08) & ramp disable */
+    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias default */
     ret |= es8311_write_reg(0x45, 0x00);
 
     /* DAC unmuted permanently (30sec + view time) for warm sessions */
@@ -424,7 +441,14 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
-    // No Delay, delay cuts samples durring playback
+
+    /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
+     * cleanly through the DAC interpolation pipeline before worker goes idle */
+    /*
+    int16_t postroll[FRAME_SIZE] = {0};
+    size_t postroll_written = 0;
+    i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
+    */ // Pipe flush not needed here, all it does is burn compute cycles.
 }
 
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
@@ -469,10 +493,11 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 
     // standby never entered at runtime
 
-    // 2. Unmute NS4168 Class-D amplifier and stream 2 zero buffers (32 ms)
-    // so the NS4168 H-bridge (~15 ms turn-on time) is fully active before the first tone sample! 
-    gpio_set_level(HAL_PIN_PA_CTRL, 1);
-    vTaskDelay(pdMS_TO_TICKS(25));
+    // 2. Unmute NS4168 Class-D amplifier if not already active
+    if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
+        gpio_set_level(HAL_PIN_PA_CTRL, 1);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 
     return ESP_OK;
 }
@@ -508,7 +533,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
     if (ret != ESP_OK) return ret;
 
     switch (type) {
-        case 0: /* H1OS_CHIME_BOOT: 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
+        case H1OS_CHIME_BOOT: /* 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
             sub_audio_render_tone_samples(523, 70);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(659, 70);
@@ -518,13 +543,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(1046, 150);
             break;
 
-        case 1: /* H1OS_CHIME_WAKE: 2-tone crisp wake (784 -> 1046 Hz) */
-            sub_audio_render_tone_samples(784, 60);
-            vTaskDelay(pdMS_TO_TICKS(10));
-            sub_audio_render_tone_samples(1046, 120);
-            break;
-
-        case 2: /* H1OS_CHIME_SLEEP: 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
+        case H1OS_CHIME_SLEEP: /* 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
             sub_audio_render_tone_samples(1046, 80);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(784, 80);
@@ -532,7 +551,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(659, 140);
             break;
 
-        case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
+        case H1OS_CHIME_SHUTDOWN: /* 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
             sub_audio_render_tone_samples(784, 90);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(659, 90);
@@ -540,7 +559,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(523, 180);
             break;
 
-        case 4: /* H1OS_CHIME_ALARM: Attention pulses */
+        case H1OS_CHIME_ALARM: /* Attention pulses */
             for (int i = 0; i < 2; i++) {
                 sub_audio_render_tone_samples(1760, 80);
                 vTaskDelay(pdMS_TO_TICKS(10));

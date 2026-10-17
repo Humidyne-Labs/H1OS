@@ -1,5 +1,4 @@
 dependencies:
   idf:                            ">=5.1"
-  lvgl/lvgl:                      "==9.6.0"
   h1os:
     path: "../../../components/h1os"

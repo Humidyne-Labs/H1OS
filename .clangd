@@ -1,12 +1,18 @@
 CompileFlags:
+  CompilationDatabase: "examples/H1OS/build_prod"
   Add:
     - -Wno-unknown-attributes
     - -Wno-macro-redefined
   Remove:
     - -fno-tree-switch-conversion
+    - -f*
+    - -m*
 
 Diagnostics:
   UnusedIncludes: Strict
+  Suppress:
+    - "-Wunused-function"
   ClangTidy:
     Remove:
       - modernize*
+      - "*"

@@ -49,7 +49,33 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct);
 esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_mv);
 
 /**
- * @brief Configure EXT1 wake sources and enter deep sleep.
+ * @brief Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
+ * Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration,
+ * configures the periodic wake timer (Flow A period), and arms the coprocessor.
+ *
+ * @param[in] flow_a_period_sec Periodic wake interval for Flow A telemetry in seconds.
+ * @return ESP_OK on success, or an error code.
+ */
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec);
+
+typedef enum {
+    SUB_POWER_SLEEP_FULL_CYCLE = 0,  /**< Normal Flow B sleep: arms PCF85063A countdown & resets slice_counter */
+    SUB_POWER_SLEEP_FLOW_A_BURST     /**< Flow A sample sleep: preserves running PCF85063A countdown & slice_counter */
+} sub_power_sleep_mode_t;
+
+/**
+ * @brief Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
+ * Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
+ *
+ * @param[in] sleep_seconds Timer duration in seconds (0 = timer disabled).
+ * @param[in] ext1_pins_mask Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
+ * @param[in] mode Full cycle or Flow A burst mode.
+ * @return Does not return on success (enters deep sleep).
+ */
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode);
+
+/**
+ * @brief Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).
  * Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
  *
  * @param[in] sleep_seconds Timer duration in seconds (0 = timer disabled).
@@ -73,5 +99,6 @@ void sub_power_cut_power_latch(void);
 bool sub_power_connected_usb(void); 
 
 #ifdef __cplusplus
+
 }
 #endif

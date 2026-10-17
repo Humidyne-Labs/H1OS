@@ -38,6 +38,63 @@ esp_err_t hal_io_early_init(void);
 esp_err_t hal_io_set_led(bool on);
 
 /**
+ * @brief Initializes LEDC hardware PWM controller for user LED on GPIO 3.
+ * Enables 10-bit hardware brightness resolution (0..100%) and hardware smooth fading.
+ * 
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_led_pwm_init(void);
+
+/**
+ * @brief Sets user LED brightness percentage using hardware PWM (0..100%).
+ * 
+ * @param brightness_pct Brightness percentage: 0 = OFF, 100 = Maximum.
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_led_set_brightness(uint8_t brightness_pct);
+
+/**
+ * @brief Smoothly fades user LED to target brightness using hardware fade engine.
+ * Non-blocking: hardware timer interpolates duty cycle with zero CPU overhead.
+ * 
+ * @param target_pct Target brightness percentage (0..100%).
+ * @param duration_ms Duration of fade transition in milliseconds.
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms);
+
+/**
+ * @brief Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+ * 
+ * Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+ * 
+ * @param cycle_period_ms Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0.
+ * @return ESP_OK on success, or ESP_FAIL if task creation fails.
+ */
+esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms);
+
+/**
+ * @brief Stops the asynchronous breathing task and turns the LED off.
+ * 
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_led_stop_breathing(void);
+
+/**
+ * @brief Queries whether the asynchronous breathing task is actively running.
+ * 
+ * @return True if breathing task is active, false otherwise.
+ */
+bool hal_led_is_breathing(void);
+
+/**
+ * @brief Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
+ * 
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_led_pwm_deinit(void);
+
+/**
  * @brief Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
  * 
  * Strictly for system shutdown; assertion of GPIO 17 is handled exclusively by the 2nd-stage bootloader.

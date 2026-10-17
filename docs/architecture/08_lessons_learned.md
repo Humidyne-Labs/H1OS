@@ -136,3 +136,30 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 | **Flash Write Timing** | On every partial/full flush | **Deferred** to sleep and shutdown only |
 | **Sub-Execution Budget** | ~15–25 ms (checking locks & math) | **Fast burst** (pure HAL raw read + integer gate) |
 | **Public API** | Fragmented across `bsp_*.h` headers | Unified `h1os.h` (`h1os_app_start`, `sleep`, `shutdown`) |
+
+---
+
+## 4. Production Lessons Learned: Thermal & Silicon Invariants
+
+### 4.1 Audio Codec Thermal Oscillation (26°C – 32°C)
+- **The Issue:** Overnight thermal imaging revealed periodic temperature cycling oscillating between 26°C and 32°C across the PCB enclosure.
+- **Root Cause:** When periodic wakes did not differentiate between unattended RTC updates and physical user button taps, the audio codec (ES8311) and Class-D amplifier (NS4168) were repeatedly initialized and taken out of standby. Even with zero audio output, powering the amplifier rails dissipates quiescent current directly into the internal enclosure volume.
+- **The Solution:** Audio initialization is strictly gated behind physical user presence (`is_user_wake = (!is_wake) || button_woke`). Unattended RTC countdown wakeups leave the audio hardware in complete <1 µA standby.
+
+### 4.2 The Danger of Silent Fallback Defaults
+- **The Issue:** Functions in the lifecycle engine contained silent magic fallback defaults (e.g. `if (sleep_sec == 0) sleep_sec = 300;` or `if (timeout_sec == 0) timeout_sec = 30;`).
+- **Why It Fails:** Silent fallbacks hide contract violations and configuration errors from the developer. If an application fails to configure a timer, silently substituting synthetic delays masks broken state machines and prevents proper testing.
+- **The Standard:** All silent fallbacks have been replaced with strict error logs (`ESP_LOGE`) and clean aborts (`ESP_ERR_INVALID_ARG`), forcing explicit contractual configuration at the application layer.
+
+### 4.3 Telemetry Cold Boot Conventions
+- Initializing persistent memory to synthetic room temperature (`25.0°C`) created false confidence and corrupted historical EWMA baselines during early boot.
+- All telemetry structures now strictly zero-out uninitialized state (`0.0°C` / `0` centi-units), allowing UI screens and downstream logic to unambiguously recognize uninitialized/NA conditions.
+
+### 4.4 ES8311 Register 0x37 Digital Equalizer Silicon Errata & Low-Power Default
+- **The Issue:** Severe harmonic distortion and intolerable acoustic buzzing ("sounds like death on 3 wheels") during synthesized audio tone playback.
+- **Root Cause:** The Everest Semiconductor ES8311 datasheet incorrectly states that the internal digital equalizer (EQ) block defaults to disabled. In physical silicon, failing to explicitly write `0x08` to Register `0x37` leaves the hardware EQ filter active in the audio signal path. With no biquad coefficients loaded, the uncalibrated filter stages severely distort and clip the output.
+- **The Solution:** 
+  1. Register `0x37` must be explicitly written with `0x08` during codec initialization, bypassing/disabling the uncalibrated digital EQ block and disabling the digital fade-in/out ramp.
+  2. Default to Low-Power DAC mode (`0x0F = 0x80`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible while delivering valuable energy savings.
+
+

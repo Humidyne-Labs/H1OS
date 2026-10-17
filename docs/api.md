@@ -1478,7 +1478,6 @@ Defined in h1os/h1os.h:55
 | Value | Description |
 |-------|-------------|
 | `H1OS_SPLASH_BOOT` |  |
-| `H1OS_SPLASH_WAKE` |  |
 | `H1OS_SPLASH_SLEEP` |  |
 | `H1OS_SPLASH_SHUTDOWN` |  |
 | `H1OS_SPLASH_MAX` |  |
@@ -1498,7 +1497,6 @@ Defined in h1os/h1os.h:63
 | Value | Description |
 |-------|-------------|
 | `H1OS_CHIME_BOOT` |  |
-| `H1OS_CHIME_WAKE` |  |
 | `H1OS_CHIME_SLEEP` |  |
 | `H1OS_CHIME_SHUTDOWN` |  |
 | `H1OS_CHIME_ALARM` |  |

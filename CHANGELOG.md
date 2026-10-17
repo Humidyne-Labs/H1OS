@@ -4,6 +4,42 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-prod] - 2026-10-16
+
+### 🚀 Added
+- **ULP-RISC-V Autonomous Reactive Coprocessor & Dual-Wake Engine** (`components/h1os/ulp/main.c`, `sub_power.c/.h`, `hal_io.c`):
+  - Established dual-wake architecture in `RTC_CNTL_ULP_CP_TIMER_REG` with simultaneous `RTC_CNTL_ULP_CP_SLP_TIMER_EN` (60s Flow A soft-timer) and `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` (instantaneous RTC GPIO wake).
+  - Explicitly enabled low-power IO sampling clock (`io_mux_enable_lp_io_clock()`) on ESP32-S3 for `HAL_PIN_RTC_INT` (GPIO 5), `HAL_PIN_BUTTON_BOOT` (GPIO 0), and `HAL_PIN_BUTTON_POWER` (GPIO 18) during sleep pad isolation, resolving silicon clock-gating of RTC level sampling.
+  - Implemented pure ULP wake to Xtensa CPU (`ESP_SLEEP_WAKEUP_ULP`) with zero CPU digital interrupt matrix exposure (`.intr_type = GPIO_INTR_DISABLE`), completely eliminating CPU watchdog panics.
+  - Implemented autonomous button hold classification in ULP: short tap ($30\text{ms}-2500\text{ms}$) wakes Flow B (`ULP_DISPATCH_MAIN_WAKE`), BOOT held $>2.5\text{s}$ triggers ROM bootloader jump (`ULP_DISPATCH_BOOTLOADER_JUMP`), and POWER held $>2.5\text{s}$ executes clean power-off (`ULP_DISPATCH_POWER_OFF`).
+- **Two-Stage Tactile Click Interaction** (`main.c`, `h1os_lifecycle.c`):
+  - Stage 1 (Deep Sleep Wake): First click is caught by ULP, waking Flow B to toggle the inverted awake badge in the UI without advancing the page or firing an audio tone.
+  - Stage 2 (Active Navigation): Second click is handled by running LVGL keypad event loop, triggering a 15ms audio tick and cycling the carousel.
+- **Canonical Build Skill & Tooling Harness Upgrade** (`.agents/skills/h1os-build/SKILL.md`, `idf_build_mcp_server.py`):
+  - Created `.agents/skills/h1os-build/SKILL.md` eliminating environment discovery loops and standardizing one-liner builds via `Microsoft.v6.1.PowerShell_profile.ps1`.
+  - Upgraded MCP server with dynamic workspace detection, `build_dir` (`build_prod`/`build_dev`) support, and automatic Espressif v6.1 profile execution.
+
+### 🛠️ Fixed & Refactored
+- **ULP Spurious 0ms Wake Elimination & Mandatory Glitch Filter** (`components/h1os/ulp/main.c`, `components/h1os/src/hal_io.c`):
+  - Added a 100 µs settling delay in `hal_io_isolate_sleep_pads()` following LP IO clock enabling (`io_mux_enable_lp_io_clock()`) before clearing `RTC_GPIO_STATUS_W1TC_REG`, ensuring input buffers synchronize the external 3.3V high level from hardware pull-up resistors and preventing `0x040001` from immediately re-latching.
+  - Made the ULP glitch filter strictly mandatory (`hold_ms < 20`): spurious wakes with 0ms hold or unheld pins are immediately recorded as `GLITCH_FILTERED`, clearing RTC interrupt flags and halting without waking the main processor.
+  - Prioritized actively held LOW levels (`boot_btn == 0` or `pwr_btn == 0`) during ULP button arbitration over stale interrupt latch status bits.
+- **Active Flow B Direct Button Monitor & Session Keepalive** (`components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/h1os_lvgl.cpp`):
+  - Integrated 50 ms direct polling of `hal_io_read_buttons()` inside `h1os_session_monitor_task`, logging hardware button transitions (`[HAL_BTN]`) and resetting the interactive session timer directly on COM3, completely decoupling button event visibility from LVGL display flush delays.
+  - Explicitly bound LVGL keypad indev to the active display (`lv_indev_set_display(s_lv_keypad_indev, s_lv_display)`).
+  - Streamlined `h1os_lvgl_port_task` loop by removing redundant outer recursive locks around `lv_timer_handler()` and clamping delay to 30 ms.
+- **Audio Codec Sleep Isolation & Thermal Mitigation** (`h1os_lifecycle.c`, `sub_audio.c`):
+  - Strictly gated ES8311 codec and NS4168 amplifier initialization behind user presence (`is_user_wake = (!is_wake) || button_woke`).
+  - Unattended periodic RTC wakes completely bypass audio initialization, keeping the codec in <1.0 µA standby and eliminating 26°C–32°C enclosure thermal oscillation.
+  - Bound audio volume strictly to lifecycle presentation settings (`volume_pct`), defaulting to `0` (muted) until explicitly initialized.
+- **Telemetry NA Standard & Elimination of Hardcoded Fallbacks** (`orch_state.c`, `sub_sensor.c`, `h1os_lifecycle.c`):
+  - Zeroed out all persistent metrics on cold boot (`amb_floor_temp_centi_c`, `window_low_temp_centi_c`, `window_high_temp_centi_c`, `last_glass_temp_centi_c` set to `0`), establishing `0.0°C` / `0%` as the unambiguous indicator for uninitialized / NA telemetry.
+  - Changed `sub_sensor_read_mcu_die_temp()` error fallback from synthetic `25.0f` to `0.0f`.
+  - Removed silent fallback timeouts (`300s`, `120s`, `30s`, `60%`) in `h1os_lifecycle.c`, enforcing strict error logging (`ESP_LOGE`) and clean aborts on unconfigured contract parameters.
+- **Diagnostic Modularity & Target-Scoped Build Cleanliness** (`orch_flow.c`, `examples/H1OS/CMakeLists.txt`):
+  - Extracted inline ring buffer serial hexdump into a modular static helper: `orch_flow_dump_ring_debug()`.
+  - Added target-scoped compiler warning suppression for `__idf_lvgl__lvgl` (`PRIVATE -w` and `SYSTEM TRUE`), eliminating FreeRTOS atomic header unused function warnings without relaxing diagnostics on application code.
+
 ---
 
 ## [2.1.0-alpha] - 2026-10-12

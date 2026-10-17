@@ -22,6 +22,7 @@ set(h1os_srcs
 
 set(bsp_requires
     esp_driver_gpio
+    esp_driver_ledc
     esp_driver_i2c
     esp_driver_i2s
     esp_driver_spi
@@ -129,6 +130,6 @@ target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS})
 if(CONFIG_ULP_COPROC_ENABLED)
     set(ulp_app_name "ulp_${COMPONENT_NAME}")
     set(ulp_sources "ulp/main.c")
-    set(ulp_exp_dep_srcs "src/hal_io.c" "src/orch_wake_stub.c")
+    set(ulp_exp_dep_srcs "src/hal_io.c" "src/orch_wake_stub.c" "src/sub_power.c" "src/orch_flow.c" "src/h1os_lifecycle.c")
     ulp_embed_binary(${ulp_app_name} "${ulp_sources}" "${ulp_exp_dep_srcs}")
 endif()

@@ -22,8 +22,10 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "h1os/h1os.h"
+#include "h1os/hal_io.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/sub_audio.h"
+#include "h1os/sub_power.h"
 #include "h1os/sub_sdcard.h"
 #include "screens.h"
 #include "humid1_cyber_wave.h"
@@ -102,32 +104,24 @@ static void keypad_event_cb(lv_event_t *e)
         if (key == 0 && lv_event_get_param(e) != NULL) {
             key = *(const uint32_t *)lv_event_get_param(e);
         }
+        ESP_LOGI(TAG, "Keypad event received: LV_EVENT_KEY (key=0x%lx)", (unsigned long)key);
+
         if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT) {
             // BOOT Button: Forward Cycle (Non-blocking acoustic feedback)
             sub_audio_play_tone_async(1046, 50);
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
-            ESP_LOGI(TAG, "Keypad forward: Navigating to page %u/%u",
+            ESP_LOGI(TAG, "Keypad forward (BOOT): Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
             return;
-        } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT) {
-            // Reverse Cycle (Non-blocking acoustic feedback)
+        } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT || key == LV_KEY_ENTER) {
+            // POWER Button: Reverse Cycle (Non-blocking acoustic feedback)
             sub_audio_play_tone_async(880, 50);
             s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-            ESP_LOGI(TAG, "Keypad reverse: Navigating to page %u/%u",
+            ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
-            return;
         }
-    }
-
-    if (code == LV_EVENT_SHORT_CLICKED) {
-        // POWER Button Short-Click (LV_KEY_ENTER): Reverse Cycle (Non-blocking acoustic feedback)
-        sub_audio_play_tone_async(880, 50);
-        s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-        ESP_LOGI(TAG, "Keypad short click (ENTER): Navigating to page %u/%u",
-                 s_app_state.active_page + 1, H1OS_NUM_SCREENS);
-        update_active_display();
     }
 }
 
@@ -140,8 +134,11 @@ static void app_on_boot(void *user_data)
     s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
-    // Probe MicroSD card
-    sub_sdcard_mount();
+    screen_base_set_awake_badge(true);
+    // Probe MicroSD card asynchronously on initial cold boot
+    sub_sdcard_mount_async();
+    // Gentle status LED heartbeat breathing during active interactive session
+    hal_led_start_breathing(2000);
     update_active_display();
 }
 
@@ -152,11 +149,20 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     if (s_app_state.boot_epoch_sec > 0 && now >= (time_t)s_app_state.boot_epoch_sec) {
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
-    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx)",
-             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes);
+    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx, ButtonWake: %d)",
+             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes, ctx->woke_from_button);
 
-    // Probe MicroSD card
-    sub_sdcard_mount();
+    if (ctx->woke_from_button) {
+        /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
+        ESP_LOGI(TAG, "First click intercepted by ULP: Inverting awake status badge.");
+        screen_base_set_awake_badge(true);
+        sub_sdcard_mount_async();
+        hal_led_start_breathing(2000);
+    } else {
+        /* Unattended external RTC countdown wake: Keep sleep badge */
+        screen_base_set_awake_badge(false);
+    }
+
     update_active_display();
 }
 
@@ -164,12 +170,14 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: PRE-SLEEP hook (Duration: %lu s)", (unsigned long)sleep_sec);
     screen_base_set_awake_badge(false);
+    hal_led_stop_breathing();
     sub_sdcard_unmount();
 }
 
 static void app_on_shutdown(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: SHUTDOWN hook executing");
+    hal_led_stop_breathing();
     sub_sdcard_unmount();
 }
 
@@ -190,7 +198,7 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         h1os_lvgl_unlock();
 
         /* Hold splash graphic briefly so it is visible before primary UI transition */
-        vTaskDelay(pdMS_TO_TICKS(6000));
+        vTaskDelay(pdMS_TO_TICKS(2*1000));
     }
 }
 
@@ -199,30 +207,27 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
  * ========================================================================= */
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Starting %s (%s v%s)", H1OS_NAME, H1OS_SUBTITLE, H1OS_VERSION_STRING);
-
     h1os_lifecycle_t lifecycle = {
-        .on_boot                    = app_on_boot,
-        .on_wake                    = app_on_wake,
-        .on_pre_sleep               = app_on_pre_sleep,
-        .on_shutdown                = app_on_shutdown,
-        .presentation = {
-            .on_splash              = app_on_splash,
-            .on_chime               = NULL,
-            .chime_mask             = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
-            .volume_pct             = 50, /* Vol: 50% */
-        },
         .session = {
-            .inactivity_timeout_sec = 30,   /* Inactivity Timeout             */
-            .enable_dfs_80mhz       = true, /* Dynamic Freq Scaling           */
-            .flow_a_period_sec      = 60,   /* SHTC3 Sensor Read Period       */
-            .flow_b_period_sec      = 300,  /* Main App Wake Period (5min)    */
+            .inactivity_timeout_sec = 30,
+            .flow_a_period_sec      = 60,
+            .flow_b_period_sec      = 300,
         },
-        .user_data                  = NULL,
+        .presentation = {
+            .chime_mask = (1 << H1OS_CHIME_BOOT) |
+                          (1 << H1OS_CHIME_SHUTDOWN),
+
+            .on_chime   = NULL,
+            .on_splash  = app_on_splash,
+            .volume_pct = 40,
+        },
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_pre_sleep = app_on_pre_sleep,
+        .on_shutdown  = app_on_shutdown,
+        .user_data    = NULL,
     };
 
-    esp_err_t ret = h1os_start(&lifecycle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "H1OS Startup Failed: %s", esp_err_to_name(ret));
-    }
+    h1os_start(&lifecycle);
 }
+

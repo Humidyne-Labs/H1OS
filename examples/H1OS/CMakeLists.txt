@@ -13,3 +13,14 @@ endif()
 
 include("${IDF_PATH}/tools/cmake/project.cmake")
 project(h1os)
+
+# Suppress compiler warnings originating strictly within external/managed libraries (e.g., LVGL)
+# without relaxing warning diagnostics on our own codebase:
+if(TARGET __idf_lvgl__lvgl)
+    # 1. Silence compiler warnings when building LVGL's own C/C++ source files (e.g., lv_freertos.c)
+    target_compile_options(__idf_lvgl__lvgl PRIVATE -w)
+
+    # 2. Treat LVGL headers as SYSTEM includes (-isystem) so any macro or header warnings
+    #    included inside our code are suppressed, while our own code remains strictly checked
+    set_target_properties(__idf_lvgl__lvgl PROPERTIES SYSTEM TRUE)
+endif()

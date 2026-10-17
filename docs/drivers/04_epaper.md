@@ -109,12 +109,23 @@ The SSD1681 includes an internal on-glass thermistor used to compensate electrop
 ### Invariant: Continuous CS# Hold
 Under 4-wire SPI on the SSD1681, **CS# must remain held LOW continuously** across both the Command Phase (`DC# = LOW`, MOSI sends `0x1B`) and the Data Read Phase (`DC# = HIGH`, SDA switches to input to read 2 bytes `[temp_int, temp_frac]`). See [`ERRATA.md` Errata E3](../../ERRATA.md#e3-ssd1681-3-wire-half-duplex-spi-cs-hold-violation) for full bus protocol details.
 
-### Mathematical Decoding
+### Mathematical Decoding & Bitfield Architecture
+The SSD1681 temperature sensor register structure (Command `0x1B`):
+- **Byte 0 (`temp_int`):** Signed 8-bit two's complement integer temperature in degrees Celsius ($1^\circ\text{C}$ per LSB). Range: $-40^\circ\text{C}$ to $+85^\circ\text{C}$.
+- **Byte 1 (`temp_frac`):** Fractional degree register.
+  - **Bit 7:** Fractional degree flag representing $2^{-1} = 0.5^\circ\text{C}$ ($50\text{ centi-}^\circ\text{C}$).
+  - **Bits 6:0:** Reserved (ignored).
+
 ```c
-int8_t temp_int   = (int8_t)raw_bytes[0];
-float  temp_frac  = (raw_bytes[1] & 0x80) ? 0.5f : 0.0f;
-float  glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
+static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;
+
+int8_t  temp_int  = (int8_t)temp_raw[0];
+int16_t frac_c   = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
+int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
 ```
+
+### Thermal Invariant: Pre-Display Capture Timing
+The on-glass reading must strictly be captured **before** any SPI DMA frame writes, waveform LUT loads, or charge-pump activations (`0x20 Master Activation`). Drawing lines or refreshing electrophoretic pigment dissipates brief micro-currents through the glass ITO layer, introducing a $+0.2^\circ\text{C}$ to $+0.5^\circ\text{C}$ transient thermal bias if read post-refresh.
 
 ---
 

@@ -6,8 +6,12 @@
  */
 
 #include "h1os/sub_power.h"
+#include "h1os/sub_rtc.h"
+#include "h1os/orch_state.h"
 #include "h1os/orch_wake_stub.h"
 #include "h1os/hal_io.h"
+
+
 #include "h1os/hal_types.h"
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
@@ -16,13 +20,40 @@
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/rtc_io_reg.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <stdlib.h>
+
+#include "ulp_riscv.h"
+#include "ulp_h1os.h"
+
+extern const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start");
+extern const uint8_t ulp_h1os_bin_end[]   asm("_binary_ulp_h1os_bin_end");
 
 static const char *TAG = "sub_power";
 
 static adc_oneshot_unit_handle_t s_adc_handle  = NULL;
 static adc_cali_handle_t         s_cali_handle = NULL;
 static bool                      s_cali_valid  = false;
+
+static void generate_vbat_lut(void)
+{
+    for (int i = 0; i <= 16; i++) {
+        uint32_t raw_point = (i == 16) ? 4095 : (i * 256);
+        int mv = 0;
+        if (s_cali_valid && s_cali_handle != NULL) {
+            adc_cali_raw_to_voltage(s_cali_handle, raw_point, &mv);
+        } else {
+            mv = (raw_point * 3100) / 4095;
+        }
+        /* 1:2 resistor divider (VBAT = V_ADC * 2) */
+        ulp_vbat_lut[i] = (uint32_t)(mv * 2);
+    }
+    ESP_LOGI(TAG, "ULP 17-Point Battery LUT generated: 0=%lu mV, 2048=%lu mV, 4095=%lu mV",
+             (unsigned long)ulp_vbat_lut[0], (unsigned long)ulp_vbat_lut[8], (unsigned long)ulp_vbat_lut[16]);
+}
 
 /* 13-point LiPo OCV Discharge Curve (matching legacy hardware calibration) */
 static const struct {
@@ -66,10 +97,10 @@ esp_err_t sub_power_init(void)
 {
     if (s_adc_handle != NULL) return ESP_OK;
 
-    /* 1. Initialize ADC1 Oneshot Unit */
+    /* 1. Initialize ADC1 Oneshot Unit in shared ULP RISC-V mode */
     adc_oneshot_unit_init_cfg_t unit_cfg = {
         .unit_id  = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
+        .ulp_mode = ADC_ULP_MODE_RISCV,
     };
     esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &s_adc_handle);
     if (err != ESP_OK) {
@@ -131,6 +162,16 @@ static int compare_int(const void *a, const void *b) {
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 {
     if (out_mv == NULL) return ESP_ERR_INVALID_ARG;
+
+    /* Architectural Invariant: If USB is plugged in, VBAT is always 4200 mV (100%) */
+    if (sub_power_connected_usb()) {
+        *out_mv = 4200;
+        if (out_pct != NULL) {
+            *out_pct = 100;
+        }
+        return ESP_OK;
+    }
+
     if (s_adc_handle == NULL) {
         esp_err_t err = sub_power_init();
         if (err != ESP_OK) return err;
@@ -195,29 +236,156 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
     return ESP_OK;
 }
 
-esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 {
-    /* Latch critical rails and freeze pad states with RTC pad holds */
+    /* Load binary on cold boot or if ULP memory was reset */
+    uint32_t causes = esp_sleep_get_wakeup_causes();
+    if (!(causes & BIT(ESP_SLEEP_WAKEUP_ULP))) {
+        ESP_LOGI(TAG, "Loading ULP-RISC-V Coprocessor binary...");
+        esp_err_t err = ulp_riscv_load_binary(ulp_h1os_bin_start, (size_t)(ulp_h1os_bin_end - ulp_h1os_bin_start));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "ulp_riscv_load_binary failed: %s", esp_err_to_name(err));
+            return err;
+        }
+
+        /* 1. Initialize ADC1 Oneshot and calibration handles prior to LUT generation */
+        sub_power_init();
+
+        /* 2. Pass battery calibration LUT into ULP exported symbols */
+        generate_vbat_lut();
+        ulp_dispatch_reason  = 0;
+        ulp_last_wake_btn    = 0;
+        ulp_last_vbat_mv     = 4000;
+
+        /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
+        uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
+        ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
+
+        /* Configure ULP to wake on GPIO wakeup source per reference architecture (Pure Event Mode) */
+        ulp_riscv_cfg_t cfg = {
+            .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO,
+        };
+        err = ulp_riscv_config_and_run(&cfg);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "ulp_riscv_config_and_run failed: %s", esp_err_to_name(err));
+            return err;
+        }
+
+        /* Ensure periodic hardware sleep timer is strictly disabled to prevent PMU arbitration lockup (ERR-001) */
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
+        /* Release RTC domain GPIO control back to HP digital matrix so HP application can read buttons during active boot session */
+        rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
+        rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+        rtc_gpio_deinit(HAL_PIN_RTC_INT);
+
+        ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized in Pure Event Mode (ERR-001 Mitigated)");
+    }
+    return ESP_OK;
+}
+
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
+{
+    (void)sleep_seconds;
+    (void)ext1_pins_mask;
+
     hal_io_isolate_sleep_pads();
 
-    if (ext1_pins_mask != 0) {
-        esp_sleep_enable_ext1_wakeup(ext1_pins_mask, ESP_EXT1_WAKEUP_ANY_LOW);
+    /* 1. Calculate dynamic slicing ratio and discard fractional remainder */
+    uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
+    uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
+    if (flow_a_sec == 0) flow_a_sec = 60;
+    if (flow_b_sec == 0) flow_b_sec = 300;
+
+    /* Integer floor division: N_overflow = floor(flow_b_sec / flow_a_sec).
+     * Deliberately discard remainder fraction (flow_b_sec % flow_a_sec)
+     * to lock execution onto a clean integer multiple of the polling tick. */
+    uint32_t overflow = flow_b_sec / flow_a_sec;
+    if (overflow == 0) overflow = 1;
+
+    if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
+        /* Arm external PCF85063A countdown timer in repetitive pulsed mode for small period (flow_a_sec) */
+        sub_rtc_arm_countdown(flow_a_sec);
     }
 
-    if (sleep_seconds > 0) {
-        esp_sleep_enable_timer_wakeup((uint64_t)sleep_seconds * 1000000ULL);
+    ulp_overflow_limit = overflow;
+    if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
+        ulp_slice_counter = 0;
+    }
+    ulp_dispatch_reason  = 0;
+    ulp_last_wake_btn    = 0;
+    ulp_last_wake_cause  = 0;
+    ulp_rtc_int_stuck    = 0;
+    ulp_usb_connected    = sub_power_connected_usb() ? 1 : 0;
+
+    ESP_LOGI(TAG, "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> Slices=%lu (SliceAcc=%lu, Remainder %lu s discarded, USB=%lu)",
+             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST",
+             (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,
+             (unsigned long)overflow, (unsigned long)ulp_slice_counter,
+             (unsigned long)(flow_b_sec % flow_a_sec),
+             (unsigned long)ulp_usb_connected);
+
+    const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
+    for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
+        gpio_num_t pin = wake_pins[i];
+        
+        /* 1. Route pad to RTC subsystem */
+        rtc_gpio_init(pin);
+        rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
+        
+        /* 2. Disarm any lingering pad hold on wake inputs */
+        rtc_gpio_hold_dis(pin);
+
+        /* 3. Configure pull-ups/pull-downs */
+        if (pin == HAL_PIN_RTC_INT) {
+            rtc_gpio_pullup_en(pin);
+            rtc_gpio_pulldown_dis(pin);
+        } else {
+            rtc_gpio_pullup_dis(pin); // External 10k pull-ups on PCB
+            rtc_gpio_pulldown_dis(pin);
+        }
+
+        /* 4. Enable level-low wake (sets int_type and wakeup_enable in RTCIO) */
+        rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
 
-    /* ULP coprocessor wakeup is enabled via ULP runtime */
+    /* ULP coprocessor wake source for the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Install RTC Wake Stub for <3ms Flow A autonomous sensor sampling */
-    orch_wake_stub_install();
+    /* 5. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    ESP_LOGI(TAG, "Entering deep sleep (%lu sec)...", (unsigned long)sleep_seconds);
+    /* 6. Allow slow clock domain synchronization delay (>= 3 RTC_SLOW_CLK cycles) */
+    esp_rom_delay_us(50);
+
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+
+    ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
+    ESP_LOGI(TAG, "RTC Controller: ULP_CP_TIMER=0x%08lx, RTC_STATUS=0x%08lx, RTC_IN=0x%08lx",
+             (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
+             (unsigned long)REG_READ(RTC_GPIO_STATUS_REG),
+             (unsigned long)REG_READ(RTC_GPIO_IN_REG));
+
+    ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
+             (unsigned long)flow_a_sec, (unsigned long)overflow);
     esp_deep_sleep_start();
     return ESP_OK;
 }
+
+esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
+{
+    return sub_power_enter_deep_sleep_mode(sleep_seconds, ext1_pins_mask, SUB_POWER_SLEEP_FULL_CYCLE);
+}
+
+
 
 void sub_power_cut_power_latch(void)
 {
@@ -230,4 +398,4 @@ bool sub_power_connected_usb(void)
     bool usb_state = hal_check_usb_ll();
     ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
     return usb_state;
-}
+}

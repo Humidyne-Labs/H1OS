@@ -19,6 +19,8 @@
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <time.h>
@@ -35,9 +37,7 @@ static const char *TAG = "orch_flow";
 #define ORCH_LEAKAGE_MARGIN_C        0.30f   /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
 #define ORCH_TRINODE_SPAN_C          15.0f   /* Linear confidence 0-100% span (15.0 C delta = 0%) */
 
-#if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
-#endif
 
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
@@ -68,9 +68,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     /* Check ULP Coprocessor dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-#if CONFIG_ULP_COPROC_ENABLED
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
-#endif
         if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN ||
             st->ulp_dispatch_reason == ULP_DISPATCH_POWER_OFF) {
             return ORCH_FLOW_CRITICAL_OFF;
@@ -78,19 +76,79 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
+        if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) {
+            return ORCH_FLOW_A_SAMPLE;
+        }
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
-    /* All non-boot wakeups reaching the OS are Flow B Main Wakes
-     * (Flow A runs strictly inside bsp_wake_stub during deep sleep) */
+    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
+        st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
+        return ORCH_FLOW_A_SAMPLE;
+    }
+
+    /* All non-boot wakeups reaching the OS are Flow B Main Wakes */
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
 void orch_flow_execute_sensor_sample(void)
 {
-    /* Architectural Invariant: Flow A executes strictly inside the bare-metal
-     * RTC Wake Stub (bsp_wake_stub) while Flow B is sleeping, and never at OS runtime. */
-    ESP_LOGW(TAG, "orch_flow_execute_sensor_sample called at OS runtime (no-op; Flow A is strictly in bsp_wake_stub)");
+    orch_persisted_state_t *st = orch_state_get();
+
+    uint16_t raw_t  = 0;
+    uint16_t raw_rh = 0;
+
+    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_t, &raw_rh, false);
+    if (err == ESP_OK) {
+        int16_t temp_centi_c  = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
+
+        float die_c = 0.0f;
+        sub_sensor_init();
+        sub_sensor_read_mcu_die_temp(&die_c);
+        sub_sensor_deinit();
+        int16_t die_centi_c = (int16_t)(die_c * 100.0f);
+
+        /* Evaluate successive-sample delta gate */
+        uint8_t q_flags = 0;
+        if (st->total_samples == 0) {
+            q_flags = 0;
+            st->valid_trend = 0;
+        } else {
+            uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
+            int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
+            int16_t diff = temp_centi_c - prev_t;
+            if (diff < 0) diff = -diff;
+
+            if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
+                st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
+                q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
+                if (st->valid_trend < 2) {
+                    st->valid_trend = 2;
+                } else {
+                    st->valid_trend++;
+                }
+            } else {
+                q_flags = 0;
+                st->valid_trend = 0;
+            }
+        }
+
+        orch_tri_node_sample_t sample = {
+            .shtc3_temp_centi_c = temp_centi_c,
+            .shtc3_rh_centi_pct = rh_centi_pct,
+            .mcu_tsens_centi_c  = die_centi_c,
+            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
+            .timestamp_sec      = (uint32_t)time(NULL),
+            .quality_flags      = q_flags,
+        };
+        orch_state_push_sample(&sample);
+        ESP_LOGI(TAG, "Flow A Sensor Sample committed: T=%.2f C, RH=%.2f %%, Die=%.2f C (Ring: %u/32, Trend: %u)",
+                 (float)temp_centi_c / 100.0f, (float)rh_centi_pct / 100.0f,
+                 (float)die_centi_c / 100.0f, st->ring_head, st->valid_trend);
+    } else {
+        ESP_LOGW(TAG, "Flow A SHTC3 read failed: %s", esp_err_to_name(err));
+    }
 }
 
 bool orch_flow_is_thermal_lockout(void)
@@ -107,6 +165,36 @@ void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec)
         st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
     } else {
         st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
+    }
+}
+
+static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
+{
+    if (st == NULL) return;
+
+    /* Build internal debug arrays */
+    float shtc3T_ring[ORCH_RING_CAPACITY];
+    float shtc3RH_ring[ORCH_RING_CAPACITY];
+    float mcuT_ring[ORCH_RING_CAPACITY];
+    float epdT_ring[ORCH_RING_CAPACITY];
+
+    /* Set to known state */
+    memset(shtc3T_ring,  0, sizeof(shtc3T_ring));
+    memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
+    memset(mcuT_ring,    0, sizeof(mcuT_ring));
+    memset(epdT_ring,    0, sizeof(epdT_ring));
+
+    ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
+    for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
+        shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
+        shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
+        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c  / 100.0f;
+        epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c  / 100.0f;
+        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i,
+                 shtc3T_ring[i], 
+                 shtc3RH_ring[i],
+                 mcuT_ring[i],
+                 epdT_ring[i]);
     }
 }
 
@@ -239,36 +327,8 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
              st->window_avg_shtc3_c, st->window_avg_die_c, st->temp_historical_c,
              t_glass, t_trinode, delta_trinode, st->trinode_confidence_pct);
 
-    /* Build internal debug arrays */
-    float shtc3T_ring[ORCH_RING_CAPACITY];
-    float shtc3RH_ring[ORCH_RING_CAPACITY];
-    float mcuT_ring[ORCH_RING_CAPACITY];
-    float epdT_ring[ORCH_RING_CAPACITY];
-
-    /* Set to known state */
-    memset(shtc3T_ring,  0, sizeof(shtc3T_ring));
-    memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
-    memset(mcuT_ring,    0, sizeof(mcuT_ring));
-    memset(epdT_ring,    0, sizeof(epdT_ring));
-
-    ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
-    for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
-        shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
-        shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
-        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c  / 100.0f;
-        epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c  / 100.0f;
-        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i,
-                                                         shtc3T_ring[i], 
-                                                         shtc3RH_ring[i],
-                                                         mcuT_ring[i],
-                                                         epdT_ring[i]);
-    }
-	
-    /* Dump ring buffer vars to console */
-    // ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer  C",  shtc3T_ring,  sizeof(shtc3T_ring),  ESP_LOG_INFO);
-    // ESP_LOG_BUFFER_HEXDUMP("SHTC3 RingBuffer RH",  shtc3RH_ring, sizeof(shtc3RH_ring), ESP_LOG_INFO);
-    // ESP_LOG_BUFFER_HEXDUMP("ESP32 RingBuffer  C",  mcuT_ring,    sizeof(mcuT_ring),    ESP_LOG_INFO);
-    // ESP_LOG_BUFFER_HEXDUMP("EPD   RingBuffer  C",  epdT_ring,    sizeof(epdT_ring),    ESP_LOG_INFO);
+    /* Dump internal debug arrays modularly */
+    orch_flow_dump_ring_debug(st);
 
     if (out_temp_c) *out_temp_c = t_amb;
     if (out_rh_pct) *out_rh_pct = rh_amb;
@@ -278,6 +338,11 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 {
+    if (sleep_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle error: sleep_sec is 0. Aborting sleep transition.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
     ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
 
     /* 1. Wait for LVGL render and flush pipeline to drain completely (including badge update) */

@@ -60,7 +60,7 @@ For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.
 | **`0x0C`**      | `SYSTEM_0C`       | `0x00`             | DAC input routing default (SDP In Left to DAC).                                                                                                         |
 | **`0x0D`**      | `SYS_PWR_ANA`     | `0xFA` then `0x01` | **Critical fix.** `0xFA` during open pre-charges $C_{VMID}$; `0x01` powers on analog reference and enables low-impedance mid-rail ($V_{DDA}/2$) buffer. |
 | **`0x0E`**      | `SYS_PGA_MOD`     | `0x02`             | Analog bias and VROI reference active (`0x02`); microphone PGA and ADC modulator powered down.                                                          |
-| **`0x0F`**      | `SYS_LP_MOD`      | `0x80`             | Subsystem low-power override: Bit 7 (`LPDAC = 1`) enables low-power DAC mode; other sub-blocks default.                                                 |
+| **`0x0F`**      | `SYS_LP_MOD`      | `0x80`             | Subsystem low-power default: Bit 7 (`LPDAC = 1`) enables low-power DAC mode; noise floor difference through NS4168 is negligible while saving power. |
 | **`0x10`**      | `SYS_BIAS`        | `0x1F`             | Analog bias current generator adjustment; delivers nominal internal reference current.                                                                  |
 | **`0x11`**      | `SYS_VMID`        | `0x7F`             | VMID buffer impedance and filter settings; filters mid-rail reference through external $C_{VMID}$.                                                      |
 | **`0x12`**      | `DAC_PWR`         | `0x00`             | DAC analog power stage ON (`PDN_DAC = 0`).                                                                                                              |
@@ -73,6 +73,30 @@ For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.
 | **`0x1C`**      | `ADC_HPF2`        | `0x6A`             | ADC HPF stage 2 and equalizer coefficient.                                                                                                              |
 | **`0x31`**      | `DAC_MUTE`        | `0x00` / `0x60`    | DAC DSM/DEM unmute (`0x00`) during playback; soft mute (`0x60`) during idle.                                                                            |
 | **`0x32`**      | `DAC_VOL`         | `0xBF`             | DAC digital volume attenuation (nominal unity gain $0\text{ dB} = \text{0xBF}$; perceptual table maps to this register).                                |
-| **`0x37`**      | `DAC_RAMP`        | `0x08`             | Disables DAC EQ and/or fade in/out ramp rate. Datasheet/User Guide in repo has error, EQ Default = Disabled, Ramp Default = Disabled                                                           |
+| **`0x37`**      | `DAC_RAMP`        | `0x08`             | **Silicon Errata:** Mandatory `0x08` write. Bypasses uncalibrated digital EQ block and disables volume fade ramp. Datasheet erroneously claims EQ defaults to disabled. |
 | **`0x44`**      | `GPIO_CFG`        | `0x08` then `0x58` | Silicon errata noise filter lock (written `0x08` twice), then internal routing set to `0x58`.                                                           |
 | **`0x45`**      | `GPIO_PULL`       | `0x00`             | Internal I2S clock line pull-up/pull-downs disabled.                                                                                                    |
+
+---
+
+## 7. Power Management & Sleep Gating Policy
+
+### 7.1 Unattended Wake Isolation (<1 µA Invariant)
+To prevent quiescent current dissipation and thermal contamination of the enclosure:
+- **Unattended Periodic Wakes (RTC Countdown Timer):**
+  - The ES8311 codec and NS4168 amplifier are **never initialized or taken out of standby**.
+  - `sub_audio_init()` is strictly bypassed during Flow A and unattended Flow B display refreshes.
+  - The entire audio subsystem remains in low-leakage hardware standby (<1.0 µA).
+- **Interactive User Wakes (Cold Boot or Physical Button Tap):**
+  - When the user presses `BOOT` or `POWER` to interact with the device, `is_user_wake` is asserted.
+  - `sub_audio_init()` executes to configure clock dividers and prepare the FreeRTOS audio worker task.
+
+### 7.2 Volume Initialization Contract
+- The internal volume variable `s_volume_pct` is initialized to `0` (muted / unconfigured).
+- Upon user wake, volume is configured strictly from `lifecycle.presentation.volume_pct`.
+- Hardcoded fallback defaults (e.g. `50%` or `60%`) have been removed; audio levels are contractual and developer-defined.
+
+### 7.3 Silicon Errata: Register 0x37 Digital Equalizer Bypass & Low-Power Default
+- **Register 0x37 EQ Bypass Errata:** The Everest Semiconductor ES8311 datasheet incorrectly claims that the internal digital equalizer (EQ) is disabled by default. In physical silicon, failing to write `0x08` to Register `0x37` leaves the hardware EQ filter active in the signal path. Because no biquad coefficients are loaded, the uncalibrated filter stages generate severe phase distortion, clipping, and harsh acoustic buzzing ("sounds like death on 3 wheels"). Programming Register `0x37 = 0x08` explicitly disables the digital volume ramp and completely bypasses/disables the uncalibrated EQ engine.
+- **Low-Power Mode Default (`0x0F = 0x80`):** H1OS defaults to Low-Power DAC bias mode (`s_low_power_mode = true`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible, while delivering measurable dynamic power savings during audio bursts.
+

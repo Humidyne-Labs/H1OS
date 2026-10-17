@@ -31,9 +31,9 @@
 #include "driver/rtc_io.h"
 #include "orch_display_sync.h"
 
-#if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
-#endif
+#include "soc/rtc_cntl_reg.h"
+
 
 static const char *TAG = "h1os_lifecycle";
 
@@ -45,7 +45,10 @@ static bool s_session_running = false;
 void h1os_reset_session_timer(void)
 {
     uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
-    if (timeout_sec == 0) timeout_sec = 30;
+    if (timeout_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting session timer reset.");
+        return;
+    }
     s_session_expiry_us = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
@@ -82,13 +85,100 @@ static void h1os_session_monitor_task(void *arg)
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
             uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-            if (sleep_sec == 0) sleep_sec = 120;
+            if (sleep_sec == 0) {
+                ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
+                h1os_shutdown();
+                break;
+            }
             h1os_sleep(sleep_sec); /* Enter deep sleep */
             break;
         }
     }
     s_session_task_handle = NULL;
     vTaskDelete(NULL);
+}
+
+/**
+ * @brief Diagnostic dump of ULP wake telemetry and execution performance.
+ *        Isolated helper function for development; comment out the call in h1os_start() for release builds.
+ */
+static void debug_dump_ulp_telemetry(void)
+{
+    uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
+    uint32_t exec_us = exec_cycles / 17; /* ~17.5 MHz RTC_FAST_CLK */
+
+    ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
+             (unsigned long)ulp_wake_counter,
+             (unsigned long)ulp_last_wake_cause,
+             (ulp_last_wake_cause == 1) ? "BOOT_BTN" :
+             (ulp_last_wake_cause == 2) ? "PWR_BTN" :
+             (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW" :
+             (ulp_last_wake_cause == 4) ? "SENSOR_TICK" :
+             (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT" :
+             (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY" : "UNKNOWN",
+             (unsigned long)ulp_slice_counter,
+             (unsigned long)ulp_overflow_limit,
+             (unsigned long)ulp_last_vbat_mv,
+             (unsigned long)ulp_vbat_raw_adc,
+             (unsigned long)ulp_last_wake_btn,
+             (unsigned long)ulp_rtc_int_stuck,
+             (unsigned long)exec_cycles,
+             (unsigned long)exec_us);
+    if (ulp_rtc_int_stuck) {
+        ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
+    }
+    if (ulp_last_wake_cause == 6) {
+        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);
+    }
+    ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
+}
+
+/**
+ * @brief Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
+ */
+static void h1os_log_flow_banner(orch_flow_type_t flow)
+{
+    orch_persisted_state_t *st = orch_state_get();
+    const char *flow_title = "UNKNOWN FLOW";
+    const char *trigger_desc = "None";
+
+    switch (flow) {
+    case ORCH_FLOW_BOOT:
+        flow_title = "[COLD BOOT INITIALIZATION]";
+        trigger_desc = "Power-On Reset / Hard Reset";
+        break;
+    case ORCH_FLOW_A_SAMPLE:
+        flow_title = "[FLOW A - QUIESCENT SENSOR SAMPLE BURST]";
+        trigger_desc = "ULP Periodic Sleep Timer (60s tick)";
+        break;
+    case ORCH_FLOW_B_MAIN_WAKE:
+        flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
+        if (ulp_last_wake_btn == 1) {
+            trigger_desc = "ULP Tactile Press (BOOT / GPIO 0)";
+        } else if (ulp_last_wake_btn == 2) {
+            trigger_desc = "ULP Tactile Press (POWER / GPIO 18)";
+        } else {
+            trigger_desc = "External RTC Alarm / Timer Tick";
+        }
+        break;
+    case ORCH_FLOW_CRITICAL_OFF:
+        flow_title = "[CRITICAL LOW POWER SHUTDOWN]";
+        trigger_desc = "Battery Brownout Guard (< 3.25V)";
+        break;
+    case ORCH_FLOW_BOOTLOADER_JUMP:
+        flow_title = "[ROM BOOTLOADER JUMP MODE]";
+        trigger_desc = "BOOT Button Long-Press (>= 3.0s)";
+        break;
+    }
+
+    ESP_LOGI(TAG, "================================================================================");
+    ESP_LOGI(TAG, ">>> H1OS ACTIVE FLOW: %s <<<", flow_title);
+    ESP_LOGI(TAG, ">>> Trigger Source  : %s", trigger_desc);
+    ESP_LOGI(TAG, ">>> Boot Count      : %lu | Wake Count: %lu | Session Inactivity: %lu s",
+             (unsigned long)st->boot_count, (unsigned long)st->wake_count,
+             (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+    ESP_LOGI(TAG, "================================================================================");
 }
 
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
@@ -122,6 +212,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     // 3. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
+    h1os_log_flow_banner(flow);
+
+    /* Dump ULP execution trace and telemetry on every wake */
+    if (flow != ORCH_FLOW_BOOT) {
+        debug_dump_ulp_telemetry();
+    }
+
 
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
         ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");
@@ -130,9 +227,37 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     }
 
     if (flow == ORCH_FLOW_BOOTLOADER_JUMP) {
-        ESP_LOGW(TAG, "Entering ROM bootloader jump mode...");
+        ESP_LOGW(TAG, "Entering ROM bootloader jump mode via RTC_CNTL_FORCE_DOWNLOAD_BOOT...");
+        sub_display_wait_busy(pdMS_TO_TICKS(5000));
+        sub_audio_standby();
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
         esp_restart();
         return ESP_OK;
+    }
+
+    if (flow == ORCH_FLOW_A_SAMPLE) {
+        int64_t t_start_us = esp_timer_get_time();
+        ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
+        orch_flow_execute_sensor_sample();
+        int64_t t_duration_us = esp_timer_get_time() - t_start_us;
+        ESP_LOGI(TAG, "[FLOW A METRICS] Execution duration: %lld us (%.2f ms) | Ring Head: %u/32",
+                 t_duration_us, (double)t_duration_us / 1000.0, orch_state_get()->ring_head);
+        /* Re-enter deep sleep immediately; display and audio remain untouched.
+         * Invariant: Use SUB_POWER_SLEEP_FLOW_A_BURST mode!
+         * Preserves the running external PCF85063A countdown and the ULP slice_counter accumulator
+         * so the Flow B UI timer advances towards overflow_limit across sample bursts. */
+        uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
+                             (1ULL << HAL_PIN_BUTTON_POWER) |
+                             (1ULL << HAL_PIN_RTC_INT);
+        return sub_power_enter_deep_sleep_mode(0, wake_mask, SUB_POWER_SLEEP_FLOW_A_BURST);
+    }
+
+    /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
+    if (flow == ORCH_FLOW_BOOT) {
+        sub_power_init_ulp(st->sample_interval_sec);
+        /* Architectural Invariant: SHTC3 is NEVER sampled during Flow B or on cold boot.
+         * Ring buffer starts with 0.0 NA telemetry; true environmental acquisition begins
+         * on the first quiescent Flow A deep-sleep pulse (60s). */
     }
 
     // 4. Flow B Interactive UI Boot
@@ -145,23 +270,10 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();
         if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-#if CONFIG_ULP_COPROC_ENABLED
             button_woke = (ulp_last_wake_btn != 0);
             if (!button_woke) {
                 is_rtc_wake = true;
             }
-#endif
-        } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-            uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
-            button_woke = (ext1_pins & ((1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER))) != 0;
-            /* Always clear any pending PCF85063A interrupt flags so INT line releases HIGH */
-            bool alarm_f = false, timer_f = false;
-            sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
-            if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
-                is_rtc_wake = true;
-            }
-            ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
-                     (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
         } else {
             /* Internal timer or other unattended wake */
             is_rtc_wake = true;
@@ -177,11 +289,12 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         }
     }
 
-    /* Architectural Invariant: Only initialize the audio subsystem if the user is present
-     * (Cold Boot or physical Button Wake). Unattended RTC/timer wakes keep the codec in <1uA sleep! */
+    /* Architectural Invariant: Initialize the audio subsystem whenever the user is present
+     * (Cold Boot, physical Button Wake).
+     * Only quiescent Flow A bursts & Flow B bypass audio initialization entirely! */
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
-        uint8_t init_vol = (s_app_lifecycle.presentation.volume_pct > 0) ? s_app_lifecycle.presentation.volume_pct : 60;
+        uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
         sub_audio_set_volume(init_vol);
         sub_audio_init();
     } else {
@@ -200,10 +313,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
     } else if (s_app_lifecycle.on_wake) {
-        if (is_user_wake) {
-            h1os_trigger_chime(H1OS_CHIME_WAKE);
-            h1os_trigger_splash(H1OS_SPLASH_WAKE);
-        }
+        /* Wake chime and wake splash stripped to protect thermal settling and conserve power */
         h1os_wake_context_t ctx = {
             .reset_reason       = esp_reset_reason(),
             .wakeup_causes      = causes,
@@ -225,12 +335,22 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     //    - If Boot or User Button Wake: wait configured inactivity session timeout for user interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
+        bool alarm_f = false, timer_f = false;
+        sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-        if (sleep_sec == 0) sleep_sec = 120;
+        if (sleep_sec == 0) {
+            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
+            h1os_shutdown();
+            return ESP_ERR_INVALID_STATE;
+        }
         return h1os_sleep(sleep_sec);
     } else {
         uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
-        if (timeout_sec == 0) timeout_sec = 30;
+        if (timeout_sec == 0) {
+            ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0 for interactive session. Aborting to safe shutdown.");
+            h1os_shutdown();
+            return ESP_ERR_INVALID_ARG;
+        }
         ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
         xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 3072, NULL, 3, &s_session_task_handle, 0);
@@ -290,10 +410,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
         out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        /* External power detection:
-         *  - < 100 mV: Zero-Volt Cable Guard (no cell, charger not floating)
-         *  - Active USB host connection via hardware SOF detection */
-        out_telemetry->is_usb_powered = (vbat_mv < 100) || sub_power_connected_usb();
+        out_telemetry->is_usb_powered  = sub_power_connected_usb();
     }
 
     return ret;
@@ -301,6 +418,10 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
+    if (sleep_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle error: h1os_sleep received sleep_sec = 0. Aborting sleep transition.");
+        return ESP_ERR_INVALID_ARG;
+    }
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
     h1os_trigger_splash(H1OS_SPLASH_SLEEP);

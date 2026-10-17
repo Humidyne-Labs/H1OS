@@ -1,12 +1,14 @@
 /*
  * SPDX-License-Identifier: MIT
- * ESP32-S3 ePaper BSP - Layer 3: ULP-RISC-V Coprocessor Hardware Monitor
+ * ESP32-S3 ePaper BSP - Pure Event Mode ULP Coprocessor
  *
- * Runs autonomously in RTC Slow SRAM during Deep Sleep.
- * Responsibilities:
- *  1. Autonomous Battery ADC sampling (GPIO 4 / ADC1 Channel 3) with brownout threshold (<3.25V).
- *  2. Hardware RTC arbitration (GPIO 5 / PCF85063A INT line) eliminating Zero-Hour wake races.
- *  3. Hardware button debounce and event classification (GPIO 0 / BOOT, GPIO 18 / BAT_KEY).
+ * Implements deterministic time slicing using external PCF85063A pulsed ticks on GPIO 5:
+ *   - Tactile Buttons (GPIO 0 / GPIO 18): Immediate wake of Main CPU into Flow B (Interactive UI).
+ *   - RTC INT Pulse (GPIO 5):
+ *       * slice_counter < overflow_limit: Sensor poll tick (Flow A prep/sample), halts without waking Main CPU.
+ *       * slice_counter == overflow_limit: Periodic overflow reached, wake Main CPU for Flow B display update.
+ *       * slice_counter > overflow_limit: Post-overflow clamp, discard trailing ticks until Main CPU re-arms.
+ *   - Remainder Fraction: Fractional remainder (T_flow_b % T_flow_a) is discarded on Main CPU.
  */
 
 #include <stdint.h>
@@ -15,98 +17,166 @@
 #include "ulp_riscv_utils.h"
 #include "ulp_riscv_gpio.h"
 #include "ulp_riscv_adc_ulp_core.h"
+#include "soc/rtc_io_reg.h"
+#include "soc/rtc_cntl_reg.h"
 
-/* Exported variables accessible by the main Xtensa core via ulp_<var> */
-uint32_t wake_counter    = 0;
-uint32_t dispatch_reason = 0; /* 0: None, 1: Sensor Sample, 2: Main Wake, 3: Critical Shutdown */
+/* Exported symbols accessible by Main CPU via ulp_h1os.h */
+volatile uint32_t wake_counter     = 0;
+volatile uint32_t last_wake_cause  = 0; /* 1: BOOT, 2: POWER, 3: LONG OVERFLOW, 4: SENSOR TICK, 5: STUCK, 6: CRITICAL_BATTERY */
+volatile uint32_t last_wake_btn    = 0;
+volatile uint32_t slice_counter    = 0;
+volatile uint32_t overflow_limit   = 5; /* Dynamic overflow limit set by Main CPU (e.g. 300s / 60s = 5) */
+volatile uint32_t rtc_int_stuck    = 0; /* 1 if GPIO 5 failed to return HIGH within 50ms */
+volatile uint32_t dispatch_reason  = 0; /* 1: SENSOR_SAMPLE, 2: MAIN_WAKE, 5: CRITICAL_SHUTDOWN */
+volatile uint32_t gpio_status_raw  = 0;
+volatile uint32_t entry_ccount     = 0;
+volatile uint32_t exit_ccount      = 0;
 
-/* Battery Calibration Parameters (Provided by main core from eFuses) */
-uint32_t cal_scale        = 1000;
-int32_t  cal_offset       = 0;
-uint32_t last_vbat_mv     = 4000;
-uint32_t vbat_critical_mv = 3250; /* Critical brownout threshold (< 3.25V) */
+/* 17-Point Piecewise Linear Battery Calibration LUT (17 x 32-bit words in RTC Slow RAM) */
+volatile uint32_t vbat_lut[17]     = {0};
+volatile uint32_t last_vbat_mv     = 4000;
+volatile uint32_t vbat_raw_adc     = 0;
+volatile uint32_t usb_connected    = 0; /* 1 if Main CPU confirmed USB VBUS active */
 
-/* Button State Tracking */
-uint32_t boot_btn_events = 0;
-uint32_t last_wake_btn   = 0; /* 0: None/RTC, 1: BOOT (GPIO 0), 2: POWER (GPIO 18) */
+#define RTC_INT_PIN        GPIO_NUM_5
+#define RTC_INT_TIMEOUT_US 50000   /* >3x the ~15.6ms PCF85063A pulse */
+#define RTC_INT_POLL_US    100
+
+static inline uint32_t ulp_raw_to_mv(int32_t raw)
+{
+    if (raw <= 0) return vbat_lut[0];
+    if (raw >= 4095) return vbat_lut[16];
+
+    uint32_t idx = (uint32_t)raw >> 8;       /* Segment index (0..15) */
+    uint32_t rem = (uint32_t)raw & 0xFF;     /* Remainder within segment (0..255) */
+
+    uint32_t y0 = vbat_lut[idx];
+    uint32_t y1 = vbat_lut[idx + 1];
+
+    /* Hardware integer multiply on RV32IMC, shift by 8 (/256) */
+    return y0 + (((y1 - y0) * rem) >> 8);
+}
 
 int main(void)
 {
     wake_counter++;
+    entry_ccount = ULP_RISCV_GET_CCOUNT();
 
-    /* 1. Hardware RTC Arbitration (GPIO 5 / PCF85063A Alarm INT) */
-    /* PCF85063A INT is Active LOW */
-    int rtc_int_level = ulp_riscv_gpio_get_level(GPIO_NUM_5);
-    if (rtc_int_level == 0) {
-        /* Alarm expired! Prompt main core straight into Full UI Refresh */
-        last_wake_btn   = 0; /* Woken by external RTC  */
-        dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-        ulp_riscv_wakeup_main_processor();
-        return 0;
-    }
+    /* 1. Sample Battery ADC (ADC1_CHANNEL_3 / GPIO 4) & Interpolate Millivolts */
+    int32_t raw_adc = ulp_riscv_adc_read_channel(ADC_UNIT_1, ADC_CHANNEL_3);
+    vbat_raw_adc = (uint32_t)raw_adc;
+    uint32_t vbat_mv = ulp_raw_to_mv(raw_adc);
+    last_vbat_mv = vbat_mv;
 
-    /* 2. Battery ADC Guard (GPIO 4 / ADC1 Channel 3) */
-    /* Read ADC1 Channel 3 */
-    int32_t raw_adc = ulp_riscv_adc_read_channel(0, 3);
-    if (raw_adc > 0) {
-        /* Vbat = (raw * cal_scale / 4096) * 2 + cal_offset */
-        uint32_t v_div_mv = (uint32_t)((raw_adc * (int64_t)cal_scale) / 4096);
-        uint32_t v_bat_mv = (v_div_mv * 2) + cal_offset;
-        last_vbat_mv = v_bat_mv;
+    /* 2. Snapshot interrupt status register immediately */
+    uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
+    gpio_status_raw = rtcio_int_st;
 
-        /* Zero-Volt Cable Guard: if v_bat_mv < 100mV, powered exclusively by USB VBUS without battery */
-        if (v_bat_mv >= 100 && v_bat_mv < vbat_critical_mv) {
-            /* Brownout threshold reached! Wake CPU immediately to show emergency screen & latch off */
-            dispatch_reason = 3; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
-            ulp_riscv_wakeup_main_processor();
-            return 0;
-        }
-    }
-
-    /* 3. Button Check (GPIO 0: BOOT0, GPIO 18: BAT_KEY) */
-    /* Wake-on-Release Rule: Wake Xtensa strictly when the button transitions back HIGH */
+    /* 3. Sample live levels (pads already configured by main CPU) */
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
     int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    int rtc_int  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
 
-    if (boot_btn == 0 || pwr_btn == 0) {
-        /* Button is held down. Track hold duration and wait for release. */
-        uint32_t hold_ms = 0;
-        while (hold_ms < 2600) {
-            ulp_riscv_delay_cycles(10 * ULP_RISCV_CYCLES_PER_MS); /* 10ms poll while depressed */
-            hold_ms += 10;
-            boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-            pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-            if (boot_btn != 0 && pwr_btn != 0) {
-                /* Clean release detected! */
-                break;
-            }
-        }
+    bool wake_main = false;
 
-        if (hold_ms >= 2500) {
-            if (boot_btn == 0) {
-                /* BOOT held > 2.5s: Prime ROM Bootloader jump */
-                dispatch_reason = 4; /* ULP_DISPATCH_BOOTLOADER_JUMP */
-            } else {
-                /* POWER held > 2.5s: Prime Power Off */
-                dispatch_reason = 5; /* ULP_DISPATCH_POWER_OFF */
-            }
-            ulp_riscv_wakeup_main_processor();
-            return 0;
-        } else if (hold_ms >= 30) {
-            /* Valid short tap released between 30ms and 2500ms -> Wake Flow B with clean released state */
-            boot_btn_events++;
-            last_wake_btn = (boot_btn == 0) ? 1 : 2;
-            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
-            ulp_riscv_wakeup_main_processor();
-            return 0;
-        }
-        /* Pulse < 30ms discarded as glitch */
-        return 0;
+    /* 4. Battery Brownout Guard:
+     * - If usb_connected != 0: Operating on USB VBUS (battery unpopulated or charging) -> Bypass shutdown.
+     * - If vbat_mv < 100 mV: Zero-Volt USB Guard -> Bypass shutdown.
+     * - If 100 mV <= vbat_mv < 3250 mV: Critical low battery -> Immediate emergency wake to cut latch! */
+    if (usb_connected) {
+        last_vbat_mv = 4200; /* Nominal full voltage on USB VBUS */
+    } else if (vbat_mv >= 100 && vbat_mv < 3250) {
+        last_wake_cause = 6; /* CRITICAL_BATTERY_FAULT */
+        last_wake_btn   = 0;
+        dispatch_reason = 5; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
+        wake_main       = true;
     }
 
-    /* Default: Sensor sample wake stub */
-    dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
-    ulp_riscv_wakeup_main_processor();
+    /* 5. Process Tactile Button and RTC Wake Triggers */
+    if (!wake_main) {
+        if (((rtcio_int_st & BIT(0)) != 0) || boot_btn == 0) {
+            /* BOOT Button (GPIO 0) pressed: Immediate tactile wake */
+            last_wake_cause = 1;
+            last_wake_btn   = 1;
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            wake_main       = true;
+        } else if (((rtcio_int_st & BIT(18)) != 0) || pwr_btn == 0) {
+            /* POWER Button (GPIO 18) pressed: Immediate tactile wake */
+            last_wake_cause = 2;
+            last_wake_btn   = 2;
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            wake_main       = true;
+        } else if (((rtcio_int_st & BIT(5)) != 0) || rtc_int == 0) {
+            /* External PCF85063A Periodic Pulse Tick (GPIO 5) */
+            slice_counter++;
 
+            if (slice_counter < overflow_limit) {
+                /* Short period: Sensor poll tick, wake Main CPU for Flow A sample */
+                last_wake_cause = 4; /* SENSOR TICK */
+                last_wake_btn   = 0;
+                dispatch_reason = 1; /* ULP_DISPATCH_SENSOR_SAMPLE */
+                wake_main       = true;
+            } else if (slice_counter == overflow_limit) {
+                /* Long period reached: Main app overflow wake for Flow B */
+                slice_counter   = 0;
+                last_wake_cause = 3; /* LONG OVERFLOW WAKE */
+                last_wake_btn   = 0;
+                dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+                wake_main       = true;
+            } else {
+                /* Post-overflow clamp: Discard trailing wakes until Main CPU re-arms */
+                wake_main       = false;
+            }
+        } else {
+            /* Spurious or unlatched trigger: clear and sleep */
+            wake_main = false;
+        }
+    }
+
+    exit_ccount = ULP_RISCV_GET_CCOUNT();
+
+    /* 5. Strict Latch Clear, Re-Arm & Wakeup Execution */
+    if (wake_main) {
+        /* Step A: Spin until RTC controller is ready for wakeup (TRM requirement) */
+        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+
+        /* Step B: Wake Main CPU */
+        ulp_riscv_wakeup_main_processor();
+
+        /* Step C: Clear RTC controller wake latch & peripheral status */
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+
+        /* Step D: DO NOT re-arm GPIO_WAKEUP_ENA here: physical line is still LOW.
+         * The Main CPU will wake up, de-assert holds, handle debounce,
+         * and re-arm GPIO_WAKEUP_ENA before entering its next sleep session. */
+    } else {
+        /* Unhandled or clamped tick: wait for external PCF85063A pulse to return HIGH before re-arming. */
+        uint32_t waited_us = 0;
+        while ((ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0) &&
+               (waited_us < RTC_INT_TIMEOUT_US)) {
+            ulp_riscv_delay_us(RTC_INT_POLL_US);
+            waited_us += RTC_INT_POLL_US;
+        }
+        rtc_int_stuck = (ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0);
+
+        /* Clear peripheral interrupt flag & controller latch */
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        ulp_riscv_gpio_wakeup_clear();
+
+        if (rtc_int_stuck) {
+            /* Line is stuck LOW: DO NOT re-arm GPIO_WAKEUP_ENA to prevent runaway wake loops.
+             * Wake Main CPU to log hardware fault and service PCF85063A over I2C. */
+            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+            last_wake_cause = 5; /* RTC_INT_STUCK_FAULT */
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            ulp_riscv_wakeup_main_processor();
+        } else {
+            /* Line is clean HIGH: Re-arm GPIO wakeup for subsequent events */
+            SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        }
+    }
+
+    ulp_riscv_shutdown();
     return 0;
 }
