@@ -408,12 +408,14 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     uint16_t vbat_mv = 0;
     uint8_t  vbat_pct = 0;
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
-        out_telemetry->battery_mv      = vbat_mv;
-        out_telemetry->battery_percent = vbat_pct;
-        /* External power detection:
-         *  - < 100 mV: Zero-Volt Cable Guard (no cell, charger not floating)
-         *  - Active USB host connection via hardware SOF detection */
-        out_telemetry->is_usb_powered = (vbat_mv < 100) || sub_power_connected_usb();
+        bool usb_conn = sub_power_connected_usb();
+        bool is_usb   = usb_conn || (vbat_mv < 100);
+        bool is_batt  = (vbat_mv >= 2800);
+
+        out_telemetry->battery_mv           = vbat_mv;
+        out_telemetry->is_usb_powered       = is_usb;
+        out_telemetry->is_battery_installed = is_batt;
+        out_telemetry->battery_percent      = is_usb ? 100 : vbat_pct;
     }
 
     return ret;

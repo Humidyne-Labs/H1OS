@@ -496,6 +496,7 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     // 2. Unmute NS4168 Class-D amplifier if not already active
     if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
         gpio_set_level(HAL_PIN_PA_CTRL, 1);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     return ESP_OK;

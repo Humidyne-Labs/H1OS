@@ -36,6 +36,7 @@ volatile uint32_t exit_ccount      = 0;
 volatile uint32_t vbat_lut[17]     = {0};
 volatile uint32_t last_vbat_mv     = 4000;
 volatile uint32_t vbat_raw_adc     = 0;
+volatile uint32_t usb_connected    = 0; /* 1 if Main CPU confirmed USB VBUS active */
 
 #define RTC_INT_PIN        GPIO_NUM_5
 #define RTC_INT_TIMEOUT_US 50000   /* >3x the ~15.6ms PCF85063A pulse */
@@ -79,9 +80,12 @@ int main(void)
     bool wake_main = false;
 
     /* 4. Battery Brownout Guard:
-     * - If vbat_mv < 100 mV: Zero-Volt USB Guard (operating on USB VBUS without battery) -> Bypass shutdown.
+     * - If usb_connected != 0: Operating on USB VBUS (battery unpopulated or charging) -> Bypass shutdown.
+     * - If vbat_mv < 100 mV: Zero-Volt USB Guard -> Bypass shutdown.
      * - If 100 mV <= vbat_mv < 3250 mV: Critical low battery -> Immediate emergency wake to cut latch! */
-    if (vbat_mv >= 100 && vbat_mv < 3250) {
+    if (usb_connected) {
+        last_vbat_mv = 4200; /* Nominal full voltage on USB VBUS */
+    } else if (vbat_mv >= 100 && vbat_mv < 3250) {
         last_wake_cause = 6; /* CRITICAL_BATTERY_FAULT */
         last_wake_btn   = 0;
         dispatch_reason = 5; /* ULP_DISPATCH_CRITICAL_SHUTDOWN */
