@@ -111,23 +111,28 @@ static void debug_dump_ulp_telemetry(void)
     uint32_t exec_us = exec_cycles / 17; /* ~17.5 MHz RTC_FAST_CLK */
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
-    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, rtcio_raw=0x%06lX, btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
              (ulp_last_wake_cause == 1) ? "BOOT_BTN" :
              (ulp_last_wake_cause == 2) ? "PWR_BTN" :
              (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW" :
              (ulp_last_wake_cause == 4) ? "SENSOR_TICK" :
-             (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT" : "UNKNOWN",
+             (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT" :
+             (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY" : "UNKNOWN",
              (unsigned long)ulp_slice_counter,
              (unsigned long)ulp_overflow_limit,
-             (unsigned long)ulp_gpio_status_raw,
+             (unsigned long)ulp_last_vbat_mv,
+             (unsigned long)ulp_vbat_raw_adc,
              (unsigned long)ulp_last_wake_btn,
              (unsigned long)ulp_rtc_int_stuck,
              (unsigned long)exec_cycles,
              (unsigned long)exec_us);
     if (ulp_rtc_int_stuck) {
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
+    }
+    if (ulp_last_wake_cause == 6) {
+        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
@@ -253,17 +258,20 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     }
 
     if (flow == ORCH_FLOW_A_SAMPLE) {
+        int64_t t_start_us = esp_timer_get_time();
         ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
         orch_flow_execute_sensor_sample();
+        int64_t t_duration_us = esp_timer_get_time() - t_start_us;
+        ESP_LOGI(TAG, "[FLOW A METRICS] Execution duration: %lld us (%.2f ms) | Ring Head: %u/32",
+                 t_duration_us, (double)t_duration_us / 1000.0, orch_state_get()->ring_head);
         /* Re-enter deep sleep immediately; display and audio remain untouched.
-         * Invariant: Do NOT call orch_flow_transition_to_sleep() here!
-         * Re-arming the external PCF85063A countdown would reset the Flow B UI timer
-         * on every 60s sample burst, permanently locking out the main application.
-         * Preserve the running external RTC countdown and return directly to deep sleep. */
+         * Invariant: Use SUB_POWER_SLEEP_FLOW_A_BURST mode!
+         * Preserves the running external PCF85063A countdown and the ULP slice_counter accumulator
+         * so the Flow B UI timer advances towards overflow_limit across sample bursts. */
         uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
                              (1ULL << HAL_PIN_BUTTON_POWER) |
                              (1ULL << HAL_PIN_RTC_INT);
-        return sub_power_enter_deep_sleep(0, wake_mask);
+        return sub_power_enter_deep_sleep_mode(0, wake_mask, SUB_POWER_SLEEP_FLOW_A_BURST);
     }
 
     /* Initialize and start ULP Coprocessor reactive monitor on cold boot */

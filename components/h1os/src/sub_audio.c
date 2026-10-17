@@ -486,10 +486,12 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     // standby never entered at runtime
 
     // 2. Unmute NS4168 Class-D amplifier if not already active
+#define AUDIO_INIT_DELAY 100
     if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
         gpio_set_level(HAL_PIN_PA_CTRL, 1);
-        vTaskDelay(pdMS_TO_TICKS(25));
+        vTaskDelay(pdMS_TO_TICKS(AUDIO_INIT_DELAY));
     }
+#undef AUDIO_INIT_DELAY
 
     return ESP_OK;
 }

@@ -28,6 +28,7 @@
 
 #if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_riscv.h"
+#include "ulp_riscv_adc.h"
 #include "ulp_h1os.h"
 
 extern const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start");
@@ -39,6 +40,25 @@ static const char *TAG = "sub_power";
 static adc_oneshot_unit_handle_t s_adc_handle  = NULL;
 static adc_cali_handle_t         s_cali_handle = NULL;
 static bool                      s_cali_valid  = false;
+
+#if CONFIG_ULP_COPROC_ENABLED
+static void generate_vbat_lut(void)
+{
+    for (int i = 0; i <= 16; i++) {
+        uint32_t raw_point = (i == 16) ? 4095 : (i * 256);
+        int mv = 0;
+        if (s_cali_valid && s_cali_handle != NULL) {
+            adc_cali_raw_to_voltage(s_cali_handle, raw_point, &mv);
+        } else {
+            mv = (raw_point * 3100) / 4095;
+        }
+        /* 1:2 resistor divider (VBAT = V_ADC * 2) */
+        ulp_vbat_lut[i] = (uint32_t)(mv * 2);
+    }
+    ESP_LOGI(TAG, "ULP 17-Point Battery LUT generated: 0=%lu mV, 2048=%lu mV, 4095=%lu mV",
+             (unsigned long)ulp_vbat_lut[0], (unsigned long)ulp_vbat_lut[8], (unsigned long)ulp_vbat_lut[16]);
+}
+#endif
 
 /* 13-point LiPo OCV Discharge Curve (matching legacy hardware calibration) */
 static const struct {
@@ -224,17 +244,20 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* Pass battery calibration parameters into ULP exported symbols */
-        uint32_t scale = 3100;
-        int32_t offset = 0;
-        sub_power_get_ulp_cal_params(&scale, &offset);
-        //ulp_cal_scale        = scale;
-        //ulp_cal_offset       = offset;
-        //ulp_vbat_critical_mv = 3250;
-        //ulp_last_vbat_mv     = 4000;
+        /* Pass battery calibration LUT into ULP exported symbols */
+        generate_vbat_lut();
         ulp_dispatch_reason  = 0;
         ulp_last_wake_btn    = 0;
-        //ulp_cycles_per_ms    = 17500;
+        ulp_last_vbat_mv     = 4000;
+
+        /* Configure ULP ADC on ADC1 Channel 3 (GPIO 4) with 12 dB attenuation */
+        ulp_riscv_adc_cfg_t adc_cfg = {
+            .adc_n   = ADC_UNIT_1,
+            .channel = ADC_CHANNEL_3,
+            .width   = ADC_BITWIDTH_DEFAULT,
+            .atten   = ADC_ATTEN_DB_12,
+        };
+        ulp_riscv_adc_init(&adc_cfg);
 
         /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
@@ -267,7 +290,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 #endif
 }
 
-esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 {
     (void)sleep_seconds;
     (void)ext1_pins_mask;
@@ -286,20 +309,25 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     uint32_t overflow = flow_b_sec / flow_a_sec;
     if (overflow == 0) overflow = 1;
 
-    /* Arm external PCF85063A countdown timer in repetitive pulsed mode for small period (flow_a_sec) */
-    sub_rtc_arm_countdown(flow_a_sec);
+    if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
+        /* Arm external PCF85063A countdown timer in repetitive pulsed mode for small period (flow_a_sec) */
+        sub_rtc_arm_countdown(flow_a_sec);
+    }
 
 #if CONFIG_ULP_COPROC_ENABLED
-    ulp_overflow_limit   = overflow;
-    ulp_slice_counter    = 0;
+    ulp_overflow_limit = overflow;
+    if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
+        ulp_slice_counter = 0;
+    }
     ulp_dispatch_reason  = 0;
     ulp_last_wake_btn    = 0;
     ulp_last_wake_cause  = 0;
     ulp_rtc_int_stuck    = 0;
 
-    ESP_LOGI(TAG, "Event Mode Slicing: Tick=%lus, Target=%lus -> Slices=%lu (Effective Period: %lu s, Remainder %lu s discarded)",
+    ESP_LOGI(TAG, "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> Slices=%lu (SliceAcc=%lu, Remainder %lu s discarded)",
+             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST",
              (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,
-             (unsigned long)overflow, (unsigned long)(overflow * flow_a_sec),
+             (unsigned long)overflow, (unsigned long)ulp_slice_counter,
              (unsigned long)(flow_b_sec % flow_a_sec));
 
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
@@ -355,6 +383,11 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
              (unsigned long)flow_a_sec, (unsigned long)overflow);
     esp_deep_sleep_start();
     return ESP_OK;
+}
+
+esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
+{
+    return sub_power_enter_deep_sleep_mode(sleep_seconds, ext1_pins_mask, SUB_POWER_SLEEP_FULL_CYCLE);
 }
 
 
