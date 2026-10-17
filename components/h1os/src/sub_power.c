@@ -17,6 +17,7 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "soc/rtc_cntl_reg.h"
+#include "soc/rtc_io_reg.h"
 #include <stdlib.h>
 
 #if CONFIG_ULP_COPROC_ENABLED
@@ -275,6 +276,14 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     ulp_cycles_per_ms    = 17500;
     ulp_last_wake_cause  = 0;
     ulp_hold_duration_ms = 0;
+
+    /* Arm per-pin RTC GPIO wakeup comparator & low-level trigger on Main CPU before sleep */
+    const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
+    for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
+        gpio_num_t pin = wake_pins[i];
+        SET_PERI_REG_MASK(RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_WAKEUP_ENABLE);
+        REG_SET_FIELD    (RTC_GPIO_PIN0_REG + 4 * pin, RTC_GPIO_PIN0_INT_TYPE, 4 /* ULP_RISCV_GPIO_INTR_LOW_LEVEL */);
+    }
 
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();

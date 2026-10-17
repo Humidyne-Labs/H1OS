@@ -120,17 +120,7 @@ static void keypad_event_cb(lv_event_t *e)
             ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
-            return;
         }
-    }
-
-    if (code == LV_EVENT_SHORT_CLICKED) {
-        // POWER Button Short-Click (LV_KEY_ENTER): Reverse Cycle (Non-blocking acoustic feedback)
-        sub_audio_play_tone_async(880, 50);
-        s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-        ESP_LOGI(TAG, "Keypad short click (ENTER): Navigating to page %u/%u",
-                 s_app_state.active_page + 1, H1OS_NUM_SCREENS);
-        update_active_display();
     }
 }
 
