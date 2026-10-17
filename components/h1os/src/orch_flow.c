@@ -37,9 +37,7 @@ static const char *TAG = "orch_flow";
 #define ORCH_LEAKAGE_MARGIN_C        0.30f   /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
 #define ORCH_TRINODE_SPAN_C          15.0f   /* Linear confidence 0-100% span (15.0 C delta = 0%) */
 
-#if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
-#endif
 
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
@@ -70,9 +68,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     /* Check ULP Coprocessor dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-#if CONFIG_ULP_COPROC_ENABLED
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
-#endif
         if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN ||
             st->ulp_dispatch_reason == ULP_DISPATCH_POWER_OFF) {
             return ORCH_FLOW_CRITICAL_OFF;

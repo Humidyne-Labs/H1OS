@@ -31,9 +31,7 @@
 #include "driver/rtc_io.h"
 #include "orch_display_sync.h"
 
-#if CONFIG_ULP_COPROC_ENABLED
 #include "ulp_h1os.h"
-#endif
 #include "soc/rtc_cntl_reg.h"
 
 
@@ -100,7 +98,6 @@ static void h1os_session_monitor_task(void *arg)
     vTaskDelete(NULL);
 }
 
-#if CONFIG_ULP_COPROC_ENABLED
 /**
  * @brief Diagnostic dump of ULP wake telemetry and execution performance.
  *        Isolated helper function for development; comment out the call in h1os_start() for release builds.
@@ -136,19 +133,6 @@ static void debug_dump_ulp_telemetry(void)
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
-#endif
-
-
-
-/**
- * @brief Diagnostic dump of EXT1 wake pin status and RTC interrupt flags.
- *        Isolated helper function for development; comment out the call in h1os_start() for release builds.
- */
-static void debug_dump_ext1_wake_status(uint64_t ext1_pins, bool button_woke, bool timer_f, bool alarm_f, bool is_rtc_wake)
-{
-    ESP_LOGI(TAG, "EXT1 Wake Status: pins=0x%llX (button=%d, rtc_timer=%d, rtc_alarm=%d) -> is_rtc_wake=%d",
-             (unsigned long long)ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
-}
 
 /**
  * @brief Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
@@ -170,7 +154,6 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
         break;
     case ORCH_FLOW_B_MAIN_WAKE:
         flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
-#if CONFIG_ULP_COPROC_ENABLED
         if (ulp_last_wake_btn == 1) {
             trigger_desc = "ULP Tactile Press (BOOT / GPIO 0)";
         } else if (ulp_last_wake_btn == 2) {
@@ -178,9 +161,6 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
         } else {
             trigger_desc = "External RTC Alarm / Timer Tick";
         }
-#else
-        trigger_desc = "Direct Hardware Wake Event";
-#endif
         break;
     case ORCH_FLOW_CRITICAL_OFF:
         flow_title = "[CRITICAL LOW POWER SHUTDOWN]";
@@ -234,12 +214,10 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
     h1os_log_flow_banner(flow);
 
-#if CONFIG_ULP_COPROC_ENABLED
     /* Dump ULP execution trace and telemetry on every wake */
     if (flow != ORCH_FLOW_BOOT) {
         debug_dump_ulp_telemetry();
     }
-#endif
 
 
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
@@ -292,23 +270,10 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();
         if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
-#if CONFIG_ULP_COPROC_ENABLED
             button_woke = (ulp_last_wake_btn != 0);
             if (!button_woke) {
                 is_rtc_wake = true;
             }
-#endif
-        } else if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1)) {
-            uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
-            button_woke = (ext1_pins & ((1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER))) != 0;
-            /* Always clear any pending PCF85063A interrupt flags so INT line releases HIGH */
-            bool alarm_f = false, timer_f = false;
-            sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
-            if (!button_woke && ((ext1_pins & (1ULL << HAL_PIN_RTC_INT)) || alarm_f || timer_f)) {
-                is_rtc_wake = true;
-            }
-            /* [DEBUG] Diagnostic EXT1 wake status dump — comment out for release builds */
-            debug_dump_ext1_wake_status(ext1_pins, button_woke, timer_f, alarm_f, is_rtc_wake);
         } else {
             /* Internal timer or other unattended wake */
             is_rtc_wake = true;
