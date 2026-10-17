@@ -408,14 +408,9 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     uint16_t vbat_mv = 0;
     uint8_t  vbat_pct = 0;
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
-        bool usb_conn = sub_power_connected_usb();
-        bool is_usb   = usb_conn || (vbat_mv < 100);
-        bool is_batt  = (vbat_mv >= 2800);
-
-        out_telemetry->battery_mv           = vbat_mv;
-        out_telemetry->is_usb_powered       = is_usb;
-        out_telemetry->is_battery_installed = is_batt;
-        out_telemetry->battery_percent      = is_usb ? 100 : vbat_pct;
+        out_telemetry->battery_mv      = vbat_mv;
+        out_telemetry->battery_percent = vbat_pct;
+        out_telemetry->is_usb_powered  = sub_power_connected_usb();
     }
 
     return ret;

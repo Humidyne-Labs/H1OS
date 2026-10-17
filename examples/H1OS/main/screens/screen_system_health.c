@@ -18,11 +18,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     // Row 1: Battery Voltage & Percentage
     lv_obj_t *lbl_bat = lv_label_create(scr);
     if (telem->is_usb_powered) {
-        if (!telem->is_battery_installed) {
-            lv_label_set_text(lbl_bat, "Power:       USB (NO BATT)");
-        } else {
-            lv_label_set_text(lbl_bat, "Power:       USB CABLE");
-        }
+        lv_label_set_text(lbl_bat, "Power:       USB CABLE");
     } else {
         lv_label_set_text_fmt(lbl_bat, "Battery:     %.2fV (%u%%)",
                               (float)telem->battery_mv / 1000.0f, telem->battery_percent);
@@ -33,11 +29,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     // Row 2: Projected Autonomy
     lv_obj_t *lbl_autonomy = lv_label_create(scr);
     if (telem->is_usb_powered) {
-        if (!telem->is_battery_installed) {
-            lv_label_set_text(lbl_autonomy, "Autonomy:    CONTINUOUS");
-        } else {
-            lv_label_set_text(lbl_autonomy, "Autonomy:    CHARGING");
-        }
+        lv_label_set_text(lbl_autonomy, "Autonomy:    CONTINUOUS");
     } else {
         float days = battery_estimate_remaining_days(400, telem->battery_mv, 0.35f);
         lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days", days);

@@ -162,6 +162,16 @@ static int compare_int(const void *a, const void *b) {
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 {
     if (out_mv == NULL) return ESP_ERR_INVALID_ARG;
+
+    /* Architectural Invariant: If USB is plugged in, VBAT is always 4200 mV (100%) */
+    if (sub_power_connected_usb()) {
+        *out_mv = 4200;
+        if (out_pct != NULL) {
+            *out_pct = 100;
+        }
+        return ESP_OK;
+    }
+
     if (s_adc_handle == NULL) {
         esp_err_t err = sub_power_init();
         if (err != ESP_OK) return err;

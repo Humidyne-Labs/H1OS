@@ -137,7 +137,6 @@ typedef struct {
     uint16_t battery_mv;              ///< Battery mV
     uint8_t  battery_percent;         ///< Battery percent
     bool     is_usb_powered;          ///< Is USB powered
-    bool     is_battery_installed;    ///< Is physical battery installed (VBAT >= 2.80V)
 } h1os_telemetry_t;
 
 /* =========================================================================
