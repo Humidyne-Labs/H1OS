@@ -25,10 +25,15 @@ volatile uint32_t last_wake_cause  = 0; /* 1: BOOT, 2: POWER, 3: LONG OVERFLOW, 
 volatile uint32_t last_wake_btn    = 0;
 volatile uint32_t slice_counter    = 0;
 volatile uint32_t overflow_limit   = 5; /* Dynamic overflow limit set by Main CPU (e.g. 300s / 60s = 5) */
+volatile uint32_t rtc_int_stuck    = 0; /* 1 if GPIO 5 failed to return HIGH within 50ms */
 volatile uint32_t dispatch_reason  = 0;
 volatile uint32_t gpio_status_raw  = 0;
 volatile uint32_t entry_ccount     = 0;
 volatile uint32_t exit_ccount      = 0;
+
+#define RTC_INT_PIN        GPIO_NUM_5
+#define RTC_INT_TIMEOUT_US 50000   /* >3x the ~15.6ms PCF85063A pulse */
+#define RTC_INT_POLL_US    100
 
 int main(void)
 {
@@ -103,18 +108,31 @@ int main(void)
          * The Main CPU will wake up, de-assert holds, handle debounce,
          * and re-arm GPIO_WAKEUP_ENA before entering its next sleep session. */
     } else {
-        /* Sensor Poll Tick: keep Main CPU asleep.
-         * Wait for external PCF85063A ~15.6ms pulse on GPIO 5 to return HIGH before re-arming,
-         * preventing an immediate level-triggered re-wake loop. */
-        uint32_t wait_timeout = 500000;
-        while ((ulp_riscv_gpio_get_level(GPIO_NUM_5) == 0) && (--wait_timeout > 0));
+        /* Sensor Poll Tick: wait for external PCF85063A ~15.6ms pulse to return HIGH before re-arming.
+         * Uses calibrated time-bounded polling via ulp_riscv_delay_us(100) up to 50ms (3x pulse width). */
+        uint32_t waited_us = 0;
+        while ((ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0) &&
+               (waited_us < RTC_INT_TIMEOUT_US)) {
+            ulp_riscv_delay_us(RTC_INT_POLL_US);
+            waited_us += RTC_INT_POLL_US;
+        }
+        rtc_int_stuck = (ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0);
 
         /* Clear peripheral interrupt flag & controller latch */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        ulp_riscv_gpio_wakeup_clear();
 
-        /* Re-arm GPIO wakeup for subsequent events */
-        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        if (rtc_int_stuck) {
+            /* Line is stuck LOW: DO NOT re-arm GPIO_WAKEUP_ENA to prevent runaway wake loops.
+             * Wake Main CPU to log hardware fault and service PCF85063A over I2C. */
+            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+            last_wake_cause = 5; /* RTC_INT_STUCK_FAULT */
+            dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+            ulp_riscv_wakeup_main_processor();
+        } else {
+            /* Line is clean HIGH: Re-arm GPIO wakeup for subsequent events */
+            SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        }
     }
 
     ulp_riscv_shutdown();

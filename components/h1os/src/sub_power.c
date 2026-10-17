@@ -295,6 +295,7 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     ulp_dispatch_reason  = 0;
     ulp_last_wake_btn    = 0;
     ulp_last_wake_cause  = 0;
+    ulp_rtc_int_stuck    = 0;
 
     ESP_LOGI(TAG, "Event Mode Slicing: Tick=%lus, Target=%lus -> Slices=%lu (Effective Period: %lu s, Remainder %lu s discarded)",
              (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,

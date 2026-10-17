@@ -111,19 +111,24 @@ static void debug_dump_ulp_telemetry(void)
     uint32_t exec_us = exec_cycles / 17; /* ~17.5 MHz RTC_FAST_CLK */
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
-    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, rtcio_raw=0x%06lX, btn=%lu, cycles=%lu (~%lu us)",
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, rtcio_raw=0x%06lX, btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
              (ulp_last_wake_cause == 1) ? "BOOT_BTN" :
              (ulp_last_wake_cause == 2) ? "PWR_BTN" :
              (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW" :
-             (ulp_last_wake_cause == 4) ? "SENSOR_TICK" : "UNKNOWN",
+             (ulp_last_wake_cause == 4) ? "SENSOR_TICK" :
+             (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT" : "UNKNOWN",
              (unsigned long)ulp_slice_counter,
              (unsigned long)ulp_overflow_limit,
              (unsigned long)ulp_gpio_status_raw,
              (unsigned long)ulp_last_wake_btn,
+             (unsigned long)ulp_rtc_int_stuck,
              (unsigned long)exec_cycles,
              (unsigned long)exec_us);
+    if (ulp_rtc_int_stuck) {
+        ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
+    }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
 #endif
