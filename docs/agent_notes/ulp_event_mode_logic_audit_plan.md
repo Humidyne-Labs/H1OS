@@ -1,102 +1,83 @@
-# Revised Implementation Plan: ULP-RISC-V Pure Event Mode Silicon Remediation (v3)
+# Implementation Plan: Calibrated Time-Bounded Polling & Stuck-Line Fault Recovery (v4)
 
-Following the 4th-party audit review of [`ulp_event_mode_logic_audit.md`](file:///c:/Users/Matt/Documents/GitHub/H1OS/docs/architecture/ulp_event_mode_logic_audit.md), the architecture and implementation plan have been revised to eliminate build-breaking calls and correctly address the level-trigger wake storm.
-
----
-
-## 1. 4th-Party Audit Reconciliation & Verified Realities
-
-| Audit Finding | Silicon Reality on ESP32-S3 | Action Taken |
-| :--- | :--- | :--- |
-| **Defect 1 (Edge vs Level)** | **Accurate.** ESP32-S3 RTC comparators only sample logic levels (`LOW_LEVEL`). `INT_TYPE = 2` drops wake transitions. | Configured `rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL)`. |
-| **Defect 2 (Bit 10 Role)** | **Misattributed.** TRM Reg 6.50 defines Bit 10 as Light-sleep wake for HP CPU. ULP deep sleep wake is gated by `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` & comparator status. | Use standard `rtc_gpio_wakeup_enable()` without manual Bit 10 overrides. |
-| **Defect 3 (LP IO Clock)** | **Invalid (Breaks Build).** `io_mux_enable_lp_io_clock()` only exists on LP_IO matrix chips (C6/H2/P4). ESP32-S3 has no LP_IO clock. | **Removed completely.** Calling this causes undefined reference linker error. |
-| **Defect 4 (Pad Buffers)** | **Accurate.** Pads require input buffers enabled and must not be frozen by pad holds. | Explicit `rtc_gpio_hold_dis(pin)` ensures pads are not frozen. |
-| **Defect 5 (CDC Latency)** | **Accurate.** Slow clock domain crossing requires $\ge 50\ \mu\text{s}$ delay before entering deep sleep. | Retained `esp_rom_delay_us(50)`. |
-| **Defect 6 (Wake Storm)** | **Accurate.** Level mode causes runaway wake loops if `GPIO_WAKEUP_ENA` is re-armed while lines are still LOW. | **Addressed via asymmetric ULP re-arming protocol in firmware.** |
-| **Defect 7 / 8 (RDY Gate)** | **Accurate.** ULP must spin on `RTC_CNTL_RDY_FOR_WAKEUP` before waking Main CPU. | Added spin loop on `RTC_CNTL_RDY_FOR_WAKEUP` in `ulp/main.c`. |
+Following technical review, this plan refines the ULP coprocessor's pulse handling during non-wake sensor ticks to replace uncalibrated cycle iterations with deterministic, time-calibrated polling using `ulp_riscv_delay_us()`, alongside stuck-pin fault detection and telemetry export.
 
 ---
 
-## 2. Proposed Code Changes
+## 1. Problem Analysis & Invariants
 
-### Component 1: `components/h1os/src/sub_power.c` (`sub_power_enter_deep_sleep`)
-```c
-const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
+### 1.1 Uncalibrated Iteration Spin Issue
+- The previous implementation used an uncalibrated counter `uint32_t wait_timeout = 500000; while (...)`.
+- Loop iteration speed varies based on compiler optimization, branch prediction, and ULP core frequency (internal 17.5 MHz RTC_FAST_CLK or 8.5 MHz divider), providing no guaranteed time duration.
+- Spinning back-to-back thrashes `RTC_GPIO_IN_REG` without physical settling time.
+- If the `/INT` line is stuck LOW (hardware solder bridge, broken pull-up resistor, or unserviced PCF85063A register latch), the loop timed out silently without notifying the Main CPU.
 
-for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
-    gpio_num_t pin = wake_pins[i];
-    
-    /* 1. Route pad to RTC subsystem */
-    rtc_gpio_init(pin);
-    rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
-    
-    /* 2. Disarm any lingering pad hold on wake inputs */
-    rtc_gpio_hold_dis(pin);
+### 1.2 Calibrated Time-Bounded Polling Solution
+- **Calibrated Delay:** Using `ulp_riscv_delay_us(100)` relies on the hardware cycle counter and `ULP_RISCV_CYCLES_PER_US_*` conversion macros for genuine microsecond accuracy.
+- **Poll Interval:** Polling every $100\ \mu\text{s}$ provides $\approx 156$ sample opportunities during the PCF85063A's $15.6\text{ ms}$ pulse ($64\text{ Hz}$ mode), completely eliminating bus thrashing.
+- **Timeout Window:** A $50\text{ ms}$ timeout ($50000\ \mu\text{s}$) spans $>3\times$ the maximum expected pulse width.
+- **Fault Detection & Export:** Export `volatile uint32_t rtc_int_stuck` to RTC Slow RAM.
+- **Safe State Recovery:** If the pin remains LOW after $50\text{ ms}$, **do NOT re-arm `GPIO_WAKEUP_ENA`** (which would otherwise enter an immediate, catastrophic 15 µs wake storm draining battery power). Instead, assert `last_wake_cause = 5` (`RTC_INT_STUCK_FAULT`) and wake the Main CPU so it can log the error and clear the PCF85063A over I2C!
 
-    /* 3. Configure pull-ups/pull-downs */
-    if (pin == HAL_PIN_RTC_INT) {
-        rtc_gpio_pullup_en(pin);
-        rtc_gpio_pulldown_dis(pin);
-    } else {
-        rtc_gpio_pullup_dis(pin); // External 10k pull-ups on PCB
-        rtc_gpio_pulldown_dis(pin);
-    }
+---
 
-    /* 4. Enable level-low wake (sets int_type and wakeup_enable in RTCIO) */
-    rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
-    
-    /* Note: Do NOT call io_mux_enable_lp_io_clock() - non-existent on ESP32-S3 */
-}
+## 2. Proposed Changes
 
-/* 5. Clear peripheral status and wake latch */
-REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+### Component 1: `components/h1os/ulp/main.c`
+1. Export shared telemetry symbol:
+   ```c
+   volatile uint32_t rtc_int_stuck = 0;
+   ```
+2. Define timing constants:
+   ```c
+   #define RTC_INT_PIN        GPIO_NUM_5
+   #define RTC_INT_TIMEOUT_US 50000   /* >3x the ~15.6ms PCF85063A pulse */
+   #define RTC_INT_POLL_US    100
+   ```
+3. Implement the calibrated poll loop in the non-wake sensor tick branch:
+   ```c
+   } else {
+       /* Sensor Poll Tick: wait for external PCF85063A pulse to return HIGH */
+       uint32_t waited_us = 0;
+       while (ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0 &&
+              waited_us < RTC_INT_TIMEOUT_US) {
+           ulp_riscv_delay_us(RTC_INT_POLL_US);
+           waited_us += RTC_INT_POLL_US;
+       }
+       rtc_int_stuck = (ulp_riscv_gpio_get_level(RTC_INT_PIN) == 0);
 
-/* 6. Pure Event Mode: timer disabled, GPIO wakeup enabled */
-CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
-SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+       /* Clear peripheral interrupt flag & controller latch */
+       REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+       ulp_riscv_gpio_wakeup_clear();
 
-/* 7. CDC sync delay (min 3 RTC_SLOW_CLK cycles) */
-esp_rom_delay_us(50);
-```
+       if (rtc_int_stuck) {
+           /* Pin is stuck LOW: DO NOT re-arm GPIO_WAKEUP_ENA to prevent wake storm.
+            * Wake Main CPU to log hardware fault and service PCF85063A over I2C. */
+           while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+           last_wake_cause = 5; /* RTC_INT_STUCK_FAULT */
+           dispatch_reason = 2; /* ULP_DISPATCH_MAIN_WAKE */
+           ulp_riscv_wakeup_main_processor();
+       } else {
+           /* Line is clean HIGH: Re-arm GPIO wakeup for subsequent events */
+           SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+       }
+   }
+   ```
 
-### Component 2: `components/h1os/ulp/main.c` (Level Wake Storm Mitigation)
-```c
-/* Conditionally wake Main CPU and cleanly shut down ULP */
-if (wake_main) {
-    /* 1. Spin until RTC controller is ready for wakeup (TRM requirement) */
-    while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+### Component 2: `components/h1os/src/sub_power.c`
+1. Initialize `ulp_rtc_int_stuck = 0;` alongside other exported symbols in `sub_power_enter_deep_sleep()`.
 
-    /* 2. Wake Main CPU */
-    ulp_riscv_wakeup_main_processor();
+### Component 3: `components/h1os/src/h1os_lifecycle.c`
+1. Update `debug_dump_ulp_telemetry()` to parse cause `5` as `"RTC_INT_STUCK_FAULT"` and log a prominent error if `ulp_rtc_int_stuck != 0`.
 
-    /* 3. Clear trigger latch & peripheral flag */
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-
-    /* 4. DO NOT re-arm GPIO_WAKEUP_ENA here: line is still LOW.
-     * Main CPU will handle debounce and re-arm it before entering next sleep. */
-} else {
-    /* Sensor Poll Tick: wait for PCF85063A ~15.6ms pulse to release before re-arming */
-    uint32_t wait_timeout = 500000;
-    while ((ulp_riscv_gpio_get_level(GPIO_NUM_5) == 0) && (--wait_timeout > 0));
-
-    /* Clear peripheral interrupt flag & controller latch */
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-
-    /* Re-arm GPIO wakeup for subsequent events */
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
-}
-```
+### Component 4: Architecture Document (`docs/architecture/ulp_event_mode_logic_audit.md`)
+1. Update Section 5.2 to document the calibrated polling mechanism, timing calculations, and stuck-pin protection behavior.
 
 ---
 
 ## 3. Verification & Execution Steps
 
-1. Apply changes to `components/h1os/src/sub_power.c` and `components/h1os/ulp/main.c`.
+1. Apply modifications to `components/h1os/ulp/main.c`, `sub_power.c`, and `h1os_lifecycle.c`.
 2. Compile development build:
    ```powershell
    & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev build
@@ -105,4 +86,4 @@ if (wake_main) {
    ```powershell
    & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod build
    ```
-4. Verify build artifacts and clean compilation without missing symbols.
+4. Verify symbol generation (`ulp_h1os.sym` includes `rtc_int_stuck`), clean compilation, and zero link errors.
