@@ -7,8 +7,10 @@
 
 #include "h1os/sub_power.h"
 #include "h1os/sub_rtc.h"
+#include "h1os/orch_state.h"
 #include "h1os/orch_wake_stub.h"
 #include "h1os/hal_io.h"
+
 
 #include "h1os/hal_types.h"
 #include "esp_log.h"
@@ -272,13 +274,32 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 
     hal_io_isolate_sleep_pads();
 
-    /* 1. Arm external PCF85063A countdown timer in repetitive pulsed mode (10s slices) */
-    sub_rtc_arm_countdown(10);
+    /* 1. Calculate dynamic slicing ratio and discard fractional remainder */
+    uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
+    uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
+    if (flow_a_sec == 0) flow_a_sec = 60;
+    if (flow_b_sec == 0) flow_b_sec = 300;
+
+    /* Integer floor division: N_overflow = floor(flow_b_sec / flow_a_sec).
+     * Deliberately discard remainder fraction (flow_b_sec % flow_a_sec)
+     * to lock execution onto a clean integer multiple of the polling tick. */
+    uint32_t overflow = flow_b_sec / flow_a_sec;
+    if (overflow == 0) overflow = 1;
+
+    /* Arm external PCF85063A countdown timer in repetitive pulsed mode for small period (flow_a_sec) */
+    sub_rtc_arm_countdown(flow_a_sec);
 
 #if CONFIG_ULP_COPROC_ENABLED
+    ulp_overflow_limit   = overflow;
+    ulp_slice_counter    = 0;
     ulp_dispatch_reason  = 0;
     ulp_last_wake_btn    = 0;
     ulp_last_wake_cause  = 0;
+
+    ESP_LOGI(TAG, "Event Mode Slicing: Tick=%lus, Target=%lus -> Slices=%lu (Effective Period: %lu s, Remainder %lu s discarded)",
+             (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,
+             (unsigned long)overflow, (unsigned long)(overflow * flow_a_sec),
+             (unsigned long)(flow_b_sec % flow_a_sec));
 
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
@@ -295,12 +316,12 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
             rtc_gpio_pulldown_dis(pin);
         }
 
-        /* Configure low-level interrupt (INT_TYPE = 4) in RTC_GPIO_PINn register without pad hold on input wake pins */
+        /* Configure falling-edge interrupt (INT_TYPE = 2) in RTC_GPIO_PINn register without pad hold on input wake pins */
         int rtc_io_num = rtc_io_number_get(pin);
         if (rtc_io_num >= 0) {
             REG_SET_FIELD(RTC_GPIO_PIN0_REG + (4 * rtc_io_num), 
                           RTC_GPIO_PIN0_INT_TYPE, 
-                          4); /* 4 = LOW_LEVEL */
+                          2); /* 2 = Falling Edge */
         }
     }
 
@@ -317,10 +338,12 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
-    ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A 10s pulse, Wake: ULP)...");
+    ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
+             (unsigned long)flow_a_sec, (unsigned long)overflow);
     esp_deep_sleep_start();
     return ESP_OK;
 }
+
 
 
 void sub_power_cut_power_latch(void)
