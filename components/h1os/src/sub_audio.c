@@ -440,7 +440,12 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
-    // No Delay, delay cuts samples durring playback
+
+    /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
+     * cleanly through the DAC interpolation pipeline before worker goes idle */
+    int16_t postroll[FRAME_SIZE] = {0};
+    size_t postroll_written = 0;
+    i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
 }
 
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
@@ -486,12 +491,9 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     // standby never entered at runtime
 
     // 2. Unmute NS4168 Class-D amplifier if not already active
-#define AUDIO_INIT_DELAY 100
     if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
         gpio_set_level(HAL_PIN_PA_CTRL, 1);
-        vTaskDelay(pdMS_TO_TICKS(AUDIO_INIT_DELAY));
     }
-#undef AUDIO_INIT_DELAY
 
     return ESP_OK;
 }
