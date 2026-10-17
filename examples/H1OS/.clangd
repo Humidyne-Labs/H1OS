@@ -1,4 +1,7 @@
 CompileFlags:
+  CompilationDatabase:
+    - build_dev
+    - build_prod
   Add:
     - -Wno-unknown-attributes
     - -Wno-macro-redefined
