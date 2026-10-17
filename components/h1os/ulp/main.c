@@ -85,22 +85,36 @@ int main(void)
         wake_main = false;
     }
 
-    /* 4. Strict Latch Clear & Re-Arm Sequence */
-    /* Step A: Clear RTC GPIO peripheral interrupt flag */
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-
-    /* Step B: Pulse GPIO_WAKEUP_CLR to clear RTC controller trigger latch */
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-
-    /* Step C: Re-arm GPIO Wakeup Enable (WAKEUP_CLR disables this bit) */
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
-
     exit_ccount = ULP_RISCV_GET_CCOUNT();
 
-    /* 5. Conditionally wake Main CPU and cleanly shut down ULP */
+    /* 4. Strict Latch Clear, Re-Arm & Wakeup Execution */
     if (wake_main) {
+        /* Step A: Spin until RTC controller is ready for wakeup (TRM requirement) */
+        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+
+        /* Step B: Wake Main CPU */
         ulp_riscv_wakeup_main_processor();
+
+        /* Step C: Clear RTC controller wake latch & peripheral status */
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+
+        /* Step D: DO NOT re-arm GPIO_WAKEUP_ENA here: physical line is still LOW.
+         * The Main CPU will wake up, de-assert holds, handle debounce,
+         * and re-arm GPIO_WAKEUP_ENA before entering its next sleep session. */
+    } else {
+        /* Sensor Poll Tick: keep Main CPU asleep.
+         * Wait for external PCF85063A ~15.6ms pulse on GPIO 5 to return HIGH before re-arming,
+         * preventing an immediate level-triggered re-wake loop. */
+        uint32_t wait_timeout = 500000;
+        while ((ulp_riscv_gpio_get_level(GPIO_NUM_5) == 0) && (--wait_timeout > 0));
+
+        /* Clear peripheral interrupt flag & controller latch */
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+
+        /* Re-arm GPIO wakeup for subsequent events */
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
     }
 
     ulp_riscv_shutdown();

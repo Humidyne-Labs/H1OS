@@ -198,7 +198,7 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         h1os_lvgl_unlock();
 
         /* Hold splash graphic briefly so it is visible before primary UI transition */
-        vTaskDelay(pdMS_TO_TICKS(6000));
+        vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }
 

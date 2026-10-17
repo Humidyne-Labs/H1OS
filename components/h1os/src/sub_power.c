@@ -305,9 +305,14 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
         gpio_num_t pin = wake_pins[i];
         
+        /* 1. Route pad to RTC subsystem */
         rtc_gpio_init(pin);
         rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
         
+        /* 2. Disarm any lingering pad hold on wake inputs */
+        rtc_gpio_hold_dis(pin);
+
+        /* 3. Configure pull-ups/pull-downs */
         if (pin == HAL_PIN_RTC_INT) {
             rtc_gpio_pullup_en(pin);
             rtc_gpio_pulldown_dis(pin);
@@ -316,27 +321,34 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
             rtc_gpio_pulldown_dis(pin);
         }
 
-        /* Configure falling-edge interrupt (INT_TYPE = 2) in RTC_GPIO_PINn register without pad hold on input wake pins */
-        int rtc_io_num = rtc_io_number_get(pin);
-        if (rtc_io_num >= 0) {
-            REG_SET_FIELD(RTC_GPIO_PIN0_REG + (4 * rtc_io_num), 
-                          RTC_GPIO_PIN0_INT_TYPE, 
-                          2); /* 2 = Falling Edge */
-        }
+        /* 4. Enable level-low wake (sets int_type and wakeup_enable in RTCIO) */
+        rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
 
     /* ULP coprocessor wake source for the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* 2. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
+    /* 5. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
+    /* 6. Allow slow clock domain synchronization delay (>= 3 RTC_SLOW_CLK cycles) */
+    esp_rom_delay_us(50);
 #endif
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+
+    ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
+             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
+    ESP_LOGI(TAG, "RTC Controller: ULP_CP_TIMER=0x%08lx, RTC_STATUS=0x%08lx, RTC_IN=0x%08lx",
+             (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
+             (unsigned long)REG_READ(RTC_GPIO_STATUS_REG),
+             (unsigned long)REG_READ(RTC_GPIO_IN_REG));
 
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
              (unsigned long)flow_a_sec, (unsigned long)overflow);
