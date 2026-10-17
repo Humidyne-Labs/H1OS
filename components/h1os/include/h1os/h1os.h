@@ -55,20 +55,18 @@ typedef struct {
 /** @brief Splash screens */
 typedef enum {
     H1OS_SPLASH_BOOT = 0, ///< Boot
-    H1OS_SPLASH_WAKE, ///< Wake
-    H1OS_SPLASH_SLEEP, ///< Sleep
+    H1OS_SPLASH_SLEEP,    ///< Sleep
     H1OS_SPLASH_SHUTDOWN, ///< Shutdown
-    H1OS_SPLASH_MAX ///< Max
+    H1OS_SPLASH_MAX       ///< Max
 } h1os_splash_type_t;
 
 /** @brief Chime Types */
 typedef enum {
-    H1OS_CHIME_BOOT = 0, ///< Boot
-    H1OS_CHIME_WAKE, ///< Wake
-    H1OS_CHIME_SLEEP, ///< Sleep
-    H1OS_CHIME_SHUTDOWN, ///< Shutdown
-    H1OS_CHIME_ALARM, ///< Alarm
-    H1OS_CHIME_MAX ///< Max
+    H1OS_CHIME_BOOT = 0,  ///< Boot
+    H1OS_CHIME_SLEEP,     ///< Sleep
+    H1OS_CHIME_SHUTDOWN,  ///< Shutdown
+    H1OS_CHIME_ALARM,     ///< Alarm
+    H1OS_CHIME_MAX        ///< Max
 } h1os_chime_type_t;
 
 typedef void (*h1os_boot_cb_t)     (void *user_data);

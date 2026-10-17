@@ -35,7 +35,6 @@ typedef struct {
  */
 typedef enum {
     H1OS_SPLASH_BOOT = 0,
-    H1OS_SPLASH_WAKE,
     H1OS_SPLASH_SLEEP,
     H1OS_SPLASH_SHUTDOWN,
     H1OS_SPLASH_MAX
@@ -46,7 +45,6 @@ typedef enum {
  */
 typedef enum {
     H1OS_CHIME_BOOT = 0,
-    H1OS_CHIME_WAKE,
     H1OS_CHIME_SLEEP,
     H1OS_CHIME_SHUTDOWN,
     H1OS_CHIME_ALARM,

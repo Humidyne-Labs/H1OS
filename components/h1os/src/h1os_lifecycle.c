@@ -325,9 +325,9 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     }
 
     /* Architectural Invariant: Initialize the audio subsystem whenever the user is present
-     * (Cold Boot, physical Button Wake, or any interactive Flow B Main Wake session).
-     * Only quiescent Flow A bursts bypass audio initialization entirely! */
-    bool is_user_wake = (!is_wake) || button_woke; // || (flow == ORCH_FLOW_B_MAIN_WAKE);
+     * (Cold Boot, physical Button Wake).
+     * Only quiescent Flow A bursts & Flow B bypass audio initialization entirely! */
+    bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
         uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
         sub_audio_set_volume(init_vol);

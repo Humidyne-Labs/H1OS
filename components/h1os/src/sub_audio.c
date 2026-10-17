@@ -16,6 +16,7 @@
  */
 
 #include "h1os/sub_audio.h"
+#include "h1os/h1os.h"
 #include "h1os/hal_i2c.h"
 #include "h1os/hal_types.h"
 #include "driver/gpio.h"
@@ -531,7 +532,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
     if (ret != ESP_OK) return ret;
 
     switch (type) {
-        case 0: /* H1OS_CHIME_BOOT: 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
+        case H1OS_CHIME_BOOT: /* 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
             sub_audio_render_tone_samples(523, 70);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(659, 70);
@@ -541,10 +542,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(1046, 150);
             break;
 
-        case 1: /* H1OS_CHIME_WAKE: Stripped to prevent cavity heating and power draw */
-            break;
-
-        case 2: /* H1OS_CHIME_SLEEP: 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
+        case H1OS_CHIME_SLEEP: /* 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
             sub_audio_render_tone_samples(1046, 80);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(784, 80);
@@ -552,7 +550,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(659, 140);
             break;
 
-        case 3: /* H1OS_CHIME_SHUTDOWN: 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
+        case H1OS_CHIME_SHUTDOWN: /* 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
             sub_audio_render_tone_samples(784, 90);
             vTaskDelay(pdMS_TO_TICKS(15));
             sub_audio_render_tone_samples(659, 90);
@@ -560,7 +558,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
             sub_audio_render_tone_samples(523, 180);
             break;
 
-        case 4: /* H1OS_CHIME_ALARM: Attention pulses */
+        case H1OS_CHIME_ALARM: /* Attention pulses */
             for (int i = 0; i < 2; i++) {
                 sub_audio_render_tone_samples(1760, 80);
                 vTaskDelay(pdMS_TO_TICKS(10));
