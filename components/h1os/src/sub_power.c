@@ -233,9 +233,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
         ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
 
-        /* Configure ULP to wake on periodic timer */
+        /* Configure ULP to wake on GPIO wakeup source per reference architecture */
         ulp_riscv_cfg_t cfg = {
-            .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_TIMER,
+            .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO,
         };
         err = ulp_riscv_config_and_run(&cfg);
         if (err != ESP_OK) {
@@ -243,8 +243,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* Enable GPIO wakeups in RTC_CNTL_ULP_CP_TIMER_REG alongside the sleep timer */
-        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        /* Arm periodic sleep timer alongside GPIO wakeup in RTC_CNTL_ULP_CP_TIMER_REG */
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
         /* Release RTC domain GPIO control back to HP digital matrix so HP application can read buttons during active boot session */
         rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
@@ -279,7 +279,8 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     /* Strict Architectural Invariant: ONLY the ULP coprocessor wakes the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Arm both ULP periodic sleep timer AND ULP RTC GPIO wakeup in RTC_CNTL_ULP_CP_TIMER_REG */
+    /* Clear any lingering GPIO wakeup latch and arm both ULP periodic sleep timer AND RTC GPIO wakeup */
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG,
                       RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 #endif

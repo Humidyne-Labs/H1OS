@@ -339,6 +339,7 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     rtc_gpio_set_direction(HAL_PIN_RTC_INT, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(HAL_PIN_RTC_INT);
     rtc_gpio_pulldown_dis(HAL_PIN_RTC_INT);
+    rtc_gpio_hold_en(HAL_PIN_RTC_INT);
     io_mux_enable_lp_io_clock(HAL_PIN_RTC_INT, true);
     rtc_gpio_wakeup_enable(HAL_PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
 
@@ -346,6 +347,7 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     rtc_gpio_set_direction(HAL_PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_dis(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_BOOT);
+    rtc_gpio_hold_en(HAL_PIN_BUTTON_BOOT);
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_BOOT, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
 
@@ -353,6 +355,7 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     rtc_gpio_set_direction(HAL_PIN_BUTTON_POWER, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_dis(HAL_PIN_BUTTON_POWER);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_hold_en(HAL_PIN_BUTTON_POWER);
     io_mux_enable_lp_io_clock(HAL_PIN_BUTTON_POWER, true);
     rtc_gpio_wakeup_enable(HAL_PIN_BUTTON_POWER, GPIO_INTR_LOW_LEVEL);
 
