@@ -162,4 +162,35 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
   1. Register `0x37` must be explicitly written with `0x08` during codec initialization, bypassing/disabling the uncalibrated digital EQ block and disabling the digital fade-in/out ramp.
   2. Default to Low-Power DAC mode (`0x0F = 0x80`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible while delivering valuable energy savings.
 
+### 4.5 The Cross-Core Spinlock Trap & Peterson Algorithm Lockup
+- **The Issue:** The main application froze indefinitely on deep sleep re-entry, with the FreeRTOS task watchdog timer (`task_wdt`) resetting Core 0.
+- **Root Cause:** A Peterson software spinlock was introduced between Core 0 and the ULP-RISC-V core to guard shared RTC Slow Memory. When the ULP coprocessor suffered a trap/crash (due to missing `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y`), it died with its spinlock flag permanently asserted. Core 0 spun indefinitely attempting to acquire the lock before entering sleep.
+- **The Solution:** Eliminate complex cross-core software spinlocks entirely. The ULP and dual-core Xtensa CPUs are naturally mutually exclusive by architecture: the ULP executes *only* while the main CPU is in deep sleep. Shared variables are updated cleanly using memory fences (`asm volatile("fence" ::: "memory")`), and execution is strictly handed off via `ulp_riscv_wakeup_main_processor()` and `ulp_riscv_halt()`.
+
+### 4.6 32.768 kHz Clock Domain Crossing (CDC) Timing Rules
+- **The Issue:** Intermittent deep sleep re-entry freezes and missed RTC GPIO edge transitions.
+- **Root Cause:** Level clear pulses on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` were asserted for only $50\ \mu\text{s}$. On hardware configured with an external 32.768 kHz quartz crystal, one clock cycle is $\approx 30.5\ \mu\text{s}$. A $50\ \mu\text{s}$ pulse spans only $1.64$ cycles, violating the ESP32-S3 TRM requirement that CDC pulses must be held for $\ge 3$ slow clock cycles ($\ge 91.55\ \mu\text{s}$) to be sampled by the internal synchronizers.
+- **The Solution:** All wake latch clearing pulses in both ULP firmware and main application code are explicitly delayed for $\ge 120\ \mu\text{s}$ ($\approx 3.93$ cycles on XTAL32K).
+
+### 4.7 Pure Event Mode & Fractional Remainder Resolution
+- **The Issue:** When Flow B interval is not an exact integer multiple of Flow A sampling interval (e.g. $T_{\text{flow-b}} = 120\text{ s}$, $T_{\text{flow-a}} = 16\text{ s}$, giving $120 / 16 = 7.5$), accumulating fixed slices causes phase drift and display jitter.
+- **Root Cause:** Attempting to run periodic sensor timing on the internal ULP timer while concurrently arming GPIO wakeups triggered the ERR-001 silicon lockup. Offloading periodic timing to the external PCF85063A in repetitive pulsed mode (`TI_TP = 1`) fixes the lockup, but produces fixed, un-alterable pulse ticks.
+- **The Solution:** In environmental telemetry, sampling rates are constrained such that Flow B interval is strictly an integer multiple of Flow A ($T_{\text{flow-b}} = N_{\text{overflow}} \times T_{\text{flow-a}}$). Slices are accumulated deterministically ($x < N_{\text{overflow}} \to$ Flow A, $x = N_{\text{overflow}} \to$ Flow B). Fractional remainders are discarded on the main CPU.
+
+### 4.8 Pre-Sleep Open-Drain Pulse Draining
+- **The Issue:** Bare-metal Flow A wake stub executions triggered immediate false wake loops upon re-entering deep sleep.
+- **Root Cause:** The PCF85063A generates an active-low open-drain pulse on `/INT` (`GPIO 5`) lasting $\approx 15.625\text{ ms}$. Because the Flow A wake stub completes in $<3.0\text{ ms}$, calling deep sleep at $t \approx 3\text{ ms}$ finds `GPIO 5` still physically LOW, immediately re-triggering the level-low wake detector.
+- **The Solution:** An atomic pulse drain barrier is placed before deep sleep entry. Both ULP (on intermediate slices) and Main CPU (on Flow A / Flow B sleep entry) actively verify that `GPIO 5` has released and returned HIGH before enabling wake detectors and executing `esp_deep_sleep_start()`.
+
+### 4.9 Stripping Wake Chimes & Wake Splashes for Thermal Cavity Integrity
+- **The Issue:** Excessive battery consumption and thermal cavity offsets during periodic wake transitions.
+- **Root Cause:** Playing acoustic chimes and rendering intermediate splash screens on every wake forced the audio amplifier and display charge pumps to run right before sensor sampling.
+- **The Solution:** Wake chimes (`H1OS_CHIME_WAKE`) and wake splashes (`H1OS_SPLASH_WAKE`) are permanently eliminated from the automatic wake execution sequence. Acoustic feedback is preserved strictly for physical power events (boot and shutdown), and display updates immediately show the telemetry dashboard without intermediate logos.
+
+### 4.10 Floating LiPo ADC Voltage on USB Power
+- **The Issue:** When operating on the bench without a physical LiPo battery installed, the unit continually entered `[CRITICAL LOW POWER SHUTDOWN]` upon boot.
+- **Root Cause:** The 200kΩ/200kΩ battery voltage divider on `GPIO 4` floats to $\approx 1.97\text{ V}$ when unpowered by a battery. The ULP brownout detector interpreted $1972\text{ mV}$ as an emergency depleted battery (falling between $100\text{ mV}$ and $3250\text{ mV}$) and commanded immediate shutdown.
+- **The Solution:** Implement the **Zero-Volt Cable Guard**: when the power latch is held HIGH and the USB VBUS line is active (`hal_check_usb_ll() == true`), the battery is forced to 4200 mV (100%), and the ULP brownout trip is suppressed.
+
+
 
