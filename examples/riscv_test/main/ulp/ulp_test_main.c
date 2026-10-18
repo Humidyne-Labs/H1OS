@@ -200,6 +200,11 @@ int main(void)
     if (!is_main_ready) {
         ulp_printf("[ULP] Main CPU not in sleep (init pass). Halting without wake signal.\n");
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
+        /* Purge any false-flag ISR interrupts or latches tripped during startup configuration */
+        s_gpio_event_occurred = false;
+        test_data.ulp_isr_fired_count = 0;
+        test_data.ulp_last_isr_source = 0xFF;
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_halt();
         return 0;
     }
@@ -221,21 +226,30 @@ int main(void)
                b18, b0, rtcio_int_st);
 
     /* 3. Classify wakeup cause:
-     * Catch raw RTC IO interrupt bit, live pin level LOW, OR any ISR firing
-     * so that brief tactile taps (released before pin sampling) are accurately captured.
+     * Verify actual hardware flags rather than blind binary fallthrough.
+     * GPIO wake is confirmed if:
+     *   - Raw RTC IO status bit is set, OR
+     *   - Pin is currently sampled LOW, OR
+     *   - An edge ISR fired while Main CPU was in sleep.
      */
     bool is_gpio = (rtcio_int_st != 0) || (b18 == 0) || s_gpio_event_occurred;
     s_gpio_event_occurred = false;
 
+    bool pmu_timer_active = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
+
+    const char *classification = "UNKNOWN_GLITCH_EVENT";
     if (is_gpio) {
         test_data.ulp_gpio_wake_count++;
-    } else {
+        classification = "RTC_GPIO_EVENT";
+    } else if (pmu_timer_active) {
         test_data.ulp_timer_wake_count++;
+        classification = "PMU_TIMER_EVENT";
     }
 
-    ulp_printf("[ULP] Wake Classified: %s (gpio_cnt=%u, timer_cnt=%u)\n",
-               is_gpio ? "RTC_GPIO_EVENT" : "PMU_TIMER_EVENT",
-               test_data.ulp_gpio_wake_count, test_data.ulp_timer_wake_count);
+    ulp_printf("[ULP] Wake Classified: %s (gpio_cnt=%u, timer_cnt=%u, timer_en=%d)\n",
+               classification,
+               test_data.ulp_gpio_wake_count, test_data.ulp_timer_wake_count,
+               pmu_timer_active ? 1 : 0);
 
     /* 4. Drain IO if tactile button is still held down */
     if (b18 == 0) {
