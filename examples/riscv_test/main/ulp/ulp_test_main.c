@@ -161,17 +161,26 @@ int main(void)
     test_data.ulp_rdy_timeout = 0;
     test_data.ulp_step_checkpoint = ULP_CP_ENTERED_MAIN;
     uint32_t start_c = ULP_RISCV_GET_CCOUNT();
+    uint32_t timer_reg = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
+    test_data.ulp_reg_timer_val = timer_reg;
 
     ulp_printf("[ULP] >>> EXECUTION ENTRY #%u <<< (stage=%u, ccount=%u)\n",
                test_data.ulp_entry_count, test_data.test_stage, start_c);
+    ulp_printf("[ULP] ULP_CP_TIMER_REG=0x%08x (TIMER_EN=%d GPIO_ENA=%d CLR=%d)\n",
+               timer_reg,
+               (timer_reg & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0,
+               (timer_reg & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0,
+               (timer_reg & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0);
 
     /* Check if Main CPU is in deep sleep and ready to receive wakeup signal */
     bool is_main_ready = REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) != 0;
     if (!is_main_ready) {
         ulp_printf("[ULP] Main CPU not in sleep (init pass). Halting without wake signal.\n");
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
-        ulp_riscv_gpio_wakeup_clear();
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        ulp_riscv_gpio_wakeup_clear();
+        ulp_riscv_delay_us(120);
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
         ulp_riscv_halt();
         return 0;
     }
@@ -237,10 +246,10 @@ int main(void)
 
         /* Clear wake latch and halt cleanly */
         ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
         ulp_riscv_delay_us(120);
         CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
 
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
@@ -264,10 +273,10 @@ int main(void)
 
         /* Clear wake latch and halt cleanly */
         ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
         ulp_riscv_delay_us(120);
         CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
 
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
@@ -281,10 +290,10 @@ int main(void)
                    b18, elapsed_ticks, min_timer_ticks);
 
         /* Clear transient latch and halt without waking Main CPU */
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
         ulp_riscv_delay_us(120);
         CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
         ulp_riscv_halt();
         return 0;

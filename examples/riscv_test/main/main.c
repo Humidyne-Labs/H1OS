@@ -186,6 +186,11 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     printf(" ULP ISR Handler Executions: %lu\n", (unsigned long)d->ulp_isr_fired_count);
     printf(" Last ISR Source GPIO      : %ld\n", (long)d->ulp_last_isr_source);
     printf(" Raw RTC_GPIO_STATUS_REG   : 0x%08lX\n", (unsigned long)d->ulp_last_gpio_status);
+    printf(" Raw RTC_CNTL_ULP_CP_TIMER : 0x%08lX (TIMER_EN=%d, GPIO_ENA=%d, CLR=%d)\n",
+           (unsigned long)d->ulp_reg_timer_val,
+           (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
+           (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0),
+           (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0));
     printf(" Sampled Pin Levels        : PWR(18)=%d, BOOT(0)=%d (Raw: 0x%08lX)\n",
            (int)(d->ulp_pin_levels & 1U),
            (int)((d->ulp_pin_levels >> 1) & 1U),
@@ -270,6 +275,13 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
+    uint32_t t_reg1 = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
+    ESP_LOGI(TAG, "Hardware Reg Check: RTC_CNTL_ULP_CP_TIMER_REG = 0x%08lX (TIMER_EN=%d, GPIO_ENA=%d, CLR=%d)",
+             (unsigned long)t_reg1,
+             (int)((t_reg1 & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
+             (int)((t_reg1 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0),
+             (int)((t_reg1 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0));
+
     enter_deep_sleep_guarded(d);
 }
 
@@ -310,6 +322,13 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
 
+    uint32_t t_reg2 = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
+    ESP_LOGI(TAG, "Hardware Reg Check: RTC_CNTL_ULP_CP_TIMER_REG = 0x%08lX (TIMER_EN=%d, GPIO_ENA=%d, CLR=%d)",
+             (unsigned long)t_reg2,
+             (int)((t_reg2 & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
+             (int)((t_reg2 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0),
+             (int)((t_reg2 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0));
+
     enter_deep_sleep_guarded(d);
 }
 
@@ -348,6 +367,13 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
+
+    uint32_t t_reg3 = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
+    ESP_LOGI(TAG, "Hardware Reg Check: RTC_CNTL_ULP_CP_TIMER_REG = 0x%08lX (TIMER_EN=%d, GPIO_ENA=%d, CLR=%d)",
+             (unsigned long)t_reg3,
+             (int)((t_reg3 & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
+             (int)((t_reg3 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0),
+             (int)((t_reg3 & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0));
 
     enter_deep_sleep_guarded(d);
 }
