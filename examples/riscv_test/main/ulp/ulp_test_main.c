@@ -103,9 +103,6 @@ int main(void)
     ulp_riscv_wakeup_main_processor();
     test_data.ulp_completed = 1;
 
-    /* Stop ULP timer immediately so it cannot re-trigger while main CPU is booting */
-    ulp_riscv_timer_stop();
-
     /* 5. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     ulp_riscv_delay_us(120);

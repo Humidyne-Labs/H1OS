@@ -26,6 +26,7 @@
 #include "soc/rtc_io_reg.h"
 #include "soc/gpio_reg.h"
 #include "ulp_riscv.h"
+#include "ulp_common.h"
 #include "ulp_riscv_test.h"
 #include "shared_test_data.h"
 
@@ -124,8 +125,8 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
         verdict = "FAIL: ULP WOKE TOO EARLY (MAIN CPU WAS AWAKE)";
     } else if (d->ulp_rdy_timeout != 0) {
         verdict = "FAIL: ULP RDY_FOR_WAKEUP TIMEOUT";
-    } else if (is_timer_wake && stage == TEST_MODE_EVENT_ONLY && d->ulp_completed == 0) {
-        verdict = "FALLBACK WAKE: 30s TIMER (No button pressed or GPIO trigger missed)";
+    } else if (is_timer_wake && d->ulp_completed == 0) {
+        verdict = "FALLBACK WAKE: 30s TIMER (ULP trigger missed or coprocessor hung)";
     } else if (is_ulp_wake && d->magic == ULP_TEST_MAGIC && d->ulp_completed == 1) {
         verdict = "PASS";
     }
@@ -189,6 +190,8 @@ static void prepare_serial_and_pins_before_sleep(void)
 
 static void enter_deep_sleep_guarded(void)
 {
+    /* Always arm 30s hardware fallback timer so device never hangs permanently in deep sleep */
+    esp_sleep_enable_timer_wakeup(30000000ULL);
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
 
@@ -355,8 +358,11 @@ void app_main(void)
         /* Deep Sleep Wakeup */
         s_boot_count++;
 
+        /* Stop the ULP PMU timer immediately from Main CPU to prevent re-triggers during terminal wait */
+        ulp_timer_stop();
+
         /* Crucial for USB Serial/JTAG: Wait for host PC CDC enumeration and terminal re-attach */
-        vTaskDelay(pdMS_TO_TICKS(2500));
+        vTaskDelay(pdMS_TO_TICKS(2000));
 
         dump_telemetry_report(s_current_test, wake_causes, p_data);
 
