@@ -1,0 +1,103 @@
+/*
+ * SPDX-License-Identifier: MIT
+ * ESP32-S3 ULP-RISC-V Coprocessor Wakeup Validation Firmware
+ *
+ * Implements 3 test scenarios with active ISR handlers:
+ *   1. Event Mode (RTC GPIO wakeup only, PMU timer disabled)
+ *   2. Timer Mode (PMU countdown timer only, RTC GPIO wakeup disabled)
+ *   3. Dual Mode  (PMU timer + RTC GPIO wakeups armed concurrently)
+ */
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "ulp_riscv.h"
+#include "ulp_riscv_utils.h"
+#include "ulp_riscv_gpio.h"
+#include "ulp_riscv_interrupt.h"
+#include "soc/rtc_io_reg.h"
+#include "soc/rtc_cntl_reg.h"
+#include "shared_test_data.h"
+
+/* Exported shared telemetry structure (accessible via ulp_test_data on Main CPU) */
+volatile test_shared_data_t test_data = {
+    .magic = ULP_TEST_MAGIC,
+    .test_stage = TEST_MODE_UNINITIALIZED,
+    .ulp_entry_count = 0,
+    .ulp_gpio_wake_count = 0,
+    .ulp_timer_wake_count = 0,
+    .ulp_isr_fired_count = 0,
+    .ulp_last_isr_source = 0xFF,
+    .ulp_last_gpio_status = 0,
+    .ulp_pin_levels = 0,
+    .ulp_cycle_count = 0,
+    .ulp_completed = 0
+};
+
+#if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
+static void gpio0_isr(void *arg)
+{
+    test_data.ulp_isr_fired_count++;
+    test_data.ulp_last_isr_source = 0;
+}
+
+static void gpio5_isr(void *arg)
+{
+    test_data.ulp_isr_fired_count++;
+    test_data.ulp_last_isr_source = 5;
+}
+
+static void gpio18_isr(void *arg)
+{
+    test_data.ulp_isr_fired_count++;
+    test_data.ulp_last_isr_source = 18;
+}
+#endif
+
+int main(void)
+{
+    test_data.ulp_entry_count++;
+    uint32_t start_c = ULP_RISCV_GET_CCOUNT();
+
+#if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
+    /* Register RTC GPIO ISR handlers for tactile keys and RTC INT */
+    ulp_riscv_gpio_isr_register(GPIO_NUM_0, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio0_isr, NULL);
+    ulp_riscv_gpio_isr_register(GPIO_NUM_5, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio5_isr, NULL);
+    ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio18_isr, NULL);
+#endif
+
+    /* 1. Snapshot raw RTC IO interrupt status register */
+    uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
+    test_data.ulp_last_gpio_status = rtcio_int_st;
+
+    /* 2. Sample live levels of tested RTC GPIO lines */
+    int b0  = ulp_riscv_gpio_get_level(GPIO_NUM_0);
+    int b5  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
+    int b18 = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    test_data.ulp_pin_levels = ((b0 ? 1U : 0U) | ((b5 ? 1U : 0U) << 5) | ((b18 ? 1U : 0U) << 18));
+
+    /* 3. Classify wakeup cause */
+    if (rtcio_int_st != 0 || b0 == 0 || b18 == 0 || b5 == 0) {
+        test_data.ulp_gpio_wake_count++;
+    } else {
+        test_data.ulp_timer_wake_count++;
+    }
+
+    test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
+    test_data.ulp_completed = 1;
+
+    asm volatile("fence" ::: "memory");
+
+    /* 4. Hand off execution: Wake Main CPU from deep sleep */
+    while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+    ulp_riscv_wakeup_main_processor();
+
+    /* 5. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    ulp_riscv_delay_us(120);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+
+    /* 6. Halt coprocessor and enter sleep */
+    ulp_riscv_halt();
+    return 0;
+}
