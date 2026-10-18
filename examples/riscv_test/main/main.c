@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <assert.h>
 #include "esp_log.h"
 #include "esp_sleep.h"
@@ -37,6 +38,9 @@ static const char *TAG = "RISCV_TEST";
 /* Persisted across deep sleep cycles in RTC Slow Memory */
 RTC_DATA_ATTR static uint32_t s_current_test = 0;
 RTC_DATA_ATTR static uint32_t s_boot_count   = 0;
+RTC_DATA_ATTR static bool s_stage1_pass      = false;
+RTC_DATA_ATTR static bool s_stage2_pass      = false;
+RTC_DATA_ATTR static bool s_stage3_pass      = false;
 
 extern const uint8_t ulp_riscv_test_bin_start[] asm("_binary_ulp_riscv_test_bin_start");
 extern const uint8_t ulp_riscv_test_bin_end[]   asm("_binary_ulp_riscv_test_bin_end");
@@ -120,10 +124,16 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
         verdict = "FAIL: ULP WOKE TOO EARLY (MAIN CPU WAS AWAKE)";
     } else if (d->ulp_rdy_timeout != 0) {
         verdict = "FAIL: ULP RDY_FOR_WAKEUP TIMEOUT";
-    } else if (is_timer_wake && stage == TEST_MODE_EVENT_ONLY && d->ulp_entry_count == 0) {
+    } else if (is_timer_wake && stage == TEST_MODE_EVENT_ONLY && d->ulp_completed == 0) {
         verdict = "FALLBACK WAKE: 30s TIMER (No button pressed or GPIO trigger missed)";
     } else if (is_ulp_wake && d->magic == ULP_TEST_MAGIC && d->ulp_completed == 1) {
         verdict = "PASS";
+    }
+
+    if (strcmp(verdict, "PASS") == 0) {
+        if (stage == TEST_MODE_TIMER_ONLY) s_stage1_pass = true;
+        else if (stage == TEST_MODE_EVENT_ONLY) s_stage2_pass = true;
+        else if (stage == TEST_MODE_DUAL_BOTH) s_stage3_pass = true;
     }
 
     printf("\n");
@@ -192,6 +202,7 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
     d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
@@ -228,6 +239,7 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
     d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
@@ -267,6 +279,7 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
     d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
@@ -306,6 +319,9 @@ void app_main(void)
         /* Cold Boot / Power-On Reset */
         s_boot_count = 0;
         s_current_test = TEST_MODE_TIMER_ONLY;
+        s_stage1_pass = false;
+        s_stage2_pass = false;
+        s_stage3_pass = false;
 
         printf("\n\n");
         printf("************************************************************************\n");
@@ -345,8 +361,16 @@ void app_main(void)
             s_current_test = TEST_MODE_COMPLETE;
             printf("\n");
             printf("************************************************************************\n");
-            printf("*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY!            *\n");
-            printf("*  Check telemetry dump above for mutual exclusivity characterization. *\n");
+            if (s_stage1_pass && s_stage2_pass && s_stage3_pass) {
+                printf("*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY! (PASS)     *\n");
+                printf("*  Mutual Exclusivity Disproven: Timer and GPIO run concurrently!      *\n");
+            } else {
+                printf("*  TEST SUITE FINISHED: ONE OR MORE STAGES FAILED                      *\n");
+                printf("*  Stage 1: %-4s | Stage 2: %-4s | Stage 3: %-4s                       *\n",
+                       s_stage1_pass ? "PASS" : "FAIL",
+                       s_stage2_pass ? "PASS" : "FAIL",
+                       s_stage3_pass ? "PASS" : "FAIL");
+            }
             printf("************************************************************************\n\n");
             fflush(stdout);
             vTaskDelay(pdMS_TO_TICKS(1500));

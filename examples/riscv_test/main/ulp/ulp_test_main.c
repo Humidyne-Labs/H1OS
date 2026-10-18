@@ -35,11 +35,14 @@ volatile test_shared_data_t test_data = {
     .ulp_completed = 0
 };
 
+static volatile bool s_gpio_event_occurred = false;
+
 #if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
 static void gpio18_isr(void *arg)
 {
     test_data.ulp_isr_fired_count++;
     test_data.ulp_last_isr_source = 18;
+    s_gpio_event_occurred = true;
 }
 #endif
 
@@ -74,8 +77,14 @@ int main(void)
     test_data.ulp_pin_levels = ((b18 ? 1U : 0U) | ((b0 ? 1U : 0U) << 1));
     test_data.ulp_step_checkpoint = ULP_CP_PINS_SAMPLED;
 
-    /* 3. Classify wakeup cause */
-    if (rtcio_int_st != 0 || b18 == 0) {
+    /* 3. Classify wakeup cause:
+     * Catch raw RTC IO interrupt bit, live pin level LOW, OR any ISR firing
+     * so that brief tactile taps (released before pin sampling) are accurately captured.
+     */
+    bool is_gpio = (rtcio_int_st != 0) || (b18 == 0) || s_gpio_event_occurred;
+    s_gpio_event_occurred = false;
+
+    if (is_gpio) {
         test_data.ulp_gpio_wake_count++;
     } else {
         test_data.ulp_timer_wake_count++;

@@ -178,3 +178,118 @@ While the code fixes have been implemented, verified against ESP-IDF architectur
 3. **Stage 3 (Dual Mode):**
    - Must wake **immediately** when tactile PWR (GPIO 18) is tapped, proving concurrent operation without waiting for the 5-second timer countdown.
    - Must report `STAGE VERDICT: PASS`.
+
+# New Log
+
+```TEXT
+--- WARNING: GDB cannot open serial ports accessed as COMx
+--- NOTE: Using \\.\COM3 instead...
+--- esp-idf-monitor 1.10.0 on \\.\COM3 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x20 (DOWNLOAD(USB/UART0))
+Saved PC:0x40041a76
+--- 0x40041a76: ets_delay_us in ROM
+waiting for download
+--- ERROR: ClearCommError failed (PermissionError(13, 'The device does not recognize the command.', None, 22))
+--- Waiting for the device to reconnect....
+I (1552) RISCV_TEST: ========================================================================
+I (1552) RISCV_TEST: >>> PREPARING STAGE 1: Pure Timer Mode (PMU Countdown) <<<
+I (1552) RISCV_TEST: Proves binary loading, slow clock domain, and ULP wake pipeline first.
+I (1552) RISCV_TEST: Will automatically wake in 5.0 seconds via internal 136 kHz RC timer...
+I (1552) RISCV_TEST: ========================================================================
+I (1552) RISCV_TEST: Pre-Sleep Pin Levels Check: PWR (GPIO 18) = 1, BOOT (GPIO 0) = 1
+--- ERROR: ClearCommError failed (PermissionError(13, 'The device does not recognize the command.', None, 22))
+--- Waiting for the device to reconnect...........
+
+========================================================================
+ [RISC-V TEST] TELEMETRY DUMP: STAGE 1: TIMER MODE (5s PMU COUNTDOWN)
+========================================================================
+ Boot Count / Sleep Wake # : 1
+ Main Wake Causes Bitmask  : 0x00000040 (ULP: YES, TIMER: NO, TRAP: NO)
+ Shared Structure Magic    : 0x554C5032 (VALID)
+ Stage Configured in ULP   : 1
+ ULP Checkpoint Reached    : 8: HALTED (CLEAN EXIT)
+ ULP Hand-Off Status       : 1 (0=Init, 1=Success, 2=Early Wake)
+ ULP RDY_FOR_WAKEUP Status : OK
+ ULP Total Entry Count     : 2
+ ULP GPIO Wake Count       : 0
+ ULP Timer Wake Count      : 2
+ ULP ISR Handler Executions: 0
+ Last ISR Source GPIO      : 255
+ Raw RTC_GPIO_STATUS_REG   : 0x00000000
+ Sampled Pin Levels        : PWR(18)=1, BOOT(0)=1 (Raw: 0x00000003)
+ Coprocessor Execution Time: 164 cycles
+ STAGE VERDICT             : PASS
+========================================================================
+
+I (4054) RISCV_TEST: Stage 1 (Timer) Finished. Transitioning to Stage 2 (Event Mode)...
+I (4054) RISCV_TEST: ========================================================================
+I (4054) RISCV_TEST: >>> PREPARING STAGE 2: Pure Event Mode (RTC GPIO 18) <<<
+I (4054) RISCV_TEST: PMU Sleep Timer is DISABLED. 30-second fallback timer armed.
+I (4054) RISCV_TEST: ACTION REQUIRED: Press tactile PWR (GPIO 18) button to wake!
+I (4054) RISCV_TEST: ========================================================================
+I (4054) RISCV_TEST: Pre-Sleep Pin Levels Check: PWR (GPIO 18) = 1, BOOT (GPIO 0) = 1
+--- ERROR: ClearCommError failed (PermissionError(13, 'The device does not recognize the command.', None, 22))
+--- Waiting for the device to reconnect.............
+
+========================================================================
+ [RISC-V TEST] TELEMETRY DUMP: STAGE 2: EVENT MODE (RTC GPIO 18)
+========================================================================
+ Boot Count / Sleep Wake # : 2
+ Main Wake Causes Bitmask  : 0x00000040 (ULP: YES, TIMER: NO, TRAP: NO)
+ Shared Structure Magic    : 0x554C5032 (VALID)
+ Stage Configured in ULP   : 2
+ ULP Checkpoint Reached    : 8: HALTED (CLEAN EXIT)
+ ULP Hand-Off Status       : 1 (0=Init, 1=Success, 2=Early Wake)
+ ULP RDY_FOR_WAKEUP Status : OK
+ ULP Total Entry Count     : 3
+ ULP GPIO Wake Count       : 1
+ ULP Timer Wake Count      : 0
+ ULP ISR Handler Executions: 105
+ Last ISR Source GPIO      : 18
+ Raw RTC_GPIO_STATUS_REG   : 0x00040000
+ Sampled Pin Levels        : PWR(18)=0, BOOT(0)=1 (Raw: 0x00000002)
+ Coprocessor Execution Time: 56126 cycles
+ STAGE VERDICT             : PASS
+========================================================================
+
+I (4054) RISCV_TEST: Stage 2 (Event) Finished. Transitioning to Stage 3 (Dual Mode)...
+I (4054) RISCV_TEST: ========================================================================
+I (4054) RISCV_TEST: >>> PREPARING STAGE 3: Dual Mode (Timer + GPIO 18 Concurrently) <<<
+I (4054) RISCV_TEST: BOTH 5s PMU Timer AND RTC GPIO 18 wakeups are armed simultaneously.
+I (4054) RISCV_TEST: You can either WAIT 5.0s for timer wake OR TAP PWR (GPIO 18) button immediately!
+I (4054) RISCV_TEST: ========================================================================
+I (4054) RISCV_TEST: Pre-Sleep Pin Levels Check: PWR (GPIO 18) = 1, BOOT (GPIO 0) = 1
+--- ERROR: ClearCommError failed (PermissionError(13, 'The device does not recognize the command.', None, 22))
+--- Waiting for the device to reconnect...........
+
+========================================================================
+ [RISC-V TEST] TELEMETRY DUMP: STAGE 3: DUAL MODE (PMU TIMER + RTC GPIO 18)
+========================================================================
+ Boot Count / Sleep Wake # : 3
+ Main Wake Causes Bitmask  : 0x00000040 (ULP: YES, TIMER: NO, TRAP: NO)
+ Shared Structure Magic    : 0x554C5032 (VALID)
+ Stage Configured in ULP   : 3
+ ULP Checkpoint Reached    : 8: HALTED (CLEAN EXIT)
+ ULP Hand-Off Status       : 1 (0=Init, 1=Success, 2=Early Wake)
+ ULP RDY_FOR_WAKEUP Status : OK
+ ULP Total Entry Count     : 5
+ ULP GPIO Wake Count       : 0
+ ULP Timer Wake Count      : 2
+ ULP ISR Handler Executions: 1
+ Last ISR Source GPIO      : 18
+ Raw RTC_GPIO_STATUS_REG   : 0x00000000
+ Sampled Pin Levels        : PWR(18)=1, BOOT(0)=1 (Raw: 0x00000003)
+ Coprocessor Execution Time: 164 cycles
+ STAGE VERDICT             : PASS
+========================================================================
+
+
+************************************************************************
+*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY!            *
+*  Check telemetry dump above for mutual exclusivity characterization. *
+************************************************************************
+```
+
