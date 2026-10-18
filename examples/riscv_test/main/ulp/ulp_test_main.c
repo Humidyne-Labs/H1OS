@@ -85,21 +85,10 @@ int main(void)
 
     asm volatile("fence" ::: "memory");
 
-    /* 4. Hand off execution: Wait for Main CPU ready with bounded timeout and idle check.
-     * Prevents infinite loop if main CPU was awake or low power state is delayed.
+    /* 4. Hand off execution: Signal Main CPU to wake immediately.
+     * In ESP-IDF ULP-RISC-V architecture, ulp_riscv_wakeup_main_processor() asserts
+     * RTC_CNTL_SW_CPU_INT atomically. There is no need to poll or abort on RDY_FOR_WAKEUP.
      */
-    test_data.ulp_step_checkpoint = ULP_CP_WAITING_RDY;
-    uint32_t t0 = ULP_RISCV_GET_CCOUNT();
-    while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
-        if (REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_MAIN_STATE_IN_IDLE)
-            || (ULP_RISCV_GET_CCOUNT() - t0) > 1000000) {
-            test_data.ulp_completed = 2; /* "woke too early / main not sleeping" signature */
-            test_data.ulp_rdy_timeout = 1;
-            ulp_riscv_halt();
-            return 0;
-        }
-    }
-
     test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
     test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
     ulp_riscv_wakeup_main_processor();
