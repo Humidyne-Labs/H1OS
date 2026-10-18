@@ -179,12 +179,18 @@ int main(void)
                test_data.ulp_entry_count, test_data.test_stage, start_c);
 
 #if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
-    /* Register RTC GPIO ISR handlers only on the first entry.
-     * Use NEGEDGE (Falling Edge) instead of LOW_LEVEL to prevent continuous level re-triggering.
+    /* Register RTC GPIO ISR handler.
+     * Note: s_intr_handlers[] lives in RTC Slow Memory and persists across runs.
+     * If already registered, ulp_riscv_gpio_isr_register returns ESP_ERR_NOT_FOUND (handler slot occupied).
+     * We check the return value: ESP_OK = freshly registered, ESP_ERR_NOT_FOUND = preserved across wakes.
      */
-    if (test_data.ulp_entry_count == 1) {
-        ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_NEGEDGE, gpio18_isr, NULL);
-        ulp_printf("[ULP] Registered GPIO 18 Negedge (Falling Edge) ISR\n");
+    esp_err_t isr_err = ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_NEGEDGE, gpio18_isr, NULL);
+    if (isr_err == ESP_OK) {
+        ulp_printf("[ULP] Registered GPIO 18 Negedge ISR (fresh slot)\n");
+    } else if (isr_err == ESP_ERR_NOT_FOUND) {
+        ulp_printf("[ULP] GPIO 18 Negedge ISR active (preserved in RTC RAM)\n");
+    } else {
+        ulp_printf("[ULP] ERR: GPIO 18 ISR reg failed: 0x%x\n", isr_err);
     }
     test_data.ulp_step_checkpoint = ULP_CP_ISR_REGISTERED;
 #endif
