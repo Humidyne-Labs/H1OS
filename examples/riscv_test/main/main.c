@@ -160,12 +160,15 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     vTaskDelay(pdMS_TO_TICKS(1500));    
 }
 
-static void enter_deep_sleep_guarded(void)
+static void prepare_serial_and_pins_before_sleep(void)
 {
     log_pin_levels_pre_sleep();
     fflush(stdout);
     vTaskDelay(pdMS_TO_TICKS(1500));
+}
 
+static void enter_deep_sleep_guarded(void)
+{
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
 
@@ -198,14 +201,15 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
     clear_stale_rtc_gpio_wake_latch();
 
+    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
+    prepare_serial_and_pins_before_sleep();
+
     /* Set 5-second wakeup period (5,000,000 microseconds) */
     ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 5000000));
 
-    /* Configure ULP in Timer Mode */
+    /* Configure ULP in Timer Mode and immediately sleep */
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_TIMER };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
-
-    /* Ensure PMU timer bit is asserted */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
     enter_deep_sleep_guarded();
@@ -237,14 +241,15 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_disable(PIN_BUTTON_BOOT);
 
-    /* Configure ULP in Event Mode */
+    /* 30-second main CPU fallback wakeup */
+    esp_sleep_enable_timer_wakeup(30000000ULL);
+
+    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
+    prepare_serial_and_pins_before_sleep();
+
+    /* Configure ULP in Event Mode and immediately sleep */
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
-
-    /* 30-second main CPU fallback wakeup: guarantees the chip will wake up and dump telemetry
-     * even if the button is never pressed or if the ULP fails to signal wake.
-     */
-    esp_sleep_enable_timer_wakeup(30000000ULL);
 
     enter_deep_sleep_guarded();
 }
@@ -275,7 +280,10 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     /* Set 5-second wakeup period */
     ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 5000000));
 
-    /* Arm GPIO wakeup and then assert Timer bit concurrently */
+    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
+    prepare_serial_and_pins_before_sleep();
+
+    /* Arm GPIO wakeup and then assert Timer bit concurrently, then immediately sleep */
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);

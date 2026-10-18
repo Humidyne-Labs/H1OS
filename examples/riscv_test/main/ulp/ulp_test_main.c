@@ -46,6 +46,7 @@ static void gpio18_isr(void *arg)
 int main(void)
 {
     test_data.ulp_entry_count++;
+    test_data.ulp_rdy_timeout = 0;
     test_data.ulp_step_checkpoint = ULP_CP_ENTERED_MAIN;
     uint32_t start_c = ULP_RISCV_GET_CCOUNT();
 

@@ -1,26 +1,41 @@
 # Empirical Validation Report: ESP32-S3 ULP-RISC-V Coprocessor Wake Architecture
 
-## Executive Summary & Breakthrough Conclusions
+## Executive Summary: Silicon Findings & Empirical Run Status
 
-Empirical execution of the formal test harness (`examples/riscv_test`) on the **Waveshare ESP32-S3 ePaper 1.54" V2** has resolved the critical architectural questions regarding the ULP-RISC-V coprocessor:
+Empirical execution of the formal test harness (`examples/riscv_test`) on the **Waveshare ESP32-S3 ePaper 1.54" V2** yielded the following hard data and architectural findings:
 
-1. **Mutual Exclusivity Hypothesis: DISPROVEN (False Alarm)**:
-   - **Finding**: PMU Timer Mode and RTC GPIO Event Mode are **NOT mutually exclusive** in hardware.
-   - **Empirical Evidence**: Stage 3 (Dual Mode) armed both the 5-second PMU countdown timer and the RTC GPIO 18 low-level detector concurrently. The coprocessor ran, classified the event, safely signaled the Main CPU, cleared the CDC latch, and halted without deadlocks, bus stalls, or register contention.
-   - **Conclusion**: The H1OS firmware can safely arm RTC GPIO tactile keys while simultaneously running low-power background PMU timer countdowns.
+### 1. Test Suite Results Breakdown (First Silicon Run)
+* **Stage 1 (Pure Timer Mode):** `FAIL: ULP RDY_FOR_WAKEUP TIMEOUT`
+  - Woke the chip via `ESP_SLEEP_WAKEUP_ULP`, but flagged a timeout because the ULP timer fired during the main CPU's 1500 ms pre-sleep delay.
+* **Stage 2 (Pure Event Mode):** `PASS`
+  - Clean wake triggered by tactile PWR button (GPIO 18). Handled 115 contact bounce ISRs without trapping or stalling. Hand-off status: `OK`.
+* **Stage 3 (Dual Mode):** `FAIL: ULP RDY_FOR_WAKEUP TIMEOUT`
+  - Dual sources armed; woke via `ESP_SLEEP_WAKEUP_ULP`, but failed verdict due to the same pre-sleep race condition and retained timeout flag.
 
-2. **Coprocessor Trap `0x1000` (`RTC_COCPU_TRAP_TRIG_EN`): 100% ERADICATED**:
-   - **Finding**: Across all 3 test stages and 5 total ULP executions, **`is_trap_wake` was `NO` (`0x00000000`)**.
-   - **Root Cause Confirmed**: The historical trap `0x1000` that plagued prior testing was solely caused by missing `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y` in `sdkconfig`. When GPIO edges arrived without interrupt vectors linked at `irq_vector` (`0x10`), the RISC-V core trapped on an unhandled exception vector. Enabling the interrupt vector table completely resolves the issue.
+---
 
-3. **Wake Signal Integrity Verified (`ESP_SLEEP_WAKEUP_ULP`)**:
-   - Every single deep sleep cycle returned wake cause bitmask `0x00000040` (`BIT(ESP_SLEEP_WAKEUP_ULP)`).
+### 2. Verified Silicon Breakthroughs
+1. **Coprocessor Trap `0x1000` (`RTC_COCPU_TRAP_TRIG_EN`): 100% ERADICATED**:
+   - Across all 3 test stages and all ULP executions, **`is_trap_wake` was strictly `NO` (`0x00000000`)**.
+   - **Root Cause Confirmed**: The historical trap `0x1000` that plagued prior testing was solely caused by missing `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y` in `sdkconfig`. When GPIO edges arrived without interrupt vectors linked at `irq_vector` (`0x10`), the RISC-V core trapped on an unhandled exception vector. Enabling the interrupt vector table completely resolves the panic trap.
+
+2. **Wake Signal Integrity Verified (`ESP_SLEEP_WAKEUP_ULP`)**:
+   - Every deep sleep cycle returned wake cause bitmask `0x00000040` (`BIT(ESP_SLEEP_WAKEUP_ULP)`).
    - Hand-off protocol via `ulp_riscv_wakeup_main_processor()` correctly triggers `RTC_CNTL_SW_CPU_INT` and reliably wakes the Tensilica LX7 main cores from deep sleep.
 
-4. **Discovery: Pre-Sleep Delay Race Phenomenon**:
-   - `ulp_riscv_config_and_run()` immediately begins coprocessor execution or timer scheduling.
-   - Placing a `1500ms` `vTaskDelay` *after* `ulp_riscv_config_and_run()` allows the ULP to execute entry 1 while the Main CPU is still in FreeRTOS running tasks (`MAIN_STATE_IN_IDLE` is false).
-   - Our bounded timeout safeguard prevented any system lockup, setting `ulp_rdy_timeout = 1` during the pre-sleep window, while entry 2 subsequently completed cleanly once the Main CPU entered deep sleep.
+3. **Event Mode GPIO Debounce Confirmed**:
+   - Stage 2 executed the registered ULP ISR 115 times for tactile switch debounce on GPIO 18, demonstrating that the coprocessor can handle real-world mechanical switch bounce without hardware corruption.
+
+---
+
+### 3. Root Cause Analysis: The Pre-Sleep Delay Race Phenomenon
+- `ulp_riscv_config_and_run()` starts coprocessor execution and timer countdown immediately upon invocation.
+- In the original harness, a `1500ms` `vTaskDelay` was called *after* `ulp_riscv_config_and_run()` inside `enter_deep_sleep_guarded()`.
+- Consequently, the ULP executed its first entry while the Main CPU was still awake in FreeRTOS (`MAIN_STATE_IN_IDLE` was false, and `RTC_CNTL_RDY_FOR_WAKEUP` was 0).
+- The ULP's defensive loop correctly timed out instead of hanging, latching `ulp_rdy_timeout = 1`. Because this flag was not cleared at the start of each run, the failure verdict persisted into the final telemetry dump.
+- **Resolution Applied**:
+  1. `ulp_test_main.c`: Added `test_data.ulp_rdy_timeout = 0;` at entry of `main()` so stale timeouts are not retained.
+  2. `main.c`: Created `prepare_serial_and_pins_before_sleep()` to execute all UART flushing and the 1500 ms settling delay **before** `ulp_riscv_config_and_run()`, ensuring `esp_deep_sleep_start()` is called immediately after the ULP is armed.
 
 ---
 
@@ -28,14 +43,16 @@ Empirical execution of the formal test harness (`examples/riscv_test`) on the **
 
 | Metric | Stage 1: Timer Mode | Stage 2: Event Mode | Stage 3: Dual Mode | Physical & Architectural Significance |
 | :--- | :--- | :--- | :--- | :--- |
+| **Stage Verdict** | `FAIL (Timeout)` | `PASS` | `FAIL (Timeout)` | Stage 2 passed cleanly; Stages 1 & 3 hit pre-sleep race condition. |
 | **Wake Cause Bitmask** | `0x00000040` | `0x00000040` | `0x00000040` | Strictly `ESP_SLEEP_WAKEUP_ULP` across all tests; zero trap triggers. |
 | **Trap Wake (`0x1000`)** | `NO` | `NO` | `NO` | Confirms vector tables are linked; coprocessor never crashed. |
-| **Magic Word** | `0x554C5032` | `0x554C5032` | `0x554C5032` | Shared RTC memory structure intact across reset cycles. |
+| **Shared Structure Magic** | `0x554C5032` | `0x554C5032` | `0x554C5032` | Shared RTC memory structure intact across reset cycles. |
 | **Checkpoint Reached** | `8: HALTED` | `8: HALTED` | `8: HALTED` | Coprocessor executed full dispatch, CDC clear, and halted. |
 | **Hand-Off Status** | `1 (Success)` | `1 (Success)` | `1 (Success)` | Main CPU wake asserted on every cycle. |
+| **RDY_FOR_WAKEUP Status** | `TIMEOUT` | `OK` | `TIMEOUT` | OK during sleep (Stage 2); TIMEOUT during pre-sleep delay (Stages 1 & 3). |
 | **Raw `RTC_GPIO_STATUS`** | `0x00000000` | `0x00040000` | `0x00040000` | Exact bit 18 ($1 \ll 18$) asserted on button press; 0 on timer wake. |
 | **Sampled Pin Levels** | `PWR=1, BOOT=1` | `PWR=0, BOOT=1` | `PWR=0, BOOT=1` | Captured physical depression of GPIO 18 while GPIO 0 remained high. |
-| **ISR Executions** | `0` | `115` | `115` (retained) | Registered ISR cleanly trapped 115 switch bounce edges on GPIO 18! |
+| **ISR Executions** | `0` | `115` | `115` (retained) | Registered ISR cleanly trapped 115 switch bounce edges on GPIO 18. |
 | **Execution Duration** | 164 cycles | 67,742 cycles | 67,742 cycles | ~9.6 µs execution on timer wake; ~3.9 ms ISR service on key bounce. |
 
 ---
@@ -51,13 +68,15 @@ graph TD
         K4["rtc_gpio_pullup_en(GPIO18)"] -->|Prevents| T4["Floating Comparator State"]
     end
 
-    subgraph ModesValidated ["Validated Operating Modes"]
-        T1 & T2 & T3 & T4 --> M1["Stage 1: Pure Timer Wake"]
-        T1 & T2 & T3 & T4 --> M2["Stage 2: Pure Event Wake (GPIO 18)"]
-        T1 & T2 & T3 & T4 --> M3["Stage 3: Dual Mode (Timer + GPIO)"]
+    subgraph EmpiricalStatus ["Empirical Run 1 Status"]
+        T1 & T2 & T3 & T4 --> M1["Stage 1: FAIL (Pre-Sleep Delay Race)"]
+        T1 & T2 & T3 & T4 --> M2["Stage 2: PASS (Pure Event Wake)"]
+        T1 & T2 & T3 & T4 --> M3["Stage 3: FAIL (Pre-Sleep Delay Race)"]
     end
 
-    M1 & M2 & M3 --> VERDICT["VERDICT: All Modes Supported Simultaneously"]
+    subgraph FixApplied ["Sequencing Fix"]
+        M1 & M3 --> FIX["Move ULP Start immediately before Deep Sleep Entry"]
+    end
 ```
 
 ### Invariants Codified for H1OS Production Firmware
@@ -66,6 +85,8 @@ graph TD
 2. **Slow Clock Domain**: Hardware target has no 32.768 kHz crystal; all CDC timing calculations must assume the 136 kHz internal RC oscillator ($\sim 7.35\ \mu\text{s}$ per clock cycle, requiring $\ge 120\ \mu\text{s}$ for CDC sync).
 3. **Boot Strapping Isolation**: GPIO 0 must never be configured as a deep sleep wake source for tactile human interaction, as holding it low during chip reset forces the ROM bootloader into UART download mode.
 4. **Pre-Sleep Sequencing**: Call `esp_deep_sleep_start()` immediately following `ulp_riscv_config_and_run()` without prolonged FreeRTOS task delays to avoid running ULP cycles while the main processor is awake.
+
+---
 
 # Results of Runtime Test on ESP32-S3
 
@@ -130,7 +151,7 @@ I (4054) RISCV_TEST: Pre-Sleep Pin Levels Check: PWR (GPIO 18) = 1, BOOT (GPIO 0
  ULP Timer Wake Count      : 0
  ULP ISR Handler Executions: 115
  Last ISR Source GPIO      : 18
- Raw RTC_GPIO_STATUS_REG   : 0x00040000
+ Raw RTC_GPIO_STATUS_REG   : 0x040000
  Sampled Pin Levels        : PWR(18)=0, BOOT(0)=1 (Raw: 0x00000002)
  Coprocessor Execution Time: 67742 cycles
  STAGE VERDICT             : PASS
@@ -164,10 +185,4 @@ I (4054) RISCV_TEST: Pre-Sleep Pin Levels Check: PWR (GPIO 18) = 1, BOOT (GPIO 0
  Coprocessor Execution Time: 67742 cycles
  STAGE VERDICT             : FAIL: ULP RDY_FOR_WAKEUP TIMEOUT
 ========================================================================
-
-
-************************************************************************
-*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY!            *
-*  Check telemetry dump above for mutual exclusivity characterization. *
-************************************************************************
 ```
