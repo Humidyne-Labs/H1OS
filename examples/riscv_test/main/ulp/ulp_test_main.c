@@ -3,8 +3,8 @@
  * ESP32-S3 ULP-RISC-V Coprocessor Wakeup Validation Firmware
  *
  * Implements 3 test scenarios with active ISR handlers:
- *   1. Event Mode (RTC GPIO wakeup only, PMU timer disabled)
- *   2. Timer Mode (PMU countdown timer only, RTC GPIO wakeup disabled)
+ *   1. Timer Mode (PMU countdown timer only, RTC GPIO wakeup disabled)
+ *   2. Event Mode (RTC GPIO wakeup only, PMU timer disabled)
  *   3. Dual Mode  (PMU timer + RTC GPIO wakeups armed concurrently)
  */
 
@@ -81,28 +81,28 @@ int main(void)
     }
 
     test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
-    test_data.ulp_completed = 1;
 
     asm volatile("fence" ::: "memory");
 
-    /* 4. Hand off execution: Wait for Main CPU ready with bounded timeout.
+    /* 4. Hand off execution: Wait for Main CPU ready with bounded timeout and idle check.
      * Prevents infinite loop if main CPU was awake or low power state is delayed.
      */
     test_data.ulp_step_checkpoint = ULP_CP_WAITING_RDY;
-    uint32_t rdy_timeout_spins = 100000;
+    uint32_t t0 = ULP_RISCV_GET_CCOUNT();
     while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
-        if (--rdy_timeout_spins == 0) {
+        if (REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_MAIN_STATE_IN_IDLE)
+            || (ULP_RISCV_GET_CCOUNT() - t0) > 1000000) {
+            test_data.ulp_completed = 2; /* "woke too early / main not sleeping" signature */
             test_data.ulp_rdy_timeout = 1;
-            break;
+            ulp_riscv_halt();
+            return 0;
         }
     }
 
-    if (rdy_timeout_spins > 0) {
-        test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
-    }
-
+    test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
     test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
     ulp_riscv_wakeup_main_processor();
+    test_data.ulp_completed = 1;
 
     /* 5. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
