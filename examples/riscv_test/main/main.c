@@ -31,7 +31,6 @@ static const char *TAG = "RISCV_TEST";
 #define PIN_POWER_HOLD   GPIO_NUM_17
 #define PIN_BUTTON_BOOT  GPIO_NUM_0
 #define PIN_BUTTON_PWR   GPIO_NUM_18
-#define PIN_RTC_INT      GPIO_NUM_5
 
 /* Persisted across deep sleep cycles in RTC Slow Memory */
 RTC_DATA_ATTR static uint32_t s_current_test = 0;
@@ -40,34 +39,19 @@ RTC_DATA_ATTR static uint32_t s_boot_count   = 0;
 extern const uint8_t ulp_riscv_test_bin_start[] asm("_binary_ulp_riscv_test_bin_start");
 extern const uint8_t ulp_riscv_test_bin_end[]   asm("_binary_ulp_riscv_test_bin_end");
 
-static void init_power_latch(void)
-{
-    /* Keep BAT_CTRL latched HIGH so unit stays powered on LiPo */
-    rtc_gpio_init(PIN_POWER_HOLD);
-    rtc_gpio_set_direction(PIN_POWER_HOLD, RTC_GPIO_MODE_OUTPUT_ONLY);
-    rtc_gpio_set_level(PIN_POWER_HOLD, 1);
-    rtc_gpio_hold_en(PIN_POWER_HOLD);
-}
-
 static void configure_rtc_pins(void)
 {
     /* Configure GPIO 0 (BOOT button) */
     rtc_gpio_init(PIN_BUTTON_BOOT);
     rtc_gpio_set_direction(PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(PIN_BUTTON_BOOT);
+    rtc_gpio_pullup_dis(PIN_BUTTON_BOOT); //10k external pullup on board
     rtc_gpio_pulldown_dis(PIN_BUTTON_BOOT);
 
     /* Configure GPIO 18 (PWR button) */
     rtc_gpio_init(PIN_BUTTON_PWR);
     rtc_gpio_set_direction(PIN_BUTTON_PWR, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(PIN_BUTTON_PWR);
+    rtc_gpio_pullup_dis(PIN_BUTTON_PWR); //10k external pullup on board
     rtc_gpio_pulldown_dis(PIN_BUTTON_PWR);
-
-    /* Configure GPIO 5 (PCF85063A INT line) */
-    rtc_gpio_init(PIN_RTC_INT);
-    rtc_gpio_set_direction(PIN_RTC_INT, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(PIN_RTC_INT);
-    rtc_gpio_pulldown_dis(PIN_RTC_INT);
 }
 
 static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_data_t *d)
@@ -103,15 +87,17 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     printf(" ULP ISR Handler Executions: %lu\n", (unsigned long)d->ulp_isr_fired_count);
     printf(" Last ISR Source GPIO      : %ld\n", (long)d->ulp_last_isr_source);
     printf(" Raw RTC_GPIO_STATUS_REG   : 0x%08lX\n", (unsigned long)d->ulp_last_gpio_status);
-    printf(" Sampled Pin Levels (0/5/18): %d / %d / %d (Raw: 0x%08lX)\n",
+    printf(" Sampled Pin Levels (BOOT 0 / PWR 18): %d / %d (Raw: 0x%08lX)\n",
            (int)(d->ulp_pin_levels & 1U),
-           (int)((d->ulp_pin_levels >> 5) & 1U),
            (int)((d->ulp_pin_levels >> 18) & 1U),
            (unsigned long)d->ulp_pin_levels);
     printf(" Coprocessor Execution Time: %lu cycles\n", (unsigned long)d->ulp_cycle_count);
     printf(" ULP Completed Hand-Off    : %lu\n", (unsigned long)d->ulp_completed);
     printf(" STAGE VERDICT             : %s\n", verdict);
     printf("========================================================================\n\n");
+
+    fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(1500));    
 }
 
 static void arm_stage_1_event_mode(test_shared_data_t *d)
@@ -131,7 +117,6 @@ static void arm_stage_1_event_mode(test_shared_data_t *d)
     /* Arm RTC GPIO wake detector */
     rtc_gpio_wakeup_enable(PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
-    rtc_gpio_wakeup_enable(PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
 
     /* Configure ULP in Event Mode */
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
@@ -139,6 +124,9 @@ static void arm_stage_1_event_mode(test_shared_data_t *d)
 
     /* Strictly ensure PMU timer is disabled */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
+
+    fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(1500));
 
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
@@ -171,6 +159,9 @@ static void arm_stage_2_timer_mode(test_shared_data_t *d)
     /* Ensure PMU timer bit is asserted */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
+    fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
 }
@@ -192,7 +183,6 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     /* Arm RTC GPIO wake detector */
     rtc_gpio_wakeup_enable(PIN_BUTTON_BOOT, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
-    rtc_gpio_wakeup_enable(PIN_RTC_INT, GPIO_INTR_LOW_LEVEL);
 
     /* Set 5-second wakeup period */
     ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 5000000));
@@ -201,6 +191,9 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
+
+    fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(1500));
 
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
@@ -212,7 +205,6 @@ void app_main(void)
     uint32_t wake_causes = esp_sleep_get_wakeup_causes();
     test_shared_data_t *p_data = (test_shared_data_t *)&ulp_test_data;
 
-    init_power_latch();
     configure_rtc_pins();
 
     if (reset_reason != ESP_RST_DEEPSLEEP || s_current_test == 0) {
@@ -232,7 +224,8 @@ void app_main(void)
                  (unsigned)(ulp_riscv_test_bin_end - ulp_riscv_test_bin_start));
         ESP_ERROR_CHECK(ulp_riscv_load_binary(ulp_riscv_test_bin_start,
                                               (ulp_riscv_test_bin_end - ulp_riscv_test_bin_start)));
-
+        fflush(stdout);
+        vTaskDelay(pdMS_TO_TICKS(1500));
         arm_stage_1_event_mode(p_data);
     } else {
         /* Deep Sleep Wakeup */
@@ -255,6 +248,8 @@ void app_main(void)
             printf("*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY!            *\n");
             printf("*  Check telemetry dump above for mutual exclusivity characterization. *\n");
             printf("************************************************************************\n\n");
+            fflush(stdout);
+            vTaskDelay(pdMS_TO_TICKS(1500));
             while (1) {
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }

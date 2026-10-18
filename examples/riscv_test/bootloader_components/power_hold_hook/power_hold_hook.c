@@ -13,6 +13,7 @@
 
 void bootloader_hooks_include(void)
 {
+    //Empty
 }
 
 void bootloader_before_init(void)

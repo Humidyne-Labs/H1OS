@@ -21,7 +21,7 @@ typedef struct {
     uint32_t ulp_isr_fired_count;   /* Total times registered ISR executed */
     uint32_t ulp_last_isr_source;   /* GPIO number that triggered the last ISR */
     uint32_t ulp_last_gpio_status;  /* Raw RTC_GPIO_STATUS_REG */
-    uint32_t ulp_pin_levels;        /* Bit 0: GPIO0, Bit 5: GPIO5, Bit 18: GPIO18 */
+    uint32_t ulp_pin_levels;        /* Bit 0: GPIO0, Bit 18: GPIO18 */
     uint32_t ulp_cycle_count;       /* Execution duration in core cycles */
     uint32_t ulp_completed;         /* Set to 1 when ULP successfully ran dispatch */
 } test_shared_data_t;

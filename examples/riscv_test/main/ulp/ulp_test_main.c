@@ -40,12 +40,6 @@ static void gpio0_isr(void *arg)
     test_data.ulp_last_isr_source = 0;
 }
 
-static void gpio5_isr(void *arg)
-{
-    test_data.ulp_isr_fired_count++;
-    test_data.ulp_last_isr_source = 5;
-}
-
 static void gpio18_isr(void *arg)
 {
     test_data.ulp_isr_fired_count++;
@@ -61,7 +55,6 @@ int main(void)
 #if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
     /* Register RTC GPIO ISR handlers for tactile keys and RTC INT */
     ulp_riscv_gpio_isr_register(GPIO_NUM_0, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio0_isr, NULL);
-    ulp_riscv_gpio_isr_register(GPIO_NUM_5, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio5_isr, NULL);
     ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio18_isr, NULL);
 #endif
 
@@ -71,12 +64,11 @@ int main(void)
 
     /* 2. Sample live levels of tested RTC GPIO lines */
     int b0  = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-    int b5  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
     int b18 = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-    test_data.ulp_pin_levels = ((b0 ? 1U : 0U) | ((b5 ? 1U : 0U) << 5) | ((b18 ? 1U : 0U) << 18));
+    test_data.ulp_pin_levels = ((b0 ? 1U : 0U) | ((b18 ? 1U : 0U) << 18));
 
     /* 3. Classify wakeup cause */
-    if (rtcio_int_st != 0 || b0 == 0 || b18 == 0 || b5 == 0) {
+    if (rtcio_int_st != 0 || b0 == 0 || b18 == 0) {
         test_data.ulp_gpio_wake_count++;
     } else {
         test_data.ulp_timer_wake_count++;
