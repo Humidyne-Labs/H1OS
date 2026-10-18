@@ -418,12 +418,36 @@ void app_main(void)
                        s_stage2_pass ? "PASS" : "FAIL",
                        s_stage3_pass ? "PASS" : "FAIL");
             }
-            printf("************************************************************************\n\n");
+            printf("========================================================================\n");
+            printf(">>> INTERACTIVE LOOP MODE ACTIVATED:                                 <<<\n");
+            printf(">>> Press & RELEASE the BOOT (GPIO 0) button to re-run test suite!   <<<\n");
+            printf("========================================================================\n\n");
             fflush(stdout);
-            vTaskDelay(pdMS_TO_TICKS(1500));
-            while (1) {
-                vTaskDelay(pdMS_TO_TICKS(1000));
+
+            /* Wait for BOOT (GPIO 0) button to be pressed (LOW) */
+            while (gpio_get_level(PIN_BUTTON_BOOT) != 0) {
+                vTaskDelay(pdMS_TO_TICKS(50));
             }
+
+            /* Wait for BOOT (GPIO 0) button to be released (HIGH) */
+            while (gpio_get_level(PIN_BUTTON_BOOT) == 0) {
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+
+            printf("\n[LOOP TRIGGER] BOOT (GPIO 0) button released! Restarting test suite from Stage 1...\n\n");
+            fflush(stdout);
+            vTaskDelay(pdMS_TO_TICKS(500));
+
+            /* Reset test state and re-arm Stage 1 */
+            s_boot_count = 0;
+            s_stage1_pass = false;
+            s_stage2_pass = false;
+            s_stage3_pass = false;
+            s_current_test = TEST_MODE_TIMER_ONLY;
+            p_data->log_buf.head = 0;
+            p_data->log_buf.tail = 0;
+
+            arm_stage_1_timer_mode(p_data);
         }
     }
 }

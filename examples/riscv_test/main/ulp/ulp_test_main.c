@@ -161,7 +161,10 @@ static void gpio18_isr(void *arg)
     test_data.ulp_isr_fired_count++;
     test_data.ulp_last_isr_source = 18;
     s_gpio_event_occurred = true;
-    ulp_printf("[ULP-ISR] GPIO 18 ISR fired! Total ISRs=%u\n", test_data.ulp_isr_fired_count);
+    /* Only log on the first edge to avoid overflowing the ring buffer with switch bounce */
+    if (test_data.ulp_isr_fired_count == 1) {
+        ulp_printf("[ULP-ISR] GPIO 18 Falling Edge detected (cnt=%u)\n", test_data.ulp_isr_fired_count);
+    }
 }
 #endif
 
@@ -177,15 +180,23 @@ int main(void)
 
 #if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
     /* Register RTC GPIO ISR handlers only on the first entry.
-     * The handler table resides in ULP .bss/.data which persists across wakes;
-     * re-registering on subsequent entries returns ESP_ERR_NOT_FOUND (slot exhaustion).
+     * Use NEGEDGE (Falling Edge) instead of LOW_LEVEL to prevent continuous level re-triggering.
      */
     if (test_data.ulp_entry_count == 1) {
-        ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_LOW_LEVEL, gpio18_isr, NULL);
-        ulp_printf("[ULP] Registered GPIO 18 Low-Level ISR handler\n");
+        ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_NEGEDGE, gpio18_isr, NULL);
+        ulp_printf("[ULP] Registered GPIO 18 Negedge (Falling Edge) ISR\n");
     }
     test_data.ulp_step_checkpoint = ULP_CP_ISR_REGISTERED;
 #endif
+
+    /* Check if Main CPU is in deep sleep and ready to receive wakeup signal */
+    bool is_main_ready = REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) != 0;
+    if (!is_main_ready) {
+        ulp_printf("[ULP] Main CPU not in sleep (init pass). Halting without wake signal.\n");
+        test_data.ulp_step_checkpoint = ULP_CP_HALTED;
+        ulp_riscv_halt();
+        return 0;
+    }
 
     /* 1. Snapshot raw RTC IO interrupt status register */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
@@ -220,21 +231,27 @@ int main(void)
                is_gpio ? "RTC_GPIO_EVENT" : "PMU_TIMER_EVENT",
                test_data.ulp_gpio_wake_count, test_data.ulp_timer_wake_count);
 
+    /* 4. Drain IO if tactile button is still held down */
+    if (b18 == 0) {
+        ulp_printf("[ULP] Draining IO (waiting for button release)...\n");
+        uint32_t drain_timeout = 50000;
+        while (ulp_riscv_gpio_get_level(GPIO_NUM_18) == 0 && --drain_timeout > 0) {
+            ulp_riscv_delay_us(100);
+        }
+    }
+
     test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
 
     asm volatile("fence" ::: "memory");
 
-    /* 4. Hand off execution: Signal Main CPU to wake immediately.
-     * In ESP-IDF ULP-RISC-V architecture, ulp_riscv_wakeup_main_processor() asserts
-     * RTC_CNTL_SW_CPU_INT atomically. There is no need to poll or abort on RDY_FOR_WAKEUP.
-     */
+    /* 5. Hand off execution: Signal Main CPU to wake immediately. */
     test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
     test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
     ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
     ulp_riscv_wakeup_main_processor();
     test_data.ulp_completed = 1;
 
-    /* 5. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
+    /* 6. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
     ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     ulp_riscv_delay_us(120);
@@ -242,7 +259,7 @@ int main(void)
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
 
-    /* 6. Halt coprocessor and enter sleep */
+    /* 7. Halt coprocessor and enter sleep */
     test_data.ulp_step_checkpoint = ULP_CP_HALTED;
     ulp_printf("[ULP] Coprocessor halting cleanly. Elapsed cycles=%u.\n",
                (unsigned)(ULP_RISCV_GET_CCOUNT() - start_c));
