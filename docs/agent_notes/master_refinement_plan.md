@@ -321,40 +321,41 @@ graph LR
 
 ### Phase 1: ULP Coprocessor & Bootloader Silicon Realignment
 - **Files:** `components/h1os/ulp/main.c`, `components/h1os/bootloader_components/h1os_boot_hook/h1os_boot_hook.c`, `docs/architecture/13_gpio_hold_domains_and_sleep_architecture.md`
-- **Actions:**
-  - Implement 30 ms glitch filter and Wake-on-Release state machine in `ulp/main.c`.
-  - Reorder CDC register clearing sequence (`RTC_GPIO_STATUS_W1TC_REG` first, then controller pulse).
-  - Convert ULP battery calculation to eFuse linear math and prune 17-point LUT.
-  - Add active validation of `GPIO_PIN17_HOLD` in `h1os_boot_hook.c` and remove dead `(void)` casts.
-  - Amend Line 129 of `13_gpio_hold_domains_and_sleep_architecture.md` to document `PA_EN` active-low operation.
+- **Shopping List Tasks:**
+  - [ ] Implement 30 ms glitch filter on inputs in `ulp/main.c`
+  - [ ] Implement Wake-on-Release state machine and hold classification ($>2.5\text{s}$) in `ulp/main.c`
+  - [ ] Reorder CDC register clearing sequence (`RTC_GPIO_STATUS_W1TC_REG` first, then 120 µs controller pulse) in `ulp/main.c`
+  - [ ] Convert ULP battery calculation to eFuse linear math ($m, b$) and prune 17-point LUT in `ulp/main.c`
+  - [ ] Add active validation of `GPIO_PIN17_HOLD` in `h1os_boot_hook.c` and prune dead `(void)` casts
+  - [ ] Amend Line 129 of `13_gpio_hold_domains_and_sleep_architecture.md` to document `PA_EN` active-low operation
 
 ### Phase 2: Flow A Wake Stub Bridge Enablement & OS Runtime Pruning
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/h1os_lifecycle.c`
-- **Actions:**
-  - Hook `orch_wake_stub_install()` into `sub_power_enter_deep_sleep_mode()`.
-  - Delete `orch_flow_execute_sensor_sample()` from `orch_flow.c`.
-  - Remove the `ORCH_FLOW_A_SAMPLE` FreeRTOS execution branch from `h1os_lifecycle.c`.
-  - Centralize the PCF85063A open-drain pulse drain barrier in `sub_power.c`.
+- **Shopping List Tasks:**
+  - [ ] Hook `orch_wake_stub_install()` into `sub_power_enter_deep_sleep_mode()`
+  - [ ] Delete `orch_flow_execute_sensor_sample()` from `orch_flow.c`
+  - [ ] Remove `ORCH_FLOW_A_SAMPLE` FreeRTOS execution branch from `h1os_lifecycle.c`
+  - [ ] Centralize PCF85063A open-drain pulse drain barrier in `sub_power.c` and remove duplicates from `orch_flow.c` and `h1os_lifecycle.c`
 
 ### Phase 3: Layer Integrity Enforcement & Dead Scaffolding Pruning
 - **Files:** `components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/sub_sdcard.c`
-- **Actions:**
-  - Route `h1os_shutdown()` exclusively through `sub_power_cut_power_latch()`.
-  - Prune `orch_flow_set_thermal_lockout()` and unused NVS CRUD functions.
-  - Purge commented-out trial loops and scratchpad developer notes across drivers.
+- **Shopping List Tasks:**
+  - [ ] Route `h1os_shutdown()` exclusively through `sub_power_cut_power_latch()`
+  - [ ] Prune `orch_flow_set_thermal_lockout()` and unused NVS CRUD functions
+  - [ ] Purge commented-out trial loops and scratchpad developer notes across drivers
 
 ### Phase 4: Mathematical & Hardware Register Optimizations
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_math.c`, `components/h1os/src/sub_display.cpp`
-- **Actions:**
-  - Replace `qsort()` with in-place insertion sort in `sub_power_read_battery()`.
-  - Implement unified psychrometric transform in `orch_math.c`.
-  - Consolidate RAM counter and DMA write primitives in `sub_display.cpp`.
+- **Shopping List Tasks:**
+  - [ ] Replace `qsort()` with fast in-place insertion sort in `sub_power_read_battery()`
+  - [ ] Implement unified psychrometric transform in `orch_math.c`
+  - [ ] Consolidate RAM counter and DMA write primitives in `sub_display.cpp`
 
 ### Phase 5: Function Decomposition & System Verification
 - **Files:** `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/h1os_lifecycle.c`
-- **Actions:**
-  - Decompose `orch_flow_query_telemetry()` into scanner, evaluator, and coordinator.
-  - Decompose `orch_flow_transition_to_sleep()` into peripheral quiescer and sleep executor.
-  - Convert `es8311_init_dac_registers()` to a static table-driven loader.
-  - Decompose `h1os_start()` into bringup, non-UI dispatch, and session launch.
-  - Verify clean compilation under ESP-IDF v6.1 and confirm binary size reductions.
+- **Shopping List Tasks:**
+  - [ ] Decompose `orch_flow_query_telemetry()` into scanner, evaluator, and coordinator
+  - [ ] Decompose `orch_flow_transition_to_sleep()` into peripheral quiescer and sleep executor
+  - [ ] Convert `es8311_init_dac_registers()` to a static table-driven loader
+  - [ ] Decompose `h1os_start()` into bringup, non-UI dispatch, and session launch
+  - [ ] Verify clean compilation under ESP-IDF v6.1 and record binary size reductions
