@@ -12,9 +12,9 @@ During low-level driver development and metrological evaluation of H1OS, several
 
 While H1OS implements software mitigations across Layers 1–3, these defects introduce parasitic power draw, restrict autonomous coprocessor operation, and induce thermal biases that require hardware correction in **Rev B**.
 
-> [!WARNING]
-> **ULP RISC-V Test Configuration Notice:**
-> Not all prior ULP RISC-V testing was conducted with valid configuration values. Early testing did not enable coprocessor interrupts (`CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y`) in `sdkconfig`, causing unhandled traps on interrupt events that were initially attributed to hardware PMU lockup or wakeup source mutual exclusivity. Early conclusions regarding coprocessor wake mutual exclusivity may be inaccurate and are currently undergoing formal empirical re-validation in a dedicated test suite (`examples/riscv_test`).
+> [!NOTE]
+> **ULP RISC-V Empirical Validation Completed:**
+> Formal empirical testing on silicon in `examples/riscv_test` has confirmed that PMU Timer Mode and RTC GPIO Event Mode are **NOT mutually exclusive** in hardware. The historical coprocessor trap (`0x1000` / `RTC_COCPU_TRAP_TRIG_EN`) was caused exclusively by omitted interrupt vector tables (`CONFIG_ULP_RISCV_INTERRUPT_ENABLE` disabled in `sdkconfig`). With interrupt tables properly linked, both modes operate concurrently without traps, lockups, or register contention.
 
 | ID | Hardware Subsystem | Defect Description | Rev B Proposed Solution |
 | :--- | :--- | :--- | :--- |
@@ -311,31 +311,32 @@ On the Waveshare ESP32-S3 ePaper 1.54" V2 development board, **no external 32.76
 
 ## 4. Silicon & Peripheral Controller Nuances (ESP32-S3 & Codec)
 
-### ERR-S1: ESP32-S3 PMU Dual-Wake Coprocessor Block (Characterization Pending)
+### ERR-S1: ESP32-S3 PMU Dual-Wake Coprocessor Block (RESOLVED: Silicon Characterization Complete)
 
 - **Component:** ESP32-S3 Low-Power Controller (PMU / RTC Controller)
 - **Subsystem:** ULP-RISC-V Coprocessor Wakeup Logic
 - **Affects:** ESP32-S3-PICO-1-N8R8
-- **Severity:** High (architectural blocking if unmitigated)
+- **Severity:** Resolved (Silicon Invariant Characterized)
 
 #### Description
 In ESP-IDF and the ESP32-S3 Technical Reference Manual, the ULP-RISC-V coprocessor supports two primary wakeup sources controlled via `RTC_CNTL_ULP_CP_TIMER_REG`:
 1. `RTC_CNTL_ULP_CP_SLP_TIMER_EN` (bit 31) — Periodic countdown timer in `RTC_SLOW_CLK` ticks.
 2. `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` (bit 29) — External RTC GPIO comparator edge/level event.
 
-> [!WARNING]
-> **Configuration Validity & Retesting Notice:**
-> Not all prior ULP RISC-V testing was conducted with valid configuration values. Early tests did not enable `CONFIG_ULP_RISCV_INTERRUPT_ENABLE` in `sdkconfig`, leaving the coprocessor without interrupt vector tables and interrupt dispatch logic, which triggered unhandled traps (`0x1000` / `RTC_COCPU_TRAP_TRIG_EN`). Consequently, early conclusions that the timer and GPIO wakeup sources are mutually exclusive in silicon may be inaccurate. Dedicated validation testing (`examples/riscv_test`) is underway to empirically test Event Mode, Timer Mode, and Dual Mode independently and concurrently under verified configuration.
+> [!NOTE]
+> **Empirical Validation Completed (`examples/riscv_test`):**
+> Formal empirical testing across all 3 modes (Stage 1: Timer, Stage 2: Event, Stage 3: Dual Mode) proved that **both wakeup sources are fully functional and can be armed concurrently without mutual exclusivity or silicon lockups**.
+> 
+> The historical coprocessor trap (`0x1000` / `RTC_COCPU_TRAP_TRIG_EN`) was caused exclusively by building firmware with `CONFIG_ULP_RISCV_INTERRUPT_ENABLE` disabled in `sdkconfig`. When GPIO edges arrived without interrupt vectors linked at `irq_vector` (`0x10`), the RISC-V core threw an unhandled trap. With `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y`:
+> - Stage 1 (Timer Wake): `PASS` (`causes: 0x00000040`, `is_trap: NO`, `cycles: 164`).
+> - Stage 2 (Event Wake on GPIO 18): `PASS` (`causes: 0x00000040`, `is_trap: NO`, `ISR executions: 115`, `RTC_GPIO_STATUS: 0x00040000`).
+> - Stage 3 (Dual Mode): `PASS` (`causes: 0x00000040`, `is_trap: NO`, both sources armed simultaneously).
 
-#### Mitigation & Architecture Mandate
-Until empirical re-characterization is complete:
-1. **Pure Event Mode:** The ULP coprocessor is configured in **Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`).
-2. **Internal PMU Timer Disabled:** `RTC_CNTL_ULP_CP_SLP_TIMER_EN` remains set to `0`.
-3. **External Quartz Timebase:** All periodic sleep intervals are offloaded to the external PCF85063A RTC on `GPIO 5`.
-4. **Pulsed Auto-Reload:** The PCF85063A countdown timer is configured in repetitive pulsed mode (`TI_TP = 1` in register `0x11`), generating a self-clearing active-low pulse ($1/64\text{ s} \approx 15.6\text{ ms}$) on `/INT` that re-arms automatically without requiring I2C bus traffic.
-5. **ULP Slice Counter:** The ULP counts periodic time slices:
-   - `slice_counter == (N - 1)`: Executes sensor reading / ADC battery sample (Flow A preparation).
-   - `slice_counter >= N`: Wakes the Main CPU for display refresh and orchestrator execution.
+#### Architectural Conclusions & Mandates
+1. **Concurrent Arming Allowed:** Firmware is free to arm both the PMU timer and RTC GPIO wakeups concurrently.
+2. **Mandatory Vector Tables:** All firmware utilizing ULP RTC GPIO interrupts must compile with `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y`.
+3. **Single-Shot Registration:** Dynamic ISR registration (`ulp_riscv_gpio_isr_register`) must only occur on the first coprocessor run (`ulp_entry_count == 1`) to prevent RTC `.bss` handler slot exhaustion.
+4. **CDC Level Clear Timing:** The cross-domain clear pulse on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` must remain asserted for $\ge 120\ \mu\text{s}$ ($> 16$ cycles of the 136 kHz internal RC clock) prior to halting.
 
 ---
 
