@@ -45,5 +45,7 @@ typedef struct {
     uint32_t ulp_step_checkpoint;   /* Breadcrumb checkpoint reaching within ULP main */
     uint32_t ulp_rdy_timeout;       /* 1 if RDY_FOR_WAKEUP poll timed out or main CPU was awake */
     uint32_t ulp_completed;         /* 0: Init, 1: Success, 2: Woke too early (main awake) */
+    uint32_t sleep_start_rtc_ticks; /* Hardware RTC timer ticks captured by host before sleep */
+    uint32_t ulp_elapsed_rtc_ticks; /* Elapsed slow clock ticks from sleep entry to ULP wake */
     ulp_log_ring_buf_t log_buf;     /* RTC Slow Memory ASCII Ring Buffer */
 } test_shared_data_t;

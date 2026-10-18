@@ -37,14 +37,14 @@ volatile test_shared_data_t test_data = {
     .ulp_step_checkpoint = 0,
     .ulp_rdy_timeout = 0,
     .ulp_completed = 0,
+    .sleep_start_rtc_ticks = 0,
+    .ulp_elapsed_rtc_ticks = 0,
     .log_buf = {
         .head = 0,
         .tail = 0,
         .buffer = {0}
     }
 };
-
-static volatile bool s_gpio_event_occurred = false;
 
 /* --- Ring Buffer & ulp_printf Implementation --- */
 
@@ -155,19 +155,6 @@ static void ulp_printf(const char *fmt, ...)
     va_end(args);
 }
 
-#if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
-static void gpio18_isr(void *arg)
-{
-    test_data.ulp_isr_fired_count++;
-    test_data.ulp_last_isr_source = 18;
-    s_gpio_event_occurred = true;
-    /* Only log on the first edge to avoid overflowing the ring buffer with switch bounce */
-    if (test_data.ulp_isr_fired_count == 1) {
-        ulp_printf("[ULP-ISR] GPIO 18 Falling Edge detected (cnt=%u)\n", test_data.ulp_isr_fired_count);
-    }
-}
-#endif
-
 int main(void)
 {
     test_data.ulp_entry_count++;
@@ -178,42 +165,28 @@ int main(void)
     ulp_printf("[ULP] >>> EXECUTION ENTRY #%u <<< (stage=%u, ccount=%u)\n",
                test_data.ulp_entry_count, test_data.test_stage, start_c);
 
-#if CONFIG_ULP_RISCV_INTERRUPT_ENABLE
-    /* Register RTC GPIO ISR handler.
-     * Note: s_intr_handlers[] lives in RTC Slow Memory and persists across runs.
-     * If already registered, ulp_riscv_gpio_isr_register returns ESP_ERR_NOT_FOUND (handler slot occupied).
-     * We check the return value: ESP_OK = freshly registered, ESP_ERR_NOT_FOUND = preserved across wakes.
-     */
-    esp_err_t isr_err = ulp_riscv_gpio_isr_register(GPIO_NUM_18, ULP_RISCV_GPIO_INTR_NEGEDGE, gpio18_isr, NULL);
-    if (isr_err == ESP_OK) {
-        ulp_printf("[ULP] Registered GPIO 18 Negedge ISR (fresh slot)\n");
-    } else if (isr_err == ESP_ERR_NOT_FOUND) {
-        ulp_printf("[ULP] GPIO 18 Negedge ISR active (preserved in RTC RAM)\n");
-    } else {
-        ulp_printf("[ULP] ERR: GPIO 18 ISR reg failed: 0x%x\n", isr_err);
-    }
-    test_data.ulp_step_checkpoint = ULP_CP_ISR_REGISTERED;
-#endif
-
     /* Check if Main CPU is in deep sleep and ready to receive wakeup signal */
     bool is_main_ready = REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) != 0;
     if (!is_main_ready) {
         ulp_printf("[ULP] Main CPU not in sleep (init pass). Halting without wake signal.\n");
         test_data.ulp_step_checkpoint = ULP_CP_HALTED;
-        /* Purge any false-flag ISR interrupts or latches tripped during startup configuration */
-        s_gpio_event_occurred = false;
-        test_data.ulp_isr_fired_count = 0;
-        test_data.ulp_last_isr_source = 0xFF;
+        ulp_riscv_gpio_wakeup_clear();
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_halt();
         return 0;
     }
 
-    /* 1. Snapshot raw RTC IO interrupt status register */
+    /* 1. Read hardware RTC slow clock timer ticks to measure elapsed time from sleep start */
+    SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
+    uint32_t now_ticks = READ_PERI_REG(RTC_CNTL_TIME0_REG);
+    uint32_t elapsed_ticks = now_ticks - test_data.sleep_start_rtc_ticks;
+    test_data.ulp_elapsed_rtc_ticks = elapsed_ticks;
+
+    /* 2. Snapshot raw RTC IO interrupt status register */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     test_data.ulp_last_gpio_status = rtcio_int_st;
 
-    /* 2. Sample live levels of tested RTC GPIO lines:
+    /* 3. Sample live levels of tested RTC GPIO lines:
      *    Bit 0: GPIO 18 (PWR button)
      *    Bit 1: GPIO 0  (BOOT button - monitoring only)
      */
@@ -222,67 +195,98 @@ int main(void)
     test_data.ulp_pin_levels = ((b18 ? 1U : 0U) | ((b0 ? 1U : 0U) << 1));
     test_data.ulp_step_checkpoint = ULP_CP_PINS_SAMPLED;
 
-    ulp_printf("[ULP] Pins Sampled: PWR(18)=%d BOOT(0)=%d RTC_IO_STATUS=0x%08x\n",
-               b18, b0, rtcio_int_st);
+    ulp_printf("[ULP] Pins Sampled: PWR(18)=%d BOOT(0)=%d RTC_IO_STATUS=0x%08x (ticks=%u)\n",
+               b18, b0, rtcio_int_st, elapsed_ticks);
 
-    /* 3. Classify wakeup cause:
-     * Verify actual hardware flags rather than blind binary fallthrough.
-     * GPIO wake is confirmed if:
-     *   - Raw RTC IO status bit is set, OR
-     *   - Pin is currently sampled LOW, OR
-     *   - An edge ISR fired while Main CPU was in sleep.
+    /* 4. Evaluate triggers:
+     * - GPIO triggered if pin is physically LOW, OR hardware latch caught a fast tap
+     * - Timer expired if timer is enabled AND elapsed ticks exceed minimum plausible threshold
+     *   (Stage 1: 5s countdown ~ 680k ticks, min 400k ticks)
+     *   (Stage 3: 15s countdown ~ 2.04M ticks, min 1.3M ticks)
      */
-    bool is_gpio = (rtcio_int_st != 0) || (b18 == 0) || s_gpio_event_occurred;
-    s_gpio_event_occurred = false;
+    bool gpio_triggered = (b18 == 0) || ((rtcio_int_st & BIT(GPIO_NUM_18)) != 0);
+    bool timer_enabled = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
+    uint32_t min_timer_ticks = (test_data.test_stage == TEST_MODE_TIMER_ONLY) ? 400000U : 1300000U;
+    bool timer_expired = timer_enabled && (elapsed_ticks >= min_timer_ticks);
 
-    bool pmu_timer_active = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
-
-    const char *classification = "UNKNOWN_GLITCH_EVENT";
-    if (is_gpio) {
+    if (gpio_triggered) {
         test_data.ulp_gpio_wake_count++;
-        classification = "RTC_GPIO_EVENT";
-    } else if (pmu_timer_active) {
-        test_data.ulp_timer_wake_count++;
-        classification = "PMU_TIMER_EVENT";
-    }
+        ulp_printf("[ULP] Wake Classified: RTC_GPIO_EVENT (b18=%d, latch=0x%08x, ticks=%u)\n",
+                   b18, rtcio_int_st, elapsed_ticks);
 
-    ulp_printf("[ULP] Wake Classified: %s (gpio_cnt=%u, timer_cnt=%u, timer_en=%d)\n",
-               classification,
-               test_data.ulp_gpio_wake_count, test_data.ulp_timer_wake_count,
-               pmu_timer_active ? 1 : 0);
-
-    /* 4. Drain IO if tactile button is still held down */
-    if (b18 == 0) {
-        ulp_printf("[ULP] Draining IO (waiting for button release)...\n");
-        uint32_t drain_timeout = 50000;
-        while (ulp_riscv_gpio_get_level(GPIO_NUM_18) == 0 && --drain_timeout > 0) {
-            ulp_riscv_delay_us(100);
+        /* Drain IO if tactile button is still held down */
+        if (b18 == 0) {
+            ulp_printf("[ULP] Draining IO (waiting for button release)...\n");
+            uint32_t drain_timeout = 50000;
+            while (ulp_riscv_gpio_get_level(GPIO_NUM_18) == 0 && --drain_timeout > 0) {
+                ulp_riscv_delay_us(100);
+            }
         }
+
+        /* Stop ULP timer so it does not fire a second wake ~15s later */
+        ulp_riscv_timer_stop();
+
+        test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
+        asm volatile("fence" ::: "memory");
+
+        /* Signal Main CPU to wake */
+        test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
+        ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
+        ulp_riscv_wakeup_main_processor();
+        test_data.ulp_completed = 1;
+
+        /* Clear wake latch and halt cleanly */
+        ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
+        ulp_riscv_gpio_wakeup_clear();
+        ulp_riscv_delay_us(120);
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
+
+        test_data.ulp_step_checkpoint = ULP_CP_HALTED;
+        ulp_printf("[ULP] Coprocessor halting cleanly. Elapsed cycles=%u.\n",
+                   (unsigned)(ULP_RISCV_GET_CCOUNT() - start_c));
+        ulp_riscv_halt();
+        return 0;
+    } else if (timer_expired) {
+        test_data.ulp_timer_wake_count++;
+        ulp_printf("[ULP] Wake Classified: PMU_TIMER_EVENT (ticks=%u >= %u, timer_en=1)\n",
+                   elapsed_ticks, min_timer_ticks);
+
+        test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
+        asm volatile("fence" ::: "memory");
+
+        /* Signal Main CPU to wake */
+        test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
+        ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
+        ulp_riscv_wakeup_main_processor();
+        test_data.ulp_completed = 1;
+
+        /* Clear wake latch and halt cleanly */
+        ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
+        ulp_riscv_gpio_wakeup_clear();
+        ulp_riscv_delay_us(120);
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
+
+        test_data.ulp_step_checkpoint = ULP_CP_HALTED;
+        ulp_printf("[ULP] Coprocessor halting cleanly. Elapsed cycles=%u.\n",
+                   (unsigned)(ULP_RISCV_GET_CCOUNT() - start_c));
+        ulp_riscv_halt();
+        return 0;
+    } else {
+        /* Filter transient sleep-entry glitch: pin is HIGH and timer has not reached countdown threshold */
+        ulp_printf("[ULP] Transient Glitch Filtered (b18=%d, ticks=%u < min %u). Resuming sleep.\n",
+                   b18, elapsed_ticks, min_timer_ticks);
+
+        /* Clear transient latch and halt without waking Main CPU */
+        ulp_riscv_gpio_wakeup_clear();
+        ulp_riscv_delay_us(120);
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        test_data.ulp_step_checkpoint = ULP_CP_HALTED;
+        ulp_riscv_halt();
+        return 0;
     }
-
-    test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
-
-    asm volatile("fence" ::: "memory");
-
-    /* 5. Hand off execution: Signal Main CPU to wake immediately. */
-    test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
-    test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
-    ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
-    ulp_riscv_wakeup_main_processor();
-    test_data.ulp_completed = 1;
-
-    /* 6. Clear RTC GPIO wake latch with conservative 120us CDC pulse (>16 cycles on 136kHz RC) */
-    ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    ulp_riscv_delay_us(120);
-    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-    test_data.ulp_step_checkpoint = ULP_CP_CDC_CLEARED;
-
-    /* 7. Halt coprocessor and enter sleep */
-    test_data.ulp_step_checkpoint = ULP_CP_HALTED;
-    ulp_printf("[ULP] Coprocessor halting cleanly. Elapsed cycles=%u.\n",
-               (unsigned)(ULP_RISCV_GET_CCOUNT() - start_c));
-    ulp_riscv_halt();
-    return 0;
 }

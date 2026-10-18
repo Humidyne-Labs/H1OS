@@ -69,6 +69,8 @@ static void configure_rtc_pins(void)
     rtc_gpio_set_direction(PIN_BUTTON_PWR, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(PIN_BUTTON_PWR);
     rtc_gpio_pulldown_dis(PIN_BUTTON_PWR);
+    /* Disable automatic sleep switching to prevent pad isolation dip on sleep entry */
+    gpio_sleep_sel_dis(PIN_BUTTON_PWR);
 
     /* Configure GPIO 0 (BOOT button) for monitoring only.
      * CRITICAL: GPIO 0 is an ESP32-S3 boot strapping pin. If held LOW during deep sleep wake reset,
@@ -198,6 +200,9 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     }
 
     printf(" Coprocessor Execution Time: %lu cycles\n", (unsigned long)d->ulp_cycle_count);
+    printf(" ULP Elapsed Slow Ticks    : %lu (~%lu ms)\n",
+           (unsigned long)d->ulp_elapsed_rtc_ticks,
+           (unsigned long)(d->ulp_elapsed_rtc_ticks / 136));
     printf(" Verified Wake Trigger     : %s\n", trigger_desc);
     printf(" STAGE VERDICT             : %s\n", verdict);
     printf("========================================================================\n\n");
@@ -213,8 +218,12 @@ static void prepare_serial_and_pins_before_sleep(void)
     vTaskDelay(pdMS_TO_TICKS(1500));
 }
 
-static void enter_deep_sleep_guarded(void)
+static void enter_deep_sleep_guarded(test_shared_data_t *d)
 {
+    /* Capture slow clock start ticks for ULP elapsed time verification */
+    SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
+    d->sleep_start_rtc_ticks = READ_PERI_REG(RTC_CNTL_TIME0_REG);
+
     /* Always arm 30s hardware fallback timer so device never hangs permanently in deep sleep */
     esp_sleep_enable_timer_wakeup(30000000ULL);
     esp_sleep_enable_ulp_wakeup();
@@ -261,7 +270,7 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
-    enter_deep_sleep_guarded();
+    enter_deep_sleep_guarded(d);
 }
 
 static void arm_stage_2_event_mode(test_shared_data_t *d)
@@ -301,7 +310,7 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO };
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
 
-    enter_deep_sleep_guarded();
+    enter_deep_sleep_guarded(d);
 }
 
 static void arm_stage_3_dual_mode(test_shared_data_t *d)
@@ -340,7 +349,7 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
-    enter_deep_sleep_guarded();
+    enter_deep_sleep_guarded(d);
 }
 
 void app_main(void)
