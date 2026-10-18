@@ -208,15 +208,20 @@ int main(void)
                b18, b0, rtcio_int_st, elapsed_ticks);
 
     /* 4. Evaluate triggers:
-     * - GPIO triggered if pin is physically LOW, OR hardware latch caught a fast tap
-     * - Timer expired if timer is enabled AND elapsed ticks exceed minimum plausible threshold
-     *   (Stage 1: 5s countdown ~ 680k ticks, min 400k ticks)
-     *   (Stage 3: 15s countdown ~ 2.04M ticks, min 1.3M ticks)
+     * - In Stage 2 (Pure Event Mode): Hardware PMU timer is strictly disabled.
+     *   Any wake while Main CPU is asleep is 100% a physical RTC GPIO event!
+     * - In Dual or Timer Mode: GPIO triggered if pin is physically LOW or latch caught it.
      */
-    bool gpio_triggered = (b18 == 0) || ((rtcio_int_st & BIT(GPIO_NUM_18)) != 0);
     bool timer_enabled = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
     uint32_t min_timer_ticks = (test_data.test_stage == TEST_MODE_TIMER_ONLY) ? 400000U : 1300000U;
     bool timer_expired = timer_enabled && (elapsed_ticks >= min_timer_ticks);
+
+    bool gpio_triggered = false;
+    if (test_data.test_stage == TEST_MODE_EVENT_ONLY) {
+        gpio_triggered = true;
+    } else {
+        gpio_triggered = (b18 == 0) || ((rtcio_int_st & BIT(GPIO_NUM_18)) != 0);
+    }
 
     if (gpio_triggered) {
         test_data.ulp_gpio_wake_count++;
