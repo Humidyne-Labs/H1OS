@@ -162,7 +162,17 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
            (int)(d->ulp_pin_levels & 1U),
            (int)((d->ulp_pin_levels >> 1) & 1U),
            (unsigned long)d->ulp_pin_levels);
+    const char *trigger_desc = "UNKNOWN / NONE";
+    if (d->ulp_timer_wake_count > 0 && d->ulp_gpio_wake_count == 0) {
+        trigger_desc = "INTERNAL PMU TIMER (Countdown Expired)";
+    } else if (d->ulp_gpio_wake_count > 0 && d->ulp_timer_wake_count == 0) {
+        trigger_desc = "PHYSICAL RTC GPIO 18 TAP (Tactile Key Pressed)";
+    } else if (d->ulp_gpio_wake_count > 0 && d->ulp_timer_wake_count > 0) {
+        trigger_desc = "DUAL CONCURRENT (Both GPIO & Timer Registered)";
+    }
+
     printf(" Coprocessor Execution Time: %lu cycles\n", (unsigned long)d->ulp_cycle_count);
+    printf(" Verified Wake Trigger     : %s\n", trigger_desc);
     printf(" STAGE VERDICT             : %s\n", verdict);
     printf("========================================================================\n\n");
 
@@ -269,9 +279,10 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
 static void arm_stage_3_dual_mode(test_shared_data_t *d)
 {
     ESP_LOGI(TAG, "========================================================================");
-    ESP_LOGI(TAG, ">>> PREPARING STAGE 3: Dual Mode (Timer + GPIO 18 Concurrently) <<<");
-    ESP_LOGI(TAG, "BOTH 5s PMU Timer AND RTC GPIO 18 wakeups are armed simultaneously.");
-    ESP_LOGI(TAG, "You can either WAIT 5.0s for timer wake OR TAP PWR (GPIO 18) button immediately!");
+    ESP_LOGI(TAG, ">>> PREPARING STAGE 3: Dual Mode (15s PMU Timer + GPIO 18 Concurrently) <<<");
+    ESP_LOGI(TAG, "PMU Timer is set to 15.0 seconds. RTC GPIO 18 is armed concurrently.");
+    ESP_LOGI(TAG, "ACTION REQUIRED: Tap tactile PWR (GPIO 18) button within 15 seconds!");
+    ESP_LOGI(TAG, "Host USB CDC reconnect takes ~3s. Waking before 15s proves GPIO wake.");
     ESP_LOGI(TAG, "========================================================================");
 
     d->test_stage = TEST_MODE_DUAL_BOTH;
@@ -290,8 +301,8 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_disable(PIN_BUTTON_BOOT);
 
-    /* Set 5-second wakeup period */
-    ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 5000000));
+    /* Set 15-second wakeup period (15,000,000 microseconds) to clearly distinguish button tap from timer */
+    ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 15000000));
 
     /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
     prepare_serial_and_pins_before_sleep();
