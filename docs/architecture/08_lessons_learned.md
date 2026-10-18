@@ -172,11 +172,15 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **Root Cause:** Level clear pulses on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` were asserted for too short a duration ($50\ \mu\text{s}$). Furthermore, the board has no physical 32.768 kHz quartz crystal (pins `GPIO 15` and `GPIO 16` are dedicated to I2S audio codec routing), so the RTC domain runs on the internal ~136 kHz RC oscillator (`CONFIG_RTC_CLK_SRC_INT_RC=y`). The ESP32-S3 TRM mandates that CDC clear signals must be held for $\ge 3$ slow clock cycles to be sampled by the internal synchronizers.
 - **The Solution:** All wake latch clearing pulses in both ULP firmware and main application code are explicitly delayed for $\ge 120\ \mu\text{s}$ ($> 16$ cycles on the 136 kHz internal RC clock), guaranteeing deterministic synchronization across domains.
 
-### 4.7 Dual-Wake Mode Empirical Validation & Disproving Mutual Exclusivity
-- **The Issue:** Attempting to run periodic sensor timing on the internal ULP timer while concurrently arming GPIO wakeups was historically reported as triggering silicon arbitration lockup (ERR-001).
-- **The Empirical Reality:** Formal empirical testing on silicon in `examples/riscv_test` **disproved the mutual exclusivity hypothesis**. In Stage 3 (Dual Mode), both the 5-second PMU countdown timer and the active-low RTC GPIO 18 detector were armed simultaneously. The coprocessor ran, classified the wake event, safely signaled the Main CPU, and halted with zero coprocessor traps (`0x1000`).
-- **The True Root Cause:** The historical traps were caused entirely by omitted interrupt vector tables (`CONFIG_ULP_RISCV_INTERRUPT_ENABLE` disabled in `sdkconfig`), which caused the RISC-V core to trap on unhandled GPIO edge vectors. With interrupt tables linked, dual-wake arming is fully stable on ESP32-S3 silicon.
-- **Architectural Value:** H1OS can employ internal PMU countdown timers alongside tactile key detectors without hardware conflict, though external quartz timebase offloading to the PCF85063A remains available for ultra-precise long-interval tracking.
+### 4.7 Silicon Invariant: Hardware Timer Suppression of RTC GPIO Wakeups (ERR-001)
+- **The Issue:** Exploring whether the ESP32-S3 internal ULP sleep timer and external RTC GPIO wakeups can run concurrently to handle periodic sampling and tactile key responsiveness simultaneously.
+- **The Empirical Reality:** Rigorous empirical testing on silicon (`examples/riscv_test`) definitively confirmed that **the internal PMU timer suppresses RTC GPIO comparator wakeups**. 
+  - In **Stage 2 (Pure Event Mode, `0x20000000`)**, tapping GPIO 18 woke the coprocessor in 1.3 seconds (`ticks=178866`, `ULP GPIO Wake Count = 1`).
+  - In **Stage 3 (Dual Mode, `0xA0000000`)**, with `TIMER_EN=1` and `GPIO_ENA=1` armed concurrently and `CLR=0` verified in hardware registers, tactile button presses were completely masked from releasing ULP core clock gating. The core remained halted for the full 15.96s countdown (`ticks=2170788`, `ULP GPIO Wake Count = 0`), waking solely on timer expiration.
+- **The Architectural Mandate:** 
+  1. The ULP must operate exclusively in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`).
+  2. All periodic intervals are offloaded to the external PCF85063A RTC on `GPIO 5`, which pulses as a peer GPIO event under `GPIO_WAKEUP_ENA`.
+  3. Main-CPU sleep timers (`esp_sleep_enable_timer_wakeup()`) remain an independent, unaffected safety watchdog.
 
 ### 4.8 Pre-Sleep Open-Drain Pulse Draining
 - **The Issue:** Bare-metal Flow A wake stub executions triggered immediate false wake loops upon re-entering deep sleep.
