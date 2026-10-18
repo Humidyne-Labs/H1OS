@@ -320,6 +320,9 @@ void app_main(void)
         /* Deep Sleep Wakeup */
         s_boot_count++;
 
+        /* Crucial for USB Serial/JTAG: Wait for host PC CDC enumeration and terminal re-attach */
+        vTaskDelay(pdMS_TO_TICKS(2500));
+
         dump_telemetry_report(s_current_test, wake_causes, p_data);
 
         if (s_current_test == TEST_MODE_TIMER_ONLY) {
