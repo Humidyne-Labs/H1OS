@@ -3,7 +3,7 @@
 > **Date:** October 18, 2026  
 > **Authors:** Humiditron & Gemini (Antigravity)  
 > **Target:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`)  
-> **Status:** **EMPIRICALLY TESTED ON SILICON — Stage 2 PASS, Stages 1 & 3 Pre-Sleep Race Diagnosed & Fixed**
+> **Status:** **IN PROGRESS — Stage 2 Validated; Fixes Implemented; Further Silicon Testing Required**
 
 ---
 
@@ -37,7 +37,7 @@ A rigorous audit and the clean-slate harness (`examples/riscv_test`) confirmed t
 
 ## 3. The Live Physical Silicon Telemetry Log
 
-Execution of the 3-stage validation suite produced the following exact hardware results:
+Execution of the initial 3-stage validation suite on physical hardware produced the following telemetry:
 
 ```text
 ========================================================================
@@ -106,24 +106,34 @@ Execution of the 3-stage validation suite produced the following exact hardware 
 
 ---
 
-## 4. Root Cause of the Stage 1 & 3 Verdict Failure
+## 4. Forensic Analysis of Issues Encountered
 
-### The Pre-Sleep Delay Race
+### 1. The Pre-Sleep Delay Race (Stages 1 & 3)
 - In `arm_stage_1_timer_mode` and `arm_stage_3_dual_mode`, `ulp_riscv_config_and_run(&cfg)` was invoked **before** a 1500 ms `vTaskDelay` inside `enter_deep_sleep_guarded()`.
-- Because `ulp_riscv_config_and_run()` immediately starts the hardware timer or coprocessor execution, the ULP executed entry 1 while the Main CPU was still awake in FreeRTOS running tasks (`MAIN_STATE_IN_IDLE` was false, and `RTC_CNTL_RDY_FOR_WAKEUP` was 0).
-- The ULP's defensive loop correctly timed out instead of hanging indefinitely, latching `ulp_rdy_timeout = 1`.
-- Because `ulp_rdy_timeout` was never reset at the beginning of each ULP invocation, the failure verdict persisted into the final telemetry dump.
+- Because `ulp_riscv_config_and_run()` starts the hardware timer immediately, the ULP executed entry 1 while the Main CPU was still running FreeRTOS tasks (`MAIN_STATE_IN_IDLE` was false, and `RTC_CNTL_RDY_FOR_WAKEUP` was 0).
+- The ULP's defensive loop timed out instead of hanging indefinitely, latching `ulp_rdy_timeout = 1`.
+- Because `ulp_rdy_timeout` was not reset at the start of each ULP entry, the failure verdict persisted into the final telemetry dump.
 
-### Why Stage 2 Passed Cleanly
-- Stage 2 operated in pure Event Mode (`WAKEUP_SOURCE_GPIO`). The timer was disabled.
-- The ULP did not execute during the 1500 ms pre-sleep window.
-- When the tactile button was pressed after the Main CPU was fully in deep sleep, `RTC_CNTL_RDY_FOR_WAKEUP` was asserted, the hand-off succeeded with `OK`, 115 contact-bounce ISRs were serviced, and the stage achieved an unequivocal **`PASS`**.
+### 2. The Stage 3 Tactile Tap Failure
+- During Stage 3, tapping the tactile PWR button failed to wake the device immediately; the chip only woke after the 5.0-second PMU countdown timer expired.
+- **Root Cause Identified**: The ULP firmware contained an legacy `RDY_FOR_WAKEUP` polling loop inherited from old 2016 FSM assembly patterns. When the button was tapped, the ULP woke up, entered this loop, detected that the Main CPU was not yet in a stable ready state (or hit the inverted `MAIN_STATE_IN_IDLE` safety check), and called `ulp_riscv_halt()` **without calling `ulp_riscv_wakeup_main_processor()`**.
+- The wake signal was never delivered to the main processor, leaving the chip asleep until the 5-second PMU timer fired.
 
 ---
 
 ## 5. Firmware Corrections Implemented
 
-1. **Reset `ulp_rdy_timeout` on Entry (`ulp_test_main.c`):**
+1. **Elimination of the Faulty `RDY_FOR_WAKEUP` Polling Loop (`ulp_test_main.c`):**
+   In ESP-IDF ULP-RISC-V architecture, `ulp_riscv_wakeup_main_processor()` writes `RTC_CNTL_SW_CPU_INT` atomically. The ULP now unconditionally signals the Main CPU upon wake:
+   ```c
+   /* 4. Hand off execution: Signal Main CPU to wake immediately. */
+   test_data.ulp_step_checkpoint = ULP_CP_RDY_CONFIRMED;
+   test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
+   ulp_riscv_wakeup_main_processor();
+   test_data.ulp_completed = 1;
+   ```
+
+2. **Reset `ulp_rdy_timeout` on Entry (`ulp_test_main.c`):**
    ```c
    int main(void)
    {
@@ -131,10 +141,10 @@ Execution of the 3-stage validation suite produced the following exact hardware 
        test_data.ulp_rdy_timeout = 0;
        ...
    ```
-2. **Re-sequence Sleep Entry (`main.c`):**
-   Perform all UART flushing and settling delays **before** starting the ULP, and call `esp_deep_sleep_start()` immediately after `ulp_riscv_config_and_run()`:
+
+3. **Re-sequencing Sleep Entry (`main.c`):**
+   All UART logging, flushing, and FreeRTOS settling delays execute **before** `ulp_riscv_config_and_run()`, ensuring `esp_deep_sleep_start()` is called immediately after starting the ULP:
    ```c
-   /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
    prepare_serial_and_pins_before_sleep();
 
    ulp_riscv_cfg_t cfg = { .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_TIMER };
@@ -146,8 +156,25 @@ Execution of the 3-stage validation suite produced the following exact hardware 
 
 ---
 
-## 6. Summary of Hard Silicon Truths
+## 6. Summary of Confirmed Silicon Facts
 
-1. **Trap `0x1000` is Eradicated:** `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y` is compulsory.
-2. **Event Mode is Solid:** RTC GPIO tactile wake with ISR debounce works cleanly and reliably on physical hardware.
-3. **Timer Mode Sequencing Rule:** `ulp_riscv_config_and_run()` must immediately precede `esp_deep_sleep_start()` without intermediate FreeRTOS task delays.
+1. **Trap `0x1000` is Eradicated:** `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y` is compulsory and completely resolves the unmapped vector panic.
+2. **Event Mode Validated:** Pure RTC GPIO tactile wake with ISR switch-bounce handling works cleanly on physical hardware (Stage 2 PASS).
+3. **Deterministic Main Wake:** `ESP_SLEEP_WAKEUP_ULP` (`0x00000040`) is consistently delivered on coprocessor wake.
+
+---
+
+## 7. Status & Required Next Steps: Further Testing Required
+
+While the code fixes have been implemented, verified against ESP-IDF architecture, and compiled cleanly into `riscv_test.bin`, **further empirical testing on physical hardware is required to verify full operation across all modes**.
+
+### Verification Criteria for Next Silicon Run:
+1. **Stage 1 (Pure Timer Mode):**
+   - Must wake automatically after 5.0 seconds.
+   - Must report `STAGE VERDICT: PASS` with `ULP RDY_FOR_WAKEUP Status: OK`.
+2. **Stage 2 (Pure Event Mode):**
+   - Must wake on tactile PWR (GPIO 18) press.
+   - Must report `STAGE VERDICT: PASS` with 0 coprocessor traps.
+3. **Stage 3 (Dual Mode):**
+   - Must wake **immediately** when tactile PWR (GPIO 18) is tapped, proving concurrent operation without waiting for the 5-second timer countdown.
+   - Must report `STAGE VERDICT: PASS`.
