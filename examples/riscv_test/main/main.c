@@ -107,6 +107,31 @@ static const char *get_checkpoint_name(uint32_t cp)
     }
 }
 
+static void dump_and_clear_ulp_ring_buffer(test_shared_data_t *d)
+{
+    printf("\n************************************************************************\n");
+    printf("*  ULP RISC-V INTERNAL RTC SLOW MEMORY RING BUFFER LOG                  *\n");
+    printf("************************************************************************\n");
+
+    if (d->log_buf.head == d->log_buf.tail) {
+        printf(" [RING BUFFER EMPTY - NO NEW ULP LOG MESSAGES]\n");
+    } else {
+        if (d->log_buf.head - d->log_buf.tail > ULP_LOG_BUF_SIZE) {
+            printf(" [WARNING: Ring buffer wrapped! Dropping %lu overflow bytes]\n",
+                   (unsigned long)(d->log_buf.head - d->log_buf.tail - ULP_LOG_BUF_SIZE));
+            d->log_buf.tail = d->log_buf.head - ULP_LOG_BUF_SIZE;
+        }
+
+        while (d->log_buf.tail < d->log_buf.head) {
+            char c = d->log_buf.buffer[d->log_buf.tail & ULP_LOG_BUF_MASK];
+            putchar(c);
+            d->log_buf.tail++;
+        }
+    }
+    printf("************************************************************************\n");
+    fflush(stdout);
+}
+
 static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_data_t *d)
 {
     bool is_ulp_wake   = (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) != 0;
@@ -353,6 +378,8 @@ void app_main(void)
                                               (ulp_riscv_test_bin_end - ulp_riscv_test_bin_start)));
         fflush(stdout);
         vTaskDelay(pdMS_TO_TICKS(1500));
+        p_data->log_buf.head = 0;
+        p_data->log_buf.tail = 0;
         arm_stage_1_timer_mode(p_data);
     } else {
         /* Deep Sleep Wakeup */
@@ -363,6 +390,9 @@ void app_main(void)
 
         /* Crucial for USB Serial/JTAG: Wait for host PC CDC enumeration and terminal re-attach */
         vTaskDelay(pdMS_TO_TICKS(2000));
+
+        /* Dump and clear coprocessor RTC slow memory ring buffer */
+        dump_and_clear_ulp_ring_buffer(p_data);
 
         dump_telemetry_report(s_current_test, wake_causes, p_data);
 

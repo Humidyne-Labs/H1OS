@@ -4,6 +4,15 @@
 
 #define ULP_TEST_MAGIC 0x554C5032U /* "ULP2" */
 
+#define ULP_LOG_BUF_SIZE 1024U
+#define ULP_LOG_BUF_MASK (ULP_LOG_BUF_SIZE - 1U)
+
+typedef struct {
+    uint32_t head;                     /* Written by ULP */
+    uint32_t tail;                     /* Read / cleared by Main CPU */
+    char buffer[ULP_LOG_BUF_SIZE];
+} ulp_log_ring_buf_t;
+
 typedef enum {
     TEST_MODE_UNINITIALIZED = 0,
     TEST_MODE_TIMER_ONLY    = 1,   /* Stage 1: Pure Timer Mode (5s PMU Countdown - Proves pipeline first) */
@@ -36,4 +45,5 @@ typedef struct {
     uint32_t ulp_step_checkpoint;   /* Breadcrumb checkpoint reaching within ULP main */
     uint32_t ulp_rdy_timeout;       /* 1 if RDY_FOR_WAKEUP poll timed out or main CPU was awake */
     uint32_t ulp_completed;         /* 0: Init, 1: Success, 2: Woke too early (main awake) */
+    ulp_log_ring_buf_t log_buf;     /* RTC Slow Memory ASCII Ring Buffer */
 } test_shared_data_t;
