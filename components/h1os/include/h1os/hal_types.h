@@ -32,8 +32,8 @@ extern "C" {
 #define HAL_PIN_STATUS_LED          GPIO_NUM_3   ///< User LED: Open-Drain, Active LOW (0 = ON, 1 = OFF)
 
 // Tactile Buttons
-#define HAL_PIN_BUTTON_BOOT         GPIO_NUM_0   ///< Hardware BOOT0 Key: Active LOW (internal pullup req)
-#define HAL_PIN_BUTTON_POWER        GPIO_NUM_18  ///< Hardware BAT_KEY: Active LOW (internal pullup req)
+#define HAL_PIN_BUTTON_BOOT         GPIO_NUM_0   ///< Hardware BOOT0 Key: Active LOW (external 10k pullup on PCB)
+#define HAL_PIN_BUTTON_POWER        GPIO_NUM_18  ///< Hardware BAT_KEY: Active LOW (external 10k pullup on PCB)
 
 // Shared I2C0 Bus (External 4.7kΩ pull-ups on PCB)
 #define HAL_PIN_I2C_SDA             GPIO_NUM_47  ///< Shared I2C Serial Data (SHTC3, PCF85063, ES8311)

@@ -21,8 +21,6 @@
 
 ---
 
-{#h1os_name}
-
 ### H1OS_NAME
 
 ```cpp
@@ -32,8 +30,6 @@
 Defined in h1os/h1os.h:33
 
 ---
-
-{#h1os_subtitle}
 
 ### H1OS_SUBTITLE
 
@@ -45,8 +41,6 @@ Defined in h1os/h1os.h:34
 
 ---
 
-{#h1os_version_major}
-
 ### H1OS_VERSION_MAJOR
 
 ```cpp
@@ -56,8 +50,6 @@ Defined in h1os/h1os.h:34
 Defined in h1os/h1os.h:35
 
 ---
-
-{#h1os_version_minor}
 
 ### H1OS_VERSION_MINOR
 
@@ -69,8 +61,6 @@ Defined in h1os/h1os.h:36
 
 ---
 
-{#h1os_version_patch}
-
 ### H1OS_VERSION_PATCH
 
 ```cpp
@@ -80,8 +70,6 @@ Defined in h1os/h1os.h:36
 Defined in h1os/h1os.h:37
 
 ---
-
-{#h1os_version_tag}
 
 ### H1OS_VERSION_TAG
 
@@ -93,8 +81,6 @@ Defined in h1os/h1os.h:38
 
 ---
 
-{#h1os_version_string}
-
 ### H1OS_VERSION_STRING
 
 ```cpp
@@ -105,7 +91,55 @@ Defined in h1os/h1os.h:39
 
 ---
 
-{#sub_nvs_namespace}
+### HAL_LEDC_TIMER
+
+```cpp
+#define HAL_LEDC_TIMER LEDC_TIMER_0
+```
+
+Defined in hal_io.c:103
+
+---
+
+### HAL_LEDC_MODE
+
+```cpp
+#define HAL_LEDC_MODE LEDC_LOW_SPEED_MODE
+```
+
+Defined in hal_io.c:104
+
+---
+
+### HAL_LEDC_CHANNEL
+
+```cpp
+#define HAL_LEDC_CHANNEL LEDC_CHANNEL_0
+```
+
+Defined in hal_io.c:105
+
+---
+
+### HAL_LEDC_DUTY_RES
+
+```cpp
+#define HAL_LEDC_DUTY_RES LEDC_TIMER_10_BIT
+```
+
+Defined in hal_io.c:106
+
+---
+
+### HAL_LEDC_FREQUENCY
+
+```cpp
+#define HAL_LEDC_FREQUENCY 5000
+```
+
+Defined in hal_io.c:107
+
+---
 
 ### SUB_NVS_NAMESPACE
 
@@ -117,8 +151,6 @@ Defined in h1os/sub_nvs.h:22
 
 ---
 
-{#rtc_reg_control_1}
-
 ### RTC_REG_CONTROL_1
 
 ```cpp
@@ -128,8 +160,6 @@ Defined in h1os/sub_nvs.h:22
 Defined in sub_rtc.c:17
 
 ---
-
-{#rtc_reg_control_2}
 
 ### RTC_REG_CONTROL_2
 
@@ -141,8 +171,6 @@ Defined in sub_rtc.c:18
 
 ---
 
-{#rtc_reg_offset}
-
 ### RTC_REG_OFFSET
 
 ```cpp
@@ -152,8 +180,6 @@ Defined in sub_rtc.c:18
 Defined in sub_rtc.c:19
 
 ---
-
-{#rtc_reg_ram_byte}
 
 ### RTC_REG_RAM_BYTE
 
@@ -165,8 +191,6 @@ Defined in sub_rtc.c:20
 
 ---
 
-{#rtc_reg_seconds}
-
 ### RTC_REG_SECONDS
 
 ```cpp
@@ -176,8 +200,6 @@ Defined in sub_rtc.c:20
 Defined in sub_rtc.c:21
 
 ---
-
-{#rtc_reg_minutes}
 
 ### RTC_REG_MINUTES
 
@@ -189,8 +211,6 @@ Defined in sub_rtc.c:22
 
 ---
 
-{#rtc_reg_hours}
-
 ### RTC_REG_HOURS
 
 ```cpp
@@ -200,8 +220,6 @@ Defined in sub_rtc.c:22
 Defined in sub_rtc.c:23
 
 ---
-
-{#rtc_reg_days}
 
 ### RTC_REG_DAYS
 
@@ -213,8 +231,6 @@ Defined in sub_rtc.c:24
 
 ---
 
-{#rtc_reg_weekdays}
-
 ### RTC_REG_WEEKDAYS
 
 ```cpp
@@ -224,8 +240,6 @@ Defined in sub_rtc.c:24
 Defined in sub_rtc.c:25
 
 ---
-
-{#rtc_reg_months}
 
 ### RTC_REG_MONTHS
 
@@ -237,8 +251,6 @@ Defined in sub_rtc.c:26
 
 ---
 
-{#rtc_reg_years}
-
 ### RTC_REG_YEARS
 
 ```cpp
@@ -248,8 +260,6 @@ Defined in sub_rtc.c:26
 Defined in sub_rtc.c:27
 
 ---
-
-{#rtc_reg_alarm_sec}
 
 ### RTC_REG_ALARM_SEC
 
@@ -261,8 +271,6 @@ Defined in sub_rtc.c:28
 
 ---
 
-{#rtc_reg_timer_value}
-
 ### RTC_REG_TIMER_VALUE
 
 ```cpp
@@ -272,8 +280,6 @@ Defined in sub_rtc.c:28
 Defined in sub_rtc.c:29
 
 ---
-
-{#rtc_reg_timer_mode}
 
 ### RTC_REG_TIMER_MODE
 
@@ -285,8 +291,6 @@ Defined in sub_rtc.c:30
 
 ---
 
-{#ctrl1_stop_mask}
-
 ### CTRL1_STOP_MASK
 
 ```cpp
@@ -296,8 +300,6 @@ Defined in sub_rtc.c:30
 Defined in sub_rtc.c:33
 
 ---
-
-{#ctrl1_12_24_mask}
 
 ### CTRL1_12_24_MASK
 
@@ -309,8 +311,6 @@ Defined in sub_rtc.c:34
 
 ---
 
-{#ctrl1_cap_sel_12_5pf}
-
 ### CTRL1_CAP_SEL_12_5PF
 
 ```cpp
@@ -320,8 +320,6 @@ Defined in sub_rtc.c:34
 Defined in sub_rtc.c:35
 
 ---
-
-{#ctrl1_sw_reset_cmd}
 
 ### CTRL1_SW_RESET_CMD
 
@@ -333,8 +331,6 @@ Defined in sub_rtc.c:36
 
 ---
 
-{#ctrl2_af_mask}
-
 ### CTRL2_AF_MASK
 
 ```cpp
@@ -344,8 +340,6 @@ Defined in sub_rtc.c:36
 Defined in sub_rtc.c:39
 
 ---
-
-{#ctrl2_tf_mask}
 
 ### CTRL2_TF_MASK
 
@@ -357,8 +351,6 @@ Defined in sub_rtc.c:40
 
 ---
 
-{#ctrl2_aie_mask}
-
 ### CTRL2_AIE_MASK
 
 ```cpp
@@ -368,8 +360,6 @@ Defined in sub_rtc.c:40
 Defined in sub_rtc.c:41
 
 ---
-
-{#ctrl2_cof_off}
 
 ### CTRL2_COF_OFF
 
@@ -381,8 +371,6 @@ Defined in sub_rtc.c:42
 
 ---
 
-{#timer_clk_4096_hz}
-
 ### TIMER_CLK_4096_HZ
 
 ```cpp
@@ -392,8 +380,6 @@ Defined in sub_rtc.c:42
 Defined in sub_rtc.c:45
 
 ---
-
-{#timer_clk_64_hz}
 
 ### TIMER_CLK_64_HZ
 
@@ -405,8 +391,6 @@ Defined in sub_rtc.c:46
 
 ---
 
-{#timer_clk_1_hz}
-
 ### TIMER_CLK_1_HZ
 
 ```cpp
@@ -416,8 +400,6 @@ Defined in sub_rtc.c:46
 Defined in sub_rtc.c:47
 
 ---
-
-{#timer_clk_1_60_hz}
 
 ### TIMER_CLK_1_60_HZ
 
@@ -429,8 +411,6 @@ Defined in sub_rtc.c:48
 
 ---
 
-{#timer_enable_bit}
-
 ### TIMER_ENABLE_BIT
 
 ```cpp
@@ -440,8 +420,6 @@ Defined in sub_rtc.c:48
 Defined in sub_rtc.c:49
 
 ---
-
-{#timer_int_enable_bit}
 
 ### TIMER_INT_ENABLE_BIT
 
@@ -453,7 +431,15 @@ Defined in sub_rtc.c:50
 
 ---
 
-{#hal_pin_power_hold}
+### TIMER_PULSE_MODE_BIT
+
+```cpp
+#define TIMER_PULSE_MODE_BIT (1 << 0)
+```
+
+Defined in sub_rtc.c:51
+
+---
 
 ### HAL_PIN_POWER_HOLD
 
@@ -467,8 +453,6 @@ Master LDO Power Latch (BAT_CTRL): Active HIGH.
 
 ---
 
-{#hal_pin_battery_adc}
-
 ### HAL_PIN_BATTERY_ADC
 
 ```cpp
@@ -480,8 +464,6 @@ Defined in h1os/hal_types.h:31
 Battery Voltage Sensing: ADC1_CHANNEL_3 (1:2 divider).
 
 ---
-
-{#hal_pin_status_led}
 
 ### HAL_PIN_STATUS_LED
 
@@ -495,8 +477,6 @@ User LED: Open-Drain, Active LOW (0 = ON, 1 = OFF).
 
 ---
 
-{#hal_pin_button_boot}
-
 ### HAL_PIN_BUTTON_BOOT
 
 ```cpp
@@ -505,11 +485,9 @@ User LED: Open-Drain, Active LOW (0 = ON, 1 = OFF).
 
 Defined in h1os/hal_types.h:35
 
-Hardware BOOT0 Key: Active LOW (internal pullup req).
+Hardware BOOT0 Key: Active LOW (external 10k pullup on PCB).
 
 ---
-
-{#hal_pin_button_power}
 
 ### HAL_PIN_BUTTON_POWER
 
@@ -519,11 +497,9 @@ Hardware BOOT0 Key: Active LOW (internal pullup req).
 
 Defined in h1os/hal_types.h:36
 
-Hardware BAT_KEY: Active LOW (internal pullup req).
+Hardware BAT_KEY: Active LOW (external 10k pullup on PCB).
 
 ---
-
-{#hal_pin_i2c_sda}
 
 ### HAL_PIN_I2C_SDA
 
@@ -537,8 +513,6 @@ Shared I2C Serial Data (SHTC3, PCF85063, ES8311).
 
 ---
 
-{#hal_pin_i2c_scl}
-
 ### HAL_PIN_I2C_SCL
 
 ```cpp
@@ -550,8 +524,6 @@ Defined in h1os/hal_types.h:40
 Shared I2C Serial Clock.
 
 ---
-
-{#hal_pin_rtc_int}
 
 ### HAL_PIN_RTC_INT
 
@@ -565,8 +537,6 @@ PCF85063A INT: Open-Drain (internal pullup mandatory).
 
 ---
 
-{#hal_pin_epd_3v3_en}
-
 ### HAL_PIN_EPD_3V3_EN
 
 ```cpp
@@ -578,8 +548,6 @@ Defined in h1os/hal_types.h:44
 EPD 3.3V Rail Gate: Active LOW (0 = Rail ON).
 
 ---
-
-{#hal_pin_epd_busy}
 
 ### HAL_PIN_EPD_BUSY
 
@@ -593,8 +561,6 @@ Display Busy Line: Active HIGH (1 = Busy, 0 = Idle).
 
 ---
 
-{#hal_pin_epd_rst}
-
 ### HAL_PIN_EPD_RST
 
 ```cpp
@@ -606,8 +572,6 @@ Defined in h1os/hal_types.h:46
 Display Hardware Reset: Active LOW.
 
 ---
-
-{#hal_pin_epd_dc}
 
 ### HAL_PIN_EPD_DC
 
@@ -621,8 +585,6 @@ Display Data / Command: 0 = Cmd, 1 = Data.
 
 ---
 
-{#hal_pin_epd_cs}
-
 ### HAL_PIN_EPD_CS
 
 ```cpp
@@ -634,8 +596,6 @@ Defined in h1os/hal_types.h:48
 Display SPI Chip Select: Active LOW.
 
 ---
-
-{#hal_pin_epd_sck}
 
 ### HAL_PIN_EPD_SCK
 
@@ -649,8 +609,6 @@ Display SPI Serial Clock (up to 20MHz).
 
 ---
 
-{#hal_pin_epd_mosi}
-
 ### HAL_PIN_EPD_MOSI
 
 ```cpp
@@ -662,8 +620,6 @@ Defined in h1os/hal_types.h:50
 Display SPI Master Out Slave In.
 
 ---
-
-{#hal_pin_pa_en}
 
 ### HAL_PIN_PA_EN
 
@@ -677,8 +633,6 @@ Amp Power Gate: Active LOW (1 = Power Cut, 0 = ON).
 
 ---
 
-{#hal_pin_pa_ctrl}
-
 ### HAL_PIN_PA_CTRL
 
 ```cpp
@@ -690,8 +644,6 @@ Defined in h1os/hal_types.h:54
 Amp Standby/Mute: Active HIGH (0 = Mute, 1 = Enable).
 
 ---
-
-{#hal_pin_i2s_mclk}
 
 ### HAL_PIN_I2S_MCLK
 
@@ -705,8 +657,6 @@ Master Clock (256 * Fs).
 
 ---
 
-{#hal_pin_i2s_sclk}
-
 ### HAL_PIN_I2S_SCLK
 
 ```cpp
@@ -718,8 +668,6 @@ Defined in h1os/hal_types.h:56
 Bit / Serial Clock.
 
 ---
-
-{#hal_pin_i2s_asdout}
 
 ### HAL_PIN_I2S_ASDOUT
 
@@ -733,8 +681,6 @@ Codec Audio Out to ESP32 (DIN).
 
 ---
 
-{#hal_pin_i2s_lrck}
-
 ### HAL_PIN_I2S_LRCK
 
 ```cpp
@@ -746,8 +692,6 @@ Defined in h1os/hal_types.h:58
 Word Select / Frame Sync (WS).
 
 ---
-
-{#hal_pin_i2s_dsdin}
 
 ### HAL_PIN_I2S_DSDIN
 
@@ -761,8 +705,6 @@ ESP32 Audio Out to Codec (DOUT).
 
 ---
 
-{#hal_pin_sd_clk}
-
 ### HAL_PIN_SD_CLK
 
 ```cpp
@@ -774,8 +716,6 @@ Defined in h1os/hal_types.h:62
 MicroSD Clock.
 
 ---
-
-{#hal_pin_sd_miso}
 
 ### HAL_PIN_SD_MISO
 
@@ -789,8 +729,6 @@ MicroSD MISO / D0.
 
 ---
 
-{#hal_pin_sd_mosi}
-
 ### HAL_PIN_SD_MOSI
 
 ```cpp
@@ -802,8 +740,6 @@ Defined in h1os/hal_types.h:64
 MicroSD MOSI / CMD.
 
 ---
-
-{#hal_i2c_addr_es8311}
 
 ### HAL_I2C_ADDR_ES8311
 
@@ -817,8 +753,6 @@ Everest Semi Audio Codec.
 
 ---
 
-{#hal_i2c_addr_pcf85063}
-
 ### HAL_I2C_ADDR_PCF85063
 
 ```cpp
@@ -830,8 +764,6 @@ Defined in h1os/hal_types.h:70
 NXP Calendar RTC.
 
 ---
-
-{#hal_i2c_addr_shtc3}
 
 ### HAL_I2C_ADDR_SHTC3
 
@@ -845,8 +777,6 @@ Sensirion Temp / Humidity Sensor.
 
 ---
 
-{#hal_i2c_freq_hz}
-
 ### HAL_I2C_FREQ_HZ
 
 ```cpp
@@ -859,8 +789,6 @@ Fast-mode 400 kHz.
 
 ---
 
-{#hal_epd_width_px}
-
 ### HAL_EPD_WIDTH_PX
 
 ```cpp
@@ -870,8 +798,6 @@ Fast-mode 400 kHz.
 Defined in h1os/hal_types.h:78
 
 ---
-
-{#hal_epd_height_px}
 
 ### HAL_EPD_HEIGHT_PX
 
@@ -883,8 +809,6 @@ Defined in h1os/hal_types.h:79
 
 ---
 
-{#hal_epd_dpi}
-
 ### HAL_EPD_DPI
 
 ```cpp
@@ -895,8 +819,6 @@ Defined in h1os/hal_types.h:80
 
 ---
 
-{#hal_epd_frame_size_bytes}
-
 ### HAL_EPD_FRAME_SIZE_BYTES
 
 ```cpp
@@ -906,8 +828,6 @@ Defined in h1os/hal_types.h:80
 Defined in h1os/hal_types.h:81
 
 ---
-
-{#hal_partition_epd_frame}
 
 ### HAL_PARTITION_EPD_FRAME
 
@@ -921,8 +841,6 @@ Defined in h1os/hal_types.h:83
 
 ---
 
-{#hal_partition_storage}
-
 ### HAL_PARTITION_STORAGE
 
 ```cpp
@@ -935,19 +853,15 @@ SPIFFS / LittleFS partition.
 
 ---
 
-{#orch_historical_ewma_alpha}
-
 ### ORCH_HISTORICAL_EWMA_ALPHA
 
 ```cpp
 #define ORCH_HISTORICAL_EWMA_ALPHA 0.25f
 ```
 
-Defined in orch_flow.c:34
+Defined in orch_flow.c:36
 
 ---
-
-{#orch_leakage_margin_c}
 
 ### ORCH_LEAKAGE_MARGIN_C
 
@@ -955,11 +869,9 @@ Defined in orch_flow.c:34
 #define ORCH_LEAKAGE_MARGIN_C 0.30f
 ```
 
-Defined in orch_flow.c:35
+Defined in orch_flow.c:37
 
 ---
-
-{#orch_trinode_span_c}
 
 ### ORCH_TRINODE_SPAN_C
 
@@ -967,11 +879,9 @@ Defined in orch_flow.c:35
 #define ORCH_TRINODE_SPAN_C 15.0f
 ```
 
-Defined in orch_flow.c:36
+Defined in orch_flow.c:38
 
 ---
-
-{#magnus_a}
 
 ### MAGNUS_A
 
@@ -983,8 +893,6 @@ Defined in orch_math.c:11
 
 ---
 
-{#magnus_b}
-
 ### MAGNUS_B
 
 ```cpp
@@ -995,19 +903,15 @@ Defined in orch_math.c:12
 
 ---
 
-{#es8311_reg_reset}
-
 ### ES8311_REG_RESET
 
 ```cpp
 #define ES8311_REG_RESET 0x00
 ```
 
-Defined in sub_audio.c:34
+Defined in sub_audio.c:35
 
 ---
-
-{#es8311_reg_sys_pwr_ana}
 
 ### ES8311_REG_SYS_PWR_ANA
 
@@ -1015,11 +919,9 @@ Defined in sub_audio.c:34
 #define ES8311_REG_SYS_PWR_ANA 0x0D
 ```
 
-Defined in sub_audio.c:35
+Defined in sub_audio.c:36
 
 ---
-
-{#es8311_reg_sys_lp_mod}
 
 ### ES8311_REG_SYS_LP_MOD
 
@@ -1027,11 +929,9 @@ Defined in sub_audio.c:35
 #define ES8311_REG_SYS_LP_MOD 0x0F
 ```
 
-Defined in sub_audio.c:36
+Defined in sub_audio.c:37
 
 ---
-
-{#es8311_reg_dac_pwr}
 
 ### ES8311_REG_DAC_PWR
 
@@ -1039,11 +939,9 @@ Defined in sub_audio.c:36
 #define ES8311_REG_DAC_PWR 0x12
 ```
 
-Defined in sub_audio.c:37
+Defined in sub_audio.c:38
 
 ---
-
-{#es8311_reg_dac_vol}
 
 ### ES8311_REG_DAC_VOL
 
@@ -1051,11 +949,9 @@ Defined in sub_audio.c:37
 #define ES8311_REG_DAC_VOL 0x32
 ```
 
-Defined in sub_audio.c:38
+Defined in sub_audio.c:39
 
 ---
-
-{#es8311_reg_flag}
 
 ### ES8311_REG_FLAG
 
@@ -1063,11 +959,9 @@ Defined in sub_audio.c:38
 #define ES8311_REG_FLAG 0xFC
 ```
 
-Defined in sub_audio.c:39
+Defined in sub_audio.c:40
 
 ---
-
-{#es8311_reg_chip_id1}
 
 ### ES8311_REG_CHIP_ID1
 
@@ -1075,11 +969,9 @@ Defined in sub_audio.c:39
 #define ES8311_REG_CHIP_ID1 0xFD
 ```
 
-Defined in sub_audio.c:40
+Defined in sub_audio.c:41
 
 ---
-
-{#es8311_reg_chip_id2}
 
 ### ES8311_REG_CHIP_ID2
 
@@ -1087,11 +979,9 @@ Defined in sub_audio.c:40
 #define ES8311_REG_CHIP_ID2 0xFE
 ```
 
-Defined in sub_audio.c:41
+Defined in sub_audio.c:42
 
 ---
-
-{#frame_size}
 
 ### FRAME_SIZE
 
@@ -1099,11 +989,9 @@ Defined in sub_audio.c:41
 #define FRAME_SIZE 0x100
 ```
 
-Defined in sub_audio.c:43
+Defined in sub_audio.c:44
 
 ---
-
-{#lipo_table_size}
 
 ### LIPO_TABLE_SIZE
 
@@ -1111,11 +999,9 @@ Defined in sub_audio.c:43
 #define LIPO_TABLE_SIZE (sizeof(s_lipo_table) / sizeof(s_lipo_table[0]))
 ```
 
-Defined in sub_power.c:47
+Defined in sub_power.c:78
 
 ---
-
-{#orch_rtc_magic}
 
 ### ORCH_RTC_MAGIC
 
@@ -1127,8 +1013,6 @@ Defined in h1os/orch_state.h:21
 
 ---
 
-{#orch_ring_capacity}
-
 ### ORCH_RING_CAPACITY
 
 ```cpp
@@ -1139,19 +1023,15 @@ Defined in h1os/orch_state.h:22
 
 ---
 
-{#sample_flag_valid_cold}
-
 ### SAMPLE_FLAG_VALID_COLD
 
 ```cpp
 #define SAMPLE_FLAG_VALID_COLD 0x01
 ```
 
-Defined in h1os/orch_state.h:33
+Defined in h1os/orch_state.h:34
 
 ---
-
-{#sample_flag_thermal_settled}
 
 ### SAMPLE_FLAG_THERMAL_SETTLED
 
@@ -1159,11 +1039,9 @@ Defined in h1os/orch_state.h:33
 #define SAMPLE_FLAG_THERMAL_SETTLED 0x02
 ```
 
-Defined in h1os/orch_state.h:34
+Defined in h1os/orch_state.h:35
 
 ---
-
-{#sample_delta_gate_centi_c}
 
 ### SAMPLE_DELTA_GATE_CENTI_C
 
@@ -1171,11 +1049,9 @@ Defined in h1os/orch_state.h:34
 #define SAMPLE_DELTA_GATE_CENTI_C 20
 ```
 
-Defined in h1os/orch_state.h:35
+Defined in h1os/orch_state.h:36
 
 ---
-
-{#orch_flag_none}
 
 ### ORCH_FLAG_NONE
 
@@ -1183,11 +1059,9 @@ Defined in h1os/orch_state.h:35
 #define ORCH_FLAG_NONE 0
 ```
 
-Defined in h1os/orch_state.h:105
+Defined in h1os/orch_state.h:106
 
 ---
-
-{#orch_flag_epd_frame_valid}
 
 ### ORCH_FLAG_EPD_FRAME_VALID
 
@@ -1195,11 +1069,9 @@ Defined in h1os/orch_state.h:105
 #define ORCH_FLAG_EPD_FRAME_VALID (1 << 0)
 ```
 
-Defined in h1os/orch_state.h:106
+Defined in h1os/orch_state.h:107
 
 ---
-
-{#orch_flag_critical_battery}
 
 ### ORCH_FLAG_CRITICAL_BATTERY
 
@@ -1207,11 +1079,9 @@ Defined in h1os/orch_state.h:106
 #define ORCH_FLAG_CRITICAL_BATTERY (1 << 1)
 ```
 
-Defined in h1os/orch_state.h:107
+Defined in h1os/orch_state.h:108
 
 ---
-
-{#orch_flag_thermal_lockout}
 
 ### ORCH_FLAG_THERMAL_LOCKOUT
 
@@ -1219,11 +1089,9 @@ Defined in h1os/orch_state.h:107
 #define ORCH_FLAG_THERMAL_LOCKOUT (1 << 2)
 ```
 
-Defined in h1os/orch_state.h:108
+Defined in h1os/orch_state.h:109
 
 ---
-
-{#sub_sdcard_mount_point}
 
 ### SUB_SDCARD_MOUNT_POINT
 
@@ -1235,8 +1103,6 @@ Defined in h1os/sub_sdcard.h:26
 
 ---
 
-{#shtc3_cmd_wakeup}
-
 ### SHTC3_CMD_WAKEUP
 
 ```cpp
@@ -1246,8 +1112,6 @@ Defined in h1os/sub_sdcard.h:26
 Defined in sub_sensor.c:22
 
 ---
-
-{#shtc3_cmd_sleep}
 
 ### SHTC3_CMD_SLEEP
 
@@ -1259,8 +1123,6 @@ Defined in sub_sensor.c:23
 
 ---
 
-{#shtc3_cmd_meas_normal_t_first}
-
 ### SHTC3_CMD_MEAS_NORMAL_T_FIRST
 
 ```cpp
@@ -1270,8 +1132,6 @@ Defined in sub_sensor.c:23
 Defined in sub_sensor.c:24
 
 ---
-
-{#shtc3_cmd_meas_lowpwr_t_first}
 
 ### SHTC3_CMD_MEAS_LOWPWR_T_FIRST
 
@@ -1283,8 +1143,6 @@ Defined in sub_sensor.c:25
 
 ---
 
-{#epd_width}
-
 ### EPD_WIDTH
 
 ```cpp
@@ -1294,8 +1152,6 @@ Defined in sub_sensor.c:25
 Defined in h1os/sub_display.h:23
 
 ---
-
-{#epd_height}
 
 ### EPD_HEIGHT
 
@@ -1307,8 +1163,6 @@ Defined in h1os/sub_display.h:24
 
 ---
 
-{#epd_buffer_size}
-
 ### EPD_BUFFER_SIZE
 
 ```cpp
@@ -1318,8 +1172,6 @@ Defined in h1os/sub_display.h:24
 Defined in h1os/sub_display.h:26
 
 ---
-
-{#lvgl_i1_palette_size}
 
 ### LVGL_I1_PALETTE_SIZE
 
@@ -1331,8 +1183,6 @@ Defined in h1os_lvgl.cpp:34
 
 ---
 
-{#sens_sar_peri_clk_gate_conf_reg}
-
 ### SENS_SAR_PERI_CLK_GATE_CONF_REG
 
 ```cpp
@@ -1342,8 +1192,6 @@ Defined in h1os_lvgl.cpp:34
 Defined in orch_wake_stub.c:25
 
 ---
-
-{#sens_tsens_clk_en}
 
 ### SENS_TSENS_CLK_EN
 
@@ -1355,8 +1203,6 @@ Defined in orch_wake_stub.c:28
 
 ---
 
-{#sda_bit_mask}
-
 ### SDA_BIT_MASK
 
 ```cpp
@@ -1366,8 +1212,6 @@ Defined in orch_wake_stub.c:28
 Defined in orch_wake_stub.c:31
 
 ---
-
-{#scl_bit_mask}
 
 ### SCL_BIT_MASK
 
@@ -1379,8 +1223,6 @@ Defined in orch_wake_stub.c:32
 
 ---
 
-{#i2c_addr_shtc3}
-
 ### I2C_ADDR_SHTC3
 
 ```cpp
@@ -1390,8 +1232,6 @@ Defined in orch_wake_stub.c:32
 Defined in orch_wake_stub.c:34
 
 ---
-
-{#i2c_addr_pcf85063}
 
 ### I2C_ADDR_PCF85063
 
@@ -1403,8 +1243,6 @@ Defined in orch_wake_stub.c:35
 
 ---
 
-{#rtc_reg_timer_val}
-
 ### RTC_REG_TIMER_VAL
 
 ```cpp
@@ -1414,8 +1252,6 @@ Defined in orch_wake_stub.c:35
 Defined in orch_wake_stub.c:36
 
 ---
-
-{#rtc_timer_te_bit}
 
 ### RTC_TIMER_TE_BIT
 
@@ -1427,8 +1263,6 @@ Defined in orch_wake_stub.c:38
 
 ---
 
-{#rtc_timer_tcf_mask}
-
 ### RTC_TIMER_TCF_MASK
 
 ```cpp
@@ -1439,8 +1273,6 @@ Defined in orch_wake_stub.c:39
 
 ---
 
-{#rtc_timer_tcf_min}
-
 ### RTC_TIMER_TCF_MIN
 
 ```cpp
@@ -1450,8 +1282,6 @@ Defined in orch_wake_stub.c:39
 Defined in orch_wake_stub.c:40
 
 ---
-
-{#config_h1os_epd_partial_refresh_limit}
 
 ### CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT
 
@@ -1465,26 +1295,24 @@ Defined in orch_display_sync.c:17
 
 ---
 
-{#h1os_splash_type_t}
-
 ### h1os_splash_type_t
 
 ```cpp
 enum h1os_splash_type_t
 ```
 
-Defined in h1os/h1os.h:55
+Defined in h1os/h1os.h:56
+
+Splash screens.
 
 | Value | Description |
 |-------|-------------|
-| `H1OS_SPLASH_BOOT` |  |
-| `H1OS_SPLASH_SLEEP` |  |
-| `H1OS_SPLASH_SHUTDOWN` |  |
-| `H1OS_SPLASH_MAX` |  |
+| `H1OS_SPLASH_BOOT` | Boot. |
+| `H1OS_SPLASH_SLEEP` | Sleep. |
+| `H1OS_SPLASH_SHUTDOWN` | Shutdown. |
+| `H1OS_SPLASH_MAX` | Max. |
 
 ---
-
-{#h1os_chime_type_t}
 
 ### h1os_chime_type_t
 
@@ -1492,19 +1320,19 @@ Defined in h1os/h1os.h:55
 enum h1os_chime_type_t
 ```
 
-Defined in h1os/h1os.h:63
+Defined in h1os/h1os.h:64
+
+Chime Types.
 
 | Value | Description |
 |-------|-------------|
-| `H1OS_CHIME_BOOT` |  |
-| `H1OS_CHIME_SLEEP` |  |
-| `H1OS_CHIME_SHUTDOWN` |  |
-| `H1OS_CHIME_ALARM` |  |
-| `H1OS_CHIME_MAX` |  |
+| `H1OS_CHIME_BOOT` | Boot. |
+| `H1OS_CHIME_SLEEP` | Sleep. |
+| `H1OS_CHIME_SHUTDOWN` | Shutdown. |
+| `H1OS_CHIME_ALARM` | Alarm. |
+| `H1OS_CHIME_MAX` | Max. |
 
 ---
-
-{#h1os_time_format_t}
 
 ### h1os_time_format_t
 
@@ -1512,7 +1340,9 @@ Defined in h1os/h1os.h:63
 enum h1os_time_format_t
 ```
 
-Defined in h1os/h1os_time.h:20
+Defined in h1os/h1os_time.h:21
+
+Time Format.
 
 | Value | Description |
 |-------|-------------|
@@ -1523,15 +1353,15 @@ Defined in h1os/h1os_time.h:20
 
 ---
 
-{#h1os_date_format_t}
-
 ### h1os_date_format_t
 
 ```cpp
 enum h1os_date_format_t
 ```
 
-Defined in h1os/h1os_time.h:27
+Defined in h1os/h1os_time.h:29
+
+Date Format.
 
 | Value | Description |
 |-------|-------------|
@@ -1540,8 +1370,6 @@ Defined in h1os/h1os_time.h:27
 | `H1OS_DATE_FMT_MM_DD_YY_DOW` | "09/26/26 Saturday" |
 
 ---
-
-{#hal_btn_mask_t}
 
 ### hal_btn_mask_t
 
@@ -1558,8 +1386,6 @@ Defined in h1os/hal_types.h:89
 | `HAL_BTN_POWER` |  |
 
 ---
-
-{#h1os_init_mode_t}
 
 ### h1os_init_mode_t
 
@@ -1579,8 +1405,6 @@ Initialization Modes for Dynamic Hardware Configuration.
 
 ---
 
-{#h1os_sleep_mode_t}
-
 ### h1os_sleep_mode_t
 
 ```cpp
@@ -1597,8 +1421,6 @@ Sleep Execution Modes.
 | `H1OS_SLEEP_MODE_DEEP` | Deep sleep (Power down, RTC slow memory preserved). |
 
 ---
-
-{#orch_flow_type_t}
 
 ### orch_flow_type_t
 
@@ -1618,7 +1440,20 @@ Defined in h1os/orch_flow.h:24
 
 ---
 
-{#audio_cmd_type_t}
+### sub_power_sleep_mode_t
+
+```cpp
+enum sub_power_sleep_mode_t
+```
+
+Defined in h1os/sub_power.h:61
+
+| Value | Description |
+|-------|-------------|
+| `SUB_POWER_SLEEP_FULL_CYCLE` | Normal Flow B sleep: arms PCF85063A countdown & resets slice_counter. |
+| `SUB_POWER_SLEEP_FLOW_A_BURST` | Flow A sample sleep: preserves running PCF85063A countdown & slice_counter. |
+
+---
 
 ### audio_cmd_type_t
 
@@ -1626,7 +1461,7 @@ Defined in h1os/orch_flow.h:24
 enum audio_cmd_type_t
 ```
 
-Defined in sub_audio.c:46
+Defined in sub_audio.c:47
 
 | Value | Description |
 |-------|-------------|
@@ -1636,29 +1471,27 @@ Defined in sub_audio.c:46
 
 ---
 
-{#orch_ulp_dispatch_t}
-
 ### orch_ulp_dispatch_t
 
 ```cpp
 enum orch_ulp_dispatch_t
 ```
 
-Defined in h1os/orch_state.h:24
+Defined in h1os/orch_state.h:25
+
+ULP Dispatch Reason.
 
 | Value | Description |
 |-------|-------------|
-| `ULP_DISPATCH_NONE` |  |
-| `ULP_DISPATCH_SENSOR_SAMPLE` |  |
-| `ULP_DISPATCH_MAIN_WAKE` |  |
-| `ULP_DISPATCH_CRITICAL_SHUTDOWN` |  |
-| `ULP_DISPATCH_BOOTLOADER_JUMP` |  |
-| `ULP_DISPATCH_POWER_OFF` |  |
+| `ULP_DISPATCH_NONE` | None. |
+| `ULP_DISPATCH_SENSOR_SAMPLE` | Sensor sample. |
+| `ULP_DISPATCH_MAIN_WAKE` | Main wake. |
+| `ULP_DISPATCH_CRITICAL_SHUTDOWN` | Shutdown. |
+| `ULP_DISPATCH_BOOTLOADER_JUMP` | Bootloader. |
+| `ULP_DISPATCH_POWER_OFF` | Power off. |
 ## Typedefs
 
 ---
-
-{#h1os_boot_cb_t}
 
 ### h1os_boot_cb_t
 
@@ -1670,8 +1503,6 @@ Defined in h1os/h1os.h:72
 
 ---
 
-{#h1os_wake_cb_t}
-
 ### h1os_wake_cb_t
 
 ```cpp
@@ -1681,8 +1512,6 @@ using h1os_wake_cb_t = void(*)
 Defined in h1os/h1os.h:73
 
 ---
-
-{#h1os_pre_sleep_cb_t}
 
 ### h1os_pre_sleep_cb_t
 
@@ -1694,8 +1523,6 @@ Defined in h1os/h1os.h:74
 
 ---
 
-{#h1os_shutdown_cb_t}
-
 ### h1os_shutdown_cb_t
 
 ```cpp
@@ -1705,8 +1532,6 @@ using h1os_shutdown_cb_t = void(*)
 Defined in h1os/h1os.h:75
 
 ---
-
-{#h1os_splash_cb_t}
 
 ### h1os_splash_cb_t
 
@@ -1718,8 +1543,6 @@ Defined in h1os/h1os.h:76
 
 ---
 
-{#h1os_chime_cb_t}
-
 ### h1os_chime_cb_t
 
 ```cpp
@@ -1730,23 +1553,19 @@ Defined in h1os/h1os.h:77
 
 ---
 
-{#h1os_time_sync_cb_t}
-
 ### h1os_time_sync_cb_t
 
 ```cpp
 using h1os_time_sync_cb_t = esp_err_t(*)
 ```
 
-Defined in h1os/h1os_time.h:36
+Defined in h1os/h1os_time.h:38
 
 Callback for external network/remote time acquisition (SNTP, GPS, BLE).
 
 ## Functions
 
 ---
-
-{#h1os_get_version}
 
 ### h1os_get_version
 
@@ -1762,8 +1581,6 @@ Get the H1OS semantic version string.
 
 ---
 
-{#h1os_start}
-
 ### h1os_start
 
 ```cpp
@@ -1775,8 +1592,6 @@ Defined in h1os/h1os.h:157
 Initialize H1OS and dispatch application lifecycle.
 
 ---
-
-{#h1os_set_volume}
 
 ### h1os_set_volume
 
@@ -1790,8 +1605,6 @@ Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
 ---
 
-{#h1os_get_telemetry}
-
 ### h1os_get_telemetry
 
 ```cpp
@@ -1803,8 +1616,6 @@ Defined in h1os/h1os.h:167
 Retrieve current Tri-Node environmental telemetry.
 
 ---
-
-{#h1os_sleep}
 
 ### h1os_sleep
 
@@ -1818,8 +1629,6 @@ Put the platform into ultra-low-power deep sleep.
 
 ---
 
-{#h1os_reset_session_timer}
-
 ### h1os_reset_session_timer
 
 ```cpp
@@ -1831,8 +1640,6 @@ Defined in h1os/h1os.h:177
 Reset the interactive session inactivity timer (extends session by timeout_sec).
 
 ---
-
-{#h1os_is_session_active}
 
 ### h1os_is_session_active
 
@@ -1849,8 +1656,6 @@ true if running in an interactive user session, false during unattended wakes.
 
 ---
 
-{#h1os_shutdown}
-
 ### h1os_shutdown
 
 ```cpp
@@ -1862,8 +1667,6 @@ Defined in h1os/h1os.h:189
 Orderly system shutdown and physical battery power cut.
 
 ---
-
-{#h1os_shutdown_for_storage}
 
 ### h1os_shutdown_for_storage
 
@@ -1878,8 +1681,6 @@ Shutdown for long-term storage: clears display to pure white before cutting powe
 Protects e-Paper electrophoretic microcapsules against permanent dye migration and burn-in.
 
 ---
-
-{#hal_io_early_init}
 
 ### hal_io_early_init
 
@@ -1897,8 +1698,6 @@ Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier m
 ESP_OK on success, or driver error code.
 
 ---
-
-{#hal_io_set_led}
 
 ### hal_io_set_led
 
@@ -1921,7 +1720,135 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_release_power_latch}
+### hal_led_pwm_init
+
+```cpp
+esp_err_t hal_led_pwm_init(void)
+```
+
+Defined in h1os/hal_io.h:46
+
+Initializes LEDC hardware PWM controller for user LED on GPIO 3.
+
+Enables 10-bit hardware brightness resolution (0..100%) and hardware smooth fading.
+
+#### Returns
+ESP_OK on success.
+
+---
+
+### hal_led_set_brightness
+
+```cpp
+esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
+```
+
+Defined in h1os/hal_io.h:54
+
+Sets user LED brightness percentage using hardware PWM (0..100%).
+
+#### Returns
+ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `brightness_pct` | `uint8_t` | Brightness percentage: 0 = OFF, 100 = Maximum. |
+
+---
+
+### hal_led_fade_to
+
+```cpp
+esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
+```
+
+Defined in h1os/hal_io.h:64
+
+Smoothly fades user LED to target brightness using hardware fade engine.
+
+Non-blocking: hardware timer interpolates duty cycle with zero CPU overhead.
+
+#### Returns
+ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `target_pct` | `uint8_t` | Target brightness percentage (0..100%). |
+| `duration_ms` | `uint32_t` | Duration of fade transition in milliseconds. |
+
+---
+
+### hal_led_start_breathing
+
+```cpp
+esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
+```
+
+Defined in h1os/hal_io.h:74
+
+Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+
+Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+
+#### Returns
+ESP_OK on success, or ESP_FAIL if task creation fails.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cycle_period_ms` | `uint32_t` | Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0. |
+
+---
+
+### hal_led_stop_breathing
+
+```cpp
+esp_err_t hal_led_stop_breathing(void)
+```
+
+Defined in h1os/hal_io.h:81
+
+Stops the asynchronous breathing task and turns the LED off.
+
+#### Returns
+ESP_OK on success.
+
+---
+
+### hal_led_is_breathing
+
+```cpp
+bool hal_led_is_breathing(void)
+```
+
+Defined in h1os/hal_io.h:88
+
+Queries whether the asynchronous breathing task is actively running.
+
+#### Returns
+True if breathing task is active, false otherwise.
+
+---
+
+### hal_led_pwm_deinit
+
+```cpp
+esp_err_t hal_led_pwm_deinit(void)
+```
+
+Defined in h1os/hal_io.h:95
+
+Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
+
+#### Returns
+ESP_OK on success.
+
+---
 
 ### hal_io_release_power_latch
 
@@ -1929,7 +1856,7 @@ ESP_OK on success.
 esp_err_t hal_io_release_power_latch(void)
 ```
 
-Defined in h1os/hal_io.h:47
+Defined in h1os/hal_io.h:104
 
 Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
 
@@ -1940,15 +1867,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_read_buttons}
-
 ### hal_io_read_buttons
 
 ```cpp
 hal_btn_mask_t hal_io_read_buttons(void)
 ```
 
-Defined in h1os/hal_io.h:54
+Defined in h1os/hal_io.h:111
 
 Samples instantaneous state of hardware tactile buttons.
 
@@ -1956,8 +1881,6 @@ Samples instantaneous state of hardware tactile buttons.
 Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 
 ---
-
-{#hal_io_button_is_pressed}
 
 ### hal_io_button_is_pressed
 
@@ -1967,7 +1890,7 @@ Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 static inline bool hal_io_button_is_pressed(gpio_num_t pin)
 ```
 
-Defined in h1os/hal_io.h:62
+Defined in h1os/hal_io.h:119
 
 Stateless check if a specific button pin is actively held down (Active LOW).
 
@@ -1982,15 +1905,13 @@ true if depressed, false otherwise
 
 ---
 
-{#hal_io_isolate_sleep_pads}
-
 ### hal_io_isolate_sleep_pads
 
 ```cpp
 esp_err_t hal_io_isolate_sleep_pads(void)
 ```
 
-Defined in h1os/hal_io.h:76
+Defined in h1os/hal_io.h:133
 
 Configures and locks dynamic peripheral lines prior to deep sleep.
 
@@ -2004,15 +1925,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_release_pad_holds}
-
 ### hal_io_release_pad_holds
 
 ```cpp
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in h1os/hal_io.h:83
+Defined in h1os/hal_io.h:140
 
 Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
 
@@ -2021,15 +1940,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_check_usb_ll}
-
 ### hal_check_usb_ll
 
 ```cpp
 bool hal_check_usb_ll(void)
 ```
 
-Defined in h1os/hal_io.h:90
+Defined in h1os/hal_io.h:147
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
 
@@ -2038,15 +1955,13 @@ true if USB host connection detected, false otherwise.
 
 ---
 
-{#hal_io_early_init-1}
-
 ### hal_io_early_init
 
 ```cpp
 esp_err_t hal_io_early_init(void)
 ```
 
-Defined in hal_io.c:18
+Defined in hal_io.c:23
 
 Early boot initialization of non-latched application pins.
 
@@ -2057,15 +1972,13 @@ ESP_OK on success, or driver error code.
 
 ---
 
-{#hal_io_release_power_latch-1}
-
 ### hal_io_release_power_latch
 
 ```cpp
 esp_err_t hal_io_release_power_latch(void)
 ```
 
-Defined in hal_io.c:71
+Defined in hal_io.c:93
 
 Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
 
@@ -2076,7 +1989,147 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_set_led-1}
+### hal_led_pwm_init
+
+```cpp
+esp_err_t hal_led_pwm_init(void)
+```
+
+Defined in hal_io.c:111
+
+Initializes LEDC hardware PWM controller for user LED on GPIO 3.
+
+Enables 10-bit hardware brightness resolution (0..100%) and hardware smooth fading.
+
+#### Returns
+ESP_OK on success.
+
+---
+
+### hal_led_set_brightness
+
+```cpp
+esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
+```
+
+Defined in hal_io.c:155
+
+Sets user LED brightness percentage using hardware PWM (0..100%).
+
+#### Returns
+ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `brightness_pct` | `uint8_t` | Brightness percentage: 0 = OFF, 100 = Maximum. |
+
+---
+
+### hal_led_fade_to
+
+```cpp
+esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
+```
+
+Defined in hal_io.c:168
+
+Smoothly fades user LED to target brightness using hardware fade engine.
+
+Non-blocking: hardware timer interpolates duty cycle with zero CPU overhead.
+
+#### Returns
+ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `target_pct` | `uint8_t` | Target brightness percentage (0..100%). |
+| `duration_ms` | `uint32_t` | Duration of fade transition in milliseconds. |
+
+---
+
+### led_breath_task
+
+`static`
+
+```cpp
+static void led_breath_task(void * arg)
+```
+
+Defined in hal_io.c:185
+
+---
+
+### hal_led_start_breathing
+
+```cpp
+esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
+```
+
+Defined in hal_io.c:215
+
+Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+
+Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+
+#### Returns
+ESP_OK on success, or ESP_FAIL if task creation fails.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cycle_period_ms` | `uint32_t` | Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0. |
+
+---
+
+### hal_led_stop_breathing
+
+```cpp
+esp_err_t hal_led_stop_breathing(void)
+```
+
+Defined in hal_io.c:241
+
+Stops the asynchronous breathing task and turns the LED off.
+
+#### Returns
+ESP_OK on success.
+
+---
+
+### hal_led_is_breathing
+
+```cpp
+bool hal_led_is_breathing(void)
+```
+
+Defined in hal_io.c:261
+
+Queries whether the asynchronous breathing task is actively running.
+
+#### Returns
+True if breathing task is active, false otherwise.
+
+---
+
+### hal_led_pwm_deinit
+
+```cpp
+esp_err_t hal_led_pwm_deinit(void)
+```
+
+Defined in hal_io.c:266
+
+Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
+
+#### Returns
+ESP_OK on success.
+
+---
 
 ### hal_io_set_led
 
@@ -2084,7 +2137,7 @@ ESP_OK on success.
 esp_err_t hal_io_set_led(bool on)
 ```
 
-Defined in hal_io.c:81
+Defined in hal_io.c:294
 
 Controls user status LED (GPIO 3, Active LOW).
 
@@ -2099,15 +2152,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_read_buttons-1}
-
 ### hal_io_read_buttons
 
 ```cpp
 hal_btn_mask_t hal_io_read_buttons(void)
 ```
 
-Defined in hal_io.c:87
+Defined in hal_io.c:306
 
 Samples instantaneous state of hardware tactile buttons.
 
@@ -2116,15 +2167,13 @@ Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 
 ---
 
-{#hal_io_isolate_sleep_pads-1}
-
 ### hal_io_isolate_sleep_pads
 
 ```cpp
 esp_err_t hal_io_isolate_sleep_pads(void)
 ```
 
-Defined in hal_io.c:99
+Defined in hal_io.c:318
 
 Configures and locks dynamic peripheral lines prior to deep sleep.
 
@@ -2138,15 +2187,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_io_release_pad_holds-1}
-
 ### hal_io_release_pad_holds
 
 ```cpp
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in hal_io.c:143
+Defined in hal_io.c:351
 
 Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
 
@@ -2155,15 +2202,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_check_usb_ll-1}
-
 ### hal_check_usb_ll
 
 ```cpp
 bool hal_check_usb_ll(void)
 ```
 
-Defined in hal_io.c:160
+Defined in hal_io.c:375
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
 
@@ -2171,8 +2216,6 @@ Check if USB Serial/JTAG is connected to an active host via SOF packets.
 true if USB host connection detected, false otherwise.
 
 ---
-
-{#hal_i2c_init}
 
 ### hal_i2c_init
 
@@ -2191,8 +2234,6 @@ ESP_OK on success, or driver error code.
 
 ---
 
-{#hal_i2c_deinit}
-
 ### hal_i2c_deinit
 
 ```cpp
@@ -2207,8 +2248,6 @@ Deinitializes the shared I2C master bus and releases mutex.
 ESP_OK on success.
 
 ---
-
-{#hal_i2c_write}
 
 ### hal_i2c_write
 
@@ -2234,8 +2273,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 
 ---
 
-{#hal_i2c_read}
-
 ### hal_i2c_read
 
 ```cpp
@@ -2259,8 +2296,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 | `timeout_ms` | `uint32_t` | Timeout budget in milliseconds. |
 
 ---
-
-{#hal_i2c_write_read}
 
 ### hal_i2c_write_read
 
@@ -2288,8 +2323,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 
 ---
 
-{#hal_i2c_probe}
-
 ### hal_i2c_probe
 
 ```cpp
@@ -2311,8 +2344,6 @@ ESP_OK if device ACKed, ESP_ERR_NOT_FOUND or other error on NACK/timeout.
 
 ---
 
-{#hal_spi_init}
-
 ### hal_spi_init
 
 ```cpp
@@ -2328,8 +2359,6 @@ ESP_OK on success, or driver error code.
 
 ---
 
-{#hal_spi_deinit}
-
 ### hal_spi_deinit
 
 ```cpp
@@ -2344,8 +2373,6 @@ Deinitializes SPI2 Master host and releases bus resources.
 ESP_OK on success.
 
 ---
-
-{#hal_spi_write_cmd}
 
 ### hal_spi_write_cmd
 
@@ -2367,8 +2394,6 @@ ESP_OK on success.
 | `cmd` | `uint8_t` | Command byte. |
 
 ---
-
-{#hal_spi_write_data}
 
 ### hal_spi_write_data
 
@@ -2392,8 +2417,6 @@ ESP_OK on success.
 
 ---
 
-{#hal_spi_write_frame_dma}
-
 ### hal_spi_write_frame_dma
 
 ```cpp
@@ -2414,8 +2437,6 @@ ESP_OK on success.
 | `frame_buffer` | `const uint8_t *` | Pointer to 5000-byte buffer. |
 
 ---
-
-{#hal_spi_read_data}
 
 ### hal_spi_read_data
 
@@ -2442,8 +2463,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_nvs_init}
-
 ### sub_nvs_init
 
 ```cpp
@@ -2455,8 +2474,6 @@ Defined in h1os/sub_nvs.h:27
 Initialize the NVS flash storage subsystem.
 
 ---
-
-{#sub_nvs_set_str}
 
 ### sub_nvs_set_str
 
@@ -2470,8 +2487,6 @@ Store a string value in NVS.
 
 ---
 
-{#sub_nvs_get_str}
-
 ### sub_nvs_get_str
 
 ```cpp
@@ -2483,8 +2498,6 @@ Defined in h1os/sub_nvs.h:37
 Retrieve a string value from NVS.
 
 ---
-
-{#sub_nvs_set_u32}
 
 ### sub_nvs_set_u32
 
@@ -2498,8 +2511,6 @@ Store an unsigned 32-bit integer in NVS.
 
 ---
 
-{#sub_nvs_get_u32}
-
 ### sub_nvs_get_u32
 
 ```cpp
@@ -2511,8 +2522,6 @@ Defined in h1os/sub_nvs.h:47
 Retrieve an unsigned 32-bit integer from NVS.
 
 ---
-
-{#sub_nvs_set_blob}
 
 ### sub_nvs_set_blob
 
@@ -2526,8 +2535,6 @@ Store a binary blob in NVS.
 
 ---
 
-{#sub_nvs_get_blob}
-
 ### sub_nvs_get_blob
 
 ```cpp
@@ -2539,8 +2546,6 @@ Defined in h1os/sub_nvs.h:57
 Retrieve a binary blob from NVS.
 
 ---
-
-{#sub_nvs_erase_key}
 
 ### sub_nvs_erase_key
 
@@ -2554,8 +2559,6 @@ Erase a specific key from NVS.
 
 ---
 
-{#sub_nvs_erase_all}
-
 ### sub_nvs_erase_all
 
 ```cpp
@@ -2567,8 +2570,6 @@ Defined in h1os/sub_nvs.h:67
 Perform a factory reset wiping the entire H1OS NVS namespace.
 
 ---
-
-{#sub_rtc_init}
 
 ### sub_rtc_init
 
@@ -2586,8 +2587,6 @@ Disables CLKOUT push-pull square wave to eliminate continuous trace leakage, ver
 ESP_OK on success, or an I2C communication error.
 
 ---
-
-{#sub_rtc_get_time}
 
 ### sub_rtc_get_time
 
@@ -2610,8 +2609,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_set_time}
-
 ### sub_rtc_set_time
 
 ```cpp
@@ -2632,8 +2629,6 @@ ESP_OK on success, or an error code.
 | `time` | `const struct tm *` | Pointer to struct tm containing target timestamp. |
 
 ---
-
-{#sub_rtc_arm_countdown}
 
 ### sub_rtc_arm_countdown
 
@@ -2658,8 +2653,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_cancel_countdown}
-
 ### sub_rtc_cancel_countdown
 
 ```cpp
@@ -2674,8 +2667,6 @@ Cancel and disarm hardware countdown timer.
 ESP_OK on success.
 
 ---
-
-{#sub_rtc_get_remaining_seconds}
 
 ### sub_rtc_get_remaining_seconds
 
@@ -2699,8 +2690,6 @@ ESP_OK on success, or an error code.
 | `out_sec` | `uint32_t *` | Remaining seconds until countdown expiration. |
 
 ---
-
-{#sub_rtc_get_and_clear_interrupts}
 
 ### sub_rtc_get_and_clear_interrupts
 
@@ -2726,8 +2715,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#hal_i2c_init-1}
-
 ### hal_i2c_init
 
 ```cpp
@@ -2745,8 +2732,6 @@ ESP_OK on success, or driver error code.
 
 ---
 
-{#hal_i2c_deinit-1}
-
 ### hal_i2c_deinit
 
 ```cpp
@@ -2761,8 +2746,6 @@ Deinitializes the shared I2C master bus and releases mutex.
 ESP_OK on success.
 
 ---
-
-{#hal_i2c_write-1}
 
 ### hal_i2c_write
 
@@ -2788,8 +2771,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 
 ---
 
-{#hal_i2c_read-1}
-
 ### hal_i2c_read
 
 ```cpp
@@ -2813,8 +2794,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 | `timeout_ms` | `uint32_t` | Timeout budget in milliseconds. |
 
 ---
-
-{#hal_i2c_write_read-1}
 
 ### hal_i2c_write_read
 
@@ -2842,8 +2821,6 @@ ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
 
 ---
 
-{#hal_i2c_probe-1}
-
 ### hal_i2c_probe
 
 ```cpp
@@ -2865,8 +2842,6 @@ ESP_OK if device ACKed, ESP_ERR_NOT_FOUND or other error on NACK/timeout.
 
 ---
 
-{#epd_set_cs}
-
 ### epd_set_cs
 
 `static` `inline`
@@ -2879,8 +2854,6 @@ Defined in hal_spi.c:19
 
 ---
 
-{#epd_set_dc}
-
 ### epd_set_dc
 
 `static` `inline`
@@ -2892,8 +2865,6 @@ static inline void epd_set_dc(uint8_t level)
 Defined in hal_spi.c:23
 
 ---
-
-{#hal_spi_init-1}
 
 ### hal_spi_init
 
@@ -2910,8 +2881,6 @@ ESP_OK on success, or driver error code.
 
 ---
 
-{#hal_spi_deinit-1}
-
 ### hal_spi_deinit
 
 ```cpp
@@ -2926,8 +2895,6 @@ Deinitializes SPI2 Master host and releases bus resources.
 ESP_OK on success.
 
 ---
-
-{#hal_spi_write_cmd-1}
 
 ### hal_spi_write_cmd
 
@@ -2949,8 +2916,6 @@ ESP_OK on success.
 | `cmd` | `uint8_t` | Command byte. |
 
 ---
-
-{#hal_spi_write_data-1}
 
 ### hal_spi_write_data
 
@@ -2974,8 +2939,6 @@ ESP_OK on success.
 
 ---
 
-{#hal_spi_write_frame_dma-1}
-
 ### hal_spi_write_frame_dma
 
 ```cpp
@@ -2997,15 +2960,13 @@ ESP_OK on success.
 
 ---
 
-{#hal_spi_read_data-1}
-
 ### hal_spi_read_data
 
 ```cpp
 esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t * out_data, size_t len)
 ```
 
-Defined in hal_spi.c:186
+Defined in hal_spi.c:187
 
 Reads data from SSD1681 (e.g.
 
@@ -3024,8 +2985,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_nvs_init-1}
-
 ### sub_nvs_init
 
 ```cpp
@@ -3037,8 +2996,6 @@ Defined in sub_nvs.c:18
 Initialize the NVS flash storage subsystem.
 
 ---
-
-{#sub_nvs_set_str-1}
 
 ### sub_nvs_set_str
 
@@ -3052,8 +3009,6 @@ Store a string value in NVS.
 
 ---
 
-{#sub_nvs_get_str-1}
-
 ### sub_nvs_get_str
 
 ```cpp
@@ -3065,8 +3020,6 @@ Defined in sub_nvs.c:62
 Retrieve a string value from NVS.
 
 ---
-
-{#sub_nvs_set_u32-1}
 
 ### sub_nvs_set_u32
 
@@ -3080,8 +3033,6 @@ Store an unsigned 32-bit integer in NVS.
 
 ---
 
-{#sub_nvs_get_u32-1}
-
 ### sub_nvs_get_u32
 
 ```cpp
@@ -3093,8 +3044,6 @@ Defined in sub_nvs.c:94
 Retrieve an unsigned 32-bit integer from NVS.
 
 ---
-
-{#sub_nvs_set_blob-1}
 
 ### sub_nvs_set_blob
 
@@ -3108,8 +3057,6 @@ Store a binary blob in NVS.
 
 ---
 
-{#sub_nvs_get_blob-1}
-
 ### sub_nvs_get_blob
 
 ```cpp
@@ -3121,8 +3068,6 @@ Defined in sub_nvs.c:125
 Retrieve a binary blob from NVS.
 
 ---
-
-{#sub_nvs_erase_key-1}
 
 ### sub_nvs_erase_key
 
@@ -3136,8 +3081,6 @@ Erase a specific key from NVS.
 
 ---
 
-{#sub_nvs_erase_all-1}
-
 ### sub_nvs_erase_all
 
 ```cpp
@@ -3150,8 +3093,6 @@ Perform a factory reset wiping the entire H1OS NVS namespace.
 
 ---
 
-{#bcd2dec}
-
 ### bcd2dec
 
 `static` `inline`
@@ -3160,11 +3101,9 @@ Perform a factory reset wiping the entire H1OS NVS namespace.
 static inline uint8_t bcd2dec(uint8_t val)
 ```
 
-Defined in sub_rtc.c:53
+Defined in sub_rtc.c:55
 
 ---
-
-{#dec2bcd}
 
 ### dec2bcd
 
@@ -3174,11 +3113,9 @@ Defined in sub_rtc.c:53
 static inline uint8_t dec2bcd(uint8_t val)
 ```
 
-Defined in sub_rtc.c:57
+Defined in sub_rtc.c:59
 
 ---
-
-{#pcf85063_read_reg}
 
 ### pcf85063_read_reg
 
@@ -3188,11 +3125,9 @@ Defined in sub_rtc.c:57
 static esp_err_t pcf85063_read_reg(uint8_t reg, uint8_t * val, size_t len)
 ```
 
-Defined in sub_rtc.c:61
+Defined in sub_rtc.c:63
 
 ---
-
-{#pcf85063_write_reg}
 
 ### pcf85063_write_reg
 
@@ -3202,11 +3137,9 @@ Defined in sub_rtc.c:61
 static esp_err_t pcf85063_write_reg(uint8_t reg, const uint8_t * val, size_t len)
 ```
 
-Defined in sub_rtc.c:66
+Defined in sub_rtc.c:68
 
 ---
-
-{#pcf85063_write_reg_u8}
 
 ### pcf85063_write_reg_u8
 
@@ -3216,11 +3149,9 @@ Defined in sub_rtc.c:66
 static esp_err_t pcf85063_write_reg_u8(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_rtc.c:75
+Defined in sub_rtc.c:77
 
 ---
-
-{#sub_rtc_init-1}
 
 ### sub_rtc_init
 
@@ -3228,7 +3159,7 @@ Defined in sub_rtc.c:75
 esp_err_t sub_rtc_init(void)
 ```
 
-Defined in sub_rtc.c:80
+Defined in sub_rtc.c:82
 
 Initialize PCF85063A RTC.
 
@@ -3239,15 +3170,13 @@ ESP_OK on success, or an I2C communication error.
 
 ---
 
-{#sub_rtc_get_time-1}
-
 ### sub_rtc_get_time
 
 ```cpp
 esp_err_t sub_rtc_get_time(struct tm * out_time)
 ```
 
-Defined in sub_rtc.c:120
+Defined in sub_rtc.c:122
 
 Read current date and time into POSIX struct tm.
 
@@ -3262,15 +3191,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_set_time-1}
-
 ### sub_rtc_set_time
 
 ```cpp
 esp_err_t sub_rtc_set_time(const struct tm * time)
 ```
 
-Defined in sub_rtc.c:144
+Defined in sub_rtc.c:146
 
 Set RTC calendar date and time.
 
@@ -3285,15 +3212,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_arm_countdown-1}
-
 ### sub_rtc_arm_countdown
 
 ```cpp
 esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 ```
 
-Defined in sub_rtc.c:174
+Defined in sub_rtc.c:176
 
 Arm hardware countdown timer.
 
@@ -3310,15 +3235,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_cancel_countdown-1}
-
 ### sub_rtc_cancel_countdown
 
 ```cpp
 esp_err_t sub_rtc_cancel_countdown(void)
 ```
 
-Defined in sub_rtc.c:210
+Defined in sub_rtc.c:213
 
 Cancel and disarm hardware countdown timer.
 
@@ -3327,15 +3250,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_rtc_get_remaining_seconds-1}
-
 ### sub_rtc_get_remaining_seconds
 
 ```cpp
 esp_err_t sub_rtc_get_remaining_seconds(uint32_t * out_sec)
 ```
 
-Defined in sub_rtc.c:222
+Defined in sub_rtc.c:225
 
 Read remaining seconds on the active countdown timer.
 
@@ -3352,15 +3273,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_rtc_get_and_clear_interrupts-1}
-
 ### sub_rtc_get_and_clear_interrupts
 
 ```cpp
 esp_err_t sub_rtc_get_and_clear_interrupts(bool * out_alarm, bool * out_timer)
 ```
 
-Defined in sub_rtc.c:250
+Defined in sub_rtc.c:253
 
 Inspect and acknowledge RTC interrupt flags.
 
@@ -3377,8 +3296,6 @@ ESP_OK on success, or an error code.
 | `out_timer` | `bool *` | Set to true if a countdown timer interrupt triggered. |
 
 ---
-
-{#h1os_lvgl_init}
 
 ### h1os_lvgl_init
 
@@ -3398,8 +3315,6 @@ Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input dr
 
 ---
 
-{#h1os_lvgl_set_first_flush_mode}
-
 ### h1os_lvgl_set_first_flush_mode
 
 ```cpp
@@ -3418,8 +3333,6 @@ Explicitly override whether the first flush executes a full or partial refresh.
 
 ---
 
-{#h1os_lvgl_start}
-
 ### h1os_lvgl_start
 
 ```cpp
@@ -3431,8 +3344,6 @@ Defined in h1os/h1os_lvgl.h:36
 Start the LVGL background FreeRTOS task.
 
 ---
-
-{#h1os_lvgl_stop}
 
 ### h1os_lvgl_stop
 
@@ -3446,8 +3357,6 @@ Stop the LVGL background task.
 
 ---
 
-{#h1os_lvgl_lock}
-
 ### h1os_lvgl_lock
 
 ```cpp
@@ -3459,8 +3368,6 @@ Defined in h1os/h1os_lvgl.h:46
 Acquire LVGL reentrant mutex lock.
 
 ---
-
-{#h1os_lvgl_unlock}
 
 ### h1os_lvgl_unlock
 
@@ -3474,8 +3381,6 @@ Release LVGL reentrant mutex lock.
 
 ---
 
-{#h1os_lvgl_has_pending_tasks}
-
 ### h1os_lvgl_has_pending_tasks
 
 ```cpp
@@ -3487,8 +3392,6 @@ Defined in h1os/h1os_lvgl.h:56
 Check if the LVGL display pipeline has pending render/flush tasks.
 
 ---
-
-{#h1os_lvgl_get_indev}
 
 ### h1os_lvgl_get_indev
 
@@ -3502,21 +3405,17 @@ Retrieve the LVGL keypad input device handle.
 
 ---
 
-{#h1os_time_set_timezone}
-
 ### h1os_time_set_timezone
 
 ```cpp
 esp_err_t h1os_time_set_timezone(const char * tz_str)
 ```
 
-Defined in h1os/h1os_time.h:41
+Defined in h1os/h1os_time.h:43
 
 Configure POSIX timezone string.
 
 ---
-
-{#h1os_time_register_sync_cb}
 
 ### h1os_time_register_sync_cb
 
@@ -3524,13 +3423,11 @@ Configure POSIX timezone string.
 esp_err_t h1os_time_register_sync_cb(h1os_time_sync_cb_t cb, void * user_data)
 ```
 
-Defined in h1os/h1os_time.h:46
+Defined in h1os/h1os_time.h:48
 
 Register external time sync callback.
 
 ---
-
-{#h1os_time_sync_now}
 
 ### h1os_time_sync_now
 
@@ -3538,13 +3435,11 @@ Register external time sync callback.
 esp_err_t h1os_time_sync_now(uint32_t timeout_ms)
 ```
 
-Defined in h1os/h1os_time.h:51
+Defined in h1os/h1os_time.h:53
 
 Trigger time synchronization using registered callback.
 
 ---
-
-{#h1os_time_sync_system_to_rtc}
 
 ### h1os_time_sync_system_to_rtc
 
@@ -3552,13 +3447,11 @@ Trigger time synchronization using registered callback.
 esp_err_t h1os_time_sync_system_to_rtc(void)
 ```
 
-Defined in h1os/h1os_time.h:56
+Defined in h1os/h1os_time.h:58
 
 Synchronize internal system clock into PCF85063A RTC hardware.
 
 ---
-
-{#h1os_time_sync_rtc_to_system}
 
 ### h1os_time_sync_rtc_to_system
 
@@ -3566,13 +3459,11 @@ Synchronize internal system clock into PCF85063A RTC hardware.
 esp_err_t h1os_time_sync_rtc_to_system(void)
 ```
 
-Defined in h1os/h1os_time.h:61
+Defined in h1os/h1os_time.h:63
 
 Synchronize PCF85063A RTC hardware into internal POSIX system clock.
 
 ---
-
-{#h1os_time_get_formatted}
 
 ### h1os_time_get_formatted
 
@@ -3580,13 +3471,11 @@ Synchronize PCF85063A RTC hardware into internal POSIX system clock.
 esp_err_t h1os_time_get_formatted(h1os_time_format_t fmt, char * dest, size_t max_len)
 ```
 
-Defined in h1os/h1os_time.h:66
+Defined in h1os/h1os_time.h:68
 
 Format current local time into destination buffer.
 
 ---
-
-{#h1os_time_get_date_formatted}
 
 ### h1os_time_get_date_formatted
 
@@ -3594,13 +3483,11 @@ Format current local time into destination buffer.
 esp_err_t h1os_time_get_date_formatted(h1os_date_format_t fmt, char * dest, size_t max_len)
 ```
 
-Defined in h1os/h1os_time.h:71
+Defined in h1os/h1os_time.h:73
 
 Format current local date into destination buffer.
 
 ---
-
-{#hal_flash_init}
 
 ### hal_flash_init
 
@@ -3616,8 +3503,6 @@ Finds and verifies the dedicated "epd_frame" partition.
 ESP_OK on success, or ESP_ERR_NOT_FOUND if partition is missing.
 
 ---
-
-{#hal_flash_read_frame}
 
 ### hal_flash_read_frame
 
@@ -3641,8 +3526,6 @@ ESP_OK on success, or flash read error.
 
 ---
 
-{#hal_flash_write_frame}
-
 ### hal_flash_write_frame
 
 ```cpp
@@ -3665,8 +3548,6 @@ ESP_OK on success, or flash write error.
 
 ---
 
-{#orch_flow_determine_wakeup}
-
 ### orch_flow_determine_wakeup
 
 ```cpp
@@ -3682,8 +3563,6 @@ Detected flow type.
 
 ---
 
-{#orch_flow_execute_sensor_sample}
-
 ### orch_flow_execute_sensor_sample
 
 ```cpp
@@ -3697,8 +3576,6 @@ Execute Flow A Headless Sensor Sample Burst.
 Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms, commits sample to RTC Slow Memory ring buffer, and re-enters deep sleep immediately. Zero measurable thermal impact on sensor cavity.
 
 ---
-
-{#orch_flow_is_thermal_lockout}
 
 ### orch_flow_is_thermal_lockout
 
@@ -3716,8 +3593,6 @@ If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibri
 True if in lockout, False if in thermal equilibrium.
 
 ---
-
-{#orch_flow_set_thermal_lockout}
 
 ### orch_flow_set_thermal_lockout
 
@@ -3737,8 +3612,6 @@ Arm or disarm thermal lockout gatekeeper.
 | `duration_sec` | `uint32_t` | Duration of lockout in seconds (typically 30-60s). |
 
 ---
-
-{#orch_flow_query_telemetry}
 
 ### orch_flow_query_telemetry
 
@@ -3765,8 +3638,6 @@ ESP_OK on success.
 
 ---
 
-{#orch_flow_transition_to_sleep}
-
 ### orch_flow_transition_to_sleep
 
 ```cpp
@@ -3787,8 +3658,6 @@ ESP_OK on success.
 | `sleep_sec` | `uint32_t` | Sleep duration in seconds. |
 
 ---
-
-{#orch_math_calc_sat_vapor_pressure}
 
 ### orch_math_calc_sat_vapor_pressure
 
@@ -3812,8 +3681,6 @@ Saturation vapor pressure in hPa.
 | `temp_c` | `float` | Temperature in Celsius. |
 
 ---
-
-{#orch_math_calc_vapor_pressure}
 
 ### orch_math_calc_vapor_pressure
 
@@ -3839,8 +3706,6 @@ Actual water vapor pressure in hPa.
 
 ---
 
-{#orch_math_calc_dew_point}
-
 ### orch_math_calc_dew_point
 
 ```cpp
@@ -3864,8 +3729,6 @@ Dew point in Celsius.
 | `rh_pct` | `float` | Measured package relative humidity in percent. |
 
 ---
-
-{#orch_math_reconstruct_ambient_rh}
 
 ### orch_math_reconstruct_ambient_rh
 
@@ -3891,8 +3754,6 @@ Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
 
 ---
 
-{#orch_math_calc_absolute_humidity}
-
 ### orch_math_calc_absolute_humidity
 
 ```cpp
@@ -3916,8 +3777,6 @@ Vapor density in g/m³.
 | `amb_temp_c` | `float` | Ambient temperature in Celsius. |
 
 ---
-
-{#orch_math_update_ewma}
 
 ### orch_math_update_ewma
 
@@ -3944,8 +3803,6 @@ Filtered result.
 
 ---
 
-{#orch_math_is_plateau_settled}
-
 ### orch_math_is_plateau_settled
 
 ```cpp
@@ -3971,8 +3828,6 @@ True if thermally settled.
 
 ---
 
-{#sub_audio_init}
-
 ### sub_audio_init
 
 ```cpp
@@ -3989,8 +3844,6 @@ Configures I2S audio bus and sets codec to active run mode.
 ESP_OK on success, or an error code.
 
 ---
-
-{#sub_audio_standby}
 
 ### sub_audio_standby
 
@@ -4009,8 +3862,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_deinit}
-
 ### sub_audio_deinit
 
 ```cpp
@@ -4025,8 +3876,6 @@ Teardown audio subsystem, stop background worker task, and delete I2S channel.
 ESP_OK on success.
 
 ---
-
-{#sub_audio_wait_until_ready}
 
 ### sub_audio_wait_until_ready
 
@@ -4049,8 +3898,6 @@ ESP_OK if codec is verified and in active CSM state, or error.
 
 ---
 
-{#sub_audio_is_ready}
-
 ### sub_audio_is_ready
 
 ```cpp
@@ -4065,8 +3912,6 @@ Quick status check of whether ES8311 codec is ready.
 true if communication and active CSM state verified.
 
 ---
-
-{#sub_audio_play_pcm}
 
 ### sub_audio_play_pcm
 
@@ -4090,8 +3935,6 @@ ESP_OK on success.
 | `sample_rate_hz` | `uint32_t` | Sample rate in Hz (default: 16000). |
 
 ---
-
-{#sub_audio_play_pcm_async}
 
 ### sub_audio_play_pcm_async
 
@@ -4118,8 +3961,6 @@ ESP_OK on success, ESP_ERR_NO_MEM / ESP_ERR_TIMEOUT if queue full.
 
 ---
 
-{#sub_audio_play_tone}
-
 ### sub_audio_play_tone
 
 ```cpp
@@ -4141,8 +3982,6 @@ ESP_OK on success.
 | `duration_ms` | `uint32_t` | Duration in milliseconds. |
 
 ---
-
-{#sub_audio_play_tone_async}
 
 ### sub_audio_play_tone_async
 
@@ -4166,8 +4005,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_chime}
-
 ### sub_audio_play_chime
 
 ```cpp
@@ -4188,8 +4025,6 @@ ESP_OK on success.
 | `type` | `uint8_t` | Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM). |
 
 ---
-
-{#sub_audio_play_chime_async}
 
 ### sub_audio_play_chime_async
 
@@ -4212,8 +4047,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_is_busy}
-
 ### sub_audio_is_busy
 
 ```cpp
@@ -4228,8 +4061,6 @@ Check if audio playback is currently active or queue has pending items.
 true if playing or queued, false if idle in standby.
 
 ---
-
-{#sub_audio_wait_idle}
 
 ### sub_audio_wait_idle
 
@@ -4251,8 +4082,6 @@ ESP_OK if idle, ESP_ERR_TIMEOUT if still active.
 | `timeout_ms` | `uint32_t` | Maximum time to wait in milliseconds. |
 
 ---
-
-{#sub_audio_set_volume}
 
 ### sub_audio_set_volume
 
@@ -4277,8 +4106,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_get_volume}
-
 ### sub_audio_get_volume
 
 ```cpp
@@ -4293,8 +4120,6 @@ Get currently configured output volume percentage (0 - 100).
 Current volume percentage.
 
 ---
-
-{#sub_audio_set_low_power_mode}
 
 ### sub_audio_set_low_power_mode
 
@@ -4319,8 +4144,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_get_low_power_mode}
-
 ### sub_audio_get_low_power_mode
 
 ```cpp
@@ -4335,8 +4158,6 @@ Query whether audio subsystem is in Low-Power Mode.
 true if Low-Power Mode is active, false if Normal Power Mode.
 
 ---
-
-{#sub_power_init}
 
 ### sub_power_init
 
@@ -4353,8 +4174,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_power_deinit}
-
 ### sub_power_deinit
 
 ```cpp
@@ -4369,8 +4188,6 @@ Deinitialize ADC handles.
 ESP_OK on success.
 
 ---
-
-{#sub_power_read_battery}
 
 ### sub_power_read_battery
 
@@ -4394,8 +4211,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_power_get_ulp_cal_params}
-
 ### sub_power_get_ulp_cal_params
 
 ```cpp
@@ -4418,7 +4233,53 @@ ESP_OK on success.
 
 ---
 
-{#sub_power_enter_deep_sleep}
+### sub_power_init_ulp
+
+```cpp
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
+```
+
+Defined in h1os/sub_power.h:59
+
+Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
+
+Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration, configures the periodic wake timer (Flow A period), and arms the coprocessor.
+
+#### Returns
+ESP_OK on success, or an error code.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `flow_a_period_sec` | `uint32_t` | Periodic wake interval for Flow A telemetry in seconds. |
+
+---
+
+### sub_power_enter_deep_sleep_mode
+
+```cpp
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
+```
+
+Defined in h1os/sub_power.h:75
+
+Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
+
+Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
+
+#### Returns
+Does not return on success (enters deep sleep).
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sleep_seconds` | `uint32_t` | Timer duration in seconds (0 = timer disabled). |
+| `ext1_pins_mask` | `uint64_t` | Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5). |
+| `mode` | [`sub_power_sleep_mode_t`](#sub_power_sleep_mode_t) | Full cycle or Flow A burst mode. |
+
+---
 
 ### sub_power_enter_deep_sleep
 
@@ -4426,9 +4287,9 @@ ESP_OK on success.
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in h1os/sub_power.h:59
+Defined in h1os/sub_power.h:85
 
-Configure EXT1 wake sources and enter deep sleep.
+Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).
 
 Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
 
@@ -4444,15 +4305,13 @@ Does not return on success (enters deep sleep).
 
 ---
 
-{#sub_power_cut_power_latch}
-
 ### sub_power_cut_power_latch
 
 ```cpp
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in h1os/sub_power.h:65
+Defined in h1os/sub_power.h:91
 
 Power off system completely by releasing battery power latch (GPIO 17).
 
@@ -4460,15 +4319,13 @@ Used for critical low-battery shutdown or explicit user power-off.
 
 ---
 
-{#sub_power_connected_usb}
-
 ### sub_power_connected_usb
 
 ```cpp
 bool sub_power_connected_usb(void)
 ```
 
-Defined in h1os/sub_power.h:73
+Defined in h1os/sub_power.h:99
 
 Check to see if USB is connected.
 
@@ -4478,8 +4335,6 @@ Used for charger detection.
 true if usb is connected, or false if disconnected.
 
 ---
-
-{#h1os_time_set_timezone-1}
 
 ### h1os_time_set_timezone
 
@@ -4493,8 +4348,6 @@ Configure POSIX timezone string.
 
 ---
 
-{#h1os_time_register_sync_cb-1}
-
 ### h1os_time_register_sync_cb
 
 ```cpp
@@ -4506,8 +4359,6 @@ Defined in h1os_time.c:32
 Register external time sync callback.
 
 ---
-
-{#h1os_time_sync_system_to_rtc-1}
 
 ### h1os_time_sync_system_to_rtc
 
@@ -4521,8 +4372,6 @@ Synchronize internal system clock into PCF85063A RTC hardware.
 
 ---
 
-{#h1os_time_sync_rtc_to_system-1}
-
 ### h1os_time_sync_rtc_to_system
 
 ```cpp
@@ -4534,8 +4383,6 @@ Defined in h1os_time.c:57
 Synchronize PCF85063A RTC hardware into internal POSIX system clock.
 
 ---
-
-{#h1os_time_sync_now-1}
 
 ### h1os_time_sync_now
 
@@ -4549,8 +4396,6 @@ Trigger time synchronization using registered callback.
 
 ---
 
-{#h1os_time_get_formatted-1}
-
 ### h1os_time_get_formatted
 
 ```cpp
@@ -4563,8 +4408,6 @@ Format current local time into destination buffer.
 
 ---
 
-{#h1os_time_get_date_formatted-1}
-
 ### h1os_time_get_date_formatted
 
 ```cpp
@@ -4576,8 +4419,6 @@ Defined in h1os_time.c:120
 Format current local date into destination buffer.
 
 ---
-
-{#hal_flash_init-1}
 
 ### hal_flash_init
 
@@ -4593,8 +4434,6 @@ Finds and verifies the dedicated "epd_frame" partition.
 ESP_OK on success, or ESP_ERR_NOT_FOUND if partition is missing.
 
 ---
-
-{#hal_flash_read_frame-1}
 
 ### hal_flash_read_frame
 
@@ -4618,8 +4457,6 @@ ESP_OK on success, or flash read error.
 
 ---
 
-{#hal_flash_write_frame-1}
-
 ### hal_flash_write_frame
 
 ```cpp
@@ -4642,8 +4479,6 @@ ESP_OK on success, or flash write error.
 
 ---
 
-{#orch_flow_determine_wakeup-1}
-
 ### orch_flow_determine_wakeup
 
 ```cpp
@@ -4659,15 +4494,13 @@ Detected flow type.
 
 ---
 
-{#orch_flow_execute_sensor_sample-1}
-
 ### orch_flow_execute_sensor_sample
 
 ```cpp
 void orch_flow_execute_sensor_sample(void)
 ```
 
-Defined in orch_flow.c:89
+Defined in orch_flow.c:94
 
 Execute Flow A Headless Sensor Sample Burst.
 
@@ -4675,15 +4508,13 @@ Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms, commits samp
 
 ---
 
-{#orch_flow_is_thermal_lockout-1}
-
 ### orch_flow_is_thermal_lockout
 
 ```cpp
 bool orch_flow_is_thermal_lockout(void)
 ```
 
-Defined in orch_flow.c:96
+Defined in orch_flow.c:154
 
 Check whether system is in Thermal Lockout state.
 
@@ -4694,15 +4525,13 @@ True if in lockout, False if in thermal equilibrium.
 
 ---
 
-{#orch_flow_set_thermal_lockout-1}
-
 ### orch_flow_set_thermal_lockout
 
 ```cpp
 void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec)
 ```
 
-Defined in orch_flow.c:102
+Defined in orch_flow.c:160
 
 Arm or disarm thermal lockout gatekeeper.
 
@@ -4715,7 +4544,17 @@ Arm or disarm thermal lockout gatekeeper.
 
 ---
 
-{#orch_flow_query_telemetry-1}
+### orch_flow_dump_ring_debug
+
+`static`
+
+```cpp
+static void orch_flow_dump_ring_debug(const orch_persisted_state_t * st)
+```
+
+Defined in orch_flow.c:171
+
+---
 
 ### orch_flow_query_telemetry
 
@@ -4723,7 +4562,7 @@ Arm or disarm thermal lockout gatekeeper.
 esp_err_t orch_flow_query_telemetry(float * out_temp_c, float * out_rh_pct, float * out_dew_c)
 ```
 
-Defined in orch_flow.c:113
+Defined in orch_flow.c:201
 
 Query current environmental telemetry through the Thermal Lockout MUX.
 
@@ -4742,15 +4581,13 @@ ESP_OK on success.
 
 ---
 
-{#orch_flow_transition_to_sleep-1}
-
 ### orch_flow_transition_to_sleep
 
 ```cpp
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 ```
 
-Defined in orch_flow.c:279
+Defined in orch_flow.c:339
 
 Execute coordinated 8-step sleep transition sequence to deep sleep.
 
@@ -4764,8 +4601,6 @@ ESP_OK on success.
 | `sleep_sec` | `uint32_t` | Sleep duration in seconds. |
 
 ---
-
-{#orch_math_calc_sat_vapor_pressure-1}
 
 ### orch_math_calc_sat_vapor_pressure
 
@@ -4789,8 +4624,6 @@ Saturation vapor pressure in hPa.
 | `temp_c` | `float` | Temperature in Celsius. |
 
 ---
-
-{#orch_math_calc_vapor_pressure-1}
 
 ### orch_math_calc_vapor_pressure
 
@@ -4816,8 +4649,6 @@ Actual water vapor pressure in hPa.
 
 ---
 
-{#orch_math_calc_dew_point-1}
-
 ### orch_math_calc_dew_point
 
 ```cpp
@@ -4841,8 +4672,6 @@ Dew point in Celsius.
 | `rh_pct` | `float` | Measured package relative humidity in percent. |
 
 ---
-
-{#orch_math_reconstruct_ambient_rh-1}
 
 ### orch_math_reconstruct_ambient_rh
 
@@ -4868,8 +4697,6 @@ Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
 
 ---
 
-{#orch_math_calc_absolute_humidity-1}
-
 ### orch_math_calc_absolute_humidity
 
 ```cpp
@@ -4893,8 +4720,6 @@ Vapor density in g/m³.
 | `amb_temp_c` | `float` | Ambient temperature in Celsius. |
 
 ---
-
-{#orch_math_update_ewma-1}
 
 ### orch_math_update_ewma
 
@@ -4921,8 +4746,6 @@ Filtered result.
 
 ---
 
-{#orch_math_is_plateau_settled-1}
-
 ### orch_math_is_plateau_settled
 
 ```cpp
@@ -4948,8 +4771,6 @@ True if thermally settled.
 
 ---
 
-{#volume_pct_to_es8311_reg}
-
 ### volume_pct_to_es8311_reg
 
 `static` `inline`
@@ -4958,11 +4779,9 @@ True if thermally settled.
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 ```
 
-Defined in sub_audio.c:105
+Defined in sub_audio.c:112
 
 ---
-
-{#audio_worker_task}
 
 ### audio_worker_task
 
@@ -4972,11 +4791,9 @@ Defined in sub_audio.c:105
 static void audio_worker_task(void * pvParameters)
 ```
 
-Defined in sub_audio.c:562
+Defined in sub_audio.c:591
 
 ---
-
-{#sub_audio_park_warm}
 
 ### sub_audio_park_warm
 
@@ -4986,11 +4803,9 @@ Defined in sub_audio.c:562
 static void sub_audio_park_warm(void)
 ```
 
-Defined in sub_audio.c:340
+Defined in sub_audio.c:373
 
 ---
-
-{#es8311_write_reg}
 
 ### es8311_write_reg
 
@@ -5000,11 +4815,9 @@ Defined in sub_audio.c:340
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_audio.c:115
+Defined in sub_audio.c:122
 
 ---
-
-{#es8311_read_reg}
 
 ### es8311_read_reg
 
@@ -5014,11 +4827,9 @@ Defined in sub_audio.c:115
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t * val)
 ```
 
-Defined in sub_audio.c:121
+Defined in sub_audio.c:128
 
 ---
-
-{#sub_audio_read_chip_id}
 
 ### sub_audio_read_chip_id
 
@@ -5028,11 +4839,21 @@ Defined in sub_audio.c:121
 static esp_err_t sub_audio_read_chip_id(uint16_t * chip_id)
 ```
 
-Defined in sub_audio.c:126
+Defined in sub_audio.c:133
 
 ---
 
-{#sub_audio_wait_until_ready-1}
+### sub_audio_flush_frame
+
+`static`
+
+```cpp
+static esp_err_t sub_audio_flush_frame(void)
+```
+
+Defined in sub_audio.c:153
+
+---
 
 ### sub_audio_wait_until_ready
 
@@ -5040,7 +4861,7 @@ Defined in sub_audio.c:126
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:146
+Defined in sub_audio.c:167
 
 Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
 
@@ -5055,15 +4876,13 @@ ESP_OK if codec is verified and in active CSM state, or error.
 
 ---
 
-{#sub_audio_is_ready-1}
-
 ### sub_audio_is_ready
 
 ```cpp
 bool sub_audio_is_ready(void)
 ```
 
-Defined in sub_audio.c:172
+Defined in sub_audio.c:193
 
 Quick status check of whether ES8311 codec is ready.
 
@@ -5071,8 +4890,6 @@ Quick status check of whether ES8311 codec is ready.
 true if communication and active CSM state verified.
 
 ---
-
-{#es8311_init_dac_registers}
 
 ### es8311_init_dac_registers
 
@@ -5082,11 +4899,9 @@ true if communication and active CSM state verified.
 static esp_err_t es8311_init_dac_registers(void)
 ```
 
-Defined in sub_audio.c:177
+Defined in sub_audio.c:198
 
 ---
-
-{#sub_audio_init-1}
 
 ### sub_audio_init
 
@@ -5094,7 +4909,7 @@ Defined in sub_audio.c:177
 esp_err_t sub_audio_init(void)
 ```
 
-Defined in sub_audio.c:238
+Defined in sub_audio.c:269
 
 Initialize ES8311 codec and NS4168 amplifier.
 
@@ -5105,15 +4920,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_audio_standby-1}
-
 ### sub_audio_standby
 
 ```cpp
 esp_err_t sub_audio_standby(void)
 ```
 
-Defined in sub_audio.c:349
+Defined in sub_audio.c:382
 
 Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0x00 @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
 
@@ -5124,8 +4937,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_render_tone_samples}
-
 ### sub_audio_render_tone_samples
 
 `static`
@@ -5134,11 +4945,9 @@ ESP_OK on success.
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:388
+Defined in sub_audio.c:421
 
 ---
-
-{#sub_audio_render_pcm_samples}
 
 ### sub_audio_render_pcm_samples
 
@@ -5148,11 +4957,9 @@ Defined in sub_audio.c:388
 static void sub_audio_render_pcm_samples(const int16_t * samples, size_t sample_count)
 ```
 
-Defined in sub_audio.c:431
+Defined in sub_audio.c:464
 
 ---
-
-{#sub_audio_prepare_and_unmute}
 
 ### sub_audio_prepare_and_unmute
 
@@ -5162,11 +4969,9 @@ Defined in sub_audio.c:431
 static esp_err_t sub_audio_prepare_and_unmute(void)
 ```
 
-Defined in sub_audio.c:453
+Defined in sub_audio.c:486
 
 ---
-
-{#sub_audio_exec_tone}
 
 ### sub_audio_exec_tone
 
@@ -5176,11 +4981,9 @@ Defined in sub_audio.c:453
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:480
+Defined in sub_audio.c:515
 
 ---
-
-{#sub_audio_exec_pcm}
 
 ### sub_audio_exec_pcm
 
@@ -5190,11 +4993,9 @@ Defined in sub_audio.c:480
 static esp_err_t sub_audio_exec_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:492
+Defined in sub_audio.c:527
 
 ---
-
-{#sub_audio_exec_chime}
 
 ### sub_audio_exec_chime
 
@@ -5204,11 +5005,9 @@ Defined in sub_audio.c:492
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:503
+Defined in sub_audio.c:538
 
 ---
-
-{#sub_audio_send_command}
 
 ### sub_audio_send_command
 
@@ -5218,11 +5017,9 @@ Defined in sub_audio.c:503
 static esp_err_t sub_audio_send_command(const audio_cmd_t * cmd, bool is_sync, uint32_t wait_ms)
 ```
 
-Defined in sub_audio.c:597
+Defined in sub_audio.c:626
 
 ---
-
-{#sub_audio_play_tone-1}
 
 ### sub_audio_play_tone
 
@@ -5230,7 +5027,7 @@ Defined in sub_audio.c:597
 esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:632
+Defined in sub_audio.c:661
 
 Play synthesized audio chime/tone synchronously.
 
@@ -5246,15 +5043,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_tone_async-1}
-
 ### sub_audio_play_tone_async
 
 ```cpp
 esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:641
+Defined in sub_audio.c:670
 
 Play synthesized audio chime/tone asynchronously via worker task.
 
@@ -5270,15 +5065,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_chime-1}
-
 ### sub_audio_play_chime
 
 ```cpp
 esp_err_t sub_audio_play_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:650
+Defined in sub_audio.c:679
 
 Play standard H1OS acoustic presentation chime synchronously.
 
@@ -5293,15 +5086,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_chime_async-1}
-
 ### sub_audio_play_chime_async
 
 ```cpp
 esp_err_t sub_audio_play_chime_async(uint8_t type)
 ```
 
-Defined in sub_audio.c:659
+Defined in sub_audio.c:688
 
 Play standard H1OS acoustic presentation chime asynchronously.
 
@@ -5316,15 +5107,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_pcm-1}
-
 ### sub_audio_play_pcm
 
 ```cpp
 esp_err_t sub_audio_play_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:668
+Defined in sub_audio.c:697
 
 Play raw 16-bit signed PCM audio samples synchronously.
 
@@ -5341,15 +5130,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_play_pcm_async-1}
-
 ### sub_audio_play_pcm_async
 
 ```cpp
 esp_err_t sub_audio_play_pcm_async(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:677
+Defined in sub_audio.c:706
 
 Play raw 16-bit signed PCM audio samples asynchronously in background worker task.
 
@@ -5368,15 +5155,13 @@ ESP_OK on success, ESP_ERR_NO_MEM / ESP_ERR_TIMEOUT if queue full.
 
 ---
 
-{#sub_audio_is_busy-1}
-
 ### sub_audio_is_busy
 
 ```cpp
 bool sub_audio_is_busy(void)
 ```
 
-Defined in sub_audio.c:686
+Defined in sub_audio.c:715
 
 Check if audio playback is currently active or queue has pending items.
 
@@ -5385,15 +5170,13 @@ true if playing or queued, false if idle in standby.
 
 ---
 
-{#sub_audio_wait_idle-1}
-
 ### sub_audio_wait_idle
 
 ```cpp
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:693
+Defined in sub_audio.c:722
 
 Wait until background audio worker completes all playback and enters standby.
 
@@ -5408,15 +5191,13 @@ ESP_OK if idle, ESP_ERR_TIMEOUT if still active.
 
 ---
 
-{#sub_audio_deinit-1}
-
 ### sub_audio_deinit
 
 ```cpp
 esp_err_t sub_audio_deinit(void)
 ```
 
-Defined in sub_audio.c:703
+Defined in sub_audio.c:732
 
 Teardown audio subsystem, stop background worker task, and delete I2S channel.
 
@@ -5425,15 +5206,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_set_volume-1}
-
 ### sub_audio_set_volume
 
 ```cpp
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:730
+Defined in sub_audio.c:759
 
 Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
 
@@ -5450,15 +5229,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_get_volume-1}
-
 ### sub_audio_get_volume
 
 ```cpp
 uint8_t sub_audio_get_volume(void)
 ```
 
-Defined in sub_audio.c:743
+Defined in sub_audio.c:772
 
 Get currently configured output volume percentage (0 - 100).
 
@@ -5467,15 +5244,13 @@ Current volume percentage.
 
 ---
 
-{#sub_audio_set_low_power_mode-1}
-
 ### sub_audio_set_low_power_mode
 
 ```cpp
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 ```
 
-Defined in sub_audio.c:749
+Defined in sub_audio.c:778
 
 Configure ES8311 DAC power mode (Low-Power vs Normal).
 
@@ -5492,15 +5267,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_audio_get_low_power_mode-1}
-
 ### sub_audio_get_low_power_mode
 
 ```cpp
 bool sub_audio_get_low_power_mode(void)
 ```
 
-Defined in sub_audio.c:758
+Defined in sub_audio.c:787
 
 Query whether audio subsystem is in Low-Power Mode.
 
@@ -5509,7 +5282,37 @@ true if Low-Power Mode is active, false if Normal Power Mode.
 
 ---
 
-{#mv_to_percent}
+### asm
+
+```cpp
+const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start")
+```
+
+Defined in sub_power.c:32
+
+---
+
+### asm
+
+```cpp
+const uint8_t ulp_h1os_bin_end[] asm("_binary_ulp_h1os_bin_end")
+```
+
+Defined in sub_power.c:33
+
+---
+
+### generate_vbat_lut
+
+`static`
+
+```cpp
+static void generate_vbat_lut(void)
+```
+
+Defined in sub_power.c:41
+
+---
 
 ### mv_to_percent
 
@@ -5519,11 +5322,9 @@ true if Low-Power Mode is active, false if Normal Power Mode.
 static uint8_t mv_to_percent(uint16_t mv)
 ```
 
-Defined in sub_power.c:49
+Defined in sub_power.c:80
 
 ---
-
-{#sub_power_init-1}
 
 ### sub_power_init
 
@@ -5531,7 +5332,7 @@ Defined in sub_power.c:49
 esp_err_t sub_power_init(void)
 ```
 
-Defined in sub_power.c:65
+Defined in sub_power.c:96
 
 Initialize Battery ADC subsystem (ADC1 Channel 3 on GPIO 4 with 12 dB atten and eFuse cal).
 
@@ -5540,15 +5341,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_power_deinit-1}
-
 ### sub_power_deinit
 
 ```cpp
 esp_err_t sub_power_deinit(void)
 ```
 
-Defined in sub_power.c:110
+Defined in sub_power.c:141
 
 Deinitialize ADC handles.
 
@@ -5556,8 +5355,6 @@ Deinitialize ADC handles.
 ESP_OK on success.
 
 ---
-
-{#compare_int}
 
 ### compare_int
 
@@ -5567,11 +5364,9 @@ ESP_OK on success.
 static int compare_int(const void * a, const void * b)
 ```
 
-Defined in sub_power.c:127
+Defined in sub_power.c:158
 
 ---
-
-{#sub_power_read_battery-1}
 
 ### sub_power_read_battery
 
@@ -5579,7 +5374,7 @@ Defined in sub_power.c:127
 esp_err_t sub_power_read_battery(uint16_t * out_mv, uint8_t * out_pct)
 ```
 
-Defined in sub_power.c:131
+Defined in sub_power.c:162
 
 Sample calibrated battery voltage with 16-sample trimmed outlier filtering.
 
@@ -5595,15 +5390,13 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_power_get_ulp_cal_params-1}
-
 ### sub_power_get_ulp_cal_params
 
 ```cpp
 esp_err_t sub_power_get_ulp_cal_params(uint32_t * out_scale, int32_t * out_offset_mv)
 ```
 
-Defined in sub_power.c:174
+Defined in sub_power.c:215
 
 Extract linear calibration coefficients (scale and offset) for ULP coprocessor hand-off.
 
@@ -5619,7 +5412,53 @@ ESP_OK on success.
 
 ---
 
-{#sub_power_enter_deep_sleep-1}
+### sub_power_init_ulp
+
+```cpp
+esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
+```
+
+Defined in sub_power.c:239
+
+Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
+
+Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration, configures the periodic wake timer (Flow A period), and arms the coprocessor.
+
+#### Returns
+ESP_OK on success, or an error code.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `flow_a_period_sec` | `uint32_t` | Periodic wake interval for Flow A telemetry in seconds. |
+
+---
+
+### sub_power_enter_deep_sleep_mode
+
+```cpp
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
+```
+
+Defined in sub_power.c:288
+
+Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
+
+Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
+
+#### Returns
+Does not return on success (enters deep sleep).
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sleep_seconds` | `uint32_t` | Timer duration in seconds (0 = timer disabled). |
+| `ext1_pins_mask` | `uint64_t` | Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5). |
+| `mode` | [`sub_power_sleep_mode_t`](#sub_power_sleep_mode_t) | Full cycle or Flow A burst mode. |
+
+---
 
 ### sub_power_enter_deep_sleep
 
@@ -5627,9 +5466,9 @@ ESP_OK on success.
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in sub_power.c:198
+Defined in sub_power.c:393
 
-Configure EXT1 wake sources and enter deep sleep.
+Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).
 
 Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
 
@@ -5645,15 +5484,13 @@ Does not return on success (enters deep sleep).
 
 ---
 
-{#sub_power_cut_power_latch-1}
-
 ### sub_power_cut_power_latch
 
 ```cpp
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in sub_power.c:222
+Defined in sub_power.c:400
 
 Power off system completely by releasing battery power latch (GPIO 17).
 
@@ -5661,15 +5498,13 @@ Used for critical low-battery shutdown or explicit user power-off.
 
 ---
 
-{#sub_power_connected_usb-1}
-
 ### sub_power_connected_usb
 
 ```cpp
 bool sub_power_connected_usb(void)
 ```
 
-Defined in sub_power.c:228
+Defined in sub_power.c:406
 
 Check to see if USB is connected.
 
@@ -5680,15 +5515,13 @@ true if usb is connected, or false if disconnected.
 
 ---
 
-{#orch_state_get}
-
 ### orch_state_get
 
 ```cpp
 orch_persisted_state_t * orch_state_get(void)
 ```
 
-Defined in h1os/orch_state.h:114
+Defined in h1os/orch_state.h:115
 
 Retrieve pointer to the persistent state in RTC Slow Memory.
 
@@ -5696,21 +5529,17 @@ Initializes default structure on boot magic mismatch.
 
 ---
 
-{#orch_state_reset}
-
 ### orch_state_reset
 
 ```cpp
 void orch_state_reset(void)
 ```
 
-Defined in h1os/orch_state.h:119
+Defined in h1os/orch_state.h:120
 
 Reset persisted RTC state to default values.
 
 ---
-
-{#orch_state_push_sample}
 
 ### orch_state_push_sample
 
@@ -5718,7 +5547,7 @@ Reset persisted RTC state to default values.
 void orch_state_push_sample(const orch_tri_node_sample_t * sample)
 ```
 
-Defined in h1os/orch_state.h:126
+Defined in h1os/orch_state.h:127
 
 Push a new Tri-Node telemetry sample into the RTC ring buffer.
 
@@ -5730,15 +5559,13 @@ Push a new Tri-Node telemetry sample into the RTC ring buffer.
 
 ---
 
-{#orch_state_get_latest_sample}
-
 ### orch_state_get_latest_sample
 
 ```cpp
 bool orch_state_get_latest_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:134
+Defined in h1os/orch_state.h:135
 
 Get the latest committed sample from the ring buffer.
 
@@ -5753,15 +5580,13 @@ true if reading present, false if buffer empty.
 
 ---
 
-{#orch_state_get_latest_valid_sample}
-
 ### orch_state_get_latest_valid_sample
 
 ```cpp
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:143
+Defined in h1os/orch_state.h:144
 
 Get the newest sample in the ring buffer marked SAMPLE_FLAG_VALID_COLD.
 
@@ -5778,8 +5603,6 @@ true if a sample is returned, false if buffer empty.
 
 ---
 
-{#sub_sdcard_mount}
-
 ### sub_sdcard_mount
 
 ```cpp
@@ -5788,11 +5611,23 @@ esp_err_t sub_sdcard_mount(void)
 
 Defined in h1os/sub_sdcard.h:31
 
-Mount MicroSD card using 1-bit SDMMC driver.
+Mount MicroSD card using 1-bit SDMMC driver (synchronous).
 
 ---
 
-{#sub_sdcard_unmount}
+### sub_sdcard_mount_async
+
+```cpp
+esp_err_t sub_sdcard_mount_async(void)
+```
+
+Defined in h1os/sub_sdcard.h:37
+
+Asynchronously mount MicroSD card in a background FreeRTOS task.
+
+Does not block caller or freeze UI refresh if card is missing.
+
+---
 
 ### sub_sdcard_unmount
 
@@ -5800,13 +5635,28 @@ Mount MicroSD card using 1-bit SDMMC driver.
 esp_err_t sub_sdcard_unmount(void)
 ```
 
-Defined in h1os/sub_sdcard.h:36
+Defined in h1os/sub_sdcard.h:42
 
 Unmount MicroSD card and release hardware bus resources.
 
 ---
 
-{#sub_sdcard_is_mounted}
+### sub_sdcard_probe
+
+```cpp
+bool sub_sdcard_probe(void)
+```
+
+Defined in h1os/sub_sdcard.h:50
+
+Fast pre-flight probe to detect if MicroSD card is physically present in the slot.
+
+Returns in < 5ms without running full 1-second SDMMC retry timeout loops.
+
+#### Returns
+true if card appears present, false otherwise.
+
+---
 
 ### sub_sdcard_is_mounted
 
@@ -5814,13 +5664,11 @@ Unmount MicroSD card and release hardware bus resources.
 bool sub_sdcard_is_mounted(void)
 ```
 
-Defined in h1os/sub_sdcard.h:41
+Defined in h1os/sub_sdcard.h:55
 
 Check if MicroSD card is mounted and ready for I/O.
 
 ---
-
-{#sub_sdcard_get_capacity_mb}
 
 ### sub_sdcard_get_capacity_mb
 
@@ -5828,13 +5676,11 @@ Check if MicroSD card is mounted and ready for I/O.
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t * out_capacity_mb)
 ```
 
-Defined in h1os/sub_sdcard.h:46
+Defined in h1os/sub_sdcard.h:60
 
 Get total capacity of mounted card in megabytes.
 
 ---
-
-{#sub_sdcard_format}
 
 ### sub_sdcard_format
 
@@ -5842,13 +5688,11 @@ Get total capacity of mounted card in megabytes.
 esp_err_t sub_sdcard_format(void)
 ```
 
-Defined in h1os/sub_sdcard.h:51
+Defined in h1os/sub_sdcard.h:65
 
 Format mounted card as FAT32 filesystem.
 
 ---
-
-{#sub_sensor_init}
 
 ### sub_sensor_init
 
@@ -5865,8 +5709,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_sensor_deinit}
-
 ### sub_sensor_deinit
 
 ```cpp
@@ -5881,8 +5723,6 @@ Deinitialize internal sensor drivers to free resources.
 ESP_OK on success.
 
 ---
-
-{#sub_sensor_read_shtc3_raw}
 
 ### sub_sensor_read_shtc3_raw
 
@@ -5907,8 +5747,6 @@ ESP_OK on success, ESP_ERR_INVALID_CRC on CRC mismatch, or I2C bus error.
 
 ---
 
-{#sub_sensor_convert_shtc3_units}
-
 ### sub_sensor_convert_shtc3_units
 
 ```cpp
@@ -5929,8 +5767,6 @@ Convert raw SHTC3 16-bit words into standard SI units.
 | `out_rh_pct` | `float *` | Relative humidity in percent (0.0 to 100.0). |
 
 ---
-
-{#sub_sensor_read_mcu_die_temp}
 
 ### sub_sensor_read_mcu_die_temp
 
@@ -5953,15 +5789,13 @@ ESP_OK on success, or driver error.
 
 ---
 
-{#orch_state_get-1}
-
 ### orch_state_get
 
 ```cpp
 orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
 ```
 
-Defined in orch_state.c:14
+Defined in orch_state.c:16
 
 Retrieve pointer to the persistent state in RTC Slow Memory.
 
@@ -5969,21 +5803,17 @@ Initializes default structure on boot magic mismatch.
 
 ---
 
-{#orch_state_reset-1}
-
 ### orch_state_reset
 
 ```cpp
 void RTC_IRAM_ATTR orch_state_reset(void)
 ```
 
-Defined in orch_state.c:22
+Defined in orch_state.c:29
 
 Reset persisted RTC state to default values.
 
 ---
-
-{#orch_state_push_sample-1}
 
 ### orch_state_push_sample
 
@@ -5991,7 +5821,7 @@ Reset persisted RTC state to default values.
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t * sample)
 ```
 
-Defined in orch_state.c:38
+Defined in orch_state.c:45
 
 Push a new Tri-Node telemetry sample into the RTC ring buffer.
 
@@ -6003,15 +5833,13 @@ Push a new Tri-Node telemetry sample into the RTC ring buffer.
 
 ---
 
-{#orch_state_get_latest_sample-1}
-
 ### orch_state_get_latest_sample
 
 ```cpp
 bool orch_state_get_latest_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in orch_state.c:48
+Defined in orch_state.c:55
 
 Get the latest committed sample from the ring buffer.
 
@@ -6026,15 +5854,13 @@ true if reading present, false if buffer empty.
 
 ---
 
-{#orch_state_get_latest_valid_sample-1}
-
 ### orch_state_get_latest_valid_sample
 
 ```cpp
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in orch_state.c:60
+Defined in orch_state.c:67
 
 Get the newest sample in the ring buffer marked SAMPLE_FLAG_VALID_COLD.
 
@@ -6051,7 +5877,48 @@ true if a sample is returned, false if buffer empty.
 
 ---
 
-{#sub_sdcard_mount-1}
+### sdcard_mount_worker_task
+
+`static`
+
+```cpp
+static void sdcard_mount_worker_task(void * pvParameters)
+```
+
+Defined in sub_sdcard.c:26
+
+---
+
+### sub_sdcard_probe
+
+```cpp
+bool sub_sdcard_probe(void)
+```
+
+Defined in sub_sdcard.c:46
+
+Fast pre-flight probe to detect if MicroSD card is physically present in the slot.
+
+Returns in < 5ms without running full 1-second SDMMC retry timeout loops.
+
+#### Returns
+true if card appears present, false otherwise.
+
+---
+
+### sub_sdcard_mount_async
+
+```cpp
+esp_err_t sub_sdcard_mount_async(void)
+```
+
+Defined in sub_sdcard.c:82
+
+Asynchronously mount MicroSD card in a background FreeRTOS task.
+
+Does not block caller or freeze UI refresh if card is missing.
+
+---
 
 ### sub_sdcard_mount
 
@@ -6059,13 +5926,11 @@ true if a sample is returned, false if buffer empty.
 esp_err_t sub_sdcard_mount(void)
 ```
 
-Defined in sub_sdcard.c:21
+Defined in sub_sdcard.c:99
 
-Mount MicroSD card using 1-bit SDMMC driver.
+Mount MicroSD card using 1-bit SDMMC driver (synchronous).
 
 ---
-
-{#sub_sdcard_unmount-1}
 
 ### sub_sdcard_unmount
 
@@ -6073,13 +5938,11 @@ Mount MicroSD card using 1-bit SDMMC driver.
 esp_err_t sub_sdcard_unmount(void)
 ```
 
-Defined in sub_sdcard.c:65
+Defined in sub_sdcard.c:171
 
 Unmount MicroSD card and release hardware bus resources.
 
 ---
-
-{#sub_sdcard_is_mounted-1}
 
 ### sub_sdcard_is_mounted
 
@@ -6087,13 +5950,11 @@ Unmount MicroSD card and release hardware bus resources.
 bool sub_sdcard_is_mounted(void)
 ```
 
-Defined in sub_sdcard.c:79
+Defined in sub_sdcard.c:188
 
 Check if MicroSD card is mounted and ready for I/O.
 
 ---
-
-{#sub_sdcard_get_capacity_mb-1}
 
 ### sub_sdcard_get_capacity_mb
 
@@ -6101,13 +5962,11 @@ Check if MicroSD card is mounted and ready for I/O.
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t * out_capacity_mb)
 ```
 
-Defined in sub_sdcard.c:84
+Defined in sub_sdcard.c:193
 
 Get total capacity of mounted card in megabytes.
 
 ---
-
-{#sub_sdcard_format-1}
 
 ### sub_sdcard_format
 
@@ -6115,13 +5974,11 @@ Get total capacity of mounted card in megabytes.
 esp_err_t sub_sdcard_format(void)
 ```
 
-Defined in sub_sdcard.c:94
+Defined in sub_sdcard.c:203
 
 Format mounted card as FAT32 filesystem.
 
 ---
-
-{#shtc3_calc_crc}
 
 ### shtc3_calc_crc
 
@@ -6134,8 +5991,6 @@ static uint8_t shtc3_calc_crc(const uint8_t * data, size_t len)
 Defined in sub_sensor.c:32
 
 ---
-
-{#sub_sensor_init-1}
 
 ### sub_sensor_init
 
@@ -6152,8 +6007,6 @@ ESP_OK on success, or an error code.
 
 ---
 
-{#sub_sensor_deinit-1}
-
 ### sub_sensor_deinit
 
 ```cpp
@@ -6168,8 +6021,6 @@ Deinitialize internal sensor drivers to free resources.
 ESP_OK on success.
 
 ---
-
-{#sub_sensor_read_shtc3_raw-1}
 
 ### sub_sensor_read_shtc3_raw
 
@@ -6194,8 +6045,6 @@ ESP_OK on success, ESP_ERR_INVALID_CRC on CRC mismatch, or I2C bus error.
 
 ---
 
-{#sub_sensor_convert_shtc3_units-1}
-
 ### sub_sensor_convert_shtc3_units
 
 ```cpp
@@ -6217,8 +6066,6 @@ Convert raw SHTC3 16-bit words into standard SI units.
 
 ---
 
-{#sub_sensor_read_mcu_die_temp-1}
-
 ### sub_sensor_read_mcu_die_temp
 
 ```cpp
@@ -6239,8 +6086,6 @@ ESP_OK on success, or driver error.
 | `out_die_temp_c` | `float *` | MCU die temperature in Celsius. |
 
 ---
-
-{#sub_display_init}
 
 ### sub_display_init
 
@@ -6265,8 +6110,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_get_framebuffer}
-
 ### sub_display_get_framebuffer
 
 ```cpp
@@ -6280,8 +6123,6 @@ Get pointer to the active working framebuffer (5000 bytes, 1-bit per pixel).
 Bit 1 = White, Bit 0 = Black.
 
 ---
-
-{#sub_display_clear}
 
 ### sub_display_clear
 
@@ -6300,8 +6141,6 @@ Clear active working framebuffer.
 | `color` | `uint8_t` | 0xFF for White, 0x00 for Black. |
 
 ---
-
-{#sub_display_sync_previous_frame}
 
 ### sub_display_sync_previous_frame
 
@@ -6326,8 +6165,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_wait_busy}
-
 ### sub_display_wait_busy
 
 ```cpp
@@ -6351,8 +6188,6 @@ ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
 
 ---
 
-{#sub_display_refresh_full}
-
 ### sub_display_refresh_full
 
 ```cpp
@@ -6369,8 +6204,6 @@ Synchronizes old frame RAM (0x26) with new frame RAM (0x24).
 ESP_OK on success.
 
 ---
-
-{#sub_display_clear_to_white_full}
 
 ### sub_display_clear_to_white_full
 
@@ -6389,8 +6222,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_refresh_partial}
-
 ### sub_display_refresh_partial
 
 ```cpp
@@ -6405,8 +6236,6 @@ Execute fast partial refresh (~300ms) with software LUT.
 ESP_OK on success.
 
 ---
-
-{#sub_display_read_glass_temp}
 
 ### sub_display_read_glass_temp
 
@@ -6429,8 +6258,6 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_enter_deep_sleep}
-
 ### sub_display_enter_deep_sleep
 
 ```cpp
@@ -6448,8 +6275,6 @@ ESP_OK on success.
 
 ---
 
-{#h1os_lvgl_port_task}
-
 ### h1os_lvgl_port_task
 
 `static`
@@ -6458,11 +6283,9 @@ ESP_OK on success.
 static void h1os_lvgl_port_task(void * pvParameters)
 ```
 
-Defined in h1os_lvgl.cpp:263
+Defined in h1os_lvgl.cpp:288
 
 ---
-
-{#h1os_lvgl_lock-1}
 
 ### h1os_lvgl_lock
 
@@ -6476,8 +6299,6 @@ Acquire LVGL reentrant mutex lock.
 
 ---
 
-{#h1os_lvgl_unlock-1}
-
 ### h1os_lvgl_unlock
 
 ```cpp
@@ -6489,8 +6310,6 @@ Defined in h1os_lvgl.cpp:43
 Release LVGL reentrant mutex lock.
 
 ---
-
-{#lvgl_tick_get_cb}
 
 ### lvgl_tick_get_cb
 
@@ -6504,8 +6323,6 @@ Defined in h1os_lvgl.cpp:47
 
 ---
 
-{#lvgl_keypad_read_cb}
-
 ### lvgl_keypad_read_cb
 
 `static`
@@ -6518,8 +6335,6 @@ Defined in h1os_lvgl.cpp:51
 
 ---
 
-{#lvgl_display_flush_cb}
-
 ### lvgl_display_flush_cb
 
 `static`
@@ -6528,11 +6343,9 @@ Defined in h1os_lvgl.cpp:51
 static void lvgl_display_flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * px_map)
 ```
 
-Defined in h1os_lvgl.cpp:68
+Defined in h1os_lvgl.cpp:77
 
 ---
-
-{#h1os_lvgl_init-1}
 
 ### h1os_lvgl_init
 
@@ -6540,7 +6353,7 @@ Defined in h1os_lvgl.cpp:68
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 ```
 
-Defined in h1os_lvgl.cpp:145
+Defined in h1os_lvgl.cpp:154
 
 Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
 
@@ -6552,15 +6365,13 @@ Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input dr
 
 ---
 
-{#h1os_lvgl_set_first_flush_mode-1}
-
 ### h1os_lvgl_set_first_flush_mode
 
 ```cpp
 void h1os_lvgl_set_first_flush_mode(bool full_refresh)
 ```
 
-Defined in h1os_lvgl.cpp:202
+Defined in h1os_lvgl.cpp:219
 
 Explicitly override whether the first flush executes a full or partial refresh.
 
@@ -6572,21 +6383,17 @@ Explicitly override whether the first flush executes a full or partial refresh.
 
 ---
 
-{#h1os_lvgl_start-1}
-
 ### h1os_lvgl_start
 
 ```cpp
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 ```
 
-Defined in h1os_lvgl.cpp:207
+Defined in h1os_lvgl.cpp:224
 
 Start the LVGL background FreeRTOS task.
 
 ---
-
-{#h1os_lvgl_stop-1}
 
 ### h1os_lvgl_stop
 
@@ -6594,13 +6401,11 @@ Start the LVGL background FreeRTOS task.
 esp_err_t h1os_lvgl_stop(void)
 ```
 
-Defined in h1os_lvgl.cpp:231
+Defined in h1os_lvgl.cpp:256
 
 Stop the LVGL background task.
 
 ---
-
-{#h1os_lvgl_has_pending_tasks-1}
 
 ### h1os_lvgl_has_pending_tasks
 
@@ -6608,13 +6413,11 @@ Stop the LVGL background task.
 bool h1os_lvgl_has_pending_tasks(void)
 ```
 
-Defined in h1os_lvgl.cpp:244
+Defined in h1os_lvgl.cpp:269
 
 Check if the LVGL display pipeline has pending render/flush tasks.
 
 ---
-
-{#h1os_lvgl_get_indev-1}
 
 ### h1os_lvgl_get_indev
 
@@ -6622,27 +6425,11 @@ Check if the LVGL display pipeline has pending render/flush tasks.
 lv_indev_t * h1os_lvgl_get_indev(void)
 ```
 
-Defined in h1os_lvgl.cpp:258
+Defined in h1os_lvgl.cpp:283
 
 Retrieve the LVGL keypad input device handle.
 
 ---
-
-{#epd_busy_isr_handler}
-
-### epd_busy_isr_handler
-
-`static`
-
-```cpp
-static void IRAM_ATTR epd_busy_isr_handler(void * arg)
-```
-
-Defined in sub_display.cpp:54
-
----
-
-{#epd_reset_pulse}
 
 ### epd_reset_pulse
 
@@ -6652,11 +6439,9 @@ Defined in sub_display.cpp:54
 static void epd_reset_pulse(void)
 ```
 
-Defined in sub_display.cpp:63
+Defined in sub_display.cpp:53
 
 ---
-
-{#sub_display_wait_busy-1}
 
 ### sub_display_wait_busy
 
@@ -6664,7 +6449,7 @@ Defined in sub_display.cpp:63
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 ```
 
-Defined in sub_display.cpp:71
+Defined in sub_display.cpp:61
 
 Synchronously wait for EPD panel to finish driving electrophoretic particles.
 
@@ -6681,8 +6466,6 @@ ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
 
 ---
 
-{#epd_configure_base_registers}
-
 ### epd_configure_base_registers
 
 `static`
@@ -6691,11 +6474,9 @@ ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
 static void epd_configure_base_registers(void)
 ```
 
-Defined in sub_display.cpp:101
+Defined in sub_display.cpp:79
 
 ---
-
-{#sub_display_init-1}
 
 ### sub_display_init
 
@@ -6703,7 +6484,7 @@ Defined in sub_display.cpp:101
 esp_err_t sub_display_init(bool is_wake_cycle)
 ```
 
-Defined in sub_display.cpp:129
+Defined in sub_display.cpp:107
 
 Initialize SSD1681 display controller.
 
@@ -6720,15 +6501,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_get_framebuffer-1}
-
 ### sub_display_get_framebuffer
 
 ```cpp
 uint8_t * sub_display_get_framebuffer(void)
 ```
 
-Defined in sub_display.cpp:184
+Defined in sub_display.cpp:180
 
 Get pointer to the active working framebuffer (5000 bytes, 1-bit per pixel).
 
@@ -6736,15 +6515,13 @@ Bit 1 = White, Bit 0 = Black.
 
 ---
 
-{#sub_display_clear-1}
-
 ### sub_display_clear
 
 ```cpp
 void sub_display_clear(uint8_t color)
 ```
 
-Defined in sub_display.cpp:189
+Defined in sub_display.cpp:185
 
 Clear active working framebuffer.
 
@@ -6756,8 +6533,6 @@ Clear active working framebuffer.
 
 ---
 
-{#set_ram_counters}
-
 ### set_ram_counters
 
 `static`
@@ -6766,11 +6541,9 @@ Clear active working framebuffer.
 static void set_ram_counters(void)
 ```
 
-Defined in sub_display.cpp:194
+Defined in sub_display.cpp:190
 
 ---
-
-{#sub_display_sync_previous_frame-1}
 
 ### sub_display_sync_previous_frame
 
@@ -6778,7 +6551,7 @@ Defined in sub_display.cpp:194
 esp_err_t sub_display_sync_previous_frame(const uint8_t * prev_frame)
 ```
 
-Defined in sub_display.cpp:204
+Defined in sub_display.cpp:200
 
 Synchronize previous frame into shadow buffer and hardware RAM 0x26.
 
@@ -6795,15 +6568,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_refresh_full-1}
-
 ### sub_display_refresh_full
 
 ```cpp
 esp_err_t sub_display_refresh_full(void)
 ```
 
-Defined in sub_display.cpp:219
+Defined in sub_display.cpp:215
 
 Execute full display refresh (OTP factory waveform LUT).
 
@@ -6814,15 +6585,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_clear_to_white_full-1}
-
 ### sub_display_clear_to_white_full
 
 ```cpp
 esp_err_t sub_display_clear_to_white_full(void)
 ```
 
-Defined in sub_display.cpp:259
+Defined in sub_display.cpp:255
 
 Clear display to pure white and trigger full OTP refresh.
 
@@ -6833,8 +6602,6 @@ ESP_OK on success.
 
 ---
 
-{#epd_load_custom_lut}
-
 ### epd_load_custom_lut
 
 `static`
@@ -6843,11 +6610,9 @@ ESP_OK on success.
 static void epd_load_custom_lut(const uint8_t * lut_buffer)
 ```
 
-Defined in sub_display.cpp:267
+Defined in sub_display.cpp:263
 
 ---
-
-{#sub_display_refresh_partial-1}
 
 ### sub_display_refresh_partial
 
@@ -6855,7 +6620,7 @@ Defined in sub_display.cpp:267
 esp_err_t sub_display_refresh_partial(void)
 ```
 
-Defined in sub_display.cpp:292
+Defined in sub_display.cpp:288
 
 Execute fast partial refresh (~300ms) with software LUT.
 
@@ -6864,15 +6629,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_read_glass_temp-1}
-
 ### sub_display_read_glass_temp
 
 ```cpp
 esp_err_t sub_display_read_glass_temp(float * out_temp_c)
 ```
 
-Defined in sub_display.cpp:331
+Defined in sub_display.cpp:327
 
 Read SSD1681 on-glass integrated temperature sensor (SPI Cmd 0x1B).
 
@@ -6887,15 +6650,13 @@ ESP_OK on success.
 
 ---
 
-{#sub_display_enter_deep_sleep-1}
-
 ### sub_display_enter_deep_sleep
 
 ```cpp
 esp_err_t sub_display_enter_deep_sleep(void)
 ```
 
-Defined in sub_display.cpp:362
+Defined in sub_display.cpp:373
 
 Put SSD1681 into Deep Sleep Mode 1 (Command 0x10, Data 0x01 @ 1.0 µA).
 
@@ -6905,8 +6666,6 @@ Crucially retains RAM contents while the 3.3V rail remains held.
 ESP_OK on success.
 
 ---
-
-{#h1os_reset_session_timer-1}
 
 ### h1os_reset_session_timer
 
@@ -6920,15 +6679,13 @@ Reset the interactive session inactivity timer (extends session by timeout_sec).
 
 ---
 
-{#h1os_is_session_active-1}
-
 ### h1os_is_session_active
 
 ```cpp
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os_lifecycle.c:53
+Defined in h1os_lifecycle.c:56
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -6936,8 +6693,6 @@ Check whether an interactive inactivity countdown session is active.
 true if running in an interactive user session, false during unattended wakes.
 
 ---
-
-{#h1os_trigger_chime}
 
 ### h1os_trigger_chime
 
@@ -6947,11 +6702,9 @@ true if running in an interactive user session, false during unattended wakes.
 static void h1os_trigger_chime(h1os_chime_type_t type)
 ```
 
-Defined in h1os_lifecycle.c:58
+Defined in h1os_lifecycle.c:61
 
 ---
-
-{#h1os_trigger_splash}
 
 ### h1os_trigger_splash
 
@@ -6961,11 +6714,9 @@ Defined in h1os_lifecycle.c:58
 static void h1os_trigger_splash(h1os_splash_type_t type)
 ```
 
-Defined in h1os_lifecycle.c:67
+Defined in h1os_lifecycle.c:70
 
 ---
-
-{#h1os_session_monitor_task}
 
 ### h1os_session_monitor_task
 
@@ -6975,11 +6726,39 @@ Defined in h1os_lifecycle.c:67
 static void h1os_session_monitor_task(void * arg)
 ```
 
-Defined in h1os_lifecycle.c:74
+Defined in h1os_lifecycle.c:77
 
 ---
 
-{#h1os_start-1}
+### debug_dump_ulp_telemetry
+
+`static`
+
+```cpp
+static void debug_dump_ulp_telemetry(void)
+```
+
+Defined in h1os_lifecycle.c:105
+
+Diagnostic dump of ULP wake telemetry and execution performance.
+
+Isolated helper function for development; comment out the call in [h1os_start()](#h1os_start-1) for release builds.
+
+---
+
+### h1os_log_flow_banner
+
+`static`
+
+```cpp
+static void h1os_log_flow_banner(orch_flow_type_t flow)
+```
+
+Defined in h1os_lifecycle.c:140
+
+Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
+
+---
 
 ### h1os_start
 
@@ -6987,13 +6766,11 @@ Defined in h1os_lifecycle.c:74
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os_lifecycle.c:94
+Defined in h1os_lifecycle.c:184
 
 Initialize H1OS and dispatch application lifecycle.
 
 ---
-
-{#h1os_get_telemetry-1}
 
 ### h1os_get_telemetry
 
@@ -7001,13 +6778,11 @@ Initialize H1OS and dispatch application lifecycle.
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os_lifecycle.c:242
+Defined in h1os_lifecycle.c:362
 
 Retrieve current Tri-Node environmental telemetry.
 
 ---
-
-{#h1os_sleep-1}
 
 ### h1os_sleep
 
@@ -7015,13 +6790,11 @@ Retrieve current Tri-Node environmental telemetry.
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:302
+Defined in h1os_lifecycle.c:419
 
 Put the platform into ultra-low-power deep sleep.
 
 ---
-
-{#execute_system_shutdown}
 
 ### execute_system_shutdown
 
@@ -7031,11 +6804,9 @@ Put the platform into ultra-low-power deep sleep.
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:313
+Defined in h1os_lifecycle.c:434
 
 ---
-
-{#h1os_shutdown-1}
 
 ### h1os_shutdown
 
@@ -7043,13 +6814,11 @@ Defined in h1os_lifecycle.c:313
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:365
+Defined in h1os_lifecycle.c:486
 
 Orderly system shutdown and physical battery power cut.
 
 ---
-
-{#h1os_shutdown_for_storage-1}
 
 ### h1os_shutdown_for_storage
 
@@ -7057,7 +6826,7 @@ Orderly system shutdown and physical battery power cut.
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:374
+Defined in h1os_lifecycle.c:495
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -7065,21 +6834,17 @@ Protects e-Paper electrophoretic microcapsules against permanent dye migration a
 
 ---
 
-{#h1os_set_volume-1}
-
 ### h1os_set_volume
 
 ```cpp
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:379
+Defined in h1os_lifecycle.c:500
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
 ---
-
-{#orch_wake_stub_install}
 
 ### orch_wake_stub_install
 
@@ -7095,8 +6860,6 @@ Called before entering deep sleep to arm the ultra-fast wake stub handler.
 
 ---
 
-{#bsp_wake_stub}
-
 ### bsp_wake_stub
 
 ```cpp
@@ -7111,8 +6874,6 @@ Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
 
 ---
 
-{#i2c_delay}
-
 ### i2c_delay
 
 `static` `inline`
@@ -7124,8 +6885,6 @@ static inline void RTC_IRAM_ATTR i2c_delay(void)
 Defined in orch_wake_stub.c:43
 
 ---
-
-{#sda_high}
 
 ### sda_high
 
@@ -7139,8 +6898,6 @@ Defined in orch_wake_stub.c:48
 
 ---
 
-{#sda_low}
-
 ### sda_low
 
 `static` `inline`
@@ -7152,8 +6909,6 @@ static inline void RTC_IRAM_ATTR sda_low(void)
 Defined in orch_wake_stub.c:54
 
 ---
-
-{#scl_high}
 
 ### scl_high
 
@@ -7167,8 +6922,6 @@ Defined in orch_wake_stub.c:61
 
 ---
 
-{#scl_low}
-
 ### scl_low
 
 `static` `inline`
@@ -7180,8 +6933,6 @@ static inline void RTC_IRAM_ATTR scl_low(void)
 Defined in orch_wake_stub.c:67
 
 ---
-
-{#sda_read}
 
 ### sda_read
 
@@ -7195,8 +6946,6 @@ Defined in orch_wake_stub.c:74
 
 ---
 
-{#i2c_start}
-
 ### i2c_start
 
 `static`
@@ -7208,8 +6957,6 @@ static void RTC_IRAM_ATTR i2c_start(void)
 Defined in orch_wake_stub.c:79
 
 ---
-
-{#i2c_stop}
 
 ### i2c_stop
 
@@ -7223,8 +6970,6 @@ Defined in orch_wake_stub.c:90
 
 ---
 
-{#i2c_write_byte}
-
 ### i2c_write_byte
 
 `static`
@@ -7236,8 +6981,6 @@ static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
 Defined in orch_wake_stub.c:100
 
 ---
-
-{#i2c_read_byte}
 
 ### i2c_read_byte
 
@@ -7251,8 +6994,6 @@ Defined in orch_wake_stub.c:126
 
 ---
 
-{#shtc3_crc8}
-
 ### shtc3_crc8
 
 `static`
@@ -7264,8 +7005,6 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t * data, size_t len)
 Defined in orch_wake_stub.c:158
 
 ---
-
-{#wake_stub_read_die_temp_centi_c}
 
 ### wake_stub_read_die_temp_centi_c
 
@@ -7279,8 +7018,6 @@ Defined in orch_wake_stub.c:175
 
 ---
 
-{#shtc3_send_sleep}
-
 ### shtc3_send_sleep
 
 `static`
@@ -7292,8 +7029,6 @@ static void RTC_IRAM_ATTR shtc3_send_sleep(void)
 Defined in orch_wake_stub.c:213
 
 ---
-
-{#bsp_wake_stub-1}
 
 ### bsp_wake_stub
 
@@ -7309,8 +7044,6 @@ Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
 
 ---
 
-{#orch_wake_stub_install-1}
-
 ### orch_wake_stub_install
 
 ```cpp
@@ -7325,8 +7058,6 @@ Called before entering deep sleep to arm the ultra-fast wake stub handler.
 
 ---
 
-{#orch_display_sync_mark_dirty}
-
 ### orch_display_sync_mark_dirty
 
 ```cpp
@@ -7338,8 +7069,6 @@ Defined in h1os/orch_display_sync.h:25
 Mark the current display framebuffer as dirty (needs flash persistence on sleep).
 
 ---
-
-{#orch_display_sync_save_if_dirty}
 
 ### orch_display_sync_save_if_dirty
 
@@ -7356,8 +7085,6 @@ ESP_OK on success or if clean (no write needed).
 
 ---
 
-{#orch_display_sync_restore_to_framebuffer}
-
 ### orch_display_sync_restore_to_framebuffer
 
 ```cpp
@@ -7372,8 +7099,6 @@ Restore framebuffer from "epd_frame" flash partition into display working buffer
 ESP_OK on success, ESP_ERR_NOT_FOUND if partition empty/invalid.
 
 ---
-
-{#orch_display_sync_should_full_refresh}
 
 ### orch_display_sync_should_full_refresh
 
@@ -7392,8 +7117,6 @@ true if full refresh required, false if differential partial refresh is permitte
 
 ---
 
-{#orch_display_sync_record_partial_refresh}
-
 ### orch_display_sync_record_partial_refresh
 
 ```cpp
@@ -7407,8 +7130,6 @@ Record execution of a differential partial refresh.
 Increments the accumulated partial refresh counter in persistent RTC memory.
 
 ---
-
-{#orch_display_sync_record_full_refresh}
 
 ### orch_display_sync_record_full_refresh
 
@@ -7424,8 +7145,6 @@ Resets the accumulated partial refresh counter back to 0.
 
 ---
 
-{#orch_display_sync_get_partial_count}
-
 ### orch_display_sync_get_partial_count
 
 ```cpp
@@ -7438,8 +7157,6 @@ Get the accumulated count of partial refreshes since the last full refresh.
 
 ---
 
-{#orch_display_sync_mark_dirty-1}
-
 ### orch_display_sync_mark_dirty
 
 ```cpp
@@ -7451,8 +7168,6 @@ Defined in orch_display_sync.c:24
 Mark the current display framebuffer as dirty (needs flash persistence on sleep).
 
 ---
-
-{#orch_display_sync_save_if_dirty-1}
 
 ### orch_display_sync_save_if_dirty
 
@@ -7469,8 +7184,6 @@ ESP_OK on success or if clean (no write needed).
 
 ---
 
-{#orch_display_sync_restore_to_framebuffer-1}
-
 ### orch_display_sync_restore_to_framebuffer
 
 ```cpp
@@ -7485,8 +7198,6 @@ Restore framebuffer from "epd_frame" flash partition into display working buffer
 ESP_OK on success, ESP_ERR_NOT_FOUND if partition empty/invalid.
 
 ---
-
-{#orch_display_sync_should_full_refresh-1}
 
 ### orch_display_sync_should_full_refresh
 
@@ -7505,8 +7216,6 @@ true if full refresh required, false if differential partial refresh is permitte
 
 ---
 
-{#orch_display_sync_record_partial_refresh-1}
-
 ### orch_display_sync_record_partial_refresh
 
 ```cpp
@@ -7520,8 +7229,6 @@ Record execution of a differential partial refresh.
 Increments the accumulated partial refresh counter in persistent RTC memory.
 
 ---
-
-{#orch_display_sync_record_full_refresh-1}
 
 ### orch_display_sync_record_full_refresh
 
@@ -7537,8 +7244,6 @@ Resets the accumulated partial refresh counter back to 0.
 
 ---
 
-{#orch_display_sync_get_partial_count-1}
-
 ### orch_display_sync_get_partial_count
 
 ```cpp
@@ -7553,8 +7258,6 @@ Get the accumulated count of partial refreshes since the last full refresh.
 
 ---
 
-{#tag}
-
 ### TAG
 
 `static`
@@ -7563,11 +7266,57 @@ Get the accumulated count of partial refreshes since the last full refresh.
 const char * TAG = "HAL_IO"
 ```
 
-Defined in hal_io.c:16
+Defined in hal_io.c:21
 
 ---
 
-{#tag-1}
+### s_led_pwm_active
+
+`static`
+
+```cpp
+bool s_led_pwm_active = false
+```
+
+Defined in hal_io.c:109
+
+---
+
+### s_breath_task
+
+`static`
+
+```cpp
+TaskHandle_t s_breath_task = NULL
+```
+
+Defined in hal_io.c:181
+
+---
+
+### s_breathing_running
+
+`static`
+
+```cpp
+volatile bool s_breathing_running = false
+```
+
+Defined in hal_io.c:182
+
+---
+
+### s_breath_period_ms
+
+`static`
+
+```cpp
+uint32_t s_breath_period_ms = 2000
+```
+
+Defined in hal_io.c:183
+
+---
 
 ### TAG
 
@@ -7581,8 +7330,6 @@ Defined in hal_i2c.c:12
 
 ---
 
-{#s_bus_handle}
-
 ### s_bus_handle
 
 `static`
@@ -7594,8 +7341,6 @@ i2c_master_bus_handle_t s_bus_handle = NULL
 Defined in hal_i2c.c:14
 
 ---
-
-{#s_i2c_mutex}
 
 ### s_i2c_mutex
 
@@ -7609,8 +7354,6 @@ Defined in hal_i2c.c:15
 
 ---
 
-{#s_is_inited}
-
 ### s_is_inited
 
 `static`
@@ -7622,8 +7365,6 @@ bool s_is_inited = false
 Defined in hal_i2c.c:16
 
 ---
-
-{#tag-2}
 
 ### TAG
 
@@ -7637,8 +7378,6 @@ Defined in hal_spi.c:12
 
 ---
 
-{#s_spi_dev}
-
 ### s_spi_dev
 
 `static`
@@ -7650,8 +7389,6 @@ spi_device_handle_t s_spi_dev = NULL
 Defined in hal_spi.c:14
 
 ---
-
-{#s_spi_read_dev}
 
 ### s_spi_read_dev
 
@@ -7665,8 +7402,6 @@ Defined in hal_spi.c:15
 
 ---
 
-{#s_is_inited-1}
-
 ### s_is_inited
 
 `static`
@@ -7678,8 +7413,6 @@ bool s_is_inited = false
 Defined in hal_spi.c:17
 
 ---
-
-{#tag-3}
 
 ### TAG
 
@@ -7693,8 +7426,6 @@ Defined in sub_nvs.c:15
 
 ---
 
-{#s_nvs_initialized}
-
 ### s_nvs_initialized
 
 `static`
@@ -7706,8 +7437,6 @@ bool s_nvs_initialized = false
 Defined in sub_nvs.c:16
 
 ---
-
-{#tag-4}
 
 ### TAG
 
@@ -7721,8 +7450,6 @@ Defined in sub_rtc.c:14
 
 ---
 
-{#tag-5}
-
 ### TAG
 
 `static`
@@ -7734,8 +7461,6 @@ const char * TAG = "h1os_time"
 Defined in h1os_time.c:16
 
 ---
-
-{#s_sync_cb}
 
 ### s_sync_cb
 
@@ -7751,8 +7476,6 @@ Defined in h1os_time.c:18
 
 ---
 
-{#s_sync_user_data}
-
 ### s_sync_user_data
 
 `static`
@@ -7764,8 +7487,6 @@ void * s_sync_user_data = NULL
 Defined in h1os_time.c:19
 
 ---
-
-{#tag-6}
 
 ### TAG
 
@@ -7779,8 +7500,6 @@ Defined in hal_flash.c:12
 
 ---
 
-{#s_part}
-
 ### s_part
 
 `static`
@@ -7793,8 +7512,6 @@ Defined in hal_flash.c:14
 
 ---
 
-{#tag-7}
-
 ### TAG
 
 `static`
@@ -7803,11 +7520,9 @@ Defined in hal_flash.c:14
 const char * TAG = "orch_flow"
 ```
 
-Defined in orch_flow.c:26
+Defined in orch_flow.c:28
 
 ---
-
-{#tag-8}
 
 ### TAG
 
@@ -7817,11 +7532,9 @@ Defined in orch_flow.c:26
 const char * TAG = "sub_audio"
 ```
 
-Defined in sub_audio.c:31
+Defined in sub_audio.c:32
 
 ---
-
-{#s_tx_chan}
 
 ### s_tx_chan
 
@@ -7831,11 +7544,9 @@ Defined in sub_audio.c:31
 i2s_chan_handle_t s_tx_chan = NULL
 ```
 
-Defined in sub_audio.c:72
+Defined in sub_audio.c:73
 
 ---
-
-{#s_audio_inited}
 
 ### s_audio_inited
 
@@ -7845,11 +7556,9 @@ Defined in sub_audio.c:72
 bool s_audio_inited = false
 ```
 
-Defined in sub_audio.c:74
+Defined in sub_audio.c:75
 
 ---
-
-{#s_i2s_chan_enabled}
 
 ### s_i2s_chan_enabled
 
@@ -7859,11 +7568,9 @@ Defined in sub_audio.c:74
 bool s_i2s_chan_enabled = false
 ```
 
-Defined in sub_audio.c:75
+Defined in sub_audio.c:76
 
 ---
-
-{#s_codec_in_standby}
 
 ### s_codec_in_standby
 
@@ -7873,11 +7580,9 @@ Defined in sub_audio.c:75
 bool s_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:76
+Defined in sub_audio.c:77
 
 ---
-
-{#s_low_power_mode}
 
 ### s_low_power_mode
 
@@ -7887,11 +7592,11 @@ Defined in sub_audio.c:76
 bool s_low_power_mode = true
 ```
 
-Defined in sub_audio.c:77
+Defined in sub_audio.c:79
+
+Low power.
 
 ---
-
-{#s_audio_queue}
 
 ### s_audio_queue
 
@@ -7901,11 +7606,9 @@ Defined in sub_audio.c:77
 QueueHandle_t s_audio_queue = NULL
 ```
 
-Defined in sub_audio.c:79
+Defined in sub_audio.c:81
 
 ---
-
-{#s_audio_task_handle}
 
 ### s_audio_task_handle
 
@@ -7915,11 +7618,9 @@ Defined in sub_audio.c:79
 TaskHandle_t s_audio_task_handle = NULL
 ```
 
-Defined in sub_audio.c:80
+Defined in sub_audio.c:82
 
 ---
-
-{#s_audio_is_busy}
 
 ### s_audio_is_busy
 
@@ -7929,25 +7630,23 @@ Defined in sub_audio.c:80
 volatile bool s_audio_is_busy = false
 ```
 
-Defined in sub_audio.c:81
+Defined in sub_audio.c:83
 
 ---
-
-{#s_volume_pct}
 
 ### s_volume_pct
 
 `static`
 
 ```cpp
-uint8_t s_volume_pct = 50
+uint8_t s_volume_pct = 0
 ```
 
-Defined in sub_audio.c:82
+Defined in sub_audio.c:85
+
+Volume percentage (0% unconfigured/muted until set by lifecycle presentation).
 
 ---
-
-{#es8311_perceptual_vol_table}
 
 ### es8311_perceptual_vol_table
 
@@ -7957,11 +7656,11 @@ Defined in sub_audio.c:82
 const uint8_t es8311_perceptual_vol_table[101]
 ```
 
-Defined in sub_audio.c:91
+Defined in sub_audio.c:98
+
+Vol table.
 
 ---
-
-{#tag-9}
 
 ### TAG
 
@@ -7971,11 +7670,9 @@ Defined in sub_audio.c:91
 const char * TAG = "sub_power"
 ```
 
-Defined in sub_power.c:21
+Defined in sub_power.c:35
 
 ---
-
-{#s_adc_handle}
 
 ### s_adc_handle
 
@@ -7985,11 +7682,9 @@ Defined in sub_power.c:21
 adc_oneshot_unit_handle_t s_adc_handle = NULL
 ```
 
-Defined in sub_power.c:23
+Defined in sub_power.c:37
 
 ---
-
-{#s_cali_handle}
 
 ### s_cali_handle
 
@@ -7999,11 +7694,9 @@ Defined in sub_power.c:23
 adc_cali_handle_t s_cali_handle = NULL
 ```
 
-Defined in sub_power.c:24
+Defined in sub_power.c:38
 
 ---
-
-{#s_cali_valid}
 
 ### s_cali_valid
 
@@ -8013,11 +7706,9 @@ Defined in sub_power.c:24
 bool s_cali_valid = false
 ```
 
-Defined in sub_power.c:25
+Defined in sub_power.c:39
 
 ---
-
-{#s_lipo_table}
 
 ### s_lipo_table
 
@@ -8027,27 +7718,35 @@ Defined in sub_power.c:25
 const struct @103206253010331351125062271206070174360205162247 s_lipo_table[]
 ```
 
-Defined in sub_power.c:45
+Defined in sub_power.c:76
 
 ---
-
-{#s_persisted_state}
 
 ### s_persisted_state
 
 `static`
 
 ```cpp
-RTC_DATA_ATTR orch_persisted_state_t s_persisted_state
+RTC_NOINIT_ATTR orch_persisted_state_t s_persisted_state
 ```
 
-Type: RTC_DATA_ATTR [`orch_persisted_state_t`](#orch_persisted_state_t)
+Type: RTC_NOINIT_ATTR [`orch_persisted_state_t`](#orch_persisted_state_t)
 
-Defined in orch_state.c:12
+Defined in orch_state.c:13
 
 ---
 
-{#tag-10}
+### s_boot_cleared
+
+`static`
+
+```cpp
+bool s_boot_cleared = false
+```
+
+Defined in orch_state.c:14
+
+---
 
 ### TAG
 
@@ -8057,11 +7756,9 @@ Defined in orch_state.c:12
 const char * TAG = "sub_sdcard"
 ```
 
-Defined in sub_sdcard.c:17
+Defined in sub_sdcard.c:20
 
 ---
-
-{#s_sd_card}
 
 ### s_sd_card
 
@@ -8071,11 +7768,33 @@ Defined in sub_sdcard.c:17
 sdmmc_card_t * s_sd_card = NULL
 ```
 
-Defined in sub_sdcard.c:19
+Defined in sub_sdcard.c:22
 
 ---
 
-{#tag-11}
+### s_mount_task
+
+`static`
+
+```cpp
+TaskHandle_t s_mount_task = NULL
+```
+
+Defined in sub_sdcard.c:23
+
+---
+
+### s_card_absent_latched
+
+`static`
+
+```cpp
+bool s_card_absent_latched = false
+```
+
+Defined in sub_sdcard.c:24
+
+---
 
 ### TAG
 
@@ -8089,8 +7808,6 @@ Defined in sub_sensor.c:19
 
 ---
 
-{#s_tsens_handle}
-
 ### s_tsens_handle
 
 `static`
@@ -8102,8 +7819,6 @@ temperature_sensor_handle_t s_tsens_handle = NULL
 Defined in sub_sensor.c:27
 
 ---
-
-{#s_tsens_inited}
 
 ### s_tsens_inited
 
@@ -8117,8 +7832,6 @@ Defined in sub_sensor.c:29
 
 ---
 
-{#tag-12}
-
 ### TAG
 
 `static`
@@ -8130,8 +7843,6 @@ const char * TAG = "h1os_lvgl"
 Defined in h1os_lvgl.cpp:26
 
 ---
-
-{#s_lv_display}
 
 ### s_lv_display
 
@@ -8145,8 +7856,6 @@ Defined in h1os_lvgl.cpp:28
 
 ---
 
-{#s_lv_keypad_indev}
-
 ### s_lv_keypad_indev
 
 `static`
@@ -8158,8 +7867,6 @@ lv_indev_t * s_lv_keypad_indev = NULL
 Defined in h1os_lvgl.cpp:29
 
 ---
-
-{#s_lvgl_task_handle}
 
 ### s_lvgl_task_handle
 
@@ -8173,8 +7880,6 @@ Defined in h1os_lvgl.cpp:30
 
 ---
 
-{#s_lvgl_task_running}
-
 ### s_lvgl_task_running
 
 `static`
@@ -8186,8 +7891,6 @@ bool s_lvgl_task_running = false
 Defined in h1os_lvgl.cpp:31
 
 ---
-
-{#s_first_boot_flush}
 
 ### s_first_boot_flush
 
@@ -8201,8 +7904,6 @@ Defined in h1os_lvgl.cpp:32
 
 ---
 
-{#tag-13}
-
 ### TAG
 
 `static`
@@ -8214,8 +7915,6 @@ const char * TAG = "sub_display"
 Defined in sub_display.cpp:21
 
 ---
-
-{#s_current_frame}
 
 ### s_current_frame
 
@@ -8229,8 +7928,6 @@ Defined in sub_display.cpp:24
 
 ---
 
-{#s_previous_frame}
-
 ### s_previous_frame
 
 `static`
@@ -8243,22 +7940,6 @@ Defined in sub_display.cpp:25
 
 ---
 
-{#s_busy_sem}
-
-### s_busy_sem
-
-`static`
-
-```cpp
-SemaphoreHandle_t s_busy_sem = NULL
-```
-
-Defined in sub_display.cpp:27
-
----
-
-{#s_inited}
-
 ### s_inited
 
 `static`
@@ -8267,11 +7948,9 @@ Defined in sub_display.cpp:27
 bool s_inited = false
 ```
 
-Defined in sub_display.cpp:29
+Defined in sub_display.cpp:27
 
 ---
-
-{#wf_partial_1in54}
 
 ### WF_PARTIAL_1IN54
 
@@ -8281,11 +7960,11 @@ Defined in sub_display.cpp:29
 const uint8_t WF_PARTIAL_1IN54[159]
 ```
 
-Defined in sub_display.cpp:32
+Defined in sub_display.cpp:31
+
+LUT.
 
 ---
-
-{#tag-14}
 
 ### TAG
 
@@ -8298,8 +7977,6 @@ const char * TAG = "h1os_lifecycle"
 Defined in h1os_lifecycle.c:38
 
 ---
-
-{#s_app_lifecycle}
 
 ### s_app_lifecycle
 
@@ -8315,8 +7992,6 @@ Defined in h1os_lifecycle.c:40
 
 ---
 
-{#s_session_expiry_us}
-
 ### s_session_expiry_us
 
 `static`
@@ -8328,8 +8003,6 @@ int64_t s_session_expiry_us = 0
 Defined in h1os_lifecycle.c:41
 
 ---
-
-{#s_session_task_handle}
 
 ### s_session_task_handle
 
@@ -8343,8 +8016,6 @@ Defined in h1os_lifecycle.c:42
 
 ---
 
-{#s_session_running}
-
 ### s_session_running
 
 `static`
@@ -8356,8 +8027,6 @@ bool s_session_running = false
 Defined in h1os_lifecycle.c:43
 
 ---
-
-{#tag-15}
 
 ### TAG
 
@@ -8371,8 +8040,6 @@ Defined in orch_display_sync.c:20
 
 ---
 
-{#s_frame_dirty}
-
 ### s_frame_dirty
 
 `static`
@@ -8383,7 +8050,7 @@ bool s_frame_dirty = false
 
 Defined in orch_display_sync.c:22
 
-{#audio_cmd_t}
+
 
 ## audio_cmd_t
 
@@ -8391,7 +8058,7 @@ Defined in orch_display_sync.c:22
 struct audio_cmd_t
 ```
 
-Defined in sub_audio.c:52
+Defined in sub_audio.c:53
 
 ### Public Attributes
 
@@ -8400,11 +8067,9 @@ Defined in sub_audio.c:52
 | [`audio_cmd_type_t`](#audio_cmd_type_t) | [`type`](#type)  |  |
 | `union audio_cmd_t::@075142260334247171354103021266123360172342241057` | [`params`](#params)  |  |
 | `SemaphoreHandle_t` | [`done_sem`](#done_sem)  |  |
-| `esp_err_t *` | [`result`](#result)  |  |
+| `esp_err_t *` | [`result`](#result)  | Pointer to store execution result. |
 
 ---
-
-{#type}
 
 #### type
 
@@ -8414,11 +8079,9 @@ audio_cmd_type_t type
 
 Type: [`audio_cmd_type_t`](#audio_cmd_type_t)
 
-Defined in sub_audio.c:53
+Defined in sub_audio.c:54
 
 ---
-
-{#params}
 
 #### params
 
@@ -8426,11 +8089,9 @@ Defined in sub_audio.c:53
 union audio_cmd_t::@075142260334247171354103021266123360172342241057 params
 ```
 
-Defined in sub_audio.c:67
+Defined in sub_audio.c:68
 
 ---
-
-{#done_sem}
 
 #### done_sem
 
@@ -8438,11 +8099,9 @@ Defined in sub_audio.c:67
 SemaphoreHandle_t done_sem
 ```
 
-Defined in sub_audio.c:68
+Defined in sub_audio.c:69
 
 ---
-
-{#result}
 
 #### result
 
@@ -8450,9 +8109,11 @@ Defined in sub_audio.c:68
 esp_err_t * result
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:70
 
-{#unionparams}
+Pointer to store execution result.
+
+
 
 ## [union].params
 
@@ -8460,7 +8121,7 @@ Defined in sub_audio.c:69
 union [union].params
 ```
 
-Defined in sub_audio.c:54
+Defined in sub_audio.c:55
 
 ### Public Attributes
 
@@ -8472,19 +8133,15 @@ Defined in sub_audio.c:54
 
 ---
 
-{#tone}
-
 #### tone
 
 ```cpp
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:59
 
 ---
-
-{#chime}
 
 #### chime
 
@@ -8492,11 +8149,9 @@ Defined in sub_audio.c:58
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:62
 
 ---
-
-{#pcm}
 
 #### pcm
 
@@ -8504,9 +8159,9 @@ Defined in sub_audio.c:61
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:67
 
-{#structparamstone}
+
 
 ## [struct].params.tone
 
@@ -8514,7 +8169,7 @@ Defined in sub_audio.c:66
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:56
 
 ### Public Attributes
 
@@ -8525,19 +8180,15 @@ Defined in sub_audio.c:55
 
 ---
 
-{#frequency_hz}
-
 #### frequency_hz
 
 ```cpp
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:57
 
 ---
-
-{#duration_ms}
 
 #### duration_ms
 
@@ -8545,9 +8196,9 @@ Defined in sub_audio.c:56
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:58
 
-{#structparamschime}
+
 
 ## [struct].params.chime
 
@@ -8555,7 +8206,7 @@ Defined in sub_audio.c:57
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -8565,17 +8216,15 @@ Defined in sub_audio.c:59
 
 ---
 
-{#chime_type}
-
 #### chime_type
 
 ```cpp
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:61
 
-{#structparamspcm}
+
 
 ## [struct].params.pcm
 
@@ -8583,7 +8232,7 @@ Defined in sub_audio.c:60
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:63
 
 ### Public Attributes
 
@@ -8595,19 +8244,15 @@ Defined in sub_audio.c:62
 
 ---
 
-{#samples}
-
 #### samples
 
 ```cpp
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:64
 
 ---
-
-{#sample_count}
 
 #### sample_count
 
@@ -8615,11 +8260,9 @@ Defined in sub_audio.c:63
 size_t sample_count
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:65
 
 ---
-
-{#sample_rate_hz}
 
 #### sample_rate_hz
 
@@ -8627,9 +8270,9 @@ Defined in sub_audio.c:64
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:66
 
-{#h1os_lifecycle_t}
+
 
 ## h1os_lifecycle_t
 
@@ -8657,8 +8300,6 @@ Defined in h1os/h1os.h:79
 
 ---
 
-{#on_boot}
-
 #### on_boot
 
 ```cpp
@@ -8672,8 +8313,6 @@ Defined in h1os/h1os.h:81
 System boot / power-on reset hook.
 
 ---
-
-{#on_wake}
 
 #### on_wake
 
@@ -8689,8 +8328,6 @@ Interactive wake hook (Timer / RTC Alarm / Button Tap).
 
 ---
 
-{#on_pre_sleep}
-
 #### on_pre_sleep
 
 ```cpp
@@ -8704,8 +8341,6 @@ Defined in h1os/h1os.h:83
 Hook executed immediately prior to entering deep sleep.
 
 ---
-
-{#on_shutdown}
 
 #### on_shutdown
 
@@ -8721,8 +8356,6 @@ Hook executed immediately prior to battery cut.
 
 ---
 
-{#presentation}
-
 #### presentation
 
 ```cpp
@@ -8732,8 +8365,6 @@ struct h1os_lifecycle_t::@325134365353002276205315372127306003103261015120 prese
 Defined in h1os/h1os.h:92
 
 ---
-
-{#session}
 
 #### session
 
@@ -8745,8 +8376,6 @@ Defined in h1os/h1os.h:100
 
 ---
 
-{#user_data}
-
 #### user_data
 
 ```cpp
@@ -8755,7 +8384,7 @@ void * user_data
 
 Defined in h1os/h1os.h:102
 
-{#structpresentation}
+
 
 ## [struct].presentation
 
@@ -8776,8 +8405,6 @@ Defined in h1os/h1os.h:87
 
 ---
 
-{#on_splash}
-
 #### on_splash
 
 ```cpp
@@ -8791,8 +8418,6 @@ Defined in h1os/h1os.h:88
 Custom splash rendering callback.
 
 ---
-
-{#on_chime}
 
 #### on_chime
 
@@ -8808,8 +8433,6 @@ Custom chime callback.
 
 ---
 
-{#chime_mask}
-
 #### chime_mask
 
 ```cpp
@@ -8822,8 +8445,6 @@ Hardware synthesized chime bitmask.
 
 ---
 
-{#volume_pct}
-
 #### volume_pct
 
 ```cpp
@@ -8834,7 +8455,7 @@ Defined in h1os/h1os.h:91
 
 Initial audio output volume (0 - 100%, default 60% if 0).
 
-{#structsession}
+
 
 ## [struct].session
 
@@ -8855,8 +8476,6 @@ Defined in h1os/h1os.h:95
 
 ---
 
-{#inactivity_timeout_sec}
-
 #### inactivity_timeout_sec
 
 ```cpp
@@ -8868,8 +8487,6 @@ Defined in h1os/h1os.h:96
 Inactivity sleep timer (default: 30s).
 
 ---
-
-{#enable_dfs_80mhz}
 
 #### enable_dfs_80mhz
 
@@ -8883,8 +8500,6 @@ Enable 80 MHz power droop while waiting for input (default: true).
 
 ---
 
-{#flow_a_period_sec}
-
 #### flow_a_period_sec
 
 ```cpp
@@ -8897,8 +8512,6 @@ Flow A headless sensor sample burst interval (default: 60s).
 
 ---
 
-{#flow_b_period_sec}
-
 #### flow_b_period_sec
 
 ```cpp
@@ -8909,7 +8522,7 @@ Defined in h1os/h1os.h:99
 
 Flow B main application wake interval (default: 120s).
 
-{#h1os_telemetry_t}
+
 
 ## h1os_telemetry_t
 
@@ -8927,34 +8540,32 @@ Defined in h1os/h1os.h:108
 
 | Return | Name | Description |
 |--------|------|-------------|
-| `float` | [`ambient_temp_c`](#ambient_temp_c)  |  |
-| `float` | [`ambient_temp_f`](#ambient_temp_f)  |  |
-| `float` | [`ambient_rh_pct`](#ambient_rh_pct)  |  |
-| `float` | [`dew_point_c`](#dew_point_c)  |  |
-| `float` | [`dew_point_f`](#dew_point_f)  |  |
-| `float` | [`absolute_humidity_g`](#absolute_humidity_g)  |  |
+| `float` | [`ambient_temp_c`](#ambient_temp_c)  | Ambient temp C. |
+| `float` | [`ambient_temp_f`](#ambient_temp_f)  | Ambient temp F. |
+| `float` | [`ambient_rh_pct`](#ambient_rh_pct)  | Ambient RH %. |
+| `float` | [`dew_point_c`](#dew_point_c)  | Dew point C. |
+| `float` | [`dew_point_f`](#dew_point_f)  | Dew point F. |
+| `float` | [`absolute_humidity_g`](#absolute_humidity_g)  | Absolute humidity g. |
 | `float` | [`window_low_c`](#window_low_c)  | Valid Window Floor (min over valid 32-sample window). |
 | `float` | [`window_high_c`](#window_high_c)  | Valid Window Ceiling (max over valid 32-sample window). |
 | `float` | [`window_avg_shtc3_c`](#window_avg_shtc3_c)  | Short-term valid SHTC3 window average. |
 | `float` | [`window_avg_die_c`](#window_avg_die_c)  | Short-term valid MCU Die window average. |
 | `float` | [`temp_historical_c`](#temp_historical_c)  | Long-term light EWMA temperature history. |
 | `float` | [`rh_historical_pct`](#rh_historical_pct)  | Long-term light EWMA relative humidity history. |
-| `float` | [`raw_shtc3_temp_c`](#raw_shtc3_temp_c)  |  |
-| `float` | [`mcu_die_temp_c`](#mcu_die_temp_c)  |  |
-| `float` | [`epd_glass_temp_c`](#epd_glass_temp_c)  |  |
+| `float` | [`raw_shtc3_temp_c`](#raw_shtc3_temp_c)  | Raw SHTC3 temp C. |
+| `float` | [`mcu_die_temp_c`](#mcu_die_temp_c)  | MCU die temp C. |
+| `float` | [`epd_glass_temp_c`](#epd_glass_temp_c)  | EPD glass temp C. |
 | `float` | [`trinode_temp_c`](#trinode_temp_c)  | (T_valid + T_die + T_glass) / 3.0 |
 | `float` | [`trinode_delta_c`](#trinode_delta_c)  | T_valid - T_trinode. |
 | `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct)  | 0-100% linear confidence score |
-| `bool` | [`is_thermally_settled`](#is_thermally_settled)  |  |
+| `bool` | [`is_thermally_settled`](#is_thermally_settled)  | Is thermally settled. |
 | `uint16_t` | [`valid_trend`](#valid_trend)  | Consecutive thermally settled Flow A samples. |
-| `uint32_t` | [`sample_count`](#sample_count-1)  |  |
-| `uint16_t` | [`battery_mv`](#battery_mv)  |  |
-| `uint8_t` | [`battery_percent`](#battery_percent)  |  |
-| `bool` | [`is_usb_powered`](#is_usb_powered)  |  |
+| `uint32_t` | [`sample_count`](#sample_count-1)  | Sample count. |
+| `uint16_t` | [`battery_mv`](#battery_mv)  | Battery mV. |
+| `uint8_t` | [`battery_percent`](#battery_percent)  | Battery percent. |
+| `bool` | [`is_usb_powered`](#is_usb_powered)  | Is USB powered. |
 
 ---
-
-{#ambient_temp_c}
 
 #### ambient_temp_c
 
@@ -8964,9 +8575,9 @@ float ambient_temp_c
 
 Defined in h1os/h1os.h:110
 
----
+Ambient temp C.
 
-{#ambient_temp_f}
+---
 
 #### ambient_temp_f
 
@@ -8976,9 +8587,9 @@ float ambient_temp_f
 
 Defined in h1os/h1os.h:111
 
----
+Ambient temp F.
 
-{#ambient_rh_pct}
+---
 
 #### ambient_rh_pct
 
@@ -8988,9 +8599,9 @@ float ambient_rh_pct
 
 Defined in h1os/h1os.h:112
 
----
+Ambient RH %.
 
-{#dew_point_c}
+---
 
 #### dew_point_c
 
@@ -9000,9 +8611,9 @@ float dew_point_c
 
 Defined in h1os/h1os.h:113
 
----
+Dew point C.
 
-{#dew_point_f}
+---
 
 #### dew_point_f
 
@@ -9012,9 +8623,9 @@ float dew_point_f
 
 Defined in h1os/h1os.h:114
 
----
+Dew point F.
 
-{#absolute_humidity_g}
+---
 
 #### absolute_humidity_g
 
@@ -9024,9 +8635,9 @@ float absolute_humidity_g
 
 Defined in h1os/h1os.h:115
 
----
+Absolute humidity g.
 
-{#window_low_c}
+---
 
 #### window_low_c
 
@@ -9040,8 +8651,6 @@ Valid Window Floor (min over valid 32-sample window).
 
 ---
 
-{#window_high_c}
-
 #### window_high_c
 
 ```cpp
@@ -9053,8 +8662,6 @@ Defined in h1os/h1os.h:119
 Valid Window Ceiling (max over valid 32-sample window).
 
 ---
-
-{#window_avg_shtc3_c}
 
 #### window_avg_shtc3_c
 
@@ -9068,8 +8675,6 @@ Short-term valid SHTC3 window average.
 
 ---
 
-{#window_avg_die_c}
-
 #### window_avg_die_c
 
 ```cpp
@@ -9081,8 +8686,6 @@ Defined in h1os/h1os.h:121
 Short-term valid MCU Die window average.
 
 ---
-
-{#temp_historical_c}
 
 #### temp_historical_c
 
@@ -9096,8 +8699,6 @@ Long-term light EWMA temperature history.
 
 ---
 
-{#rh_historical_pct}
-
 #### rh_historical_pct
 
 ```cpp
@@ -9110,8 +8711,6 @@ Long-term light EWMA relative humidity history.
 
 ---
 
-{#raw_shtc3_temp_c}
-
 #### raw_shtc3_temp_c
 
 ```cpp
@@ -9120,9 +8719,9 @@ float raw_shtc3_temp_c
 
 Defined in h1os/h1os.h:126
 
----
+Raw SHTC3 temp C.
 
-{#mcu_die_temp_c}
+---
 
 #### mcu_die_temp_c
 
@@ -9132,9 +8731,9 @@ float mcu_die_temp_c
 
 Defined in h1os/h1os.h:127
 
----
+MCU die temp C.
 
-{#epd_glass_temp_c}
+---
 
 #### epd_glass_temp_c
 
@@ -9144,9 +8743,9 @@ float epd_glass_temp_c
 
 Defined in h1os/h1os.h:128
 
----
+EPD glass temp C.
 
-{#trinode_temp_c}
+---
 
 #### trinode_temp_c
 
@@ -9160,8 +8759,6 @@ Defined in h1os/h1os.h:129
 
 ---
 
-{#trinode_delta_c}
-
 #### trinode_delta_c
 
 ```cpp
@@ -9173,8 +8770,6 @@ Defined in h1os/h1os.h:130
 T_valid - T_trinode.
 
 ---
-
-{#trinode_confidence_pct}
 
 #### trinode_confidence_pct
 
@@ -9188,8 +8783,6 @@ Defined in h1os/h1os.h:131
 
 ---
 
-{#is_thermally_settled}
-
 #### is_thermally_settled
 
 ```cpp
@@ -9198,9 +8791,9 @@ bool is_thermally_settled
 
 Defined in h1os/h1os.h:134
 
----
+Is thermally settled.
 
-{#valid_trend}
+---
 
 #### valid_trend
 
@@ -9214,8 +8807,6 @@ Consecutive thermally settled Flow A samples.
 
 ---
 
-{#sample_count-1}
-
 #### sample_count
 
 ```cpp
@@ -9224,9 +8815,9 @@ uint32_t sample_count
 
 Defined in h1os/h1os.h:136
 
----
+Sample count.
 
-{#battery_mv}
+---
 
 #### battery_mv
 
@@ -9236,9 +8827,9 @@ uint16_t battery_mv
 
 Defined in h1os/h1os.h:137
 
----
+Battery mV.
 
-{#battery_percent}
+---
 
 #### battery_percent
 
@@ -9248,9 +8839,9 @@ uint8_t battery_percent
 
 Defined in h1os/h1os.h:138
 
----
+Battery percent.
 
-{#is_usb_powered}
+---
 
 #### is_usb_powered
 
@@ -9260,7 +8851,9 @@ bool is_usb_powered
 
 Defined in h1os/h1os.h:139
 
-{#h1os_wake_context_t}
+Is USB powered.
+
+
 
 ## h1os_wake_context_t
 
@@ -9278,18 +8871,16 @@ Defined in h1os/h1os.h:44
 
 | Return | Name | Description |
 |--------|------|-------------|
-| `esp_reset_reason_t` | [`reset_reason`](#reset_reason)  |  |
+| `esp_reset_reason_t` | [`reset_reason`](#reset_reason)  | Reset reason. |
 | `uint32_t` | [`wakeup_causes`](#wakeup_causes)  | Bitmap of wakeup sources (esp_sleep_get_wakeup_causes). |
-| `uint32_t` | [`boot_count`](#boot_count)  |  |
-| `uint32_t` | [`deep_sleep_count`](#deep_sleep_count)  |  |
-| `bool` | [`woke_from_button`](#woke_from_button)  |  |
-| `uint8_t` | [`wake_button`](#wake_button)  |  |
-| `uint32_t` | [`sleep_duration_sec`](#sleep_duration_sec)  |  |
-| `void *` | [`user_data`](#user_data-1)  |  |
+| `uint32_t` | [`boot_count`](#boot_count)  | Boot count. |
+| `uint32_t` | [`deep_sleep_count`](#deep_sleep_count)  | Deep sleep count. |
+| `bool` | [`woke_from_button`](#woke_from_button)  | Woke from button. |
+| `uint8_t` | [`wake_button`](#wake_button)  | Wake button GPIO. |
+| `uint32_t` | [`sleep_duration_sec`](#sleep_duration_sec)  | Sleep duration in seconds. |
+| `void *` | [`user_data`](#user_data-1)  | User data. |
 
 ---
-
-{#reset_reason}
 
 #### reset_reason
 
@@ -9299,9 +8890,9 @@ esp_reset_reason_t reset_reason
 
 Defined in h1os/h1os.h:45
 
----
+Reset reason.
 
-{#wakeup_causes}
+---
 
 #### wakeup_causes
 
@@ -9315,8 +8906,6 @@ Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).
 
 ---
 
-{#boot_count}
-
 #### boot_count
 
 ```cpp
@@ -9325,9 +8914,9 @@ uint32_t boot_count
 
 Defined in h1os/h1os.h:47
 
----
+Boot count.
 
-{#deep_sleep_count}
+---
 
 #### deep_sleep_count
 
@@ -9337,9 +8926,9 @@ uint32_t deep_sleep_count
 
 Defined in h1os/h1os.h:48
 
----
+Deep sleep count.
 
-{#woke_from_button}
+---
 
 #### woke_from_button
 
@@ -9349,9 +8938,9 @@ bool woke_from_button
 
 Defined in h1os/h1os.h:49
 
----
+Woke from button.
 
-{#wake_button}
+---
 
 #### wake_button
 
@@ -9361,9 +8950,9 @@ uint8_t wake_button
 
 Defined in h1os/h1os.h:50
 
----
+Wake button GPIO.
 
-{#sleep_duration_sec}
+---
 
 #### sleep_duration_sec
 
@@ -9373,9 +8962,9 @@ uint32_t sleep_duration_sec
 
 Defined in h1os/h1os.h:51
 
----
+Sleep duration in seconds.
 
-{#user_data-1}
+---
 
 #### user_data
 
@@ -9385,7 +8974,9 @@ void * user_data
 
 Defined in h1os/h1os.h:52
 
-{#orch_persisted_state_t}
+User data.
+
+
 
 ## orch_persisted_state_t
 
@@ -9397,52 +8988,50 @@ Defined in h1os/h1os.h:52
 struct orch_persisted_state_t
 ```
 
-Defined in h1os/orch_state.h:47
+Defined in h1os/orch_state.h:48
 
 ### Public Attributes
 
 | Return | Name | Description |
 |--------|------|-------------|
-| `uint32_t` | [`magic`](#magic)  |  |
-| `uint32_t` | [`boot_count`](#boot_count-1)  |  |
-| `uint32_t` | [`wake_count`](#wake_count)  |  |
-| `uint8_t` | [`flags`](#flags)  |  |
-| `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason)  |  |
-| `uint16_t` | [`last_vbat_mv`](#last_vbat_mv)  |  |
-| `uint32_t` | [`sample_interval_sec`](#sample_interval_sec)  |  |
-| `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec-1)  |  |
-| `uint32_t` | [`wake_timestamp_epoch`](#wake_timestamp_epoch)  |  |
-| `uint32_t` | [`ulp_vbat_scale`](#ulp_vbat_scale)  |  |
-| `int32_t` | [`ulp_vbat_offset_mv`](#ulp_vbat_offset_mv)  |  |
-| `uint16_t` | [`epd_partial_refresh_count`](#epd_partial_refresh_count)  |  |
-| `uint16_t` | [`valid_trend`](#valid_trend-1)  |  |
+| `uint32_t` | [`magic`](#magic)  | Magic word. |
+| `uint32_t` | [`boot_count`](#boot_count-1)  | Boot count. |
+| `uint32_t` | [`wake_count`](#wake_count)  | Wake count. |
+| `uint8_t` | [`flags`](#flags)  | Flags. |
+| `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason)  | ULP dispatch reason. |
+| `uint16_t` | [`last_vbat_mv`](#last_vbat_mv)  | Last vbat mv. |
+| `uint32_t` | [`sample_interval_sec`](#sample_interval_sec)  | Sample interval sec. |
+| `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec-1)  | Flow B period sec. |
+| `uint32_t` | [`wake_timestamp_epoch`](#wake_timestamp_epoch)  | Wake timestamp epoch. |
+| `uint32_t` | [`ulp_vbat_scale`](#ulp_vbat_scale)  | ULP vbat scale. |
+| `int32_t` | [`ulp_vbat_offset_mv`](#ulp_vbat_offset_mv)  | ULP vbat offset mv. |
+| `uint16_t` | [`epd_partial_refresh_count`](#epd_partial_refresh_count)  | EPD partial refresh count. |
+| `uint16_t` | [`valid_trend`](#valid_trend-1)  | Valid trend. |
 | `int16_t` | [`amb_floor_temp_centi_c`](#amb_floor_temp_centi_c)  |  |
 | `int16_t` | [`window_low_temp_centi_c`](#window_low_temp_centi_c)  |  |
 | `int16_t` | [`window_high_temp_centi_c`](#window_high_temp_centi_c)  |  |
 | `int16_t` | [`last_glass_temp_centi_c`](#last_glass_temp_centi_c)  |  |
-| `float` | [`window_avg_shtc3_c`](#window_avg_shtc3_c-1)  |  |
-| `float` | [`window_avg_die_c`](#window_avg_die_c-1)  |  |
+| `float` | [`window_avg_shtc3_c`](#window_avg_shtc3_c-1)  | Window avg shtc3 c. |
+| `float` | [`window_avg_die_c`](#window_avg_die_c-1)  | Window avg die c. |
 | `float` | [`temp_historical_c`](#temp_historical_c-1)  |  |
 | `float` | [`rh_historical_pct`](#rh_historical_pct-1)  |  |
-| `float` | [`reconstructed_amb_temp_c`](#reconstructed_amb_temp_c)  |  |
-| `float` | [`reconstructed_amb_rh_pct`](#reconstructed_amb_rh_pct)  |  |
-| `float` | [`reconstructed_dew_point_c`](#reconstructed_dew_point_c)  |  |
-| `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa)  |  |
-| `float` | [`trinode_temp_c`](#trinode_temp_c-1)  |  |
-| `float` | [`trinode_delta_c`](#trinode_delta_c-1)  |  |
-| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct-1)  |  |
-| `bool` | [`ewma_inited`](#ewma_inited)  |  |
+| `float` | [`reconstructed_amb_temp_c`](#reconstructed_amb_temp_c)  | Reconstructed amb temp c. |
+| `float` | [`reconstructed_amb_rh_pct`](#reconstructed_amb_rh_pct)  | Reconstructed amb rh pct. |
+| `float` | [`reconstructed_dew_point_c`](#reconstructed_dew_point_c)  | Reconstructed dew point c. |
+| `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa)  | Vapor pressure hpa. |
+| `float` | [`trinode_temp_c`](#trinode_temp_c-1)  | Trinode temp c. |
+| `float` | [`trinode_delta_c`](#trinode_delta_c-1)  | Trinode delta c. |
+| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct-1)  | Trinode confidence pct. |
+| `bool` | [`ewma_inited`](#ewma_inited)  | EWMA inited. |
 | `int16_t` | [`tsens_cal_centi_c`](#tsens_cal_centi_c)  |  |
-| `uint8_t` | [`app_stage`](#app_stage)  |  |
-| `uint8_t` | [`scratchpad_len`](#scratchpad_len)  |  |
-| `uint8_t` | [`scratchpad`](#scratchpad)  |  |
-| [`orch_tri_node_sample_t`](#orch_tri_node_sample_t) | [`ring`](#ring)  |  |
-| `uint8_t` | [`ring_head`](#ring_head)  |  |
-| `uint32_t` | [`total_samples`](#total_samples)  |  |
+| `uint8_t` | [`app_stage`](#app_stage)  | App stage. |
+| `uint8_t` | [`scratchpad_len`](#scratchpad_len)  | Scratchpad len. |
+| `uint8_t` | [`scratchpad`](#scratchpad)  | Scratchpad. |
+| [`orch_tri_node_sample_t`](#orch_tri_node_sample_t) | [`ring`](#ring)  | Ring buffer. |
+| `uint8_t` | [`ring_head`](#ring_head)  | Ring head. |
+| `uint32_t` | [`total_samples`](#total_samples)  | Total samples. |
 
 ---
-
-{#magic}
 
 #### magic
 
@@ -9450,11 +9039,11 @@ Defined in h1os/orch_state.h:47
 uint32_t magic
 ```
 
-Defined in h1os/orch_state.h:48
+Defined in h1os/orch_state.h:49
+
+Magic word.
 
 ---
-
-{#boot_count-1}
 
 #### boot_count
 
@@ -9462,11 +9051,11 @@ Defined in h1os/orch_state.h:48
 uint32_t boot_count
 ```
 
-Defined in h1os/orch_state.h:49
+Defined in h1os/orch_state.h:50
+
+Boot count.
 
 ---
-
-{#wake_count}
 
 #### wake_count
 
@@ -9474,11 +9063,11 @@ Defined in h1os/orch_state.h:49
 uint32_t wake_count
 ```
 
-Defined in h1os/orch_state.h:50
+Defined in h1os/orch_state.h:51
+
+Wake count.
 
 ---
-
-{#flags}
 
 #### flags
 
@@ -9486,11 +9075,11 @@ Defined in h1os/orch_state.h:50
 uint8_t flags
 ```
 
-Defined in h1os/orch_state.h:51
+Defined in h1os/orch_state.h:52
+
+Flags.
 
 ---
-
-{#ulp_dispatch_reason}
 
 #### ulp_dispatch_reason
 
@@ -9498,11 +9087,11 @@ Defined in h1os/orch_state.h:51
 uint8_t ulp_dispatch_reason
 ```
 
-Defined in h1os/orch_state.h:52
+Defined in h1os/orch_state.h:53
+
+ULP dispatch reason.
 
 ---
-
-{#last_vbat_mv}
 
 #### last_vbat_mv
 
@@ -9510,11 +9099,11 @@ Defined in h1os/orch_state.h:52
 uint16_t last_vbat_mv
 ```
 
-Defined in h1os/orch_state.h:53
+Defined in h1os/orch_state.h:54
+
+Last vbat mv.
 
 ---
-
-{#sample_interval_sec}
 
 #### sample_interval_sec
 
@@ -9522,11 +9111,11 @@ Defined in h1os/orch_state.h:53
 uint32_t sample_interval_sec
 ```
 
-Defined in h1os/orch_state.h:55
+Defined in h1os/orch_state.h:56
+
+Sample interval sec.
 
 ---
-
-{#flow_b_period_sec-1}
 
 #### flow_b_period_sec
 
@@ -9534,11 +9123,11 @@ Defined in h1os/orch_state.h:55
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/orch_state.h:56
+Defined in h1os/orch_state.h:57
+
+Flow B period sec.
 
 ---
-
-{#wake_timestamp_epoch}
 
 #### wake_timestamp_epoch
 
@@ -9546,11 +9135,11 @@ Defined in h1os/orch_state.h:56
 uint32_t wake_timestamp_epoch
 ```
 
-Defined in h1os/orch_state.h:57
+Defined in h1os/orch_state.h:58
+
+Wake timestamp epoch.
 
 ---
-
-{#ulp_vbat_scale}
 
 #### ulp_vbat_scale
 
@@ -9558,11 +9147,11 @@ Defined in h1os/orch_state.h:57
 uint32_t ulp_vbat_scale
 ```
 
-Defined in h1os/orch_state.h:60
+Defined in h1os/orch_state.h:61
+
+ULP vbat scale.
 
 ---
-
-{#ulp_vbat_offset_mv}
 
 #### ulp_vbat_offset_mv
 
@@ -9570,11 +9159,11 @@ Defined in h1os/orch_state.h:60
 int32_t ulp_vbat_offset_mv
 ```
 
-Defined in h1os/orch_state.h:61
+Defined in h1os/orch_state.h:62
+
+ULP vbat offset mv.
 
 ---
-
-{#epd_partial_refresh_count}
 
 #### epd_partial_refresh_count
 
@@ -9582,11 +9171,11 @@ Defined in h1os/orch_state.h:61
 uint16_t epd_partial_refresh_count
 ```
 
-Defined in h1os/orch_state.h:64
+Defined in h1os/orch_state.h:65
+
+EPD partial refresh count.
 
 ---
-
-{#valid_trend-1}
 
 #### valid_trend
 
@@ -9594,11 +9183,11 @@ Defined in h1os/orch_state.h:64
 uint16_t valid_trend
 ```
 
-Defined in h1os/orch_state.h:65
+Defined in h1os/orch_state.h:66
+
+Valid trend.
 
 ---
-
-{#amb_floor_temp_centi_c}
 
 #### amb_floor_temp_centi_c
 
@@ -9606,11 +9195,9 @@ Defined in h1os/orch_state.h:65
 int16_t amb_floor_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:68
+Defined in h1os/orch_state.h:69
 
 ---
-
-{#window_low_temp_centi_c}
 
 #### window_low_temp_centi_c
 
@@ -9618,11 +9205,9 @@ Defined in h1os/orch_state.h:68
 int16_t window_low_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:69
+Defined in h1os/orch_state.h:70
 
 ---
-
-{#window_high_temp_centi_c}
 
 #### window_high_temp_centi_c
 
@@ -9630,11 +9215,9 @@ Defined in h1os/orch_state.h:69
 int16_t window_high_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:70
+Defined in h1os/orch_state.h:71
 
 ---
-
-{#last_glass_temp_centi_c}
 
 #### last_glass_temp_centi_c
 
@@ -9642,11 +9225,9 @@ Defined in h1os/orch_state.h:70
 int16_t last_glass_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:71
+Defined in h1os/orch_state.h:72
 
 ---
-
-{#window_avg_shtc3_c-1}
 
 #### window_avg_shtc3_c
 
@@ -9654,11 +9235,11 @@ Defined in h1os/orch_state.h:71
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/orch_state.h:74
+Defined in h1os/orch_state.h:75
+
+Window avg shtc3 c.
 
 ---
-
-{#window_avg_die_c-1}
 
 #### window_avg_die_c
 
@@ -9666,11 +9247,11 @@ Defined in h1os/orch_state.h:74
 float window_avg_die_c
 ```
 
-Defined in h1os/orch_state.h:75
+Defined in h1os/orch_state.h:76
+
+Window avg die c.
 
 ---
-
-{#temp_historical_c-1}
 
 #### temp_historical_c
 
@@ -9678,11 +9259,9 @@ Defined in h1os/orch_state.h:75
 float temp_historical_c
 ```
 
-Defined in h1os/orch_state.h:76
+Defined in h1os/orch_state.h:77
 
 ---
-
-{#rh_historical_pct-1}
 
 #### rh_historical_pct
 
@@ -9690,11 +9269,9 @@ Defined in h1os/orch_state.h:76
 float rh_historical_pct
 ```
 
-Defined in h1os/orch_state.h:77
+Defined in h1os/orch_state.h:78
 
 ---
-
-{#reconstructed_amb_temp_c}
 
 #### reconstructed_amb_temp_c
 
@@ -9702,11 +9279,11 @@ Defined in h1os/orch_state.h:77
 float reconstructed_amb_temp_c
 ```
 
-Defined in h1os/orch_state.h:80
+Defined in h1os/orch_state.h:81
+
+Reconstructed amb temp c.
 
 ---
-
-{#reconstructed_amb_rh_pct}
 
 #### reconstructed_amb_rh_pct
 
@@ -9714,11 +9291,11 @@ Defined in h1os/orch_state.h:80
 float reconstructed_amb_rh_pct
 ```
 
-Defined in h1os/orch_state.h:81
+Defined in h1os/orch_state.h:82
+
+Reconstructed amb rh pct.
 
 ---
-
-{#reconstructed_dew_point_c}
 
 #### reconstructed_dew_point_c
 
@@ -9726,11 +9303,11 @@ Defined in h1os/orch_state.h:81
 float reconstructed_dew_point_c
 ```
 
-Defined in h1os/orch_state.h:82
+Defined in h1os/orch_state.h:83
+
+Reconstructed dew point c.
 
 ---
-
-{#vapor_pressure_hpa}
 
 #### vapor_pressure_hpa
 
@@ -9738,11 +9315,11 @@ Defined in h1os/orch_state.h:82
 float vapor_pressure_hpa
 ```
 
-Defined in h1os/orch_state.h:83
+Defined in h1os/orch_state.h:84
+
+Vapor pressure hpa.
 
 ---
-
-{#trinode_temp_c-1}
 
 #### trinode_temp_c
 
@@ -9750,11 +9327,11 @@ Defined in h1os/orch_state.h:83
 float trinode_temp_c
 ```
 
-Defined in h1os/orch_state.h:86
+Defined in h1os/orch_state.h:87
+
+Trinode temp c.
 
 ---
-
-{#trinode_delta_c-1}
 
 #### trinode_delta_c
 
@@ -9762,11 +9339,11 @@ Defined in h1os/orch_state.h:86
 float trinode_delta_c
 ```
 
-Defined in h1os/orch_state.h:87
+Defined in h1os/orch_state.h:88
+
+Trinode delta c.
 
 ---
-
-{#trinode_confidence_pct-1}
 
 #### trinode_confidence_pct
 
@@ -9774,11 +9351,11 @@ Defined in h1os/orch_state.h:87
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/orch_state.h:88
+Defined in h1os/orch_state.h:89
+
+Trinode confidence pct.
 
 ---
-
-{#ewma_inited}
 
 #### ewma_inited
 
@@ -9786,11 +9363,11 @@ Defined in h1os/orch_state.h:88
 bool ewma_inited
 ```
 
-Defined in h1os/orch_state.h:89
+Defined in h1os/orch_state.h:90
+
+EWMA inited.
 
 ---
-
-{#tsens_cal_centi_c}
 
 #### tsens_cal_centi_c
 
@@ -9798,11 +9375,9 @@ Defined in h1os/orch_state.h:89
 int16_t tsens_cal_centi_c
 ```
 
-Defined in h1os/orch_state.h:90
+Defined in h1os/orch_state.h:91
 
 ---
-
-{#app_stage}
 
 #### app_stage
 
@@ -9810,11 +9385,11 @@ Defined in h1os/orch_state.h:90
 uint8_t app_stage
 ```
 
-Defined in h1os/orch_state.h:93
+Defined in h1os/orch_state.h:94
+
+App stage.
 
 ---
-
-{#scratchpad_len}
 
 #### scratchpad_len
 
@@ -9822,11 +9397,11 @@ Defined in h1os/orch_state.h:93
 uint8_t scratchpad_len
 ```
 
-Defined in h1os/orch_state.h:94
+Defined in h1os/orch_state.h:95
+
+Scratchpad len.
 
 ---
-
-{#scratchpad}
 
 #### scratchpad
 
@@ -9834,11 +9409,11 @@ Defined in h1os/orch_state.h:94
 uint8_t scratchpad[32]
 ```
 
-Defined in h1os/orch_state.h:95
+Defined in h1os/orch_state.h:96
+
+Scratchpad.
 
 ---
-
-{#ring}
 
 #### ring
 
@@ -9846,11 +9421,11 @@ Defined in h1os/orch_state.h:95
 orch_tri_node_sample_t ring[32]
 ```
 
-Defined in h1os/orch_state.h:98
+Defined in h1os/orch_state.h:99
+
+Ring buffer.
 
 ---
-
-{#ring_head}
 
 #### ring_head
 
@@ -9858,11 +9433,11 @@ Defined in h1os/orch_state.h:98
 uint8_t ring_head
 ```
 
-Defined in h1os/orch_state.h:100
+Defined in h1os/orch_state.h:101
+
+Ring head.
 
 ---
-
-{#total_samples}
 
 #### total_samples
 
@@ -9870,9 +9445,11 @@ Defined in h1os/orch_state.h:100
 uint32_t total_samples
 ```
 
-Defined in h1os/orch_state.h:101
+Defined in h1os/orch_state.h:102
 
-{#orch_tri_node_sample_t}
+Total samples.
+
+
 
 ## orch_tri_node_sample_t
 
@@ -9884,23 +9461,21 @@ Defined in h1os/orch_state.h:101
 struct orch_tri_node_sample_t
 ```
 
-Defined in h1os/orch_state.h:37
+Defined in h1os/orch_state.h:38
 
 ### Public Attributes
 
 | Return | Name | Description |
 |--------|------|-------------|
-| `int16_t` | [`shtc3_temp_centi_c`](#shtc3_temp_centi_c)  |  |
-| `uint16_t` | [`shtc3_rh_centi_pct`](#shtc3_rh_centi_pct)  |  |
-| `int16_t` | [`mcu_tsens_centi_c`](#mcu_tsens_centi_c)  |  |
-| `int16_t` | [`epd_glass_centi_c`](#epd_glass_centi_c)  |  |
-| `uint32_t` | [`timestamp_sec`](#timestamp_sec)  |  |
-| `uint8_t` | [`quality_flags`](#quality_flags)  |  |
-| `uint8_t` | [`_pad`](#_pad)  |  |
+| `int16_t` | [`shtc3_temp_centi_c`](#shtc3_temp_centi_c)  | SHTC3 temp (centi-°C: 2350 = 23.50 °C). |
+| `uint16_t` | [`shtc3_rh_centi_pct`](#shtc3_rh_centi_pct)  | SHTC3 RH (centi-%: 5520 = 55.20 %). |
+| `int16_t` | [`mcu_tsens_centi_c`](#mcu_tsens_centi_c)  | Internal MCU junction TSENS (centi-°C). |
+| `int16_t` | [`epd_glass_centi_c`](#epd_glass_centi_c)  | SSD1681 glass thermistor (centi-°C). |
+| `uint32_t` | [`timestamp_sec`](#timestamp_sec)  | POSIX epoch or relative seconds. |
+| `uint8_t` | [`quality_flags`](#quality_flags)  | Bit 0: SAMPLE_FLAG_VALID_COLD, Bit 1: SAMPLE_FLAG_THERMAL_SETTLED. |
+| `uint8_t` | [`_pad`](#_pad)  | Padding for 32-bit alignment. |
 
 ---
-
-{#shtc3_temp_centi_c}
 
 #### shtc3_temp_centi_c
 
@@ -9908,11 +9483,11 @@ Defined in h1os/orch_state.h:37
 int16_t shtc3_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:38
+Defined in h1os/orch_state.h:39
+
+SHTC3 temp (centi-°C: 2350 = 23.50 °C).
 
 ---
-
-{#shtc3_rh_centi_pct}
 
 #### shtc3_rh_centi_pct
 
@@ -9920,11 +9495,11 @@ Defined in h1os/orch_state.h:38
 uint16_t shtc3_rh_centi_pct
 ```
 
-Defined in h1os/orch_state.h:39
+Defined in h1os/orch_state.h:40
+
+SHTC3 RH (centi-%: 5520 = 55.20 %).
 
 ---
-
-{#mcu_tsens_centi_c}
 
 #### mcu_tsens_centi_c
 
@@ -9932,11 +9507,11 @@ Defined in h1os/orch_state.h:39
 int16_t mcu_tsens_centi_c
 ```
 
-Defined in h1os/orch_state.h:40
+Defined in h1os/orch_state.h:41
+
+Internal MCU junction TSENS (centi-°C).
 
 ---
-
-{#epd_glass_centi_c}
 
 #### epd_glass_centi_c
 
@@ -9944,11 +9519,11 @@ Defined in h1os/orch_state.h:40
 int16_t epd_glass_centi_c
 ```
 
-Defined in h1os/orch_state.h:41
+Defined in h1os/orch_state.h:42
+
+SSD1681 glass thermistor (centi-°C).
 
 ---
-
-{#timestamp_sec}
 
 #### timestamp_sec
 
@@ -9956,11 +9531,11 @@ Defined in h1os/orch_state.h:41
 uint32_t timestamp_sec
 ```
 
-Defined in h1os/orch_state.h:42
+Defined in h1os/orch_state.h:43
+
+POSIX epoch or relative seconds.
 
 ---
-
-{#quality_flags}
 
 #### quality_flags
 
@@ -9968,11 +9543,11 @@ Defined in h1os/orch_state.h:42
 uint8_t quality_flags
 ```
 
-Defined in h1os/orch_state.h:43
+Defined in h1os/orch_state.h:44
+
+Bit 0: SAMPLE_FLAG_VALID_COLD, Bit 1: SAMPLE_FLAG_THERMAL_SETTLED.
 
 ---
-
-{#_pad}
 
 #### _pad
 
@@ -9980,9 +9555,11 @@ Defined in h1os/orch_state.h:43
 uint8_t _pad[3]
 ```
 
-Defined in h1os/orch_state.h:44
+Defined in h1os/orch_state.h:45
 
-{#structs_lipo_table}
+Padding for 32-bit alignment.
+
+
 
 ## [struct].s_lipo_table
 
@@ -9990,7 +9567,7 @@ Defined in h1os/orch_state.h:44
 struct [struct].s_lipo_table
 ```
 
-Defined in sub_power.c:28
+Defined in sub_power.c:59
 
 ### Public Attributes
 
@@ -10001,19 +9578,15 @@ Defined in sub_power.c:28
 
 ---
 
-{#mv}
-
 #### mv
 
 ```cpp
 uint16_t mv
 ```
 
-Defined in sub_power.c:29
+Defined in sub_power.c:60
 
 ---
-
-{#pct}
 
 #### pct
 
@@ -10021,9 +9594,9 @@ Defined in sub_power.c:29
 uint8_t pct
 ```
 
-Defined in sub_power.c:30
+Defined in sub_power.c:61
 
-{#structparamspcm}
+
 
 ## [struct].params.pcm
 
@@ -10031,7 +9604,7 @@ Defined in sub_power.c:30
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:63
 
 ### Public Attributes
 
@@ -10043,19 +9616,15 @@ Defined in sub_audio.c:62
 
 ---
 
-{#samples}
-
 #### samples
 
 ```cpp
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:64
 
 ---
-
-{#sample_count}
 
 #### sample_count
 
@@ -10063,11 +9632,9 @@ Defined in sub_audio.c:63
 size_t sample_count
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:65
 
 ---
-
-{#sample_rate_hz}
 
 #### sample_rate_hz
 
@@ -10075,9 +9642,9 @@ Defined in sub_audio.c:64
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:66
 
-{#structparamstone}
+
 
 ## [struct].params.tone
 
@@ -10085,7 +9652,7 @@ Defined in sub_audio.c:65
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:56
 
 ### Public Attributes
 
@@ -10096,19 +9663,15 @@ Defined in sub_audio.c:55
 
 ---
 
-{#frequency_hz}
-
 #### frequency_hz
 
 ```cpp
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:57
 
 ---
-
-{#duration_ms}
 
 #### duration_ms
 
@@ -10116,9 +9679,9 @@ Defined in sub_audio.c:56
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:58
 
-{#structsession}
+
 
 ## [struct].session
 
@@ -10139,8 +9702,6 @@ Defined in h1os/h1os.h:95
 
 ---
 
-{#inactivity_timeout_sec}
-
 #### inactivity_timeout_sec
 
 ```cpp
@@ -10152,8 +9713,6 @@ Defined in h1os/h1os.h:96
 Inactivity sleep timer (default: 30s).
 
 ---
-
-{#enable_dfs_80mhz}
 
 #### enable_dfs_80mhz
 
@@ -10167,8 +9726,6 @@ Enable 80 MHz power droop while waiting for input (default: true).
 
 ---
 
-{#flow_a_period_sec}
-
 #### flow_a_period_sec
 
 ```cpp
@@ -10181,8 +9738,6 @@ Flow A headless sensor sample burst interval (default: 60s).
 
 ---
 
-{#flow_b_period_sec}
-
 #### flow_b_period_sec
 
 ```cpp
@@ -10193,7 +9748,7 @@ Defined in h1os/h1os.h:99
 
 Flow B main application wake interval (default: 120s).
 
-{#structparamschime}
+
 
 ## [struct].params.chime
 
@@ -10201,7 +9756,7 @@ Flow B main application wake interval (default: 120s).
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -10211,17 +9766,15 @@ Defined in sub_audio.c:59
 
 ---
 
-{#chime_type}
-
 #### chime_type
 
 ```cpp
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:61
 
-{#structpresentation}
+
 
 ## [struct].presentation
 
@@ -10242,8 +9795,6 @@ Defined in h1os/h1os.h:87
 
 ---
 
-{#on_splash}
-
 #### on_splash
 
 ```cpp
@@ -10257,8 +9808,6 @@ Defined in h1os/h1os.h:88
 Custom splash rendering callback.
 
 ---
-
-{#on_chime}
 
 #### on_chime
 
@@ -10274,8 +9823,6 @@ Custom chime callback.
 
 ---
 
-{#chime_mask}
-
 #### chime_mask
 
 ```cpp
@@ -10288,8 +9835,6 @@ Hardware synthesized chime bitmask.
 
 ---
 
-{#volume_pct}
-
 #### volume_pct
 
 ```cpp
@@ -10300,7 +9845,7 @@ Defined in h1os/h1os.h:91
 
 Initial audio output volume (0 - 100%, default 60% if 0).
 
-{#unionparams}
+
 
 ## [union].params
 
@@ -10308,7 +9853,7 @@ Initial audio output volume (0 - 100%, default 60% if 0).
 union [union].params
 ```
 
-Defined in sub_audio.c:54
+Defined in sub_audio.c:55
 
 ### Public Attributes
 
@@ -10320,19 +9865,15 @@ Defined in sub_audio.c:54
 
 ---
 
-{#tone}
-
 #### tone
 
 ```cpp
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:59
 
 ---
-
-{#chime}
 
 #### chime
 
@@ -10340,11 +9881,9 @@ Defined in sub_audio.c:58
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:62
 
 ---
-
-{#pcm}
 
 #### pcm
 
@@ -10352,9 +9891,9 @@ Defined in sub_audio.c:61
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:67
 
-{#structparamstone}
+
 
 ## [struct].params.tone
 
@@ -10362,7 +9901,7 @@ Defined in sub_audio.c:66
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:56
 
 ### Public Attributes
 
@@ -10373,19 +9912,15 @@ Defined in sub_audio.c:55
 
 ---
 
-{#frequency_hz}
-
 #### frequency_hz
 
 ```cpp
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:57
 
 ---
-
-{#duration_ms}
 
 #### duration_ms
 
@@ -10393,9 +9928,9 @@ Defined in sub_audio.c:56
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:58
 
-{#structparamschime}
+
 
 ## [struct].params.chime
 
@@ -10403,7 +9938,7 @@ Defined in sub_audio.c:57
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -10413,17 +9948,15 @@ Defined in sub_audio.c:59
 
 ---
 
-{#chime_type}
-
 #### chime_type
 
 ```cpp
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:61
 
-{#structparamspcm}
+
 
 ## [struct].params.pcm
 
@@ -10431,7 +9964,7 @@ Defined in sub_audio.c:60
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:63
 
 ### Public Attributes
 
@@ -10443,19 +9976,15 @@ Defined in sub_audio.c:62
 
 ---
 
-{#samples}
-
 #### samples
 
 ```cpp
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:64
 
 ---
-
-{#sample_count}
 
 #### sample_count
 
@@ -10463,11 +9992,9 @@ Defined in sub_audio.c:63
 size_t sample_count
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:65
 
 ---
-
-{#sample_rate_hz}
 
 #### sample_rate_hz
 
@@ -10475,6 +10002,6 @@ Defined in sub_audio.c:64
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:66
 
 Generated by [Moxygen](https://0state.com/moxygen)

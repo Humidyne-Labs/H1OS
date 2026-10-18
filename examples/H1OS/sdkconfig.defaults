@@ -44,6 +44,8 @@ CONFIG_RTC_CLK_SRC_INT_RC=y
 CONFIG_ULP_COPROC_ENABLED=y
 CONFIG_ULP_COPROC_TYPE_RISCV=y
 CONFIG_ULP_COPROC_RESERVE_MEM=4096
+CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y
+
 
 # =========================================================================
 # Networking & Wi-Fi Configuration (Low-Memory Footprint)

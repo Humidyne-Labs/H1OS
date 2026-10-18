@@ -79,12 +79,12 @@ graph TD;
     subgraph Flow_B_Domain ["Flow B: Main OS Wake (Every 120s RTC or Button Tap)"]
         B_WAKE["Flow B Wake (Never Reads SHTC3)"];
         B_GLASS["Read SSD1681 Glass Temp (0x1B) BEFORE Display Use"];
-        B_SCAN["Scan ring[32]: Window Floor/Ceiling, Short-Term Window Avgs, & Long-Term temp_historical (EWMA)"];
-        B_CONF["Compute T_trinode = (T_valid + T_die + T_glass) / 3 & Confidence (0-100%)"];
+        B_SCAN["Scan ring[32]: Window Floor/Ceiling, Short-Term Window Avgs, and Long-Term temp_historical (EWMA)"];
+        B_CONF["Compute T_trinode = (T_valid + T_die + T_glass) / 3 and Confidence (0-100%)"];
         B_CHK{"valid_trend < 2 OR SHTC3_avg > Die_avg?"};
         B_NORM["Use Unsmoothed T_valid as T_amb -> Compute Magnus Math"];
         B_PROMOTE["Promote Die/Glass Reference as T_amb -> Reconstruct Compensated Telemetry"];
-        B_UI["Render LVGL UI & Enter Unified Sleep Funnel"];
+        B_UI["Render LVGL UI and Enter Unified Sleep Funnel"];
 
         B_WAKE --> B_GLASS --> B_SCAN --> B_CONF --> B_CHK;
         B_CHK -- "NO (Settled & In Ballpark)" --> B_NORM --> B_UI;
@@ -107,7 +107,7 @@ Flow A runs **strictly** inside [`bsp_wake_stub()`](file:///c:/Users/Matt/Docume
    - Enable the internal SAR temperature sensor directly via RTC/SAR registers (`SENS.sar_tsens_ctrl.tsens_power_up = 1`), delay `50 µs`, read the 8-bit raw code `tsens_raw = SENS.sar_tsens_ctrl.tsens_out`, power down `tsens_power_up = 0`, and convert to centi-°C using fixed-point integer arithmetic:
 
 $$
-T_{\text{die(centi)}} = (438 \times \text{tsens\_raw}) - 27880 - 20450 \quad [0.01^\circ\text{C}]
+T_{\text{die(centi)}} = (438 \times \text{tsens-raw}) - 27880 - 20450 \quad [0.01^\circ\text{C}]
 $$
 
 3. **SHTC3 Normal-Power Readout (`~15 ms`):**
@@ -140,7 +140,7 @@ $$
   - Update the consecutive settled trend counter:
     - If starting a new settled streak (`st->valid_trend == 0`), both the back-marked previous sample and the new sample are now valid, so **`st->valid_trend = 2`** (cleanly satisfying Flow B's `valid_trend >= 2` gate as soon as the first settled pair completes).
     - If continuing an existing settled streak (`st->valid_trend >= 2`), increment **`st->valid_trend++`**.
-  - Compute trend rate metric: $\text{Trend Rate} = \frac{\text{valid\_trend}}{\text{sample\_interval\_sec}}$.
+  - Compute trend rate metric: $\text{Trend Rate} = \frac{\text{valid-trend}}{\text{sample-interval-sec}}$.
 - **Case 2 — Thermally Unstable (`st->total_samples > 0` AND $\Delta T_{\text{step}} > 20$ centi-°C):**
   - Mark the new sample `SAMPLE_FLAG_VALID_COLD = 0`.
   - Reset consecutive settled trend counter: `st->valid_trend = 0`.

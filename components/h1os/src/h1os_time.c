@@ -20,7 +20,7 @@ static void *s_sync_user_data = NULL;
 
 esp_err_t h1os_time_set_timezone(const char *tz_str)
 {
-    if (tz_str == NULL || strlen(tz_str) == 0) {
+    if (tz_str == NULL || strlen(tz_str) == 0 || strlen(tz_str) > 64) {
         tz_str = "UTC";
     }
     setenv("TZ", tz_str, 1);

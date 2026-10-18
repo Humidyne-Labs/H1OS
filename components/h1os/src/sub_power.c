@@ -292,20 +292,20 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     hal_io_isolate_sleep_pads();
 
-    /* 1. Calculate dynamic slicing ratio and discard fractional remainder */
+    /* 1. Calculate dynamic slicing ratio and remainder for Two-Stage RTC Arming */
     uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
     uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
     if (flow_a_sec == 0) flow_a_sec = 60;
     if (flow_b_sec == 0) flow_b_sec = 300;
 
-    /* Integer floor division: N_overflow = floor(flow_b_sec / flow_a_sec).
-     * Deliberately discard remainder fraction (flow_b_sec % flow_a_sec)
-     * to lock execution onto a clean integer multiple of the polling tick. */
-    uint32_t overflow = flow_b_sec / flow_a_sec;
+    uint32_t full_slices = flow_b_sec / flow_a_sec;
+    uint32_t remainder   = flow_b_sec % flow_a_sec;
+    /* Total ticks to reach Flow B: full slices + 1 remainder tick (if remainder > 0) */
+    uint32_t overflow = full_slices + (remainder > 0 ? 1 : 0);
     if (overflow == 0) overflow = 1;
 
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
-        /* Arm external PCF85063A countdown timer in repetitive pulsed mode for small period (flow_a_sec) */
+        /* Arm external PCF85063A countdown timer in repetitive pulsed mode for base Flow A period */
         sub_rtc_arm_countdown(flow_a_sec);
     }
 
@@ -314,16 +314,15 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         ulp_slice_counter = 0;
     }
     ulp_dispatch_reason  = 0;
-    ulp_last_wake_btn    = 0;
-    ulp_last_wake_cause  = 0;
     ulp_rtc_int_stuck    = 0;
     ulp_usb_connected    = sub_power_connected_usb() ? 1 : 0;
+    asm volatile("memw" ::: "memory");
 
-    ESP_LOGI(TAG, "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> Slices=%lu (SliceAcc=%lu, Remainder %lu s discarded, USB=%lu)",
+    ESP_LOGI(TAG, "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> FullSlices=%lu, Remainder=%lus -> TotalOverflowLimit=%lu (SliceAcc=%lu, USB=%lu)",
              (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST",
              (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,
+             (unsigned long)full_slices, (unsigned long)remainder,
              (unsigned long)overflow, (unsigned long)ulp_slice_counter,
-             (unsigned long)(flow_b_sec % flow_a_sec),
              (unsigned long)ulp_usb_connected);
 
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
@@ -350,29 +349,41 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
 
+    /* Route Battery ADC (GPIO 4) to RTC analog subsystem for ULP sampling (no wakeup bits) */
+    rtc_gpio_init(HAL_PIN_BATTERY_ADC);
+    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
+    rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
+    rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
+
     /* ULP coprocessor wake source for the main application */
     esp_sleep_enable_ulp_wakeup();
 
     /* 5. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    esp_rom_delay_us(120); /* Guaranteed >= 3.9 RTC_SLOW_CLK cycles on XTAL32K */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    /* 6. Allow slow clock domain synchronization delay (>= 3 RTC_SLOW_CLK cycles) */
-    esp_rom_delay_us(50);
+    /* 6. Allow slow clock domain synchronization delay (>= 4 RTC_SLOW_CLK cycles) */
+    esp_rom_delay_us(120);
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
+    ESP_LOGI(TAG, "Pre-Sleep Audit: ULP_CP_TIMER=0x%08lx, GPIO_STATUS=0x%08lx",
+             (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
+             (unsigned long)REG_READ(RTC_GPIO_STATUS_REG));
     ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
              (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),
              (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
              (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
-    ESP_LOGI(TAG, "RTC Controller: ULP_CP_TIMER=0x%08lx, RTC_STATUS=0x%08lx, RTC_IN=0x%08lx",
-             (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
-             (unsigned long)REG_READ(RTC_GPIO_STATUS_REG),
-             (unsigned long)REG_READ(RTC_GPIO_IN_REG));
+    /* Two-Domain Architecture Invariant (Doc 13):
+     * Digital pad auto-hold (GPIO 42 PA_EN, GPIO 46 PA_CTRL) was already cleanly armed
+     * in hal_io_isolate_sleep_pads(). RTC IO pads (GPIO 0..21) are governed exclusively
+     * by RTC_CNTL_PAD_HOLD_REG and are strictly unheld for wake inputs (IO0, IO18, IO5, IO4). */
 
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
              (unsigned long)flow_a_sec, (unsigned long)overflow);
@@ -385,8 +396,6 @@ esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_
     return sub_power_enter_deep_sleep_mode(sleep_seconds, ext1_pins_mask, SUB_POWER_SLEEP_FULL_CYCLE);
 }
 
-
-
 void sub_power_cut_power_latch(void)
 {
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");
@@ -398,4 +407,4 @@ bool sub_power_connected_usb(void)
     bool usb_state = hal_check_usb_ll();
     ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
     return usb_state;
-}
+}

@@ -84,9 +84,6 @@ static volatile bool     s_audio_is_busy     = false;
 /** @brief Volume percentage (0% unconfigured/muted until set by lifecycle presentation) */
 static uint8_t           s_volume_pct        = 0;
 
-
-
-
 /*
  * Perceptual Volume Lookup Table (0% to 100%)
  * Maps 0%-100% input to Register 0x32 values using a logarithmic scale:
@@ -148,6 +145,23 @@ static esp_err_t sub_audio_read_chip_id(uint16_t* chip_id)
     }
 
     return ESP_OK;
+}
+
+static esp_err_t sub_audio_flush_frame(void)
+{
+    /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
+     * cleanly through the DAC interpolation pipeline.
+     */
+    //uint8_t bootstrap = 0;
+    esp_err_t ret = ESP_OK;
+    int16_t postroll[FRAME_SIZE] = {0};
+    //while(bootstrap++ < 4) {
+    size_t postroll_written = 0;
+    ret = i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
+    ret = ((ret == ESP_OK) && (postroll_written == FRAME_SIZE)) ? ESP_OK : ESP_ERR_INVALID_STATE; //confirm flush wright
+    vTaskDelay(pdMS_TO_TICKS(20));
+    //}
+    return ret;
 }
 
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
@@ -265,6 +279,8 @@ esp_err_t sub_audio_init(void)
     sub_audio_read_chip_id(&chip_id);
     if(chip_id != 0x8311) {
         ESP_LOGE(TAG, "Chip ID NOT Valid (0x%04X)", chip_id);
+        s_audio_inited = false;
+        return ESP_ERR_INVALID_VERSION;
     } else {
         ESP_LOGI(TAG, "Chip ID Valid (0x%04X)", chip_id);
     }
@@ -328,19 +344,40 @@ esp_err_t sub_audio_init(void)
     es8311_write_reg(0x32, vol_reg);                           /* Write initial DAC volume */
     es8311_write_reg(0x31, (s_volume_pct == 0) ? 0x60 : 0x00); /* Unmute DAC DSM/DEM       */
 
-    /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) for instant click response */
+    sub_audio_flush_frame(); // 20ms flush
+
+    /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) with Direct-to-Task Handshake */
     if (s_audio_queue == NULL) {
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
-            xTaskCreatePinnedToCore(
+            TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
+            BaseType_t res = xTaskCreatePinnedToCore(
                 audio_worker_task,
                 "h1os_audio_worker",
                 4096,
-                NULL,
+                (void *)current_task,
                 6,
                 &s_audio_task_handle,
                 tskNO_AFFINITY
             );
+            if (res == pdPASS) {
+                /* Block until worker signals, or timeout after 500ms */
+                if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
+                    ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
+                    vTaskDelete(s_audio_task_handle);
+                    s_audio_task_handle = NULL;
+                    vQueueDelete(s_audio_queue);
+                    s_audio_queue = NULL;
+                    return ESP_ERR_TIMEOUT;
+                }
+            } else {
+                ESP_LOGE(TAG, "Failed to create audio worker task: %d", res);
+                vQueueDelete(s_audio_queue);
+                s_audio_queue = NULL;
+                return ESP_ERR_NO_MEM;
+            }
+        } else {
+            return ESP_ERR_NO_MEM;
         }
     }
 
@@ -441,14 +478,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
-
-    /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
-     * cleanly through the DAC interpolation pipeline before worker goes idle */
-    /*
-    int16_t postroll[FRAME_SIZE] = {0};
-    size_t postroll_written = 0;
-    i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
-    */ // Pipe flush not needed here, all it does is burn compute cycles.
+    // 'NO' Delay here
 }
 
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
@@ -496,9 +526,10 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     // 2. Unmute NS4168 Class-D amplifier if not already active
     if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
         gpio_set_level(HAL_PIN_PA_CTRL, 1);
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 
+    //sub_audio_flush_frame(); //20ms flush
     return ESP_OK;
 }
 
@@ -580,8 +611,14 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
 /* FreeRTOS Audio Background Worker Task */
 static void audio_worker_task(void *pvParameters)
 {
+    TaskHandle_t creator_task = (TaskHandle_t)pvParameters;
     audio_cmd_t cmd;
     ESP_LOGI(TAG, "Audio worker task initialized and active");
+
+    /* Signal creator task that worker initialization is complete and loop is starting */
+    if (creator_task != NULL) {
+        xTaskNotifyGive(creator_task);
+    }
 
     while (1) {
         if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {

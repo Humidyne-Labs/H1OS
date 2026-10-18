@@ -43,7 +43,9 @@ h1os/ (Repository Root)
         ├── 08_lessons_learned.md      <-- Post-Mortem & Architectural Rationale
         ├── 09_roadmap.md              <-- Canonical Phased Construction Plan & Milestones
         ├── 10_changelog.md            <-- Release Policy & SemVer Management
-        └── 11_benchmarks.md           <-- Class-E Hardware Benchmarking & Silicon Metrics
+        ├── 11_benchmarks.md           <-- Class-E Hardware Benchmarking & Silicon Metrics
+        ├── 12_temperature_sensor_operation.md <-- SHTC3 & TSENS Dual Temperature Sensor Architecture
+        └── 13_gpio_hold_domains_and_sleep_architecture.md <-- Silicon Hold Domains & Low-Power Sleep Architecture
 ```
 
 ---

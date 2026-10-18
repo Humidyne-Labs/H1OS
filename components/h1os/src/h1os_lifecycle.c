@@ -242,6 +242,16 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         int64_t t_duration_us = esp_timer_get_time() - t_start_us;
         ESP_LOGI(TAG, "[FLOW A METRICS] Execution duration: %lld us (%.2f ms) | Ring Head: %u/32",
                  t_duration_us, (double)t_duration_us / 1000.0, orch_state_get()->ring_head);
+
+        /* Drain GPIO 5 pulse: Wait for external PCF85063A ~15.6ms open-drain pulse to release HIGH.
+         * Bounded to 25ms timeout. Entering deep sleep while the line is held LOW causes immediate
+         * false triggers, missed edge transitions, and PMU arbitration aborts! */
+        uint32_t drain_wait_us = 0;
+        while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 25000) {
+            esp_rom_delay_us(500);
+            drain_wait_us += 500;
+        }
+
         /* Re-enter deep sleep immediately; display and audio remain untouched.
          * Invariant: Use SUB_POWER_SLEEP_FLOW_A_BURST mode!
          * Preserves the running external PCF85063A countdown and the ULP slice_counter accumulator
@@ -269,7 +279,11 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
 
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();
-        if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
+        if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
+            ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
+            /* Prevent immediate re-sleep loop on coprocessor trap: allow interactive session to inspect fault */
+            is_rtc_wake = false;
+        } else if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
             button_woke = (ulp_last_wake_btn != 0);
             if (!button_woke) {
                 is_rtc_wake = true;
@@ -320,7 +334,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
             .boot_count         = orch_state_get()->boot_count,
             .deep_sleep_count   = orch_state_get()->wake_count,
             .woke_from_button   = button_woke,
-            .wake_button        = 0,
+            .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : 0,
             .sleep_duration_sec = orch_state_get()->sample_interval_sec,
             .user_data          = s_app_lifecycle.user_data
         };

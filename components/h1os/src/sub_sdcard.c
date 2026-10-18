@@ -43,41 +43,9 @@ static void sdcard_mount_worker_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-bool sub_sdcard_probe(void)
-{
-    if (s_sd_card != NULL) {
-        return true;
-    }
-    if (s_card_absent_latched) {
-        return false;
-    }
-
-    /* Fast electrical check on DAT0 (GPIO 40) and CMD (GPIO 41):
-     * Pull down briefly. SD cards actively pull DAT0/CMD high on power-up.
-     * Note: Waveshare PCB has external 10k pull-ups, so electrical pull-down probe
-     * may read high even without a card. Initial mount timeout confirms true presence. */
-    gpio_config_t probe_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_SD_MISO) | (1ULL << HAL_PIN_SD_MOSI),
-        .mode         = GPIO_MODE_INPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_ENABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&probe_cfg);
-    esp_rom_delay_us(100);
-
-    int miso_lvl = gpio_get_level(HAL_PIN_SD_MISO);
-    int mosi_lvl = gpio_get_level(HAL_PIN_SD_MOSI);
-
-    /* Release pull-downs and de-init pins back to default reset state so SDMMC host receives pristine pads */
-    gpio_pulldown_dis(HAL_PIN_SD_MISO);
-    gpio_pulldown_dis(HAL_PIN_SD_MOSI);
-    gpio_reset_pin(HAL_PIN_SD_MISO);
-    gpio_reset_pin(HAL_PIN_SD_MOSI);
-
-    /* If both pins were pulled to ground, definitely no card attached */
-    return (miso_lvl != 0 || mosi_lvl != 0);
-}
+// All ESP32 connected SD/MMC io has been fitted with external pullups of 10K
+// This function will fail on probe, due to the hardware configureation.
+// "bool sub_sdcard_probe(void)" has been pruned.
 
 esp_err_t sub_sdcard_mount_async(void)
 {
@@ -106,25 +74,20 @@ esp_err_t sub_sdcard_mount(void)
         return ESP_ERR_NOT_FOUND;
     }
 
-    /* Fast pre-flight check: don't touch SDMMC peripheral if slot is empty */
-    if (!sub_sdcard_probe()) {
-        ESP_LOGD(TAG, "MicroSD pre-flight check: No card detected. Skipping SDMMC bus init.");
-        return ESP_ERR_NOT_FOUND;
-    }
-
     /* FatFS Mount Configuration:
      * .allocation_unit_size specifies cluster size in bytes ONLY if the card is formatted
      * by FatFS (i.e. format_if_mount_failed == true). Setting to 0 enables FatFS auto-allocation
      * based on SD card volume geometry and sector count. */
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
-        .max_files              = 5,
+        .max_files              = 1,
         .allocation_unit_size   = 0, /* 0 = Auto-determine cluster allocation unit */
     };
 
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
-    host.flags        = SDMMC_HOST_FLAG_1BIT;
+    sdmmc_host_t host       = SDMMC_HOST_DEFAULT();
+    host.max_freq_khz       = SDMMC_FREQ_DEFAULT;
+    host.flags              = SDMMC_HOST_FLAG_1BIT;
+    host.command_timeout_ms = 3; // set for 3ms command timeout
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;

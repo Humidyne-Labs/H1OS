@@ -95,42 +95,74 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     uint16_t area_h     = (area->y2 - area->y1 + 1);
     uint32_t src_stride = lv_draw_buf_width_to_stride(area_w, LV_COLOR_FORMAT_I1);
 
-    if ((area->x1 % 8 == 0) && (area_w % 8 == 0) && (dest_buf != NULL)) {
-        uint16_t bytes_per_line = area_w   / 8;
-        uint16_t start_byte_x   = area->x1 / 8;
+    if (dest_buf == NULL || src_buf == NULL || area_w == 0 || area_h == 0) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+
+    uint16_t y_start = area->y1;
+    if (y_start >= EPD_HEIGHT) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+    if (y_start + area_h > EPD_HEIGHT) {
+        area_h = EPD_HEIGHT - y_start;
+    }
+
+    const uint32_t epd_stride = EPD_WIDTH / 8;
+
+    // Fast Path: Byte-aligned X offset and width
+    if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
+        uint16_t bytes_per_line = area_w >> 3;
+        uint16_t start_byte_x   = area->x1 >> 3;
+
+        const uint8_t *src = src_buf;
+        uint8_t       *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
 
         for (uint16_t y = 0; y < area_h; y++) {
-            uint16_t      dst_y      = area->y1 + y;
-            uint32_t      dst_offset = (dst_y * (EPD_WIDTH / 8)) + start_byte_x;
-            const uint8_t *src       = src_buf + (y * src_stride);
-            uint8_t       *dst       = dest_buf + dst_offset;
-
-            if (((uintptr_t)src % 4 == 0) && ((uintptr_t)dst % 4 == 0) && (bytes_per_line % 4 == 0)) {
-                const uint32_t *src32 = (const uint32_t *)src;
-                uint32_t       *dst32 = (uint32_t *)dst;
-                uint16_t        words = bytes_per_line / 4;
-                for (uint16_t i = 0; i < words; i++) dst32[i] = src32[i];
-            } else {
-                memcpy(dst, src, bytes_per_line);
-            }
+            memcpy(dst, src, bytes_per_line);
+            src += src_stride;
+            dst += epd_stride;
         }
-    } else if (dest_buf != NULL) {
-        for (uint16_t y = 0; y < area_h; y++) {
-            const uint8_t *src_line = src_buf + (y * src_stride);
-            uint16_t       dst_y    = area->y1 + y;
+    } else {
+        // Optimized Fallback: Unaligned bitwise byte stream (up to 8 px per cycle)
+        uint16_t x1 = area->x1;
+        uint16_t x2 = x1 + area_w - 1;
+        if (x1 < EPD_WIDTH) {
+            if (x2 >= EPD_WIDTH) x2 = EPD_WIDTH - 1;
 
-            for (uint16_t x = 0; x < area_w; x++) {
-                uint8_t bit_val = (src_line[x >> 3] >> (7 - (x & 0x07))) & 0x01;
-                uint16_t px = area->x1 + x;
-                if (px < EPD_WIDTH && dst_y < EPD_HEIGHT) {
-                    uint32_t byte_idx = (dst_y * (EPD_WIDTH / 8)) + (px / 8);
-                    uint8_t bit_mask = 1 << (7 - (px % 8));
-                    if (bit_val) {
-                        dest_buf[byte_idx] |= bit_mask;
-                    } else {
-                        dest_buf[byte_idx] &= ~bit_mask;
-                    }
+            uint32_t first_byte = x1 >> 3;
+            uint32_t last_byte  = x2 >> 3;
+            uint8_t  shift      = x1 & 7;
+
+            uint8_t left_mask  = 0xFF >> shift;
+            uint8_t right_mask = 0xFF << (7 - (x2 & 7));
+
+            for (uint16_t y = 0; y < area_h; y++) {
+                const uint8_t *s = src_buf + (y * src_stride);
+                uint8_t       *d = dest_buf + ((y_start + y) * epd_stride) + first_byte;
+
+                if (first_byte == last_byte) {
+                    uint8_t mask = left_mask & right_mask;
+                    uint8_t val  = (*s >> shift) & mask;
+                    *d = (*d & ~mask) | val;
+                    continue;
                 }
+
+                uint8_t carry = *s;
+                *d = (*d & ~left_mask) | ((carry >> shift) & left_mask);
+                d++;
+
+                for (uint32_t bx = first_byte + 1; bx < last_byte; bx++) {
+                    s++;
+                    uint8_t next = *s;
+                    *d++ = (carry << (8 - shift)) | (next >> shift);
+                    carry = next;
+                }
+
+                s++;
+                uint8_t val = (carry << (8 - shift)) | (*s >> shift);
+                *d = (*d & ~right_mask) | (val & right_mask);
             }
         }
     }

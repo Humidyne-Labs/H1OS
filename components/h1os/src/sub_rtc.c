@@ -179,16 +179,7 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* 1. Stop timer while configuring */
-    pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0);
-
-    /* 2. Clear any pending flags in Control_2 so INT pin is deasserted (HIGH) */
-    uint8_t ctrl2 = 0;
-    pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
-    ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
-    pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
-
-    /* 3. Select 1Hz (seconds) or 1/60Hz (minutes) clock source */
+    /* Select 1Hz (seconds) or 1/60Hz (minutes) clock source */
     uint8_t timer_value = 0;
     uint8_t clk_src     = 0;
 
@@ -200,14 +191,57 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
         timer_value = (uint8_t)((seconds + 59) / 60);
     }
 
-    /* 4. Write timer countdown reload value */
-    esp_err_t err = pcf85063_write_reg_u8(RTC_REG_TIMER_VALUE, timer_value);
+    /* 1. Stop timer safely: Clear TE while preserving clk_src, TIE, and TI_TP (Pulsed Mode).
+     * Do NOT write 0 to Timer_mode, as that sets TI_TP=0 (Level Mode), which immediately
+     * forces the open-drain INT pin LOW if TF is set! */
+    uint8_t stop_mode = clk_src | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
+    esp_err_t err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, stop_mode);
     if (err != ESP_OK) return err;
 
-    /* 5. Start timer in Timer_mode (0x11): TE = 1, TIE = 1, TI_TP = 1 (Repetitive Pulsed Mode) */
-    uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
-    return pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, timer_mode);
+    /* 2. Write timer countdown reload value */
+    err = pcf85063_write_reg_u8(RTC_REG_TIMER_VALUE, timer_value);
+    if (err != ESP_OK) return err;
 
+    /* 3. Clear any pending flags in Control_2 while preserving COF_OFF */
+    uint8_t ctrl2 = 0;
+    err = pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
+    if (err != ESP_OK) return err;
+
+    ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
+    err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
+    if (err != ESP_OK) return err;
+
+    /* 4. Readback verification of Control_2: Confirm TF and AF are deasserted */
+    uint8_t check_ctrl2 = 0xFF;
+    for (int retry = 0; retry < 3; retry++) {
+        pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);
+        if (!(check_ctrl2 & (CTRL2_TF_MASK | CTRL2_AF_MASK))) {
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    if (check_ctrl2 & (CTRL2_TF_MASK | CTRL2_AF_MASK)) {
+        ESP_LOGE(TAG, "Failed to clear PCF85063A interrupt flags in Control_2: 0x%02x", check_ctrl2);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* 5. Start timer in Timer_mode (0x11): TE = 1, TIE = 1, TI_TP = 1 (Repetitive Pulsed Mode).
+     * Dynamic prescaler mask: (clk_src | 0x07) resulting in 0x17 (1Hz) or 0x1F (1/60Hz) */
+    uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
+    err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, timer_mode);
+    if (err != ESP_OK) return err;
+
+    /* 6. Readback verification of Timer_mode: Confirm timer is enabled in pulse mode */
+    uint8_t check_mode = 0;
+    pcf85063_read_reg(RTC_REG_TIMER_MODE, &check_mode, 1);
+    if ((check_mode & 0x07) != 0x07) {
+        ESP_LOGE(TAG, "Timer_mode readback mismatch (expected 0x%02x, got 0x%02x)", timer_mode, check_mode);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "PCF85063A countdown armed: %lu s (clk_src=0x%02x, val=%u, mode=0x%02x)",
+             (unsigned long)seconds, clk_src, timer_value, timer_mode);
+    return ESP_OK;
 }
 
 esp_err_t sub_rtc_cancel_countdown(void)
@@ -261,5 +295,15 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer)
 
     /* Clear flags while preserving COF_OFF and AIE */
     ctrl2 = (ctrl2 & ~(CTRL2_AF_MASK | CTRL2_TF_MASK)) | CTRL2_COF_OFF;
-    return pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
+    err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
+    if (err != ESP_OK) return err;
+
+    /* Readback verification */
+    uint8_t check_ctrl2 = 0;
+    pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);
+    if (check_ctrl2 & (CTRL2_AF_MASK | CTRL2_TF_MASK)) {
+        ESP_LOGW(TAG, "sub_rtc_get_and_clear_interrupts: flags not cleared (0x%02x)", check_ctrl2);
+    }
+
+    return ESP_OK;
 }

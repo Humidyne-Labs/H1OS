@@ -66,6 +66,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     st->wake_count++;
 
+    /* Check for ULP Coprocessor crash / trap */
+    if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
+        ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
+        return ORCH_FLOW_B_MAIN_WAKE;
+    }
+
     /* Check ULP Coprocessor dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
@@ -375,14 +381,9 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
     /* 5. Put SSD1681 display controller into Deep Sleep Mode 1 (1.0 µA) */
     sub_display_enter_deep_sleep();
 
-    /* 6. Arm external PCF85063A countdown timer if sleep duration > 0 */
-    if (sleep_sec > 0) {
-        sub_rtc_arm_countdown(sleep_sec);
-    }
-
-    /* 7. Sub-Interval Sensor Timing:
-     * Arm internal timer for Flow A sample interval (e.g. 60s) if sample_interval_sec < sleep_sec.
-     * If sample interval is disabled or >= sleep_sec, sleep purely until external RTC expires. */
+    /* 6. Sub-Interval Sensor Timing & Centralized RTC Countdown Arming:
+     * Note: Countdown timer arming is handled exclusively inside sub_power_enter_deep_sleep_mode()
+     * to eliminate back-to-back I2C STOP/START/RELOAD cycles and avoid asynchronous clock-domain collisions! */
     uint32_t sample_sec = orch_state_get()->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;
     if (sample_sec > 0 && sample_sec < sleep_sec) {
@@ -391,6 +392,15 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 
     ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
              (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
+
+    /* 7. Drain GPIO 5 pulse: Wait for external PCF85063A ~15.6ms open-drain pulse to release HIGH.
+     * Bounded to 25ms timeout. Entering deep sleep while the line is held LOW causes immediate
+     * false triggers, missed edge transitions, and PMU arbitration aborts! */
+    uint32_t drain_wait_us = 0;
+    while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 25000) {
+        esp_rom_delay_us(500);
+        drain_wait_us += 500;
+    }
 
     /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
