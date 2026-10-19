@@ -33,7 +33,10 @@ typedef struct {
     void *user_data;
 } h1os_wake_context_t;
 
-typedef enum { H1OS_SPLASH_BOOT = 0, H1OS_SPLASH_SLEEP, H1OS_SPLASH_SHUTDOWN, H1OS_SPLASH_MAX } h1os_splash_type_t;
+typedef enum { H1OS_SPLASH_BOOT = 0,
+               H1OS_SPLASH_SLEEP,
+               H1OS_SPLASH_SHUTDOWN,
+               H1OS_SPLASH_MAX } h1os_splash_type_t;
 
 typedef enum {
     H1OS_CHIME_BOOT = 0,

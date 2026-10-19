@@ -27,7 +27,8 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
 
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec);
 
-typedef enum { SUB_POWER_SLEEP_FULL_CYCLE = 0, SUB_POWER_SLEEP_FLOW_A_BURST } sub_power_sleep_mode_t;
+typedef enum { SUB_POWER_SLEEP_FULL_CYCLE = 0,
+               SUB_POWER_SLEEP_FLOW_A_BURST } sub_power_sleep_mode_t;
 
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode);
 
