@@ -106,7 +106,11 @@ void      sub_power_cut_power_latch(void);
 esp_err_t sub_audio_init(void);
 esp_err_t sub_audio_deinit(void);
 esp_err_t sub_audio_standby(void);
-esp_err_t sub_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms);
+esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len);
+bool      sub_audio_is_busy(void);
+esp_err_t sub_audio_wait_idle(uint32_t timeout_ms);
+esp_err_t sub_audio_set_volume(uint8_t volume_pct);
+uint8_t   sub_audio_get_volume(void);
 ```
 
 ---
@@ -116,10 +120,12 @@ Lightweight wrapper around ESP-IDF NVS flash for calibration offsets, baseline e
 
 ```c
 esp_err_t sub_nvs_init(void);
-esp_err_t sub_nvs_get_i32(const char *key, int32_t *out_val);
-esp_err_t sub_nvs_set_i32(const char *key, int32_t val);
+esp_err_t sub_nvs_get_u32(const char *key, uint32_t *out_val);
+esp_err_t sub_nvs_set_u32(const char *key, uint32_t val);
 esp_err_t sub_nvs_get_str(const char *key, char *out_str, size_t max_len);
 esp_err_t sub_nvs_set_str(const char *key, const char *str);
+esp_err_t sub_nvs_get_blob(const char *key, void *out_data, size_t *inout_len);
+esp_err_t sub_nvs_set_blob(const char *key, const void *data, size_t len);
 ```
 
 ---

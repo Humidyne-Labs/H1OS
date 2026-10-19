@@ -172,11 +172,10 @@ typedef enum {
 } orch_flow_type_t;
 
 orch_flow_type_t orch_flow_determine_wakeup(void);
-void             orch_flow_execute_sensor_sample(void);
 bool             orch_flow_is_thermal_lockout(void);
-void             orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 esp_err_t        orch_flow_query_telemetry(float *out_t, float *out_rh, float *out_dew);
 esp_err_t        orch_flow_transition_to_sleep(uint32_t sleep_seconds);
+```
 
 ---
 

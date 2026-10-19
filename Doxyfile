@@ -1031,6 +1031,8 @@ WARN_LOGFILE           =
 
 INPUT                  = components/h1os/include \
                          components/h1os/src \
+                         components/h1os/bootloader_components/h1os_boot_hook \
+                         components/h1os/ulp \
                          README.md
 
 # This tag can be used to specify the character encoding of the source files
