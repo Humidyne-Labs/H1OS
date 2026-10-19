@@ -162,8 +162,9 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
         /* Step 1: Clear peripheral interrupt status register first (CDC order) */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 
-        /* Step 2: Spin until RTC controller is ready for wakeup (TRM requirement) */
-        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+        /* Step 2: Spin until RTC controller is ready for wakeup (TRM requirement, bounded) */
+        uint32_t rdy_timeout = 50000;
+        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0);
 
         /* Step 3: Wake Main CPU */
         ulp_riscv_wakeup_main_processor();
@@ -195,7 +196,8 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
         if (rtc_int_stuck) {
             /* Line is stuck LOW: DO NOT re-arm GPIO_WAKEUP_ENA to prevent runaway wake loops.
              * Wake Main CPU to log hardware fault and service PCF85063A over I2C. */
-            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP));
+            uint32_t rdy_timeout = 50000;
+            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0);
             last_wake_cause = 5; /* RTC_INT_STUCK_FAULT */
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
             ulp_riscv_wakeup_main_processor();
@@ -212,6 +214,19 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
 int main(void)
 {
+    /* 0. Guard against execution while Main CPU is awake (e.g. cold-boot init pass):
+     * When sub_power_init_ulp() calls ulp_riscv_config_and_run(), the coprocessor starts
+     * immediately. If the Main CPU has not yet entered deep sleep, RDY_FOR_WAKEUP is 0.
+     * Halt cleanly without triggering spurious wakes or spinning on unready controllers. */
+    if (!REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        ulp_riscv_delay_us(120);
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+        ulp_riscv_halt();
+        return 0;
+    }
+
     wake_counter++;
     asm volatile("fence" ::: "memory");
 
