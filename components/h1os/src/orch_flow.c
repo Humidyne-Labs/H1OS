@@ -246,10 +246,11 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
     }
 
-    /* 7. Psychrometric Math (Magnus Equations from T_valid, RH_valid, and T_amb) */
-    float vp     = orch_math_calc_vapor_pressure(t_valid, rh_valid);
-    float dew    = orch_math_calc_dew_point(t_valid, rh_valid);
-    float rh_amb = orch_math_reconstruct_ambient_rh(vp, t_amb);
+    /* 7. Psychrometric Math (Single-pass Magnus equations from T_valid, RH_valid, and T_amb) */
+    float vp     = 0.0f;
+    float dew    = 0.0f;
+    float rh_amb = 0.0f;
+    orch_math_calc_psychrometrics(t_valid, rh_valid, t_amb, &vp, &dew, &rh_amb);
 
     st->reconstructed_amb_temp_c  = t_amb;
     st->reconstructed_amb_rh_pct  = rh_amb;

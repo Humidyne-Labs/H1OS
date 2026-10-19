@@ -64,6 +64,21 @@ float orch_math_calc_dew_point(float temp_c, float rh_pct);
 float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor_temp_c);
 
 /**
+ * @brief Unified Psychrometric Vector Transform.
+ * Evaluates water vapor pressure invariant (e), true dew point (T_dew),
+ * and reconstructed ambient relative humidity (RH_amb) in a single consolidated pass.
+ *
+ * @param[in]  temp_c        Measured package temperature in Celsius.
+ * @param[in]  rh_pct        Measured package relative humidity in percent.
+ * @param[in]  amb_floor_c   Ambient floor baseline temperature in Celsius.
+ * @param[out] out_vp_hpa    Output vapor pressure in hPa (optional, can be NULL).
+ * @param[out] out_dew_c     Output dew point in Celsius (optional, can be NULL).
+ * @param[out] out_rh_amb    Output reconstructed ambient RH in percent (optional, can be NULL).
+ */
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c,
+                                   float *out_vp_hpa, float *out_dew_c, float *out_rh_amb);
+
+/**
  * @brief Calculate absolute humidity (vapor density) in grams per cubic meter (g/m³).
  * Formula: d_v = 216.7 * (e / (273.15 + T_ambient))
  *

@@ -139,10 +139,6 @@ esp_err_t sub_power_deinit(void)
     return ESP_OK;
 }
 
-static int compare_int(const void *a, const void *b) {
-    return (*(const int *)a - *(const int *)b);
-}
-
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 {
     if (out_mv == NULL) return ESP_ERR_INVALID_ARG;
@@ -169,7 +165,16 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
         samples[i] = raw;
     }
 
-    qsort(samples, 16, sizeof(int), compare_int);
+    /* Fast in-place insertion sort for fixed N=16 */
+    for (int i = 1; i < 16; i++) {
+        int key = samples[i];
+        int j = i - 1;
+        while (j >= 0 && samples[j] > key) {
+            samples[j + 1] = samples[j];
+            j--;
+        }
+        samples[j + 1] = key;
+    }
 
     int sum = 0;
     for (int i = 4; i < 12; i++) {

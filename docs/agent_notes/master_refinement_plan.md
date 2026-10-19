@@ -347,9 +347,9 @@ graph LR
 ### Phase 4: Mathematical & Hardware Register Optimizations
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_math.c`, `components/h1os/src/sub_display.cpp`
 - **Shopping List Tasks:**
-  - [ ] Replace `qsort()` with fast in-place insertion sort in `sub_power_read_battery()`
-  - [ ] Implement unified psychrometric transform in `orch_math.c`
-  - [ ] Consolidate RAM counter and DMA write primitives in `sub_display.cpp`
+  - [x] Replace `qsort()` with fast in-place insertion sort in `sub_power_read_battery()`
+  - [x] Implement unified psychrometric transform in `orch_math.c`
+  - [x] Consolidate RAM counter and DMA write primitives in `sub_display.cpp`
 
 ### Phase 5: Function Decomposition & System Verification
 - **Files:** `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/h1os_lifecycle.c`

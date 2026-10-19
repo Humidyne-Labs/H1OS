@@ -187,14 +187,18 @@ void sub_display_clear(uint8_t color)
     memset(s_current_frame, color, EPD_BUFFER_SIZE);
 }
 
-static void set_ram_counters(void)
+static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
 {
-    uint8_t d_x[] = { 0x00 };
+    static const uint8_t d_x[] = { 0x00 };
+    static const uint8_t d_y[] = { 0x00, 0x00 };
+
     hal_spi_write_cmd(0x4E);
     hal_spi_write_data(d_x, sizeof(d_x));
-    uint8_t d_y[] = { 0x00, 0x00 };
     hal_spi_write_cmd(0x4F);
     hal_spi_write_data(d_y, sizeof(d_y));
+
+    hal_spi_write_cmd(ram_cmd);
+    hal_spi_write_frame_dma(frame_data);
 }
 
 esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
@@ -204,9 +208,7 @@ esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
     memcpy(s_previous_frame, prev_frame, EPD_BUFFER_SIZE);
     memcpy(s_current_frame, prev_frame, EPD_BUFFER_SIZE);
 
-    set_ram_counters();
-    hal_spi_write_cmd(0x26);
-    hal_spi_write_frame_dma(s_previous_frame);
+    epd_commit_ram_dma(0x26, s_previous_frame);
 
     ESP_LOGI(TAG, "SSD1681 RAM 0x26 synchronized with prior frame for differential scan");
     return ESP_OK;
@@ -223,14 +225,10 @@ esp_err_t sub_display_refresh_full(void)
     epd_configure_base_registers();
 
     /* 2. Write to RAM 0x24 (Current Frame) */
-    set_ram_counters();
-    hal_spi_write_cmd(0x24);
-    hal_spi_write_frame_dma(s_current_frame);
+    epd_commit_ram_dma(0x24, s_current_frame);
 
     /* 3. Write to RAM 0x26 (Previous Frame) */
-    set_ram_counters();
-    hal_spi_write_cmd(0x26);
-    hal_spi_write_frame_dma(s_current_frame);
+    epd_commit_ram_dma(0x26, s_current_frame);
 
     /* 4. Display Update Control 2: Full OTP refresh sequence (0xF7) */
     uint8_t d_upd[] = { 0xF7 };
@@ -290,9 +288,7 @@ esp_err_t sub_display_refresh_partial(void)
     int64_t t_start = esp_timer_get_time();
 
     /* 1. Write New Frame to RAM 0x24 (DO NOT overwrite 0x26 in differential mode!) */
-    set_ram_counters();
-    hal_spi_write_cmd(0x24);
-    hal_spi_write_frame_dma(s_current_frame);
+    epd_commit_ram_dma(0x24, s_current_frame);
 
     /* 2. Load SSD1681 Partial LUT partitioned across 5 registers */
     epd_load_custom_lut(WF_PARTIAL_1IN54);
