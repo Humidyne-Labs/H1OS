@@ -1,14 +1,9 @@
-/*
+/**
+ * @file ulp_test_main.c
+ * @brief ULP test firmware main routine
+ *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
- * ESP32-S3 ULP-RISC-V Coprocessor Wakeup Validation Firmware
- *
- * Implements 3 test scenarios with active ISR handlers:
- *   1. Timer Mode (PMU countdown timer only, RTC GPIO wakeup disabled)
- *   2. Event Mode (RTC GPIO wakeup only, PMU timer disabled)
- *   3. Dual Mode  (PMU timer + RTC GPIO wakeups armed concurrently)
- *
- * Includes an internal RTC Slow Memory ASCII Ring Buffer with a custom ulp_printf()
- * that logs all coprocessor operations (wakeups, pin status, ISRs, classification, halts).
  */
 
 #include "shared_test_data.h"
@@ -23,7 +18,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Exported shared telemetry structure (accessible via ulp_test_data on Main CPU) */
 volatile test_shared_data_t test_data = {.magic = ULP_TEST_MAGIC,
                                          .test_stage = TEST_MODE_UNINITIALIZED,
                                          .ulp_entry_count = 0,
@@ -40,8 +34,6 @@ volatile test_shared_data_t test_data = {.magic = ULP_TEST_MAGIC,
                                          .sleep_start_rtc_ticks = 0,
                                          .ulp_elapsed_rtc_ticks = 0,
                                          .log_buf = {.head = 0, .tail = 0, .buffer = {0}}};
-
-/* --- Ring Buffer & ulp_printf Implementation --- */
 
 static void ulp_log_putc(char c)
 {
@@ -167,7 +159,6 @@ int main(void)
                (timer_reg & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0,
                (timer_reg & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0);
 
-    /* Check if Main CPU is in deep sleep and ready to receive wakeup signal */
     bool is_main_ready = REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) != 0;
     if (!is_main_ready) {
         ulp_printf("[ULP] Main CPU not in sleep (init pass). Halting without wake signal.\n");
@@ -180,20 +171,14 @@ int main(void)
         return 0;
     }
 
-    /* 1. Read hardware RTC slow clock timer ticks to measure elapsed time from sleep start */
     SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
     uint32_t now_ticks = READ_PERI_REG(RTC_CNTL_TIME0_REG);
     uint32_t elapsed_ticks = now_ticks - test_data.sleep_start_rtc_ticks;
     test_data.ulp_elapsed_rtc_ticks = elapsed_ticks;
 
-    /* 2. Snapshot raw RTC IO interrupt status register */
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     test_data.ulp_last_gpio_status = rtcio_int_st;
 
-    /* 3. Sample live levels of tested RTC GPIO lines:
-     *    Bit 0: GPIO 18 (PWR button)
-     *    Bit 1: GPIO 0  (BOOT button - monitoring only)
-     */
     int b18 = ulp_riscv_gpio_get_level(GPIO_NUM_18);
     int b0 = ulp_riscv_gpio_get_level(GPIO_NUM_0);
     test_data.ulp_pin_levels = ((b18 ? 1U : 0U) | ((b0 ? 1U : 0U) << 1));
@@ -202,11 +187,6 @@ int main(void)
     ulp_printf("[ULP] Pins Sampled: PWR(18)=%d BOOT(0)=%d RTC_IO_STATUS=0x%08x (ticks=%u)\n", b18, b0, rtcio_int_st,
                elapsed_ticks);
 
-    /* 4. Evaluate triggers:
-     * - In Stage 2 (Pure Event Mode): Hardware PMU timer is strictly disabled.
-     *   Any wake while Main CPU is asleep is 100% a physical RTC GPIO event!
-     * - In Dual or Timer Mode: GPIO triggered if pin is physically LOW or latch caught it.
-     */
     bool timer_enabled = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
     uint32_t min_timer_ticks = (test_data.test_stage == TEST_MODE_TIMER_ONLY) ? 400000U : 1300000U;
     bool timer_expired = timer_enabled && (elapsed_ticks >= min_timer_ticks);
@@ -223,7 +203,6 @@ int main(void)
         ulp_printf("[ULP] Wake Classified: RTC_GPIO_EVENT (b18=%d, latch=0x%08x, ticks=%u)\n", b18, rtcio_int_st,
                    elapsed_ticks);
 
-        /* Drain IO if tactile button is still held down */
         if (b18 == 0) {
             ulp_printf("[ULP] Draining IO (waiting for button release)...\n");
             uint32_t drain_timeout = 50000;
@@ -232,19 +211,16 @@ int main(void)
             }
         }
 
-        /* Stop ULP timer so it does not fire a second wake ~15s later */
         ulp_riscv_timer_stop();
 
         test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
         asm volatile("fence" ::: "memory");
 
-        /* Signal Main CPU to wake */
         test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
         ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
         ulp_riscv_wakeup_main_processor();
         test_data.ulp_completed = 1;
 
-        /* Clear wake latch and halt cleanly */
         ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
@@ -265,13 +241,11 @@ int main(void)
         test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
         asm volatile("fence" ::: "memory");
 
-        /* Signal Main CPU to wake */
         test_data.ulp_step_checkpoint = ULP_CP_WAKE_SIGNALED;
         ulp_printf("[ULP] Signaling Main CPU wakeup (assert RTC_CNTL_SW_CPU_INT)...\n");
         ulp_riscv_wakeup_main_processor();
         test_data.ulp_completed = 1;
 
-        /* Clear wake latch and halt cleanly */
         ulp_printf("[ULP] Pulsing CDC clear latch for 120us...\n");
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
@@ -285,12 +259,9 @@ int main(void)
         ulp_riscv_halt();
         return 0;
     } else {
-        /* Filter transient sleep-entry glitch: pin is HIGH and timer has not reached countdown
-         * threshold */
         ulp_printf("[ULP] Transient Glitch Filtered (b18=%d, ticks=%u < min %u). Resuming sleep.\n", b18, elapsed_ticks,
                    min_timer_ticks);
 
-        /* Clear transient latch and halt without waking Main CPU */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
         ulp_riscv_gpio_wakeup_clear();
         ulp_riscv_delay_us(120);

@@ -1,7 +1,8 @@
 /**
  * @file h1os_lifecycle.c
- * @brief Layer 4: Declarative Application Lifecycle Engine Implementation
+ * @brief Layer 4: Declarative application lifecycle engine implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -79,7 +80,6 @@ static void h1os_session_monitor_task(void *arg)
     while (s_session_running) {
         vTaskDelay(pdMS_TO_TICKS(500));
 
-        /* Inactivity session timeout */
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
             ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
                      (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
@@ -91,7 +91,7 @@ static void h1os_session_monitor_task(void *arg)
                 h1os_shutdown();
                 break;
             }
-            h1os_sleep(sleep_sec); /* Enter deep sleep */
+            h1os_sleep(sleep_sec);
             break;
         }
     }
@@ -99,15 +99,10 @@ static void h1os_session_monitor_task(void *arg)
     vTaskDelete(NULL);
 }
 
-/**
- * @brief Diagnostic dump of ULP wake telemetry and execution performance.
- *        Isolated helper function for development; comment out the call in h1os_start() for release
- * builds.
- */
 static void debug_dump_ulp_telemetry(void)
 {
     uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
-    uint32_t exec_us = exec_cycles / 17; /* ~17.5 MHz RTC_FAST_CLK */
+    uint32_t exec_us = exec_cycles / 17;
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
     ESP_LOGI(TAG,
@@ -135,9 +130,6 @@ static void debug_dump_ulp_telemetry(void)
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
 
-/**
- * @brief Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
- */
 static void h1os_log_flow_banner(orch_flow_type_t flow)
 {
     orch_persisted_state_t *st = orch_state_get();
@@ -188,7 +180,6 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         s_app_lifecycle = *config;
     }
 
-    /* Apply configurable Flow A and Flow B timings to persistent state */
     orch_persisted_state_t *st = orch_state_get();
     if (s_app_lifecycle.session.flow_a_period_sec > 0) {
         st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
@@ -200,33 +191,23 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", H1OS_NAME, H1OS_SUBTITLE,
              h1os_version_get_string(), (unsigned long)st->sample_interval_sec, (unsigned long)st->flow_b_period_sec);
 
-    // 0. Initialize Dynamic Frequency Scaling (Gate CPU to 80 MHz baseline)
     sub_power_init_dfs(s_app_lifecycle.session.enable_dfs_80mhz);
 
-    // 1. Initialize Base Hardware I/O & Release Boot Pad Holds
     hal_io_early_init();
 
-    // 2. Initialize Shared I2C Master Bus (Sensors, RTC, Audio Codec)
     hal_i2c_init();
 
-    // 3. Initialize Persistent Storage Subsystem
     sub_nvs_init();
 
-    // 4. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
     h1os_log_flow_banner(flow);
 
-    /* Dump ULP execution trace and telemetry on every wake */
     if (flow != ORCH_FLOW_BOOT) {
         debug_dump_ulp_telemetry();
     }
 
-    /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
     if (flow == ORCH_FLOW_BOOT) {
         sub_power_init_ulp(st->sample_interval_sec);
-        /* Architectural Invariant: SHTC3 is NEVER sampled during Flow B or on cold boot.
-         * Ring buffer starts with 0.0 NA telemetry; true environmental acquisition begins
-         * on the first quiescent Flow A deep-sleep pulse (60s). */
     }
 
     return flow;
@@ -264,8 +245,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         causes = esp_sleep_get_wakeup_causes();
         if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
             ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
-            /* Prevent immediate re-sleep loop on coprocessor trap: allow interactive session to
-             * inspect fault */
+
             is_rtc_wake = false;
         } else if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
             button_woke = (ulp_last_wake_btn != 0);
@@ -273,7 +253,6 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
                 is_rtc_wake = true;
             }
         } else {
-            /* Internal timer or other unattended wake */
             is_rtc_wake = true;
         }
     }
@@ -287,9 +266,6 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
     }
 
-    /* Architectural Invariant: Initialize the audio subsystem whenever the user is present
-     * (Cold Boot, physical Button Wake).
-     * Only quiescent Flow A bursts & Flow B bypass audio initialization entirely! */
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
         uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
@@ -311,7 +287,6 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
     } else if (s_app_lifecycle.on_wake) {
-        /* Wake chime and wake splash stripped to protect thermal settling and conserve power */
         h1os_wake_context_t ctx = {.reset_reason = esp_reset_reason(),
                                    .wakeup_causes = causes,
                                    .boot_count = orch_state_get()->boot_count,
@@ -323,13 +298,8 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
     }
 
-    // 5. Start LVGL interactive render loop
     h1os_lvgl_start(5, 1);
 
-    // 6. Invariant Governance:
-    //    - If RTC Wake: screen update rendered, go right back to sleep immediately!
-    //    - If Boot or User Button Wake: wait configured inactivity session timeout for user
-    //    interaction.
     if (is_rtc_wake) {
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         bool alarm_f = false, timer_f = false;
@@ -387,11 +357,9 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->dew_point_f = (dew * 9.0f / 5.0f) + 32.0f;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
 
-        /* Reconstructed absolute humidity from invariant vapor pressure and active T_amb */
         out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
-    /* Three-Tier Temporal Hierarchy & Tri-Node Confidence Metrics */
     out_telemetry->window_low_c = (float)st->window_low_temp_centi_c / 100.0f;
     out_telemetry->window_high_c = (float)st->window_high_temp_centi_c / 100.0f;
     out_telemetry->window_avg_shtc3_c = st->window_avg_shtc3_c;
@@ -404,7 +372,6 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     out_telemetry->valid_trend = st->valid_trend;
     out_telemetry->epd_glass_temp_c = (float)st->last_glass_temp_centi_c / 100.0f;
 
-    /* Multi-Node Diagnostics from Ring Buffer (Flow B never reads SHTC3) */
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
@@ -415,7 +382,6 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     }
     out_telemetry->sample_count = st->total_samples;
 
-    /* Battery & Power Acquisition */
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
@@ -446,9 +412,8 @@ static void execute_system_shutdown(bool force_clean_white)
 {
     ESP_LOGI(TAG, "Executing system shutdown (%s)...",
              force_clean_white ? "storage mode: clean white" : "standard mode");
-    s_session_running = false; /* Stop inactivity monitor from racing into h1os_sleep() */
+    s_session_running = false;
 
-    /* Cancel any active external PCF85063A countdown timer so it does not fire in standby */
     sub_rtc_cancel_countdown();
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
@@ -456,11 +421,10 @@ static void execute_system_shutdown(bool force_clean_white)
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
-    // Wait for shutdown chime to finish playing cleanly before cutting power
+
     sub_audio_wait_idle(1500);
     sub_audio_standby();
 
-    /* Display shutdown / storage handling */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
     if (force_clean_white) {
         sub_display_clear_to_white_full();
@@ -470,21 +434,15 @@ static void execute_system_shutdown(bool force_clean_white)
     }
     sub_display_enter_deep_sleep();
 
-    /* The POWER button physically bridges the LDO gate while held, and an
-     * EXT1 ANY_LOW wake would fire instantly if it is still down. Wait for a
-     * stable release (4 x 50 ms HIGH), bounded to 10 s. */
     int stable_high = 0;
     for (int i = 0; i < 200 && stable_high < 4; i++) {
         stable_high = (gpio_get_level(HAL_PIN_BUTTON_POWER) == 1) ? stable_high + 1 : 0;
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    /* Release battery LDO power latch (GPIO 17 LOW). On battery, power dies here. */
     sub_power_cut_power_latch();
     vTaskDelay(pdMS_TO_TICKS(200));
 
-    /* Still running => powered from USB VBUS. Do NOT use sub_power_enter_deep_sleep():
-     * it re-asserts and holds GPIO 17 HIGH. Enter a POWER-button-only deep sleep. */
     ESP_LOGW(TAG, "External power detected; entering standby (wake: POWER button only)");
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);

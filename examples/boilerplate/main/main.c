@@ -1,12 +1,8 @@
 /**
  * @file main.c
- * @brief H1OS Turnkey Starter Application Boilerplate
+ * @brief H1OS turnkey starter application boilerplate
  *
- * Minimal clean-slate boilerplate project for firmware engineers building custom
- * applications atop the H1OS Class-E Environmental Telemetry Operating System.
- *
- * Target: Waveshare ESP32-S3 ePaper 1.54" V2 (200x200 Monochrome EPD)
- *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -23,7 +19,6 @@
 
 static const char *TAG = "boilerplate_app";
 
-/* Persistent Application State in RTC Slow Memory */
 typedef struct {
     uint32_t boot_epoch_sec;
     uint32_t cycle_counter;
@@ -31,10 +26,6 @@ typedef struct {
 
 RTC_DATA_ATTR static app_state_t s_app_state = {0};
 
-/* =========================================================================
- * UI Presentation (Single Clean LVGL v9 Monochrome Card)
- * Geometry: 200x200 px (188 DPI), 1-bit packed typography (14pt & 20pt)
- * ========================================================================= */
 static void render_starter_screen(const h1os_telemetry_t *telem)
 {
     h1os_lvgl_lock(100);
@@ -42,7 +33,6 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
-    // 1. Header Bar: Title (left), Cycle count (right)
     lv_obj_t *header = lv_label_create(scr);
     lv_label_set_text(header, "H1OS STARTER");
     lv_obj_set_style_text_font(header, H1OS_FONT_14, 0);
@@ -53,14 +43,12 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_cycle, H1OS_FONT_14, 0);
     lv_obj_align(lbl_cycle, LV_ALIGN_TOP_RIGHT, -6, 4);
 
-    // Divider Line (Y = 22, X: 4 to 196)
     static lv_point_precise_t div_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *div = lv_line_create(scr);
     lv_line_set_points(div, div_pts, 2);
     lv_obj_set_style_line_width(div, 1, 0);
     lv_obj_set_style_line_color(div, lv_color_black(), 0);
 
-    // 2. Hero Environmental Readings (20pt Bold Numbers)
     lv_obj_t *lbl_temp = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_temp, "%.1f°F", telem->ambient_temp_f);
     lv_obj_set_style_text_font(lbl_temp, H1OS_FONT_20, 0);
@@ -76,7 +64,6 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_metric, H1OS_FONT_14, 0);
     lv_obj_align(lbl_metric, LV_ALIGN_TOP_LEFT, 6, 58);
 
-    // 3. System Metrics Block
     lv_obj_t *lbl_dew = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", telem->dew_point_f);
     lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
@@ -92,13 +79,11 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_pwr, H1OS_FONT_14, 0);
     lv_obj_align(lbl_pwr, LV_ALIGN_TOP_LEFT, 6, 108);
 
-    // 4. Status Bar
     lv_obj_t *lbl_status = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_status, "Status:     %s", telem->is_thermally_settled ? "SETTLED" : "SETTLING");
     lv_obj_set_style_text_font(lbl_status, H1OS_FONT_14, 0);
     lv_obj_align(lbl_status, LV_ALIGN_TOP_LEFT, 6, 132);
 
-    // 5. Footer Bar
     lv_obj_t *lbl_foot = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot, "%s v%" PRIu32 ".%" PRIu32 " READY", H1OS_NAME, h1os_version_get_major(),
                           h1os_version_get_minor());
@@ -116,9 +101,6 @@ static void update_display(void)
     render_starter_screen(&telem);
 }
 
-/* =========================================================================
- * Application Lifecycle Handlers
- * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
     ESP_LOGI(TAG, "Application booted cleanly (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
@@ -145,9 +127,6 @@ static void app_on_shutdown(void *user_data)
     ESP_LOGI(TAG, "System shutting down");
 }
 
-/* =========================================================================
- * Main Entry Point
- * ========================================================================= */
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting H1OS Application Boilerplate");

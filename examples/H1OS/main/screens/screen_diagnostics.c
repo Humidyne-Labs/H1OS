@@ -1,7 +1,8 @@
 /**
  * @file screen_diagnostics.c
- * @brief Screen 4: Verbose OS Diagnostics (Page 4/4)
+ * @brief H1OS showcase application: modular 4-screen environmental telemetry
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -59,20 +60,17 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     orch_persisted_state_t *st = orch_state_get();
 
-    // Row 1: Reset Reason
     lv_obj_t *lbl_rst = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_rst, "Reset:  %s", get_reset_reason_str(esp_reset_reason()));
     lv_obj_set_style_text_font(lbl_rst, H1OS_FONT_14, 0);
     lv_obj_align(lbl_rst, LV_ALIGN_TOP_LEFT, 6, 28);
 
-    // Row 2: Wake Causes
     uint32_t causes = esp_sleep_get_wakeup_causes();
     lv_obj_t *lbl_wake = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_wake, "Wake:   %s", get_wake_causes_str(causes));
     lv_obj_set_style_text_font(lbl_wake, H1OS_FONT_14, 0);
     lv_obj_align(lbl_wake, LV_ALIGN_TOP_LEFT, 6, 48);
 
-    // Row 3: ULP Monitor Dispatch
     const char *ulp_str = "NONE";
     switch (st->ulp_dispatch_reason) {
     case ULP_DISPATCH_SENSOR_SAMPLE:
@@ -100,7 +98,6 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_set_style_text_font(lbl_ulp, H1OS_FONT_14, 0);
     lv_obj_align(lbl_ulp, LV_ALIGN_TOP_LEFT, 6, 68);
 
-    // Row 4: Heap Memory (Free / Minimum Ever Free)
     uint32_t free_heap = esp_get_free_heap_size() / 1024;
     uint32_t min_heap = esp_get_minimum_free_heap_size() / 1024;
     lv_obj_t *lbl_heap = lv_label_create(scr);
@@ -108,26 +105,22 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
 
-    // Row 5: FreeRTOS Task High Watermark
     UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
     lv_obj_t *lbl_stack = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_stack, "Stack:  %u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
     lv_obj_set_style_text_font(lbl_stack, H1OS_FONT_14, 0);
     lv_obj_align(lbl_stack, LV_ALIGN_TOP_LEFT, 6, 114);
 
-    // Row 6: Wakes & Ring Buffer Head
     lv_obj_t *lbl_wakes = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)", (unsigned long)st->wake_count, st->ring_head);
     lv_obj_set_style_text_font(lbl_wakes, H1OS_FONT_14, 0);
     lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
 
-    // Row 7: Dynamic Frequency Scaling
     lv_obj_t *lbl_dfs = lv_label_create(scr);
     lv_label_set_text(lbl_dfs, "CPU:    80MHz (DFS ON)");
     lv_obj_set_style_text_font(lbl_dfs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
 
-    // Footer Bar: Version (left), Target (right) - shortened to fit 200px display
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32, h1os_version_get_major(), h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);

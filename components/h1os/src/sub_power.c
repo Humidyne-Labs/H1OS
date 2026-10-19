@@ -1,7 +1,8 @@
 /**
  * @file sub_power.c
- * @brief Layer 2: Battery ADC Monitoring & Deep Sleep Hardware Driver Implementation
+ * @brief Layer 2: Battery ADC monitoring, DFS, and sleep engine implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -38,7 +39,6 @@ static adc_oneshot_unit_handle_t s_adc_handle = NULL;
 static adc_cali_handle_t s_cali_handle = NULL;
 static bool s_cali_valid = false;
 
-/* 13-point LiPo OCV Discharge Curve (matching legacy hardware calibration) */
 static const struct {
     uint16_t mv;
     uint8_t pct;
@@ -70,7 +70,6 @@ esp_err_t sub_power_init(void)
     if (s_adc_handle != NULL)
         return ESP_OK;
 
-    /* 1. Initialize ADC1 Oneshot Unit in shared ULP RISC-V mode */
     adc_oneshot_unit_init_cfg_t unit_cfg = {
         .unit_id = ADC_UNIT_1,
         .ulp_mode = ADC_ULP_MODE_RISCV,
@@ -81,7 +80,6 @@ esp_err_t sub_power_init(void)
         return err;
     }
 
-    /* 2. Configure Channel 3 (GPIO 4) with 12 dB Attenuation (0 - 3.1V input) */
     adc_oneshot_chan_cfg_t chan_cfg = {
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
@@ -92,7 +90,6 @@ esp_err_t sub_power_init(void)
         return err;
     }
 
-    /* 3. Initialize Calibration Scheme (Curve Fitting on ESP32-S3) */
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     adc_cali_curve_fitting_config_t cali_cfg = {
         .unit_id = ADC_UNIT_1,
@@ -133,7 +130,6 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
     if (out_mv == NULL)
         return ESP_ERR_INVALID_ARG;
 
-    /* Architectural Invariant: If USB is plugged in, VBAT is always 4200 mV (100%) */
     if (sub_power_connected_usb()) {
         *out_mv = 4200;
         if (out_pct != NULL) {
@@ -148,7 +144,6 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
             return err;
     }
 
-    /* 16-sample trimmed mean (drop lowest 4 and highest 4) */
     int samples[16];
     for (int i = 0; i < 16; i++) {
         int raw = 0;
@@ -156,7 +151,6 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
         samples[i] = raw;
     }
 
-    /* Fast in-place insertion sort for fixed N=16 */
     for (int i = 1; i < 16; i++) {
         int key = samples[i];
         int j = i - 1;
@@ -177,11 +171,9 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
     if (s_cali_valid && s_cali_handle != NULL) {
         adc_cali_raw_to_voltage(s_cali_handle, avg_raw, &voltage_mv);
     } else {
-        /* Fallback linear calculation: 12 dB full scale ~3100 mV */
         voltage_mv = (avg_raw * 3100) / 4095;
     }
 
-    /* Resistor divider is 1:2 (200k / 200k), so VBAT = V_ADC * 2 */
     uint16_t vbat_mv = (uint16_t)(voltage_mv * 2);
 
     *out_mv = vbat_mv;
@@ -203,14 +195,12 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
         adc_cali_raw_to_voltage(s_cali_handle, 1000, &v_low);
         adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_high);
 
-        /* Slope m = (v_high - v_low) / (3000 - 1000) */
         int32_t m_scale = (int32_t)(((int64_t)(v_high - v_low) * 4096) / 2000);
         int32_t b_offset = (int32_t)(v_low - ((m_scale * 1000LL) / 4096));
 
         *out_scale = (uint32_t)m_scale;
-        *out_offset_mv = b_offset * 2; /* account for 1:2 divider */
+        *out_offset_mv = b_offset * 2;
     } else {
-        /* Default ideal 12 dB full-scale 3100 mV */
         *out_scale = 3100;
         *out_offset_mv = 0;
     }
@@ -219,7 +209,6 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
 
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 {
-    /* Load binary on cold boot or if ULP memory was reset */
     uint32_t causes = esp_sleep_get_wakeup_causes();
     if (!(causes & BIT(ESP_SLEEP_WAKEUP_ULP))) {
         ESP_LOGI(TAG, "Loading ULP-RISC-V Coprocessor binary...");
@@ -229,10 +218,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* 1. Initialize ADC1 Oneshot and calibration handles prior to calibration extraction */
         sub_power_init();
 
-        /* 2. Pass eFuse linear battery calibration parameters into ULP exported symbols */
         sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
         ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV", (unsigned long)ulp_cal_scale,
                  (long)ulp_cal_offset);
@@ -240,12 +227,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ulp_last_wake_btn = 0;
         ulp_last_vbat_mv = 4000;
 
-        /* Set periodic timer wakeup period (Flow A sample interval, e.g. 60s) */
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
         ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
 
-        /* Configure ULP to wake on GPIO wakeup source per reference architecture (Pure Event Mode)
-         */
         ulp_riscv_cfg_t cfg = {
             .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO,
         };
@@ -255,13 +239,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* Ensure periodic hardware sleep timer is strictly disabled to prevent PMU arbitration
-         * lockup (ERR-001) */
         CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
         SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-        /* Release RTC domain GPIO control back to HP digital matrix so HP application can read
-         * buttons during active boot session */
         rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
         rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
         rtc_gpio_deinit(HAL_PIN_RTC_INT);
@@ -278,7 +258,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     hal_io_isolate_sleep_pads();
 
-    /* 1. Calculate dynamic slicing ratio and remainder for Two-Stage RTC Arming */
     uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
     uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
     if (flow_a_sec == 0)
@@ -288,14 +267,12 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder = flow_b_sec % flow_a_sec;
-    /* Total ticks to reach Flow B: full slices + 1 remainder tick (if remainder > 0) */
+
     uint32_t overflow = full_slices + (remainder > 0 ? 1 : 0);
     if (overflow == 0)
         overflow = 1;
 
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
-        /* Arm external PCF85063A countdown timer in repetitive pulsed mode for base Flow A period
-         */
         sub_rtc_arm_countdown(flow_a_sec);
     }
 
@@ -319,59 +296,46 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
         gpio_num_t pin = wake_pins[i];
 
-        /* 1. Route pad to RTC subsystem */
         rtc_gpio_init(pin);
         rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
 
-        /* 2. Disarm any lingering pad hold on wake inputs */
         rtc_gpio_hold_dis(pin);
 
-        /* 3. Configure pull-ups/pull-downs */
         if (pin == HAL_PIN_RTC_INT) {
             rtc_gpio_pullup_en(pin);
             rtc_gpio_pulldown_dis(pin);
         } else {
-            rtc_gpio_pullup_dis(pin);  // External 10k pull-ups on PCB
+            rtc_gpio_pullup_dis(pin);
             rtc_gpio_pulldown_dis(pin);
         }
 
-        /* 4. Enable level-low wake (sets int_type and wakeup_enable in RTCIO) */
         rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
 
-    /* Route Battery ADC (GPIO 4) to RTC analog subsystem for ULP sampling (no wakeup bits) */
     rtc_gpio_init(HAL_PIN_BATTERY_ADC);
     rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
 
-    /* ULP coprocessor wake source for the main application */
     esp_sleep_enable_ulp_wakeup();
 
-    /* Install RTC Fast Memory deep sleep wake stub (<3ms Flow A sensor burst) */
     orch_wake_stub_install();
 
-    /* Centralized PCF85063A open-drain pulse drain barrier:
-     * Wait for external PCF85063A ~15.6ms pulse on GPIO 5 to release HIGH before clearing latches.
-     * Bounded to 50ms timeout. Entering sleep or clearing latches while line is LOW causes
-     * immediate false wake loops, missed edge transitions, and PMU lockups (ERR-S4)! */
     uint32_t drain_wait_us = 0;
     while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
         esp_rom_delay_us(500);
         drain_wait_us += 500;
     }
 
-    /* 5. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    esp_rom_delay_us(120); /* Guaranteed >= 3.9 RTC_SLOW_CLK cycles on XTAL32K */
+    esp_rom_delay_us(120);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    /* 6. Allow slow clock domain synchronization delay (>= 4 RTC_SLOW_CLK cycles) */
     esp_rom_delay_us(120);
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -381,10 +345,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
              (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)), (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
              (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
-    /* Two-Domain Architecture Invariant (Doc 13):
-     * Digital pad auto-hold (GPIO 42 PA_EN, GPIO 46 PA_CTRL) was already cleanly armed
-     * in hal_io_isolate_sleep_pads(). RTC IO pads (GPIO 0..21) are governed exclusively
-     * by RTC_CNTL_PAD_HOLD_REG and are strictly unheld for wake inputs (IO0, IO18, IO5, IO4). */
 
     ESP_LOGI(TAG,
              "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, "

@@ -1,7 +1,8 @@
 /**
  * @file h1os_time.c
- * @brief Layer 4: System Time Services, Timezone Management & RTC Bridge Implementation
+ * @brief Layer 4: System time services, timezone management, and RTC bridge
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 

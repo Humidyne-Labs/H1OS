@@ -1,7 +1,8 @@
 /**
  * @file orch_flow.c
- * @brief Layer 3: Execution Flow Arbiter & Thermal Lockout MUX Implementation
+ * @brief Layer 3: Execution flow arbiter and thermal lockout MUX implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -36,9 +37,9 @@ static const char *TAG = "orch_flow";
 #include <limits.h>
 #include <math.h>
 
-#define ORCH_HISTORICAL_EWMA_ALPHA 0.25f /* Light EWMA alpha for long-term temp_historical */
-#define ORCH_LEAKAGE_MARGIN_C 0.30f /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
-#define ORCH_TRINODE_SPAN_C 15.0f /* Linear confidence 0-100% span (15.0 C delta = 0%) */
+#define ORCH_HISTORICAL_EWMA_ALPHA 0.25f
+#define ORCH_LEAKAGE_MARGIN_C 0.30f
+#define ORCH_TRINODE_SPAN_C 15.0f
 
 #include "ulp_h1os.h"
 
@@ -48,11 +49,10 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     orch_persisted_state_t *st = orch_state_get();
 
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
-        /* System boot / Power On Reset */
         st->boot_count++;
         if (EFUSE.rd_sys_part1_data4.blk_version_major != 0) {
             uint32_t cal_temp = EFUSE.rd_sys_part1_data4.temp_calib;
-            /* BIT(8) is sign (1: negative, 0: positive); magnitude in 0.1 C (10 centi-C) */
+
             int32_t cal_deci_c =
                 ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp) : (int32_t)((uint8_t)cal_temp);
             st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);
@@ -72,13 +72,11 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     st->wake_count++;
 
-    /* Check for ULP Coprocessor crash / trap */
     if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
         ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
-    /* Check ULP Coprocessor dispatch reason */
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
         if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN ||
@@ -88,18 +86,15 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
-        /* All non-critical, non-bootloader ULP wakeups reaching full OS boot are Flow B Main Wakes
-         */
+
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
-    /* All non-boot wakeups reaching the OS are Flow B Main Wakes */
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
 bool orch_flow_is_thermal_lockout(void)
 {
-    /* Thermally settled once >= 2 successive Flow A samples pass the <= 0.20 C gate */
     return (orch_state_get()->valid_trend < 2);
 }
 
@@ -108,13 +103,11 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
     if (st == NULL)
         return;
 
-    /* Build internal debug arrays */
     float shtc3T_ring[ORCH_RING_CAPACITY];
     float shtc3RH_ring[ORCH_RING_CAPACITY];
     float mcuT_ring[ORCH_RING_CAPACITY];
     float epdT_ring[ORCH_RING_CAPACITY];
 
-    /* Set to known state */
     memset(shtc3T_ring, 0, sizeof(shtc3T_ring));
     memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
     memset(mcuT_ring, 0, sizeof(mcuT_ring));
@@ -153,7 +146,6 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
         }
     }
 
-    /* If no sample in the window is marked VALID_COLD yet, scan all available samples */
     if (valid_cnt == 0) {
         for (uint32_t i = 0; i < count; i++) {
             int16_t s_t = st->ring[i].shtc3_temp_centi_c;
@@ -204,12 +196,6 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 {
     orch_persisted_state_t *st = orch_state_get();
 
-    /* Flow B Invariant: Never query SHTC3 (0x70) in Flow B!
-     * All calculations operate on the 32-sample RTC ring buffer populated by Flow A,
-     * the pre-display SSD1681 Glass Thermistor (st->last_glass_temp_centi_c), and MCU Die TSENS. */
-
-    /* 1. Cold-Boot / Empty Ring Buffer Guard (total_samples == 0):
-     *    Do not fabricate or compute any temperatures on cold boot before Flow A has sampled. */
     if (st->total_samples == 0) {
         ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
                  (double)st->last_glass_temp_centi_c / 100.0);
@@ -222,17 +208,13 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         return ESP_OK;
     }
 
-    /* 2. Read current Glass Temp (cached pre-display in sub_display_init) and Die Temp (from Flow A
-     * ring) */
     float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
     orch_tri_node_sample_t latest_raw = {0};
     orch_state_get_latest_sample(&latest_raw);
     float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
 
-    /* 3. Scan 32-Sample Ring Buffer: Compute Valid Window Floor, Ceiling, & Short-Term Averages */
     orch_flow_scan_ring_metrics(st);
 
-    /* 4. Tier 1 (Current Valid Sample) & Tier 3 (Long-Term temp_historical Light EWMA) */
     orch_tri_node_sample_t valid_samp = {0};
     orch_state_get_latest_valid_sample(&valid_samp);
 
@@ -248,7 +230,6 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         st->rh_historical_pct = orch_math_update_ewma(rh_valid, st->rh_historical_pct, ORCH_HISTORICAL_EWMA_ALPHA);
     }
 
-    /* 5. Tri-Node Composite Mean & 0-100% Linear Confidence Score */
     float t_trinode = (t_valid + t_die + t_glass) / 3.0f;
     float delta_trinode = t_valid - t_trinode;
     float conf = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
@@ -261,14 +242,9 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     st->trinode_delta_c = delta_trinode;
     st->trinode_confidence_pct = (uint8_t)(conf + 0.5f);
 
-    /* 6. Dynamic Ambient Selection (T_amb):
-     *    - Case A (valid_trend < 2): Promote min(T_glass, T_die, T_valid)
-     *    - Case B (window_avg_shtc3 > window_avg_die + margin): Promote min(T_die, T_glass)
-     *    - Typical Settled: Use unsmoothed T_valid directly */
     const char *amb_mode = NULL;
     float t_amb = orch_flow_evaluate_ambient_selection(st, t_valid, t_die, t_glass, &amb_mode);
 
-    /* 7. Psychrometric Math (Single-pass Magnus equations from T_valid, RH_valid, and T_amb) */
     float vp = 0.0f;
     float dew = 0.0f;
     float rh_amb = 0.0f;
@@ -292,7 +268,6 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
              (double)st->window_avg_die_c, (double)st->temp_historical_c, (double)t_glass, (double)t_trinode,
              (double)delta_trinode, st->trinode_confidence_pct);
 
-    /* Dump internal debug arrays modularly */
     orch_flow_dump_ring_debug(st);
 
     if (out_temp_c)
@@ -306,7 +281,6 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 
 static void orch_flow_quiesce_peripherals(void)
 {
-    /* 1. Wait for LVGL render and flush pipeline to drain completely (including badge update) */
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
@@ -316,34 +290,24 @@ static void orch_flow_quiesce_peripherals(void)
         }
     }
 
-    /* 1b. Wait for any background audio playback and soft-ramp teardown to complete */
     if (sub_audio_is_busy()) {
         ESP_LOGI(TAG, "Waiting for audio playback to finish...");
         sub_audio_wait_idle(1000);
     }
     sub_audio_standby();
 
-    /* 2. Wait for physical EPD panel to finish driving electrophoretic particles (GPIO 8 BUSY
-     * falling edge) */
     ESP_LOGI(TAG, "Waiting for EPD panel BUSY line...");
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
-    /* 3. Post-Busy Particle Settling Guard: 250ms delay for micro-capsule voltages to discharge */
     vTaskDelay(pdMS_TO_TICKS(250));
 
-    /* 4. Persist 5000-byte EPD frame to raw flash partition if modified */
     orch_display_sync_save_if_dirty();
 
-    /* 5. Put SSD1681 display controller into Deep Sleep Mode 1 (1.0 µA) */
     sub_display_enter_deep_sleep();
 }
 
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
-    /* 6. Sub-Interval Sensor Timing & Centralized RTC Countdown Arming:
-     * Note: Countdown timer arming is handled exclusively inside sub_power_enter_deep_sleep_mode()
-     * to eliminate back-to-back I2C STOP/START/RELOAD cycles and avoid asynchronous clock-domain
-     * collisions! */
     uint32_t sample_sec = orch_state_get()->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;
     if (sample_sec > 0 && sample_sec < sleep_sec) {
@@ -355,7 +319,6 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
              "= %lus",
              (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
 
-    /* 7. Enter hardware deep sleep with buttons and RTC INT wake sources */
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
 }

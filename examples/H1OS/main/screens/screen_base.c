@@ -1,7 +1,8 @@
 /**
  * @file screen_base.c
- * @brief Common base layout builder for 200x200 monochrome e-Paper screens.
+ * @brief H1OS showcase application: modular 4-screen environmental telemetry
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -19,7 +20,6 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
-    // Bind hardware keypad listener to active screen cleanly
     lv_group_t *def_grp = lv_group_get_default();
     if (def_grp == NULL) {
         def_grp = lv_group_create();
@@ -38,15 +38,11 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_group_focus_obj(scr);
     lv_obj_set_clickable(scr, true);
 
-    // 1. Header Title: Left-aligned at (X: 6, Y: 4)
     lv_obj_t *lbl_title = lv_label_create(scr);
     lv_label_set_text(lbl_title, title);
     lv_obj_set_style_text_font(lbl_title, H1OS_FONT_14, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 6, 4);
 
-    // 2. Invertible Sleep/Wake Status Badge (Page Indicator at Top-Right)
-    //    - Active interactive session (AWAKE): Inverted badge (Black background, White text)
-    //    - Sleeping / Unattended wake (SLEEP): Standard badge (White background, Black text)
     bool is_awake = h1os_is_session_active();
     lv_obj_t *badge = lv_obj_create(scr);
     lv_obj_remove_style_all(badge);
@@ -67,7 +63,6 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     s_active_badge_lbl = lbl_pg;
     s_badge_is_awake = is_awake;
 
-    // Divider Line (Y = 22, X: 4 to 196)
     static lv_point_precise_t line_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line = lv_line_create(scr);
     lv_line_set_points(line, line_pts, 2);

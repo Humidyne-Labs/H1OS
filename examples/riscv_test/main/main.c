@@ -1,11 +1,9 @@
-/*
- * SPDX-License-Identifier: MIT
- * ESP32-S3 ULP-RISC-V Coprocessor Wakeup Validation Test Harness
+/**
+ * @file main.c
+ * @brief ULP-RISC-V verification harness application main
  *
- * Sequentially exercises and evaluates:
- *   - Stage 1: Timer Mode (PMU Countdown only - proves pipeline first)
- *   - Stage 2: Event Mode (RTC GPIO 18 only with 30s fallback timer)
- *   - Stage 3: Dual Mode  (PMU Countdown + RTC GPIO 18 armed concurrently)
+ * Copyright (c) 2026 Humidyne Labs
+ * SPDX-License-Identifier: MIT
  */
 
 #include "driver/gpio.h"
@@ -33,11 +31,9 @@
 
 static const char *TAG = "RISCV_TEST";
 
-/* Note: Power hold (BAT_CTRL, GPIO 17) is latched exclusively by 2nd-stage bootloader hook */
 #define PIN_BUTTON_BOOT GPIO_NUM_0
 #define PIN_BUTTON_PWR GPIO_NUM_18
 
-/* Persisted across deep sleep cycles in RTC Slow Memory */
 RTC_DATA_ATTR static uint32_t s_current_test = 0;
 RTC_DATA_ATTR static uint32_t s_boot_count = 0;
 RTC_DATA_ATTR static bool s_stage1_pass = false;
@@ -49,7 +45,6 @@ extern const uint8_t ulp_riscv_test_bin_end[] asm("_binary_ulp_riscv_test_bin_en
 
 static void clear_stale_rtc_gpio_wake_latch(void)
 {
-    /* Clear any pending RTC GPIO interrupt status and cycle CDC clear pulse */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     esp_rom_delay_us(120);
@@ -58,26 +53,16 @@ static void clear_stale_rtc_gpio_wake_latch(void)
 
 static void configure_rtc_pins(void)
 {
-    /* Ensure no residual RTC hold latches are engaged */
     rtc_gpio_hold_dis(PIN_BUTTON_PWR);
     rtc_gpio_hold_dis(PIN_BUTTON_BOOT);
 
-    /* Configure GPIO 18 (PWR button) - Primary wake trigger.
-     * Enable internal RTC pullup (~45k) to guarantee high idle state if external 10k is absent.
-     * In parallel with external 10k, equivalent pullup is ~8.2k (safe and active high).
-     */
     rtc_gpio_init(PIN_BUTTON_PWR);
     rtc_gpio_set_direction(PIN_BUTTON_PWR, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(PIN_BUTTON_PWR);
     rtc_gpio_pulldown_dis(PIN_BUTTON_PWR);
-    /* Disable automatic sleep switching to prevent pad isolation dip on sleep entry */
+
     gpio_sleep_sel_dis(PIN_BUTTON_PWR);
 
-    /* Configure GPIO 0 (BOOT button) for monitoring only.
-     * CRITICAL: GPIO 0 is an ESP32-S3 boot strapping pin. If held LOW during deep sleep wake reset,
-     * the chip enters ROM download bootloader mode instead of running application code.
-     * Therefore, GPIO 0 is NEVER armed as a deep sleep wake source.
-     */
     rtc_gpio_init(PIN_BUTTON_BOOT);
     rtc_gpio_set_direction(PIN_BUTTON_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(PIN_BUTTON_BOOT);
@@ -243,16 +228,13 @@ static void prepare_serial_and_pins_before_sleep(void)
 
 static void enter_deep_sleep_guarded(test_shared_data_t *d)
 {
-    /* Capture slow clock start ticks for ULP elapsed time verification */
     SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
     d->sleep_start_rtc_ticks = READ_PERI_REG(RTC_CNTL_TIME0_REG);
 
-    /* Always arm 30s hardware fallback timer so device never hangs permanently in deep sleep */
     esp_sleep_enable_timer_wakeup(30000000ULL);
     esp_sleep_enable_ulp_wakeup();
     esp_deep_sleep_start();
 
-    /* If esp_deep_sleep_start returns, the sleep was rejected by hardware! */
     ESP_LOGE(TAG, "FATAL: Deep sleep was REJECTED by hardware! Wakeup trigger was already pending "
                   "at sleep entry.");
     while (1) {
@@ -277,19 +259,15 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
-    /* Cleanly disarm RTC GPIO wake detector and clear stale latches */
     rtc_gpio_wakeup_disable(PIN_BUTTON_PWR);
     rtc_gpio_wakeup_disable(PIN_BUTTON_BOOT);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
     clear_stale_rtc_gpio_wake_latch();
 
-    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
     prepare_serial_and_pins_before_sleep();
 
-    /* Set 5-second wakeup period (5,000,000 microseconds) */
     ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 5000000));
 
-    /* Configure ULP in Timer Mode and immediately sleep */
     ulp_riscv_cfg_t cfg = {.wakeup_source = ULP_RISCV_WAKEUP_SOURCE_TIMER};
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
@@ -322,23 +300,17 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
-    /* Strictly ensure PMU timer is disabled */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
 
-    /* Clear stale RTC GPIO wake latches before arming */
     clear_stale_rtc_gpio_wake_latch();
 
-    /* Arm ONLY GPIO 18 for RTC GPIO wake. GPIO 0 is omitted to prevent ROM boot strapping trap. */
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_disable(PIN_BUTTON_BOOT);
 
-    /* 30-second main CPU fallback wakeup */
     esp_sleep_enable_timer_wakeup(30000000ULL);
 
-    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
     prepare_serial_and_pins_before_sleep();
 
-    /* Configure ULP in Event Mode and immediately sleep */
     ulp_riscv_cfg_t cfg = {.wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO};
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
 
@@ -371,21 +343,15 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     d->ulp_step_checkpoint = 0;
     d->ulp_rdy_timeout = 0;
 
-    /* Clear stale RTC GPIO wake latches before arming */
     clear_stale_rtc_gpio_wake_latch();
 
-    /* Arm RTC GPIO wake detector for GPIO 18 */
     rtc_gpio_wakeup_enable(PIN_BUTTON_PWR, GPIO_INTR_LOW_LEVEL);
     rtc_gpio_wakeup_disable(PIN_BUTTON_BOOT);
 
-    /* Set 15-second wakeup period (15,000,000 microseconds) to clearly distinguish button tap from
-     * timer */
     ESP_ERROR_CHECK(ulp_set_wakeup_period(0, 15000000));
 
-    /* Perform all logging and serial drain DELAYS BEFORE starting the ULP */
     prepare_serial_and_pins_before_sleep();
 
-    /* Arm GPIO wakeup and then assert Timer bit concurrently, then immediately sleep */
     ulp_riscv_cfg_t cfg = {.wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO};
     ESP_ERROR_CHECK(ulp_riscv_config_and_run(&cfg));
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
@@ -407,13 +373,11 @@ void app_main(void)
     uint32_t wake_causes = esp_sleep_get_wakeup_causes();
     test_shared_data_t *p_data = (test_shared_data_t *)&ulp_test_data;
 
-    /* Force RTC peripheral power domain to remain ON to stabilize RTC GPIO comparator */
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     configure_rtc_pins();
 
     if (reset_reason != ESP_RST_DEEPSLEEP || s_current_test == 0) {
-        /* Cold Boot / Power-On Reset */
         s_boot_count = 0;
         s_current_test = TEST_MODE_TIMER_ONLY;
         s_stage1_pass = false;
@@ -440,17 +404,12 @@ void app_main(void)
         p_data->log_buf.tail = 0;
         arm_stage_1_timer_mode(p_data);
     } else {
-        /* Deep Sleep Wakeup */
         s_boot_count++;
 
-        /* Stop the ULP PMU timer immediately from Main CPU to prevent re-triggers during terminal
-         * wait */
         ulp_timer_stop();
 
-        /* Crucial for USB Serial/JTAG: Wait for host PC CDC enumeration and terminal re-attach */
         vTaskDelay(pdMS_TO_TICKS(2000));
 
-        /* Dump and clear coprocessor RTC slow memory ring buffer */
         dump_and_clear_ulp_ring_buffer(p_data);
 
         dump_telemetry_report(s_current_test, wake_causes, p_data);
@@ -488,12 +447,10 @@ void app_main(void)
             printf("========================================================================\n\n");
             fflush(stdout);
 
-            /* Wait for BOOT (GPIO 0) button to be pressed (LOW) */
             while (gpio_get_level(PIN_BUTTON_BOOT) != 0) {
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
 
-            /* Wait for BOOT (GPIO 0) button to be released (HIGH) */
             while (gpio_get_level(PIN_BUTTON_BOOT) == 0) {
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
@@ -503,7 +460,6 @@ void app_main(void)
             fflush(stdout);
             vTaskDelay(pdMS_TO_TICKS(500));
 
-            /* Reset test state and re-arm Stage 1 */
             s_boot_count = 0;
             s_stage1_pass = false;
             s_stage2_pass = false;

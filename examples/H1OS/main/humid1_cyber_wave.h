@@ -1,10 +1,8 @@
 /**
  * @file humid1_cyber_wave.h
- * @brief HUMID1 Cyber-Wave EPD Boot Graphic LVGL Image Descriptor
+ * @brief H1OS showcase application: modular 4-screen environmental telemetry
  *
- * Dimensions: 200 x 200 pixels
- * Format: 1-bit monochrome (LV_COLOR_FORMAT_I1)
- *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 

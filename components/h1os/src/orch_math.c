@@ -1,7 +1,8 @@
 /**
  * @file orch_math.c
- * @brief Layer 3: Class-E Psychrometric & Signal Math Engine Implementation
+ * @brief Layer 3: Class-E psychrometric and signal math implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -14,7 +15,6 @@
 
 float orch_math_calc_sat_vapor_pressure(float temp_c)
 {
-    /* e_s(T) = 6.112 * exp((17.625 * T) / (243.04 + T)) [hPa] */
     return 6.112f * expf((MAGNUS_A * temp_c) / (MAGNUS_B + temp_c));
 }
 
@@ -37,10 +37,8 @@ float orch_math_calc_dew_point(float temp_c, float rh_pct)
     if (rh_norm > 1.0f)
         rh_norm = 1.0f;
 
-    /* gamma = ln(RH/100) + (17.625 * T) / (243.04 + T) */
     float gamma = logf(rh_norm) + (MAGNUS_A * temp_c) / (MAGNUS_B + temp_c);
 
-    /* T_dew = (243.04 * gamma) / (17.625 - gamma) */
     return (MAGNUS_B * gamma) / (MAGNUS_A - gamma);
 }
 
@@ -67,7 +65,6 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c
     if (rh_norm > 1.0f)
         rh_norm = 1.0f;
 
-    /* Single evaluation of Magnus saturation term at sensor temperature */
     float term_t = (MAGNUS_A * temp_c) / (MAGNUS_B + temp_c);
     float es = 6.112f * expf(term_t);
     float vp = rh_norm * es;
@@ -77,7 +74,6 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c
     }
 
     if (out_dew_c) {
-        /* gamma = ln(RH/100) + (17.625 * T) / (243.04 + T) */
         float gamma = logf(rh_norm) + term_t;
         *out_dew_c = (MAGNUS_B * gamma) / (MAGNUS_A - gamma);
     }
@@ -99,7 +95,6 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c
 
 float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_c)
 {
-    /* d_v = 216.7 * (e / (273.15 + T_ambient)) [g/m³] */
     float temp_k = 273.15f + amb_temp_c;
     if (temp_k <= 0.1f)
         return 0.0f;

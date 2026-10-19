@@ -1,7 +1,8 @@
 /**
  * @file sub_nvs.c
- * @brief Layer 2: Non-Volatile Storage (NVS) Subsystem Manager Implementation
+ * @brief Layer 2: Non-volatile storage (NVS) manager implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 

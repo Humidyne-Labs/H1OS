@@ -1,7 +1,8 @@
 /**
  * @file orch_state.c
- * @brief Layer 3: Persistent RTC Slow SRAM State Implementation
+ * @brief Layer 3: Persistent RTC Slow SRAM state implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -17,8 +18,6 @@ static bool s_boot_cleared = false;
 
 orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
 {
-    /* Clean slate on any boot (cold power-on, USB reset, external reset) or invalid magic.
-     * Only deep sleep wakeups (ESP_RST_DEEPSLEEP) preserve the ring buffer across sleep cycles. */
     if (s_persisted_state.magic != ORCH_RTC_MAGIC || (!s_boot_cleared && esp_reset_reason() != ESP_RST_DEEPSLEEP)) {
         orch_state_reset();
         s_boot_cleared = true;
@@ -35,11 +34,11 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     s_persisted_state.magic = ORCH_RTC_MAGIC;
     s_persisted_state.sample_interval_sec = 0;
     s_persisted_state.flow_b_period_sec = 0;
-    s_persisted_state.amb_floor_temp_centi_c = 0; /* 0 indicates uninitialized / NA */
-    s_persisted_state.window_low_temp_centi_c = 0; /* 0 indicates uninitialized / NA */
-    s_persisted_state.window_high_temp_centi_c = 0; /* 0 indicates uninitialized / NA */
-    s_persisted_state.last_glass_temp_centi_c = 0; /* 0 indicates uninitialized / NA */
-    s_persisted_state.trinode_confidence_pct = 0; /* 0 indicates uninitialized / NA */
+    s_persisted_state.amb_floor_temp_centi_c = 0;
+    s_persisted_state.window_low_temp_centi_c = 0;
+    s_persisted_state.window_high_temp_centi_c = 0;
+    s_persisted_state.last_glass_temp_centi_c = 0;
+    s_persisted_state.trinode_confidence_pct = 0;
 }
 
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)
@@ -86,7 +85,6 @@ bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample)
         }
     }
 
-    /* Fallback to latest sample if no sample has been marked valid yet */
     uint8_t latest_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
     *out_sample = st->ring[latest_idx];
     return true;

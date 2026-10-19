@@ -1,6 +1,9 @@
 /**
  * @file power_hold_hook.c
- * @brief Early 2nd-stage bootloader hook to latch BAT_CTRL (GPIO 17) HIGH in < 25ms
+ * @brief Early 2nd-stage bootloader power hold hook for test app
+ *
+ * Copyright (c) 2026 Humidyne Labs
+ * SPDX-License-Identifier: MIT
  */
 
 #include "esp_rom_gpio.h"
@@ -13,12 +16,10 @@
 
 void bootloader_hooks_include(void)
 {
-    // Empty
 }
 
 void bootloader_before_init(void)
 {
-    /* Latch BAT_CTRL (GPIO 17) HIGH and freeze with RTC pad hold in < 25ms */
     REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(PIN_POWER_HOLD));
     esp_rom_gpio_pad_select_gpio(PIN_POWER_HOLD);
     esp_rom_gpio_connect_out_signal(PIN_POWER_HOLD, SIG_GPIO_OUT_IDX, false, false);

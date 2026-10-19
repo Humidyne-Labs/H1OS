@@ -1,7 +1,8 @@
 /**
  * @file hal_spi.c
- * @brief Layer 1 HAL SPI Master Bus Driver Implementation
+ * @brief Layer 1: SPI master bus driver implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -34,7 +35,6 @@ esp_err_t hal_spi_init(void)
         return ESP_OK;
     }
 
-    // 1. Configure DC, RST, and CS GPIO pins as manual outputs
     gpio_config_t epd_ctrl_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_DC) | (1ULL << HAL_PIN_EPD_RST) | (1ULL << HAL_PIN_EPD_CS),
         .mode = GPIO_MODE_OUTPUT,
@@ -47,7 +47,6 @@ esp_err_t hal_spi_init(void)
     gpio_set_level(HAL_PIN_EPD_DC, 1);
     gpio_set_level(HAL_PIN_EPD_CS, 1);
 
-    // 2. Configure BUSY GPIO pin as input
     gpio_config_t busy_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
         .mode = GPIO_MODE_INPUT,
@@ -57,7 +56,6 @@ esp_err_t hal_spi_init(void)
     };
     gpio_config(&busy_cfg);
 
-    // 3. Initialize SPI Master Bus
     spi_bus_config_t buscfg = {
         .mosi_io_num = HAL_PIN_EPD_MOSI,
         .miso_io_num = -1,
@@ -73,11 +71,10 @@ esp_err_t hal_spi_init(void)
         return ret;
     }
 
-    // 4. Fast Transmit Device (20 MHz, Mode 0)
     spi_device_interface_config_t devcfg = {
-        .clock_speed_hz = 20 * 1000 * 1000,  // 20 MHz write speed
-        .mode = 0,  // CPOL=0, CPHA=0
-        .spics_io_num = -1,  // Manual CS
+        .clock_speed_hz = 20 * 1000 * 1000,
+        .mode = 0,
+        .spics_io_num = -1,
         .queue_size = 7,
     };
 
@@ -88,11 +85,10 @@ esp_err_t hal_spi_init(void)
         return ret;
     }
 
-    // 5. Half-Duplex 3-Wire Read Device (2 MHz, Mode 0) for on-glass temp readout
     spi_device_interface_config_t rdevcfg = {
-        .clock_speed_hz = 2 * 1000 * 1000,  // 2 MHz read speed
+        .clock_speed_hz = 2 * 1000 * 1000,
         .mode = 0,
-        .spics_io_num = -1,  // Manual CS
+        .spics_io_num = -1,
         .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_3WIRE,
         .queue_size = 1,
     };
@@ -137,7 +133,7 @@ esp_err_t hal_spi_write_cmd(uint8_t cmd)
         return ESP_ERR_INVALID_STATE;
     }
 
-    epd_set_dc(0);  // DC = 0 for command
+    epd_set_dc(0);
     epd_set_cs(0);
 
     spi_transaction_t t;
@@ -157,7 +153,7 @@ esp_err_t hal_spi_write_data(const uint8_t *data, size_t len)
         return ESP_ERR_INVALID_STATE;
     }
 
-    epd_set_dc(1);  // DC = 1 for data
+    epd_set_dc(1);
     epd_set_cs(0);
 
     spi_transaction_t t;
@@ -176,7 +172,7 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
         return ESP_ERR_INVALID_STATE;
     }
 
-    epd_set_dc(1);  // DC = 1 for data
+    epd_set_dc(1);
     epd_set_cs(0);
 
     spi_transaction_t t;
@@ -184,7 +180,6 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
     t.length = HAL_EPD_FRAME_SIZE_BYTES * 8;
     t.tx_buffer = frame_buffer;
 
-    /* Use interrupt-driven GDMA transmit so FreeRTOS yields CPU during 2ms 5KB transfer */
     esp_err_t ret = spi_device_transmit(s_spi_dev, &t);
     epd_set_cs(1);
     return ret;
@@ -196,10 +191,8 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // 1. Assert CS# continuously across entire Command + Data Read phases
     epd_set_cs(0);
 
-    // 2. Command Phase: D/C# = 0
     epd_set_dc(0);
     spi_transaction_t t_cmd;
     memset(&t_cmd, 0, sizeof(t_cmd));
@@ -214,8 +207,6 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
         return ret;
     }
 
-    // 3. Data Read Phase: D/C# = 1 (Hardware SPI half-duplex 3-wire read on SDA)
-    // Hold CD line firmly HIGH before and during read data phase
     epd_set_dc(1);
     esp_rom_delay_us(5);
     spi_transaction_t t_read;
@@ -226,7 +217,6 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
 
     ret = spi_device_polling_transmit(s_spi_read_dev, &t_read);
 
-    // 4. De-assert CS#
     epd_set_cs(1);
 
     if (ret == ESP_OK) {

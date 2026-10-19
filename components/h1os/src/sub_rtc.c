@@ -1,7 +1,8 @@
 /**
  * @file sub_rtc.c
- * @brief Layer 2: PCF85063A Real-Time Clock Subsystem Driver Implementation
+ * @brief Layer 2: PCF85063A real-time clock driver implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -14,7 +15,6 @@
 
 static const char *TAG = "sub_rtc";
 
-/* PCF85063A Register Map */
 #define RTC_REG_CONTROL_1 0x00
 #define RTC_REG_CONTROL_2 0x01
 #define RTC_REG_OFFSET 0x02
@@ -30,19 +30,16 @@ static const char *TAG = "sub_rtc";
 #define RTC_REG_TIMER_VALUE 0x10
 #define RTC_REG_TIMER_MODE 0x11
 
-/* Control_1 Register Bitmasks */
 #define CTRL1_STOP_MASK (1 << 5)
 #define CTRL1_12_24_MASK (1 << 1)
 #define CTRL1_CAP_SEL_12_5PF (1 << 0)
 #define CTRL1_SW_RESET_CMD 0x58
 
-/* Control_2 Register Bitmasks */
 #define CTRL2_AF_MASK (1 << 6)
 #define CTRL2_TF_MASK (1 << 3)
 #define CTRL2_AIE_MASK (1 << 7)
 #define CTRL2_COF_OFF 0x07
 
-/* Timer Mode Register (0x11) Bitmasks - TCF[1:0] in bits [4:3] */
 #define TIMER_CLK_4096_HZ (0 << 3)
 #define TIMER_CLK_64_HZ (1 << 3)
 #define TIMER_CLK_1_HZ (2 << 3)
@@ -51,7 +48,6 @@ static const char *TAG = "sub_rtc";
 #define TIMER_INT_ENABLE_BIT (1 << 1)
 #define TIMER_PULSE_MODE_BIT (1 << 0)
 
-/* BCD Conversion Helpers */
 static inline uint8_t bcd2dec(uint8_t val)
 {
     return ((val >> 4) * 10) + (val & 0x0F);
@@ -84,7 +80,6 @@ static esp_err_t pcf85063_write_reg_u8(uint8_t reg, uint8_t val)
 
 esp_err_t sub_rtc_init(void)
 {
-    /* 1. Configure Control_1 (12.5pF crystal capacitance, STOP=0, 24h mode) */
     uint8_t ctrl1 = 0;
     esp_err_t err = pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1);
     if (err == ESP_OK) {
@@ -95,8 +90,6 @@ esp_err_t sub_rtc_init(void)
         return err;
     }
 
-    /* 2. Disable CLKOUT push-pull square wave (Control_2 bits COF[2:0] = 111) to eliminate
-     * parasitic trace leakage */
     uint8_t ctrl2 = 0;
     err = pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
     if (err != ESP_OK) {
@@ -104,7 +97,6 @@ esp_err_t sub_rtc_init(void)
         return err;
     }
 
-    /* Set COF[2:0] = 0x07 (bits 2:0 in Control_2: 0b00000111) and clear pending flags */
     ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
 
     err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
@@ -113,7 +105,6 @@ esp_err_t sub_rtc_init(void)
         return err;
     }
 
-    /* 3. Check Oscillator Stop flag in Seconds register (bit 7) */
     uint8_t sec_reg = 0;
     err = pcf85063_read_reg(RTC_REG_SECONDS, &sec_reg, 1);
     if (err == ESP_OK && (sec_reg & 0x80)) {
@@ -140,8 +131,8 @@ esp_err_t sub_rtc_get_time(struct tm *out_time)
     out_time->tm_hour = bcd2dec(data[2] & 0x3F);
     out_time->tm_mday = bcd2dec(data[3] & 0x3F);
     out_time->tm_wday = data[4] & 0x07;
-    out_time->tm_mon = bcd2dec(data[5] & 0x1F) - 1; /* POSIX is 0-11                          */
-    out_time->tm_year = bcd2dec(data[6]) + 100; /* POSIX is years since 1900 (2000 = 100) */
+    out_time->tm_mon = bcd2dec(data[5] & 0x1F) - 1;
+    out_time->tm_year = bcd2dec(data[6]) + 100;
     out_time->tm_isdst = -1;
 
     return ESP_OK;
@@ -153,14 +144,13 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Stop clock during setting */
     uint8_t ctrl1 = 0;
     pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1);
-    ctrl1 |= (1 << 5); /* STOP bit */
+    ctrl1 |= (1 << 5);
     pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
 
     uint8_t data[7];
-    data[0] = dec2bcd((uint8_t)time->tm_sec) & 0x7F; /* Clear OS bit */
+    data[0] = dec2bcd((uint8_t)time->tm_sec) & 0x7F;
     data[1] = dec2bcd((uint8_t)time->tm_min) & 0x7F;
     data[2] = dec2bcd((uint8_t)time->tm_hour) & 0x3F;
     data[3] = dec2bcd((uint8_t)time->tm_mday) & 0x3F;
@@ -170,7 +160,6 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
 
     esp_err_t err = pcf85063_write_reg(RTC_REG_SECONDS, data, sizeof(data));
 
-    /* Restart clock */
     ctrl1 &= ~(1 << 5);
     pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
 
@@ -183,7 +172,6 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Select 1Hz (seconds) or 1/60Hz (minutes) clock source */
     uint8_t timer_value = 0;
     uint8_t clk_src = 0;
 
@@ -195,20 +183,15 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
         timer_value = (uint8_t)((seconds + 59) / 60);
     }
 
-    /* 1. Stop timer safely: Clear TE while preserving clk_src, TIE, and TI_TP (Pulsed Mode).
-     * Do NOT write 0 to Timer_mode, as that sets TI_TP=0 (Level Mode), which immediately
-     * forces the open-drain INT pin LOW if TF is set! */
     uint8_t stop_mode = clk_src | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
     esp_err_t err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, stop_mode);
     if (err != ESP_OK)
         return err;
 
-    /* 2. Write timer countdown reload value */
     err = pcf85063_write_reg_u8(RTC_REG_TIMER_VALUE, timer_value);
     if (err != ESP_OK)
         return err;
 
-    /* 3. Clear any pending flags in Control_2 while preserving COF_OFF */
     uint8_t ctrl2 = 0;
     err = pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
     if (err != ESP_OK)
@@ -219,7 +202,6 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
     if (err != ESP_OK)
         return err;
 
-    /* 4. Readback verification of Control_2: Confirm TF and AF are deasserted */
     uint8_t check_ctrl2 = 0xFF;
     for (int retry = 0; retry < 3; retry++) {
         pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);
@@ -233,14 +215,11 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
         return ESP_ERR_INVALID_STATE;
     }
 
-    /* 5. Start timer in Timer_mode (0x11): TE = 1, TIE = 1, TI_TP = 1 (Repetitive Pulsed Mode).
-     * Dynamic prescaler mask: (clk_src | 0x07) resulting in 0x17 (1Hz) or 0x1F (1/60Hz) */
     uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
     err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, timer_mode);
     if (err != ESP_OK)
         return err;
 
-    /* 6. Readback verification of Timer_mode: Confirm timer is enabled in pulse mode */
     uint8_t check_mode = 0;
     pcf85063_read_reg(RTC_REG_TIMER_MODE, &check_mode, 1);
     if ((check_mode & 0x07) != 0x07) {
@@ -255,10 +234,8 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 
 esp_err_t sub_rtc_cancel_countdown(void)
 {
-    /* 1. Disable timer */
     pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0);
 
-    /* 2. Clear flags while preserving COF_OFF */
     uint8_t ctrl2 = 0;
     pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
     ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
@@ -285,7 +262,6 @@ esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec)
     if (err != ESP_OK)
         return err;
 
-    /* Check clock source (TCF bits [4:3]) */
     uint8_t clk_src = timer_mode & (3 << 3);
     if (clk_src == TIMER_CLK_1_60_HZ) {
         *out_sec = (uint32_t)timer_val * 60;
@@ -308,13 +284,11 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer)
     if (out_timer)
         *out_timer = (ctrl2 & CTRL2_TF_MASK) != 0;
 
-    /* Clear flags while preserving COF_OFF and AIE */
     ctrl2 = (ctrl2 & ~(CTRL2_AF_MASK | CTRL2_TF_MASK)) | CTRL2_COF_OFF;
     err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
     if (err != ESP_OK)
         return err;
 
-    /* Readback verification */
     uint8_t check_ctrl2 = 0;
     pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);
     if (check_ctrl2 & (CTRL2_AF_MASK | CTRL2_TF_MASK)) {

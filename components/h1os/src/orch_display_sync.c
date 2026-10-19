@@ -1,7 +1,8 @@
 /**
  * @file orch_display_sync.c
- * @brief Layer 3: Deferred Flash Frame Sync Engine Implementation
+ * @brief Layer 3: Deferred flash frame sync engine implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -38,7 +39,6 @@ esp_err_t orch_display_sync_save_if_dirty(void)
     if (fb == NULL)
         return ESP_ERR_INVALID_STATE;
 
-    /* Write to epd_frame raw flash partition */
     esp_err_t err = hal_flash_write_frame(fb, EPD_BUFFER_SIZE);
     if (err == ESP_OK) {
         s_frame_dirty = false;
@@ -64,7 +64,7 @@ esp_err_t orch_display_sync_restore_to_framebuffer(void)
     esp_err_t err = hal_flash_read_frame(fb, EPD_BUFFER_SIZE);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Restored 5000-byte EPD frame from flash partition");
-        /* Synchronize hardware RAM 0x26 with restored frame for differential partial scan */
+
         sub_display_sync_previous_frame(fb);
     } else {
         ESP_LOGW(TAG, "Failed to read EPD frame from flash: %s", esp_err_to_name(err));
@@ -76,7 +76,6 @@ bool orch_display_sync_should_full_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
 
-    /* Anti-Ghosting partial refresh threshold (default 6: 6 x 4h = 24h max) */
     if (st->epd_partial_refresh_count >= CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT) {
         ESP_LOGI(TAG,
                  "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh "

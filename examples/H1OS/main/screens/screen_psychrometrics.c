@@ -1,7 +1,8 @@
 /**
  * @file screen_psychrometrics.c
- * @brief Screen 2: Psychrometrics Engine & Invariants (Page 2/4)
+ * @brief H1OS showcase application: modular 4-screen environmental telemetry
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -14,7 +15,6 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
 {
     lv_obj_t *scr = screen_base_create("PSYCHROMETRICS", "2/4", event_cb);
 
-    // Row 1: Dew Point (°F and °C)
     lv_obj_t *lbl_dew = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_dew, "Dew Point:   %.1f°F", telem->dew_point_f);
     lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
@@ -25,13 +25,11 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
     lv_obj_set_style_text_font(lbl_dew_c, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dew_c, LV_ALIGN_TOP_LEFT, 6, 52);
 
-    // Row 2: Absolute Humidity
     lv_obj_t *lbl_abs = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_abs, "Abs Humid:   %.1f g/m³", telem->absolute_humidity_g);
     lv_obj_set_style_text_font(lbl_abs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_abs, LV_ALIGN_TOP_LEFT, 6, 80);
 
-    // Row 3: Glass Thermistor & Ambient Floor
     lv_obj_t *lbl_glass = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_glass, "EPD Glass:   %.1f°C", telem->epd_glass_temp_c);
     lv_obj_set_style_text_font(lbl_glass, H1OS_FONT_14, 0);
@@ -42,7 +40,6 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
     lv_obj_set_style_text_font(lbl_floor, H1OS_FONT_14, 0);
     lv_obj_align(lbl_floor, LV_ALIGN_TOP_LEFT, 6, 134);
 
-    // Footer Bar: Tri-Node Confidence (left), Clock Time (right)
     char time_str[16] = "--:--";
     h1os_time_get_formatted(H1OS_TIME_FMT_12H_MIN, time_str, sizeof(time_str));
 

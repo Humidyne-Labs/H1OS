@@ -1,7 +1,8 @@
 /**
  * @file h1os_lvgl.cpp
- * @brief Layer 4: LVGL v9 FreeRTOS Integration Port & Keypad Input Implementation
+ * @brief Layer 4: LVGL v9 FreeRTOS integration port and keypad input driver
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -130,7 +131,6 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
     const uint32_t epd_stride = EPD_WIDTH / 8;
 
-    // Fast Path: Byte-aligned X offset and width
     if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
         uint16_t bytes_per_line = area_w >> 3;
         uint16_t start_byte_x = area->x1 >> 3;
@@ -144,7 +144,6 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
             dst += epd_stride;
         }
     } else {
-        // Optimized Fallback: Unaligned bitwise byte stream (up to 8 px per cycle)
         uint16_t x1 = area->x1;
         uint16_t x2 = x1 + area_w - 1;
         if (x1 < EPD_WIDTH) {
@@ -214,8 +213,6 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         return ret;
     }
 
-    /* On system boot, execute full OTP refresh; on sleep wake, execute differential partial refresh
-     */
     s_first_boot_flush = !is_wake_cycle;
 
     lv_init();
@@ -253,7 +250,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         lv_indev_set_type(s_lv_keypad_indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_display(s_lv_keypad_indev, s_lv_display);
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
-        lv_indev_set_long_press_time(s_lv_keypad_indev, 2000); /* 2.0s hold for shutdown */
+        lv_indev_set_long_press_time(s_lv_keypad_indev, 2000);
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
 
         lv_group_t *def_grp = lv_group_get_default();
@@ -287,8 +284,6 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
     task_priority = (task_priority > 0) ? task_priority : 5;
     core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
 
-    /* Architectural Invariant: Must set running flag BEFORE spawning task on Core 1
-     * to eliminate task creation race where the port task exits on its first loop! */
     s_lvgl_task_running = true;
 
     BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, "h1os_lvgl", 8192, NULL, task_priority,
@@ -319,10 +314,9 @@ bool h1os_lvgl_has_pending_tasks(void)
 {
     if (s_lv_display == NULL)
         return false;
-    /* Check if display refresh timer is actively scheduled / running */
+
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
-        /* Timer is active; check if any screen layer or area is dirty */
         if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
             return true;
         }

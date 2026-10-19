@@ -1,19 +1,8 @@
 /**
  * @file main.c
- * @brief H1OS Showcase Demonstration: Modular 4-Screen Luxury Environmental OS
+ * @brief H1OS showcase application: modular 4-screen environmental telemetry
  *
- * Demonstrates the H1OS Class-E Luxury Environmental Telemetry Operating System
- * on the Waveshare ESP32-S3 ePaper 1.54" V2 (200x200 Monochrome EPD, 188 DPI):
- *  - Modular Screens (screen_env_hero, screen_psychrometrics, screen_system_health,
- * screen_diagnostics).
- *  - Tactile Keypad Navigation:
- *      * Short-press BOOT (GPIO 0): Step forward (1 -> 2 -> 3 -> 4 -> 1) with 15ms audio tick.
- *      * Short-press POWER (GPIO 18): Step backward (4 -> 3 -> 2 -> 1 -> 4) with 15ms audio tick.
- *      * Long-press POWER (GPIO 18 >= 2s): Power-down chime & orderly hardware shutdown
- * (h1os_shutdown).
- *  - Synthesized Audio Feedback (ES8311 I2S Codec & NS4168 Amp).
- *  - 30-Second Inactivity Sleep with 80 MHz DFS Power Droop.
- *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -37,29 +26,19 @@
 
 static const char *TAG = "h1os_demo";
 
-/* Persistent Application State in RTC Slow Memory */
 typedef struct {
     uint32_t boot_epoch_sec;
     uint32_t total_uptime_sec;
     uint32_t cycle_counter;
-    /**********************
-     *   0 = ENV HERO,
-     *   1 = PSYCHROMETRICS,
-     *   2 = HEALTH,
-     *   3 = DIAGNOSTICS
-     **********************/
+
     uint8_t active_page;
 } app_rtc_persisted_state_t;
 
 RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {0};
 
-/* --- Forward Declarations --- */
 static void update_active_display(void);
 static void keypad_event_cb(lv_event_t *e);
 
-/* =========================================================================
- * Screen Switcher Dispatcher
- * ========================================================================= */
 static void update_active_display(void)
 {
     static h1os_telemetry_t telem;
@@ -87,9 +66,6 @@ static void update_active_display(void)
 
 static bool s_is_shutting_down = false;
 
-/* =========================================================================
- * Hardware Keypad Event Callback
- * ========================================================================= */
 static void keypad_event_cb(lv_event_t *e)
 {
     if (s_is_shutting_down)
@@ -98,7 +74,6 @@ static void keypad_event_cb(lv_event_t *e)
     lv_event_code_t code = lv_event_get_code(e);
 
     if (code == LV_EVENT_LONG_PRESSED) {
-        // Native LVGL Long-Press Detection (>= 2.0s hold on POWER / LV_KEY_ENTER)
         ESP_LOGI(TAG, "Keypad: Native LVGL long-press (>=2.0s) detected! Executing shutdown...");
         s_is_shutting_down = true;
         h1os_shutdown();
@@ -113,7 +88,6 @@ static void keypad_event_cb(lv_event_t *e)
         ESP_LOGI(TAG, "Keypad event received: LV_EVENT_KEY (key=0x%lx)", (unsigned long)key);
 
         if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT) {
-            // BOOT Button: Forward Cycle (Non-blocking acoustic feedback)
             const uint32_t tone_fwd[] = {1046, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_fwd, sizeof(tone_fwd));
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
@@ -122,7 +96,6 @@ static void keypad_event_cb(lv_event_t *e)
             update_active_display();
             return;
         } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT || key == LV_KEY_ENTER) {
-            // POWER Button: Reverse Cycle (Non-blocking acoustic feedback)
             const uint32_t tone_rev[] = {880, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
             s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
@@ -133,9 +106,6 @@ static void keypad_event_cb(lv_event_t *e)
     }
 }
 
-/* =========================================================================
- * Application Lifecycle Handlers
- * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
@@ -144,9 +114,9 @@ static void app_on_boot(void *user_data)
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
     screen_base_set_awake_badge(true);
-    // Probe MicroSD card asynchronously on initial cold boot
+
     sub_sdcard_mount_async();
-    // Gentle status LED heartbeat breathing during active interactive session
+
     hal_led_start_breathing(2000);
     update_active_display();
 }
@@ -162,13 +132,11 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
              (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes, ctx->woke_from_button);
 
     if (ctx->woke_from_button) {
-        /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
         ESP_LOGI(TAG, "First click intercepted by ULP: Inverting awake status badge.");
         screen_base_set_awake_badge(true);
         sub_sdcard_mount_async();
         hal_led_start_breathing(2000);
     } else {
-        /* Unattended external RTC countdown wake: Keep sleep badge */
         screen_base_set_awake_badge(false);
     }
 
@@ -206,14 +174,10 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         lv_refr_now(NULL);
         h1os_lvgl_unlock();
 
-        /* Hold splash graphic briefly so it is visible before primary UI transition */
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
     }
 }
 
-/* =========================================================================
- * Application Entry Point
- * ========================================================================= */
 void app_main(void)
 {
     h1os_lifecycle_t lifecycle = {

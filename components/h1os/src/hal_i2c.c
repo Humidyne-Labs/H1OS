@@ -1,7 +1,8 @@
 /**
  * @file hal_i2c.c
- * @brief Layer 1 HAL Shared I2C Master Bus Driver Implementation
+ * @brief Layer 1: Shared I2C master bus driver implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -40,7 +41,7 @@ esp_err_t hal_i2c_init(void)
         .trans_queue_depth = 0,
         .flags =
             {
-                .enable_internal_pullup = 0,  // External 4.7k pullups present on PCB
+                .enable_internal_pullup = 0,
             },
     };
 

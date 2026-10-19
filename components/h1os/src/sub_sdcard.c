@@ -1,7 +1,8 @@
 /**
  * @file sub_sdcard.c
- * @brief Layer 2: MicroSD Card Subsystem Manager Implementation (1-Bit SDMMC FATFS)
+ * @brief Layer 2: MicroSD card subsystem manager implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -54,7 +55,6 @@ esp_err_t sub_sdcard_mount_async(void)
         return ESP_ERR_NOT_FOUND;
     }
     if (s_mount_task != NULL) {
-        /* Mount already in progress */
         return ESP_OK;
     }
 
@@ -72,20 +72,16 @@ esp_err_t sub_sdcard_mount(void)
         return ESP_ERR_NOT_FOUND;
     }
 
-    /* FatFS Mount Configuration:
-     * .allocation_unit_size specifies cluster size in bytes ONLY if the card is formatted
-     * by FatFS (i.e. format_if_mount_failed == true). Setting to 0 enables FatFS auto-allocation
-     * based on SD card volume geometry and sector count. */
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 1,
-        .allocation_unit_size = 0, /* 0 = Auto-determine cluster allocation unit */
+        .allocation_unit_size = 0,
     };
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
     host.flags = SDMMC_HOST_FLAG_1BIT;
-    host.command_timeout_ms = 3;  // set for 3ms command timeout
+    host.command_timeout_ms = 3;
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;
@@ -95,7 +91,6 @@ esp_err_t sub_sdcard_mount(void)
     slot_config.cd = SDMMC_SLOT_NO_CD;
     slot_config.wp = SDMMC_SLOT_NO_WP;
 
-    /* Temporarily silence low-level SD driver error noise during card discovery */
     esp_log_level_set("sdmmc_common", ESP_LOG_NONE);
     esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_NONE);
     esp_log_level_set("sdmmc_cmd", ESP_LOG_NONE);
@@ -106,7 +101,6 @@ esp_err_t sub_sdcard_mount(void)
 
     esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config, &mount_config, &s_sd_card);
 
-    /* Restore normal warning level for future operations */
     esp_log_level_set("sdmmc_common", ESP_LOG_WARN);
     esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_WARN);
     esp_log_level_set("sdmmc_cmd", ESP_LOG_WARN);
@@ -117,7 +111,7 @@ esp_err_t sub_sdcard_mount(void)
 
     if (ret != ESP_OK) {
         s_sd_card = NULL;
-        s_card_absent_latched = true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
+        s_card_absent_latched = true;
         gpio_reset_pin(HAL_PIN_SD_CLK);
         gpio_reset_pin(HAL_PIN_SD_MOSI);
         gpio_reset_pin(HAL_PIN_SD_MISO);

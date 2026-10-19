@@ -1,7 +1,8 @@
 /**
  * @file sub_display.cpp
- * @brief Layer 2: SSD1681 1.54" E-Paper Display Manager Implementation
+ * @brief Layer 2: SSD1681 e-Paper display manager implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -22,14 +23,11 @@
 
 static const char *TAG = "sub_display";
 
-/* Ping-Pong Framebuffers in DMA-capable internal SRAM */
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
 static bool s_inited = false;
 
-/* Factory-calibrated 159-byte Partial LUT */
-/** @brief LUT */
 static const uint8_t WF_PARTIAL_1IN54[159] = {
     0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -51,7 +49,6 @@ static void epd_reset_pulse(void)
 
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
-    /* Brief settle delay in case a command (0x20 / 0x12) was just clocked out over SPI */
     esp_rom_delay_us(200);
 
     TickType_t start_ticks = xTaskGetTickCount();
@@ -69,27 +66,22 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 
 static void epd_configure_base_registers(void)
 {
-    /* Driver output control: 200 mux lines (0xC7, 0x00, 0x00) */
     uint8_t d_drv[] = {0xC7, 0x00, 0x00};
     hal_spi_write_cmd(0x01);
     hal_spi_write_data(d_drv, sizeof(d_drv));
 
-    /* Data entry mode: X inc, Y inc */
     uint8_t d_entry[] = {0x03};
     hal_spi_write_cmd(0x11);
     hal_spi_write_data(d_entry, sizeof(d_entry));
 
-    /* Set RAM X address window: 0 to 24 (200 pixels / 8 = 25 bytes) */
     uint8_t d_xwin[] = {0x00, 0x18};
     hal_spi_write_cmd(0x44);
     hal_spi_write_data(d_xwin, sizeof(d_xwin));
 
-    /* Set RAM Y address window: 0 to 199 (0x0000 to 0x00C7) */
     uint8_t d_ywin[] = {0x00, 0x00, 0xC7, 0x00};
     hal_spi_write_cmd(0x45);
     hal_spi_write_data(d_ywin, sizeof(d_ywin));
 
-    /* Border waveform: factory default for full OTP refresh */
     uint8_t d_border[] = {0x05};
     hal_spi_write_cmd(0x3C);
     hal_spi_write_data(d_border, sizeof(d_border));
@@ -100,10 +92,8 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     if (s_inited)
         return ESP_OK;
 
-    /* 1. Init SPI and GPIO */
     hal_spi_init();
 
-    /* 2. Configure BUSY interrupt pin (RST is handled by hal_spi_init) */
     gpio_config_t busy_conf = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
         .mode = GPIO_MODE_INPUT,
@@ -113,40 +103,26 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     };
     gpio_config(&busy_conf);
 
-    /* 3. Hardware Reset Pulse */
     epd_reset_pulse();
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
 
-    /* 4. SSD1681 Initialization Sequence */
-    hal_spi_write_cmd(0x12); /* Software Reset */
+    hal_spi_write_cmd(0x12);
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
 
-    /* 4b. Pre-Display Glass Temperature Capture:
-     * Strictly acquire BEFORE any RAM write, LUT load, or charge-pump activation
-     * to prevent display refresh heat from offsetting the glass thermistor.
-     * Full hardware sequence per SSD1681 datasheet:
-     *   1. Select internal sensor (0x18 -> 0x80)
-     *   2. Load temp/clock (0x22 -> 0xB1)
-     *   3. Master Activation (0x20) + wait for BUSY line falling edge
-     *   4. Read 2-byte calibrated temperature from Command 0x1B with D/C held HIGH. */
     static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;
     uint8_t temp_raw[2] = {0};
 
-    /* Step 1: Select internal thermal sensor */
     hal_spi_write_cmd(0x18);
     uint8_t t_sel[] = {0x80};
     hal_spi_write_data(t_sel, sizeof(t_sel));
 
-    /* Step 2: Load temperature and clock */
     hal_spi_write_cmd(0x22);
     uint8_t t_load[] = {0xB1};
     hal_spi_write_data(t_load, sizeof(t_load));
 
-    /* Step 3: Master Activation to execute ADC temperature conversion */
     hal_spi_write_cmd(0x20);
     sub_display_wait_busy(pdMS_TO_TICKS(100));
 
-    /* Step 4: Read 2 bytes temperature with CD held HIGH */
     if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
         if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
             int8_t temp_int = (int8_t)temp_raw[0];
@@ -211,30 +187,22 @@ esp_err_t sub_display_refresh_full(void)
 {
     int64_t t_start = esp_timer_get_time();
 
-    /* 1. Reset SSD1681 out of any prior custom partial LUT (0x32) or Ping-Pong
-     *    differential mode (0x37 = 0x40) so 0x22 = 0xF7 reloads the factory OTP LUT. */
-    hal_spi_write_cmd(0x12); /* Software Reset */
+    hal_spi_write_cmd(0x12);
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
     epd_configure_base_registers();
 
-    /* 2. Write to RAM 0x24 (Current Frame) */
     epd_commit_ram_dma(0x24, s_current_frame);
 
-    /* 3. Write to RAM 0x26 (Previous Frame) */
     epd_commit_ram_dma(0x26, s_current_frame);
 
-    /* 4. Display Update Control 2: Full OTP refresh sequence (0xF7) */
     uint8_t d_upd[] = {0xF7};
     hal_spi_write_cmd(0x22);
     hal_spi_write_data(d_upd, sizeof(d_upd));
 
-    /* 5. Master Activation */
     hal_spi_write_cmd(0x20);
 
-    /* 6. Wait for panel completion */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
-    /* 7. Sync shadow buffer */
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
     int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
@@ -256,23 +224,18 @@ static void epd_load_custom_lut(const uint8_t *lut_buffer)
     if (lut_buffer == NULL)
         return;
 
-    /* 1. Core Look-Up Tables 0-4 and Timing Groups 0-11 (153 bytes) */
     hal_spi_write_cmd(0x32);
     hal_spi_write_data(&lut_buffer[0], 153);
 
-    /* 2. End of Frame Pulse Timing (EOPT) (1 byte) */
     hal_spi_write_cmd(0x3F);
     hal_spi_write_data(&lut_buffer[153], 1);
 
-    /* 3. Gate Driving Voltage (1 byte) */
     hal_spi_write_cmd(0x03);
     hal_spi_write_data(&lut_buffer[154], 1);
 
-    /* 4. Source Driving Voltages (VSH1, VSH2, VSL) (3 bytes) */
     hal_spi_write_cmd(0x04);
     hal_spi_write_data(&lut_buffer[155], 3);
 
-    /* 5. VCOM Modulation Voltage (1 byte) */
     hal_spi_write_cmd(0x2C);
     hal_spi_write_data(&lut_buffer[158], 1);
 }
@@ -281,31 +244,25 @@ esp_err_t sub_display_refresh_partial(void)
 {
     int64_t t_start = esp_timer_get_time();
 
-    /* 1. Write New Frame to RAM 0x24 (DO NOT overwrite 0x26 in differential mode!) */
     epd_commit_ram_dma(0x24, s_current_frame);
 
-    /* 2. Load SSD1681 Partial LUT partitioned across 5 registers */
     epd_load_custom_lut(WF_PARTIAL_1IN54);
 
-    /* 3. Configure Display Option (0x37) & Border Waveform (0x3C) for Differential Scan */
     static const uint8_t disp_option[10] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00};
     hal_spi_write_cmd(0x37);
     hal_spi_write_data(disp_option, sizeof(disp_option));
 
-    uint8_t d_border[] = {0x80};  // Border Floating / LUT0
+    uint8_t d_border[] = {0x80};
     hal_spi_write_cmd(0x3C);
     hal_spi_write_data(d_border, sizeof(d_border));
 
-    /* 4. Trigger Partial Display Update (0x22 0xCF + 0x20) */
     uint8_t d_upd[] = {0xCF};
     hal_spi_write_cmd(0x22);
     hal_spi_write_data(d_upd, sizeof(d_upd));
 
-    /* Master Activation */
     hal_spi_write_cmd(0x20);
     sub_display_wait_busy(pdMS_TO_TICKS(2000));
 
-    /* 5. Sync shadow buffer */
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
     int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
@@ -319,8 +276,6 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
     if (out_temp_c == NULL)
         return ESP_ERR_INVALID_ARG;
 
-    /* If display is already initialized, return the pristine pre-display glass reading
-     * captured at the start of sub_display_init() before any charge-pump refresh heat. */
     if (s_inited) {
         *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
         return ESP_OK;
@@ -328,25 +283,21 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 
     uint8_t temp_raw[2] = {0};
 
-    /* Step 1: Select internal thermal sensor */
     hal_spi_write_cmd(0x18);
     uint8_t t_sel[] = {0x80};
     hal_spi_write_data(t_sel, sizeof(t_sel));
 
-    /* Step 2: Load temperature and clock */
     hal_spi_write_cmd(0x22);
     uint8_t t_load[] = {0xB1};
     hal_spi_write_data(t_load, sizeof(t_load));
 
-    /* Step 3: Master Activation to execute ADC temperature conversion */
     hal_spi_write_cmd(0x20);
     sub_display_wait_busy(pdMS_TO_TICKS(100));
 
-    /* Step 4: Read 2 bytes temperature with CD held HIGH */
     esp_err_t err = hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw));
     if (err == ESP_OK) {
         int8_t temp_int = (int8_t)temp_raw[0];
-        float temp_frac = (temp_raw[1] & 0x80) ? 0.5f : 0.0f; /* Bit 7 = 0.5 deg C */
+        float temp_frac = (temp_raw[1] & 0x80) ? 0.5f : 0.0f;
         float glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
 
         if (glass_temp < -40.0f || glass_temp > 85.0f || temp_raw[0] == 0xFF || temp_raw[0] == 0x00) {
@@ -363,10 +314,8 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 
 esp_err_t sub_display_enter_deep_sleep(void)
 {
-    /* Ensure panel is completely finished before issuing sleep command */
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
-    /* Deep Sleep Mode 1: Keeps RAM retained @ 1.0 µA */
     uint8_t d_sleep[] = {0x01};
     hal_spi_write_cmd(0x10);
     hal_spi_write_data(d_sleep, sizeof(d_sleep));

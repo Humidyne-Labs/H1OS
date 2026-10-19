@@ -1,7 +1,8 @@
 /**
  * @file hal_flash.c
- * @brief Layer 1 HAL Raw Flash Partition Storage Implementation
+ * @brief Layer 1: Raw flash partition storage implementation
  *
+ * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
  */
 
@@ -60,7 +61,6 @@ esp_err_t hal_flash_write_frame(const uint8_t *frame_data, size_t len)
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Erase the 16KB partition sector (must be 4KB sector aligned)
     size_t erase_size = (len + 4095) & ~4095;
     if (erase_size > s_part->size) {
         erase_size = s_part->size;
@@ -72,7 +72,6 @@ esp_err_t hal_flash_write_frame(const uint8_t *frame_data, size_t len)
         return ret;
     }
 
-    // Write the raw frame data
     ret = esp_partition_write(s_part, 0, frame_data, len);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write frame to '%s': %d", s_part->label, ret);
