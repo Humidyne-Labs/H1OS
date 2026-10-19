@@ -69,14 +69,20 @@ void bootloader_before_init(void)
  */
 void bootloader_after_init(void)
 {
-    /* Low bank audit (GPIO 0-31) */
-    uint32_t g17_out  __unused = (REG_READ(GPIO_OUT_REG)          >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_oe   __unused = (REG_READ(GPIO_ENABLE_REG)       >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_hold __unused = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    /* Validate critical battery power latch (GPIO 17 / BAT_CTRL) */
+    uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g17_out  = (REG_READ(GPIO_OUT_REG)          >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g6_hold  = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
 
-    /* High bank audit (GPIO 32-48, GPIO 42 is bit 10) */
-    uint32_t g42_out  __unused = (REG_READ(GPIO_OUT1_REG)         >> (H1OS_PIN_PA_EN - 32)) & 1U;
-    uint32_t g42_oe   __unused = (REG_READ(GPIO_ENABLE1_REG)      >> (H1OS_PIN_PA_EN - 32)) & 1U;
-    (void)g17_out; (void)g17_oe; (void)g17_hold;
-    (void)g42_out; (void)g42_oe;
+    if (g17_hold == 0 || g17_out == 0) {
+        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]",
+                 (unsigned long)g17_out, (unsigned long)g17_hold);
+        /* Re-assert latch immediately to prevent impending brownout drop */
+        gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD, 1);
+        gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
+        REG_SET_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
+    } else {
+        ESP_LOGD(TAG, "Hardware master rails verified [BAT_CTRL=%lu (hold=%lu), EPD_EN_HOLD=%lu]",
+                 (unsigned long)g17_out, (unsigned long)g17_hold, (unsigned long)g6_hold);
+    }
 }

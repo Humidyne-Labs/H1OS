@@ -38,22 +38,6 @@ static adc_oneshot_unit_handle_t s_adc_handle  = NULL;
 static adc_cali_handle_t         s_cali_handle = NULL;
 static bool                      s_cali_valid  = false;
 
-static void generate_vbat_lut(void)
-{
-    for (int i = 0; i <= 16; i++) {
-        uint32_t raw_point = (i == 16) ? 4095 : (i * 256);
-        int mv = 0;
-        if (s_cali_valid && s_cali_handle != NULL) {
-            adc_cali_raw_to_voltage(s_cali_handle, raw_point, &mv);
-        } else {
-            mv = (raw_point * 3100) / 4095;
-        }
-        /* 1:2 resistor divider (VBAT = V_ADC * 2) */
-        ulp_vbat_lut[i] = (uint32_t)(mv * 2);
-    }
-    ESP_LOGI(TAG, "ULP 17-Point Battery LUT generated: 0=%lu mV, 2048=%lu mV, 4095=%lu mV",
-             (unsigned long)ulp_vbat_lut[0], (unsigned long)ulp_vbat_lut[8], (unsigned long)ulp_vbat_lut[16]);
-}
 
 /* 13-point LiPo OCV Discharge Curve (matching legacy hardware calibration) */
 static const struct {
@@ -248,11 +232,13 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        /* 1. Initialize ADC1 Oneshot and calibration handles prior to LUT generation */
+        /* 1. Initialize ADC1 Oneshot and calibration handles prior to calibration extraction */
         sub_power_init();
 
-        /* 2. Pass battery calibration LUT into ULP exported symbols */
-        generate_vbat_lut();
+        /* 2. Pass eFuse linear battery calibration parameters into ULP exported symbols */
+        sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
+        ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV",
+                 (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
         ulp_dispatch_reason  = 0;
         ulp_last_wake_btn    = 0;
         ulp_last_vbat_mv     = 4000;

@@ -322,12 +322,12 @@ graph LR
 ### Phase 1: ULP Coprocessor & Bootloader Silicon Realignment
 - **Files:** `components/h1os/ulp/main.c`, `components/h1os/bootloader_components/h1os_boot_hook/h1os_boot_hook.c`, `docs/architecture/13_gpio_hold_domains_and_sleep_architecture.md`
 - **Shopping List Tasks:**
-  - [ ] Implement 30 ms glitch filter on inputs in `ulp/main.c`
-  - [ ] Implement Wake-on-Release state machine and hold classification ($>2.5\text{s}$) in `ulp/main.c`
-  - [ ] Reorder CDC register clearing sequence (`RTC_GPIO_STATUS_W1TC_REG` first, then 120 µs controller pulse) in `ulp/main.c`
-  - [ ] Convert ULP battery calculation to eFuse linear math ($m, b$) and prune 17-point LUT in `ulp/main.c`
-  - [ ] Add active validation of `GPIO_PIN17_HOLD` in `h1os_boot_hook.c` and prune dead `(void)` casts
-  - [ ] Amend Line 129 of `13_gpio_hold_domains_and_sleep_architecture.md` to document `PA_EN` active-low operation
+  - [x] Implement 30 ms glitch filter on inputs in `ulp/main.c`
+  - [x] Implement Wake-on-Release state machine and hold classification ($>2.5\text{s}$) in `ulp/main.c`
+  - [x] Reorder CDC register clearing sequence (`RTC_GPIO_STATUS_W1TC_REG` first, then 120 µs controller pulse) in `ulp/main.c`
+  - [x] Convert ULP battery calculation to eFuse linear math ($m, b$) and prune 17-point LUT in `ulp/main.c`
+  - [x] Add active validation of `GPIO_PIN17_HOLD` in `h1os_boot_hook.c` and prune dead `(void)` casts
+  - [x] Amend Line 129 of `13_gpio_hold_domains_and_sleep_architecture.md` to document `PA_EN` active-low operation
 
 ### Phase 2: Flow A Wake Stub Bridge Enablement & OS Runtime Pruning
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/h1os_lifecycle.c`

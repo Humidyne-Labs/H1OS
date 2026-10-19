@@ -126,8 +126,9 @@ The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](file:///c:/Users/Matt/Docume
    - Latched via `RTC_CNTL_PAD_HOLD_REG.GPIO_PIN6_HOLD = 1`.
    - Prevents display power collapse and eliminates PCF85063A I2C clamping.
 3. `HAL_PIN_PA_EN` (GPIO 42, Digital IO):
-   - Driven HIGH (`GPIO_OUT1_REG` bit 10) to cut power to the audio amplifier during boot.
+   - Driven LOW (`GPIO_OUT1_REG` bit 10 = 0) to energize the audio power rail (`0 = ON`).
    - Latched in digital domain via `RTC_CNTL_DIG_PAD_HOLD_REG`.
+   - **Anti-Clamping Invariant:** Keeping the audio rail energized prevents the ES8311 codec's internal ESD protection diodes from forward-biasing and clamping the shared I2C bus (`GPIO 47`/`48`) to 0.7 V. Hardware mute during boot and deep sleep is enforced by driving `HAL_PIN_PA_CTRL` (GPIO 46) LOW.
 
 ### 4.2 Application Static Sleep Isolation
 Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/src/hal_io.c#L318) isolates static outputs to prevent parasitic leakage currents through external components:
