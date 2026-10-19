@@ -18,10 +18,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "h1os/h1os.h"
+#include "h1os/h1os_version.h"
 #include "h1os/hal_io.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/sub_audio.h"
@@ -132,7 +134,11 @@ static void keypad_event_cb(lv_event_t *e)
  * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
-    ESP_LOGI(TAG, "Lifecycle: BOOT initialized");
+    ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")",
+             h1os_version_get_string(),
+             h1os_version_get_build_date(),
+             h1os_version_get_build_time(),
+             h1os_version_get_code());
     s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 

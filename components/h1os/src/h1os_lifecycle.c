@@ -206,7 +206,7 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     }
 
     ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", H1OS_NAME,
-             H1OS_SUBTITLE, H1OS_VERSION_STRING, (unsigned long)st->sample_interval_sec,
+             H1OS_SUBTITLE, h1os_version_get_string(), (unsigned long)st->sample_interval_sec,
              (unsigned long)st->flow_b_period_sec);
 
     // 1. Initialize Base Hardware I/O & Release Boot Pad Holds

@@ -8,10 +8,12 @@
 #include "screens.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/orch_state.h"
+#include "h1os/h1os_version.h"
 #include "esp_system.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <inttypes.h>
 
 static const char* get_reset_reason_str(esp_reset_reason_t reason)
 {
@@ -103,7 +105,8 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     // Footer Bar: Version (left), Target (right) - shortened to fit 200px display
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text(lbl_foot_l, "H1OS v2.1");
+    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32,
+                          h1os_version_get_major(), h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
