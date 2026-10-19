@@ -11,17 +11,18 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define EPD_WIDTH       200
-#define EPD_HEIGHT      200
+#define EPD_WIDTH 200
+#define EPD_HEIGHT 200
 
 #define EPD_BUFFER_SIZE ((EPD_WIDTH * EPD_HEIGHT) / 8) /* 5000 bytes */
 
@@ -39,7 +40,7 @@ esp_err_t sub_display_init(bool is_wake_cycle);
  * @brief Get pointer to the active working framebuffer (5000 bytes, 1-bit per pixel).
  * Bit 1 = White, Bit 0 = Black.
  */
-uint8_t* sub_display_get_framebuffer(void);
+uint8_t *sub_display_get_framebuffer(void);
 
 /**
  * @brief Clear active working framebuffer.

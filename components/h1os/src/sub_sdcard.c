@@ -5,22 +5,24 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <stdio.h>
-#include <string.h>
-#include "esp_vfs_fat.h"
-#include "sdmmc_cmd.h"
-#include "driver/sdmmc_host.h"
+#include "sub_sdcard.h"
+
 #include "driver/gpio.h"
+#include "driver/sdmmc_host.h"
 #include "esp_log.h"
+#include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal_types.h"
-#include "sub_sdcard.h"
+#include "sdmmc_cmd.h"
+
+#include <stdio.h>
+#include <string.h>
 
 static const char *TAG = "sub_sdcard";
 
-static sdmmc_card_t *s_sd_card = NULL;
-static TaskHandle_t  s_mount_task = NULL;
+static sdmmc_card_t *s_sd_card             = NULL;
+static TaskHandle_t  s_mount_task          = NULL;
 static bool          s_card_absent_latched = false;
 
 static void sdcard_mount_worker_task(void *pvParameters)
@@ -37,12 +39,12 @@ static void sdcard_mount_worker_task(void *pvParameters)
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Asynchronous MicroSD mount successful.");
     } else {
-        ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)", esp_err_to_name(err));
+        ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)",
+                 esp_err_to_name(err));
     }
     s_mount_task = NULL;
     vTaskDelete(NULL);
 }
-
 
 esp_err_t sub_sdcard_mount_async(void)
 {
@@ -57,7 +59,8 @@ esp_err_t sub_sdcard_mount_async(void)
         return ESP_OK;
     }
 
-    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
+    BaseType_t res =
+        xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
     return (res == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
@@ -87,40 +90,43 @@ esp_err_t sub_sdcard_mount(void)
     host.command_timeout_ms = 3; // set for 3ms command timeout
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    slot_config.width = 1;
-    slot_config.clk   = HAL_PIN_SD_CLK;
-    slot_config.cmd   = HAL_PIN_SD_MOSI;
-    slot_config.d0    = HAL_PIN_SD_MISO;
-    slot_config.cd    = SDMMC_SLOT_NO_CD;
-    slot_config.wp    = SDMMC_SLOT_NO_WP;
+    slot_config.width               = 1;
+    slot_config.clk                 = HAL_PIN_SD_CLK;
+    slot_config.cmd                 = HAL_PIN_SD_MOSI;
+    slot_config.d0                  = HAL_PIN_SD_MISO;
+    slot_config.cd                  = SDMMC_SLOT_NO_CD;
+    slot_config.wp                  = SDMMC_SLOT_NO_WP;
 
     /* Temporarily silence low-level SD driver error noise during card discovery */
-    esp_log_level_set("sdmmc_common",  ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_common", ESP_LOG_NONE);
     esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_NONE);
-    esp_log_level_set("sdmmc_cmd",     ESP_LOG_NONE);
-    esp_log_level_set("sdmmc_sd",      ESP_LOG_NONE);
-    esp_log_level_set("sdmmc_io",      ESP_LOG_NONE);
-    esp_log_level_set("SD_HOST",       ESP_LOG_NONE);
-    esp_log_level_set("SD_TRANS",      ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_cmd", ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_sd", ESP_LOG_NONE);
+    esp_log_level_set("sdmmc_io", ESP_LOG_NONE);
+    esp_log_level_set("SD_HOST", ESP_LOG_NONE);
+    esp_log_level_set("SD_TRANS", ESP_LOG_NONE);
 
-    esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config, &mount_config, &s_sd_card);
+    esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config,
+                                            &mount_config, &s_sd_card);
 
     /* Restore normal warning level for future operations */
-    esp_log_level_set("sdmmc_common",  ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_common", ESP_LOG_WARN);
     esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_WARN);
-    esp_log_level_set("sdmmc_cmd",     ESP_LOG_WARN);
-    esp_log_level_set("sdmmc_sd",      ESP_LOG_WARN);
-    esp_log_level_set("sdmmc_io",      ESP_LOG_WARN);
-    esp_log_level_set("SD_HOST",       ESP_LOG_WARN);
-    esp_log_level_set("SD_TRANS",      ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_cmd", ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_sd", ESP_LOG_WARN);
+    esp_log_level_set("sdmmc_io", ESP_LOG_WARN);
+    esp_log_level_set("SD_HOST", ESP_LOG_WARN);
+    esp_log_level_set("SD_TRANS", ESP_LOG_WARN);
 
     if (ret != ESP_OK) {
         s_sd_card = NULL;
-        s_card_absent_latched = true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
+        s_card_absent_latched =
+            true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
         gpio_reset_pin(HAL_PIN_SD_CLK);
         gpio_reset_pin(HAL_PIN_SD_MOSI);
         gpio_reset_pin(HAL_PIN_SD_MISO);
-        ESP_LOGD(TAG, "MicroSD card not detected in slot (%s). Absent state latched.", esp_err_to_name(ret));
+        ESP_LOGD(TAG, "MicroSD card not detected in slot (%s). Absent state latched.",
+                 esp_err_to_name(ret));
         return ret;
     }
 
@@ -135,7 +141,7 @@ esp_err_t sub_sdcard_unmount(void)
     }
 
     esp_err_t ret = esp_vfs_fat_sdcard_unmount(SUB_SDCARD_MOUNT_POINT, s_sd_card);
-    s_sd_card = NULL;
+    s_sd_card     = NULL;
     gpio_reset_pin(HAL_PIN_SD_CLK);
     gpio_reset_pin(HAL_PIN_SD_MOSI);
     gpio_reset_pin(HAL_PIN_SD_MISO);
@@ -152,16 +158,19 @@ bool sub_sdcard_is_mounted(void)
 
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
 {
-    if (!out_capacity_mb)  return ESP_ERR_INVALID_ARG;
-    if (s_sd_card == NULL) return ESP_ERR_INVALID_STATE;
+    if (!out_capacity_mb)
+        return ESP_ERR_INVALID_ARG;
+    if (s_sd_card == NULL)
+        return ESP_ERR_INVALID_STATE;
 
-    uint64_t bytes = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;
+    uint64_t bytes   = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;
     *out_capacity_mb = (uint32_t)(bytes / (1024 * 1024));
     return ESP_OK;
 }
 
 esp_err_t sub_sdcard_format(void)
 {
-    if (s_sd_card == NULL) return ESP_ERR_INVALID_STATE;
+    if (s_sd_card == NULL)
+        return ESP_ERR_INVALID_STATE;
     return esp_vfs_fat_sdcard_format(SUB_SDCARD_MOUNT_POINT, s_sd_card);
 }

@@ -12,21 +12,22 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
 #include "h1os/orch_state.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef enum {
-    ORCH_FLOW_BOOT = 0,          /**< Initial system boot / power-on reset.          */
-    ORCH_FLOW_A_SAMPLE,          /**< Headless sensor sample burst.                  */
-    ORCH_FLOW_B_MAIN_WAKE,       /**< Full UI wake / Button wake / RTC timer expiry. */
-    ORCH_FLOW_BOOTLOADER_JUMP,   /**< ROM bootloader download mode.                  */
-    ORCH_FLOW_CRITICAL_OFF       /**< Low battery shutdown or power cut.             */
+    ORCH_FLOW_BOOT = 0,        /**< Initial system boot / power-on reset.          */
+    ORCH_FLOW_A_SAMPLE,        /**< Headless sensor sample burst.                  */
+    ORCH_FLOW_B_MAIN_WAKE,     /**< Full UI wake / Button wake / RTC timer expiry. */
+    ORCH_FLOW_BOOTLOADER_JUMP, /**< ROM bootloader download mode.                  */
+    ORCH_FLOW_CRITICAL_OFF     /**< Low battery shutdown or power cut.             */
 } orch_flow_type_t;
 
 /**
@@ -36,7 +37,6 @@ typedef enum {
  */
 orch_flow_type_t orch_flow_determine_wakeup(void);
 
-
 /**
  * @brief Check whether system is in Thermal Lockout state.
  * If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibrium.
@@ -44,7 +44,6 @@ orch_flow_type_t orch_flow_determine_wakeup(void);
  * @return True if in lockout, False if in thermal equilibrium.
  */
 bool orch_flow_is_thermal_lockout(void);
-
 
 /**
  * @brief Query current environmental telemetry through the Thermal Lockout MUX.

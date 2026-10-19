@@ -1,44 +1,46 @@
 /**
  * @file orch_wake_stub.c
- * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sample Burst)
+ * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sample
+ * Burst)
  *
  * SPDX-License-Identifier: MIT
  */
 
 #include "h1os/orch_wake_stub.h"
-#include "h1os/orch_state.h"
-#include "h1os/orch_math.h"
-#include "h1os/hal_types.h"
-#include "ulp_h1os.h"
-#include "esp_wake_stub.h"
-#include "esp_sleep.h"
+
+#include "esp32s3/rom/rtc.h"
 #include "esp_attr.h"
 #include "esp_rom_sys.h"
-#include "esp32s3/rom/rtc.h"
+#include "esp_sleep.h"
+#include "esp_wake_stub.h"
+#include "h1os/hal_types.h"
+#include "h1os/orch_math.h"
+#include "h1os/orch_state.h"
 #include "soc/gpio_reg.h"
 #include "soc/io_mux_reg.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
 #include "soc/sens_reg.h"
 #include "soc/soc.h"
+#include "ulp_h1os.h"
 
 #ifndef SENS_SAR_PERI_CLK_GATE_CONF_REG
 #define SENS_SAR_PERI_CLK_GATE_CONF_REG (DR_REG_SENS_BASE + 0x104)
 #endif
 #ifndef SENS_TSENS_CLK_EN
-#define SENS_TSENS_CLK_EN               (1UL << 29)
+#define SENS_TSENS_CLK_EN (1UL << 29)
 #endif
 
-#define SDA_BIT_MASK      (1UL << (HAL_PIN_I2C_SDA - 32))  /* GPIO 47 -> Bit 15 in Reg 1 */
-#define SCL_BIT_MASK      (1UL << (HAL_PIN_I2C_SCL - 32))  /* GPIO 48 -> Bit 16 in Reg 1 */
+#define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32)) /* GPIO 47 -> Bit 15 in Reg 1 */
+#define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32)) /* GPIO 48 -> Bit 16 in Reg 1 */
 
-#define I2C_ADDR_SHTC3    0x70
+#define I2C_ADDR_SHTC3 0x70
 #define I2C_ADDR_PCF85063 0x51
 #define RTC_REG_TIMER_VAL 0x10
 
-#define RTC_TIMER_TE_BIT   (1 << 2)
+#define RTC_TIMER_TE_BIT (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
-#define RTC_TIMER_TCF_MIN  (3 << 3)
+#define RTC_TIMER_TCF_MIN (3 << 3)
 
 /* Fast Bit-Bang I2C Primitives running from RTC Fast Memory */
 static inline void RTC_IRAM_ATTR i2c_delay(void)
@@ -173,7 +175,8 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 }
 
 /* Low-power MCU Die TSENS readout via RTC SAR registers on ESP32-S3 (Centigrade * 100) */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c, int16_t fallback_centi_c)
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c,
+                                                             int16_t fallback_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
@@ -191,7 +194,8 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
     uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
 
     /* Shut down TSENS immediately to minimize deep-sleep leakage */
-    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT | SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG,
+                SENS_TSENS_DUMP_OUT | SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 0);
     REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
 
@@ -313,12 +317,13 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
         /* 8. Convert to Centi-Units (Pure integer arithmetic in RTC Memory) */
-        int16_t temp_centi_c  = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
         uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t die_centi_c   = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        int16_t  die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
 
         /* 9. Successive-Sample Thermal Delta Gate & Trend Back-Marking:
-         *    - Case 0 (total_samples == 0): First sample cannot prove stability alone -> VALID_COLD = 0, valid_trend = 0.
+         *    - Case 0 (total_samples == 0): First sample cannot prove stability alone -> VALID_COLD
+         * = 0, valid_trend = 0.
          *    - Case 1 (total_samples > 0 && |T_new - T_prev| <= 20 centi-C):
          *      Back-mark previous sample VALID_COLD = 1, mark new sample VALID_COLD = 1,
          *      and set valid_trend = 2 (if starting streak) or valid_trend++ (if continuing).
@@ -326,17 +331,20 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
          *      Mark new sample VALID_COLD = 0 and reset valid_trend = 0. */
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {
-            q_flags = 0;
+            q_flags         = 0;
             st->valid_trend = 0;
         } else {
-            uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
+            uint8_t prev_idx =
+                (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
             int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
-            int16_t diff = temp_centi_c - prev_t;
-            if (diff < 0) diff = -diff;
+            int16_t diff   = temp_centi_c - prev_t;
+            if (diff < 0)
+                diff = -diff;
 
             if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
                 /* Back-mark the preceding sample as valid and mark current sample as valid */
-                st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
+                st->ring[prev_idx].quality_flags |=
+                    (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
                 q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
                 if (st->valid_trend < 2) {
                     st->valid_trend = 2;
@@ -344,7 +352,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
                     st->valid_trend++;
                 }
             } else {
-                q_flags = 0;
+                q_flags         = 0;
                 st->valid_trend = 0;
             }
         }
@@ -362,10 +370,11 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     /* 10. Query PCF85063A (0x51) remaining countdown to prevent Zero-Hour runt collisions */
     uint32_t sleep_sec = st->sample_interval_sec;
-    if (sleep_sec == 0) sleep_sec = 60;
+    if (sleep_sec == 0)
+        sleep_sec = 60;
 
-    bool rtc_timer_active = false;
-    uint32_t rem_sec = 0;
+    bool     rtc_timer_active = false;
+    uint32_t rem_sec          = 0;
 
     i2c_start();
     if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
@@ -376,9 +385,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             uint8_t timer_mode = i2c_read_byte(false);
             if (timer_mode & RTC_TIMER_TE_BIT) {
                 rtc_timer_active = true;
-                rem_sec = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN)
-                          ? ((uint32_t)timer_val * 60U)
-                          : (uint32_t)timer_val;
+                rem_sec          = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN)
+                                       ? ((uint32_t)timer_val * 60U)
+                                       : (uint32_t)timer_val;
             }
         }
     }
@@ -401,9 +410,11 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         esp_wake_stub_set_wakeup_time((uint64_t)sleep_sec * 1000000ULL);
     } else {
         /* Next sample lands at or after external RTC expiry -> Discard runt timer rearm!
-         * Disable internal timer wakeup so chip sleeps purely until external RTC INT fires Flow B */
+         * Disable internal timer wakeup so chip sleeps purely until external RTC INT fires Flow B
+         */
         uint32_t wake_ena = REG_GET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA);
-        REG_SET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA, wake_ena & ~((uint32_t)TIMER_EXPIRE));
+        REG_SET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA,
+                      wake_ena & ~((uint32_t)TIMER_EXPIRE));
     }
 
     /* Turn off status pin pulse right before re-entering sleep */

@@ -1,0 +1,30 @@
+---
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+
+# Layout & Spacing
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Bracing & Alignment
+BreakBeforeBraces: Linux
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignTrailingComments: true
+PointerAlignment: Right
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+# Spacing & Empty Lines
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SpacesBeforeTrailingComments: 1
+...

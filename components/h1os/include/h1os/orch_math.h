@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,8 +75,8 @@ float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor
  * @param[out] out_dew_c     Output dew point in Celsius (optional, can be NULL).
  * @param[out] out_rh_amb    Output reconstructed ambient RH in percent (optional, can be NULL).
  */
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c,
-                                   float *out_vp_hpa, float *out_dew_c, float *out_rh_amb);
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa,
+                                   float *out_dew_c, float *out_rh_amb);
 
 /**
  * @brief Calculate absolute humidity (vapor density) in grams per cubic meter (g/m³).
@@ -105,10 +105,12 @@ float orch_math_update_ewma(float current_sample, float previous_ewma, float alp
  *
  * @param[in] initial_temp_centi_c Initial sleep entry baseline temp (centi-°C).
  * @param[in] current_temp_centi_c Current sample temp (centi-°C).
- * @param[in] gate_threshold_centi_c Threshold drop (typically 5 to 20 centi-°C, i.e. 0.05 - 0.20 °C).
+ * @param[in] gate_threshold_centi_c Threshold drop (typically 5 to 20 centi-°C, i.e. 0.05 - 0.20
+ * °C).
  * @return True if thermally settled.
  */
-bool orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c, int16_t gate_threshold_centi_c);
+bool orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c,
+                                  int16_t gate_threshold_centi_c);
 
 #ifdef __cplusplus
 }

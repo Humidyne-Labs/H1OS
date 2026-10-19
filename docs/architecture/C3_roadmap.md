@@ -17,17 +17,17 @@ Development follows the **Four Canonical Stages of Construction**:
 - [x] **1.2 Hardware Errata Call to Action**: Author and place `ERRATA.md` in repository root for PCB dev visibility.
 - [x] **1.3 Master Architectural Consolidation Blueprint**: Create comprehensive blueprint capturing reactive ULP Monitor, ULP sleep-gating, interactive Flow B session, bootloader power latch, zero-volt cable guard, and minimal SD card scope.
 - [x] **1.4 Architectural Audit & Reconciliation**: Reconcile all architecture specifications in `docs/architecture/` with the Master Blueprint:
-  - [x] `00_system.md`: Update taxonomy, errata reference, and system principles.
-  - [x] `01_master.md`: Detail 4-layer structure, subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and interactive session.
-  - [x] `02_hal.md`: Document bone stubbing policy, stateless button pin readers, and bootloader latch release rules.
-  - [x] `03_subsystems.md`: Detail `sub_nvs`, minimal `sub_sdcard`, Zero-Volt Cable Guard in `sub_power`, remove bespoke button driver.
-  - [x] `04_orchestrator.md`: Formalize interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 9-step sleep sequence.
-  - [x] `05_ulp.md`: Re-specify purely reactive ULP Monitor (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
-  - [x] `06_api.md`: Rebrand API to `h1os_*`, document LVGL v9 indev keypad, time services (`h1os_time`).
-  - [x] `07_state_machine.md`: Update Mermaid state and sequence diagrams for reactive ULP, Zero-Hour conflict suppression, and interactive session.
-  - [x] `08_lessons_learned.md`: Document Scaffolding Trap, LVGL indev vs bespoke button driver, reactive ULP monitor, and Zero-Hour math.
-  - [x] `09_roadmap.md`: Align roadmap with the 4 canonical construction stages.
-  - [x] `10_changelog.md`: Format H1OS clean-slate release notes and link to root `CHANGELOG.md`.
+   - [x] `A0_system_governance.md`: Update taxonomy, errata reference, and system principles.
+  - [x] `A1_master_blueprint.md`: Detail 4-layer structure, subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and interactive session.
+  - [x] `A2_hal.md`: Document bone stubbing policy, stateless button pin readers, and bootloader latch release rules.
+  - [x] `A4_subsystems.md`: Detail `sub_nvs`, minimal `sub_sdcard`, Zero-Volt Cable Guard in `sub_power`, remove bespoke button driver.
+  - [x] `A5_orchestrator.md`: Formalize interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 8-step sleep sequence.
+  - [x] `A6_ulp_coprocessor.md`: Re-specify purely reactive ULP Monitor (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
+  - [x] `B1_api_and_services.md`: Rebrand API to `h1os_*`, document LVGL v9 indev keypad, time services (`h1os_time`).
+  - [x] `B2_state_machine.md`: Update Mermaid state and sequence diagrams for reactive ULP, Zero-Hour conflict suppression, and interactive session.
+  - [x] `C2_lessons_learned.md`: Document Scaffolding Trap, LVGL indev vs bespoke button driver, reactive ULP monitor, and Zero-Hour math.
+  - [x] `C3_roadmap.md`: Align roadmap with the 4 canonical construction stages.
+  - [x] `C4_changelog_policy.md`: Format H1OS clean-slate release notes and link to root `CHANGELOG.md`.
 
 ---
 
@@ -92,7 +92,7 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] **Zero-Hour Conflict Stress Test**: Race condition elimination verified in `orch_flow.c`.
   - [x] **Flash Endurance Audit**: SPI flash writes restricted strictly to sleep and shutdown in `orch_display_sync.c`.
   - [x] **Tri-Node Thermal Benchmark**: Cavity compensation architecture modeled in `orch_math.c`.
-  - [x] **Benchmarking Protocol & Guide**: Documented in [`docs/architecture/11_benchmarks.md`](11_benchmarks.md).
+  - [x] **Benchmarking Protocol & Guide**: Documented in [`docs/architecture/C1_benchmarks_and_verification.md`](C1_benchmarks_and_verification.md).
 
 ---
 

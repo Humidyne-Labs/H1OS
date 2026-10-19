@@ -32,20 +32,21 @@ h1os/ (Repository Root)
     │   └── 07_io.md                   <-- Tactile Buttons & LED Indicators
     │
     └── architecture/                  <-- TIER 2: Internal Engineering Specs
-        ├── 00_system.md               <-- Governance & Doc Architecture [THIS FILE]
-        ├── 01_master.md               <-- 4-Layer Hierarchy, Philosophy & Boundaries
-        ├── 02_hal.md                  <-- HAL, Pad Holds, Flash & Bus Drivers
-        ├── 03_subsystems.md           <-- Peripheral Subsystem Managers
-        ├── 04_orchestrator.md         <-- Flow Arbiter & Class-E Math Engine
-        ├── 05_ulp.md                  <-- ULP-RISC-V Coprocessor Hardware Monitor
-        ├── 06_api.md                  <-- Declarative Lifecycle & LVGL v9 Engine
-        ├── 07_state_machine.md        <-- Execution Flowcharts & State Machine
-        ├── 08_lessons_learned.md      <-- Post-Mortem & Architectural Rationale
-        ├── 09_roadmap.md              <-- Canonical Phased Construction Plan & Milestones
-        ├── 10_changelog.md            <-- Release Policy & SemVer Management
-        ├── 11_benchmarks.md           <-- Class-E Hardware Benchmarking & Silicon Metrics
-        ├── 12_temperature_sensor_operation.md <-- SHTC3 & TSENS Dual Temperature Sensor Architecture
-        └── 13_gpio_hold_domains_and_sleep_architecture.md <-- Silicon Hold Domains & Low-Power Sleep Architecture
+        ├── A0_system_governance.md    <-- Governance & Doc Architecture [THIS FILE]
+        ├── A1_master_blueprint.md     <-- 4-Layer Hierarchy, Philosophy & Boundaries
+        ├── A2_hal.md                  <-- HAL, Pad Holds, Flash & Bus Drivers
+        ├── A3_gpio_hold_and_sleep.md  <-- Silicon Hold Domains & Low-Power Sleep Architecture
+        ├── A4_subsystems.md           <-- Peripheral Subsystem Managers
+        ├── A5_orchestrator.md         <-- Flow Arbiter & Class-E Math Engine
+        ├── A6_ulp_coprocessor.md      <-- ULP-RISC-V Coprocessor Hardware Monitor
+        ├── A7_sensor_psychrometrics.md<-- Tri-Node Temperature & Psychrometric Sensor Operation
+        ├── B1_api_and_services.md     <-- Declarative Lifecycle & LVGL v9 Engine
+        ├── B2_state_machine.md        <-- Execution Flowcharts & State Machine
+        ├── B3_firmware_standards.md   <-- Firmware Engineering, Safety Rules & Style
+        ├── C1_benchmarks_and_verification.md <-- Hardware Benchmarking & Silicon Metrics
+        ├── C2_lessons_learned.md      <-- Post-Mortem & Architectural Rationale
+        ├── C3_roadmap.md              <-- Canonical Phased Construction Plan & Milestones
+        └── C4_changelog_policy.md     <-- Release Policy & SemVer Management
 ```
 
 ---

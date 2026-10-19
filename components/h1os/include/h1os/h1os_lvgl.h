@@ -7,10 +7,11 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
 #include "lvgl.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +59,7 @@ bool h1os_lvgl_has_pending_tasks(void);
 /**
  * @brief Retrieve the LVGL keypad input device handle.
  */
-lv_indev_t* h1os_lvgl_get_indev(void);
+lv_indev_t *h1os_lvgl_get_indev(void);
 
 /* =========================================================================
  * 1-Bit Packed Binary Typography Suite

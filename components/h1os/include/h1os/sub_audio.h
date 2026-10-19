@@ -11,9 +11,10 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,9 +64,10 @@ bool sub_audio_is_ready(void);
  * @brief Acoustic payload type for consolidated sub_audio_play dispatch.
  */
 typedef enum {
-    SUB_AUDIO_TONE = 0, /**< Synthesized square/sine tone (params: uint32_t frequency_hz, uint32_t duration_ms) */
-    SUB_AUDIO_CHIME,     /**< Standard acoustic presentation chime (params: uint8_t chime_type) */
-    SUB_AUDIO_PCM,       /**< Raw 16-bit Mono PCM buffer (params: const int16_t *samples, count = len) */
+    SUB_AUDIO_TONE = 0, /**< Synthesized square/sine tone (params: uint32_t frequency_hz, uint32_t
+                           duration_ms) */
+    SUB_AUDIO_CHIME,    /**< Standard acoustic presentation chime (params: uint8_t chime_type) */
+    SUB_AUDIO_PCM, /**< Raw 16-bit Mono PCM buffer (params: const int16_t *samples, count = len) */
 } sub_audio_type_t;
 
 /**

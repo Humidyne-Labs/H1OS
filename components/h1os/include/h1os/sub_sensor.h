@@ -11,9 +11,10 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,7 +50,8 @@ esp_err_t sub_sensor_read_shtc3_raw(uint16_t *out_raw_temp, uint16_t *out_raw_rh
  * @param[out] out_temp_c Temperature in Celsius.
  * @param[out] out_rh_pct Relative humidity in percent (0.0 to 100.0).
  */
-void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *out_temp_c, float *out_rh_pct);
+void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *out_temp_c,
+                                    float *out_rh_pct);
 
 /**
  * @brief Read ESP32-S3 internal silicon junction temperature via internal TSENS macro.

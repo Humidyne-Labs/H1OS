@@ -16,32 +16,34 @@
  */
 
 #include "h1os/sub_audio.h"
-#include "h1os/h1os.h"
-#include "h1os/hal_i2c.h"
-#include "h1os/hal_types.h"
+
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "h1os/h1os.h"
+#include "h1os/hal_i2c.h"
+#include "h1os/hal_types.h"
+
 #include <math.h>
 #include <string.h>
 
 static const char *TAG = "sub_audio";
 
 /* ES8311 Core Register Map */
-#define ES8311_REG_RESET        0x00
-#define ES8311_REG_SYS_PWR_ANA  0x0D
-#define ES8311_REG_SYS_LP_MOD   0x0F  /* Subsystem low power overrides: bit 7 = LPDAC */
-#define ES8311_REG_DAC_PWR      0x12
-#define ES8311_REG_DAC_VOL      0x32
-#define ES8311_REG_FLAG         0xFC  /* Read-only status flag: Bits 6:4 = FLAG_CSM_CHIP */
-#define ES8311_REG_CHIP_ID1     0xFD  /* Expected: 0x83 */
-#define ES8311_REG_CHIP_ID2     0xFE  /* Expected: 0x11 */
+#define ES8311_REG_RESET 0x00
+#define ES8311_REG_SYS_PWR_ANA 0x0D
+#define ES8311_REG_SYS_LP_MOD 0x0F /* Subsystem low power overrides: bit 7 = LPDAC */
+#define ES8311_REG_DAC_PWR 0x12
+#define ES8311_REG_DAC_VOL 0x32
+#define ES8311_REG_FLAG 0xFC     /* Read-only status flag: Bits 6:4 = FLAG_CSM_CHIP */
+#define ES8311_REG_CHIP_ID1 0xFD /* Expected: 0x83 */
+#define ES8311_REG_CHIP_ID2 0xFE /* Expected: 0x11 */
 
-#define FRAME_SIZE              0x100 /* 256 bytes */
+#define FRAME_SIZE 0x100 /* 256 bytes */
 
 /* Audio Worker Command Types */
 typedef enum {
@@ -62,8 +64,8 @@ typedef struct {
         } chime;
         struct {
             const int16_t *samples;
-            size_t sample_count;
-            uint32_t sample_rate_hz;
+            size_t         sample_count;
+            uint32_t       sample_rate_hz;
         } pcm;
     } params;
     SemaphoreHandle_t done_sem; /* Set for synchronous caller, NULL for async */
@@ -72,17 +74,17 @@ typedef struct {
 
 static i2s_chan_handle_t s_tx_chan = NULL;
 
-static bool s_audio_inited         = false;
-static bool s_i2s_chan_enabled     = false;
-static bool s_codec_in_standby     = false;
+static bool s_audio_inited     = false;
+static bool s_i2s_chan_enabled = false;
+static bool s_codec_in_standby = false;
 /** @brief Low power */
-static bool s_low_power_mode       = true;
+static bool s_low_power_mode = true;
 
-static QueueHandle_t     s_audio_queue       = NULL;
-static TaskHandle_t      s_audio_task_handle = NULL;
-static volatile bool     s_audio_is_busy     = false;
+static QueueHandle_t s_audio_queue       = NULL;
+static TaskHandle_t  s_audio_task_handle = NULL;
+static volatile bool s_audio_is_busy     = false;
 /** @brief Volume percentage (0% unconfigured/muted until set by lifecycle presentation) */
-static uint8_t           s_volume_pct        = 0;
+static uint8_t s_volume_pct = 0;
 
 /*
  * Perceptual Volume Lookup Table (0% to 100%)
@@ -108,7 +110,8 @@ static const uint8_t es8311_perceptual_vol_table[101] = {
 
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 {
-    if (pct > 100) pct = 100;
+    if (pct > 100)
+        pct = 100;
     return es8311_perceptual_vol_table[pct];
 }
 
@@ -118,7 +121,7 @@ static void sub_audio_park_warm(void);
 
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 {
-    uint8_t buf[2] = { reg, val };
+    uint8_t buf[2] = {reg, val};
     return hal_i2c_write(HAL_I2C_ADDR_ES8311, buf, sizeof(buf), pdMS_TO_TICKS(50));
 }
 
@@ -127,9 +130,9 @@ static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *val)
     return hal_i2c_write_read(HAL_I2C_ADDR_ES8311, &reg, 1, val, 1, pdMS_TO_TICKS(50));
 }
 
-static esp_err_t sub_audio_read_chip_id(uint16_t* chip_id)
+static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 {
-    if (s_tx_chan != NULL && !s_i2s_chan_enabled) 
+    if (s_tx_chan != NULL && !s_i2s_chan_enabled)
         return ESP_ERR_INVALID_STATE;
 
     uint8_t id1 = 0, id2 = 0;
@@ -151,11 +154,13 @@ static esp_err_t sub_audio_flush_frame(void)
 {
     /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
      * cleanly through the DAC interpolation pipeline. */
-    esp_err_t ret = ESP_OK;
-    int16_t postroll[FRAME_SIZE] = {0};
-    size_t postroll_written = 0;
-    ret = i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
-    ret = ((ret == ESP_OK) && (postroll_written == sizeof(postroll))) ? ESP_OK : ESP_ERR_INVALID_STATE;
+    esp_err_t ret                  = ESP_OK;
+    int16_t   postroll[FRAME_SIZE] = {0};
+    size_t    postroll_written     = 0;
+    ret = i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written,
+                            pdMS_TO_TICKS(100));
+    ret = ((ret == ESP_OK) && (postroll_written == sizeof(postroll))) ? ESP_OK
+                                                                      : ESP_ERR_INVALID_STATE;
     vTaskDelay(pdMS_TO_TICKS(20));
     return ret;
 }
@@ -164,17 +169,18 @@ esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 {
     /* Probe device presence before waiting for CSM readiness */
     uint16_t chip_id = 0x0000;
-    if(sub_audio_read_chip_id(&chip_id) != ESP_OK) 
+    if (sub_audio_read_chip_id(&chip_id) != ESP_OK)
         return ESP_ERR_INVALID_STATE;
 
-    uint32_t elapsed_ms = 0;
-    const uint32_t step_ms = 5;
+    uint32_t       elapsed_ms = 0;
+    const uint32_t step_ms    = 5;
     while (elapsed_ms < timeout_ms) {
         uint8_t flag = 0;
         if (es8311_read_reg(ES8311_REG_FLAG, &flag) == ESP_OK) {
             uint8_t csm_state = (flag >> 4) & 0x07; /* Bits 6:4 = FLAG_CSM_CHIP */
             if (csm_state != 0) {
-                ESP_LOGD(TAG, "ES8311 CSM active in state S%u after %lu ms", csm_state, (unsigned long)elapsed_ms);
+                ESP_LOGD(TAG, "ES8311 CSM active in state S%u after %lu ms", csm_state,
+                         (unsigned long)elapsed_ms);
                 return ESP_OK;
             }
         }
@@ -199,60 +205,61 @@ typedef struct {
 /* Phase 1: Clock tree, bias initialization, and VMID fast charging */
 static const es8311_reg_entry_t s_es8311_init_pre_charge[] = {
     /* 1. Silicon errata I2C noise immunity lock (must be written twice first) */
-    { 0x44, 0x08 },
-    { 0x44, 0x08 },
+    {0x44, 0x08},
+    {0x44, 0x08},
 
     /* 2. Wake analog baseline and begin smooth VMID capacitor charge */
-    { 0x0D, 0xFA },
+    {0x0D, 0xFA},
 
     /* 3. Clock tree setup (16kHz Philips I2S master clocking) */
-    { 0x01, 0x30 },
-    { 0x02, 0x00 },
-    { 0x03, 0x10 },
-    { 0x16, 0x24 }, /* ADC volume scale baseline */
-    { 0x04, 0x20 }, /* DAC OSR = 0x20 for 16kHz Fs */
-    { 0x05, 0x00 },
-    { 0x0B, 0x00 },
-    { 0x0C, 0x00 },
+    {0x01, 0x30},
+    {0x02, 0x00},
+    {0x03, 0x10},
+    {0x16, 0x24}, /* ADC volume scale baseline */
+    {0x04, 0x20}, /* DAC OSR = 0x20 for 16kHz Fs */
+    {0x05, 0x00},
+    {0x0B, 0x00},
+    {0x0C, 0x00},
 
     /* 4. Analog bias & VMID buffer configuration */
-    { 0x10, 0x1F }, /* Bias generator current nominal */
-    { 0x11, 0x7F }, /* Connect external C_VMID filter cap */
+    {0x10, 0x1F}, /* Bias generator current nominal */
+    {0x11, 0x7F}, /* Connect external C_VMID filter cap */
 
     /* 5. State machine power on & I2S slave mode */
-    { 0x00, 0x80 }, /* CSM power on, slave mode */
-    { 0x01, 0x3F }, /* MCLK pin input, all clocks active */
-    { 0x06, 0x03 }, /* BCLK divider = 4 */
-    { 0x07, 0x00 }, /* Master LRCK divider high byte */
-    { 0x08, 0xFF }, /* Master LRCK divider low byte */
+    {0x00, 0x80}, /* CSM power on, slave mode */
+    {0x01, 0x3F}, /* MCLK pin input, all clocks active */
+    {0x06, 0x03}, /* BCLK divider = 4 */
+    {0x07, 0x00}, /* Master LRCK divider high byte */
+    {0x08, 0xFF}, /* Master LRCK divider low byte */
 
     /* 6. Signal routing and high-pass filters */
-    { 0x13, 0x10 }, /* Reference bias configuration */
-    { 0x1B, 0x0A },
-    { 0x1C, 0x6A },
-    { 0x44, 0x58 }, /* Internal reference signal routing */
+    {0x13, 0x10}, /* Reference bias configuration */
+    {0x1B, 0x0A},
+    {0x1C, 0x6A},
+    {0x44, 0x58}, /* Internal reference signal routing */
 
     /* 7. Serial Data Port (SDP) configuration (16-bit mono Left I2S) */
-    { 0x09, 0x0C }, /* SDP_IN: 16-bit Philips I2S, unmuted */
-    { 0x0A, 0x0C }, /* SDP_OUT: 16-bit Philips I2S, unmuted */
+    {0x09, 0x0C}, /* SDP_IN: 16-bit Philips I2S, unmuted */
+    {0x0A, 0x0C}, /* SDP_OUT: 16-bit Philips I2S, unmuted */
 };
 
 /* Phase 2: Post-charge low-noise analog reference, EQ bypass errata, and unmuting */
 static const es8311_reg_entry_t s_es8311_init_post_charge[] = {
     /* Power on DAC and lock low-noise analog reference (Fixes Hiss) */
-    { 0x17, 0xBF }, /* ALC baseline */
-    { 0x0E, 0x02 }, /* Power down Mic/ADC Modulator; keep VROI on */
-    { 0x12, 0x00 }, /* DAC analog stage power ON */
-    { 0x14, 0x1A }, /* ADC input termination (no floating mic hum) */
-    { 0x0D, 0x01 }, /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
-    { 0x15, 0x40 },
+    {0x17, 0xBF}, /* ALC baseline */
+    {0x0E, 0x02}, /* Power down Mic/ADC Modulator; keep VROI on */
+    {0x12, 0x00}, /* DAC analog stage power ON */
+    {0x14, 0x1A}, /* ADC input termination (no floating mic hum) */
+    {0x0D, 0x01}, /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
+    {0x15, 0x40},
 
-    /* SILICON ERRATA (Reg 0x37 = 0x08): Explicitly disables volume fade ramp and bypasses/disables EQ */
-    { 0x37, 0x08 },
-    { 0x45, 0x00 },
+    /* SILICON ERRATA (Reg 0x37 = 0x08): Explicitly disables volume fade ramp and bypasses/disables
+       EQ */
+    {0x37, 0x08},
+    {0x45, 0x00},
 
     /* DAC unmuted permanently (30sec + view time) for warm sessions */
-    { 0x31, 0x00 },
+    {0x31, 0x00},
 };
 
 static esp_err_t es8311_write_table(const es8311_reg_entry_t *table, size_t count)
@@ -269,17 +276,19 @@ static esp_err_t es8311_init_dac_registers(void)
     esp_err_t ret = ESP_OK;
 
     /* 1-7. Execute pre-charge configuration sequence */
-    ret |= es8311_write_table(s_es8311_init_pre_charge,
-                              sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_pre_charge, sizeof(s_es8311_init_pre_charge) /
+                                                            sizeof(s_es8311_init_pre_charge[0]));
 
-    /* 8. Allow C_VMID fast-charge (0x0D = 0xFA) to saturate to AVDD/2 (1.65V) before switching to low-noise normal mode */
+    /* 8. Allow C_VMID fast-charge (0x0D = 0xFA) to saturate to AVDD/2 (1.65V) before switching to
+     * low-noise normal mode */
     vTaskDelay(pdMS_TO_TICKS(35));
 
     /* 9. Execute post-charge configuration sequence */
-    ret |= es8311_write_table(s_es8311_init_post_charge,
-                              sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_post_charge, sizeof(s_es8311_init_post_charge) /
+                                                             sizeof(s_es8311_init_post_charge[0]));
 
-    /* Dynamic Low-Power Mode (Reg 0x0F = 0x80): Standard default; negligible noise floor delta saves dynamic power */
+    /* Dynamic Low-Power Mode (Reg 0x0F = 0x80): Standard default; negligible noise floor delta
+     * saves dynamic power */
     ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00);
 
     return ret;
@@ -287,16 +296,18 @@ static esp_err_t es8311_init_dac_registers(void)
 
 esp_err_t sub_audio_init(void)
 {
-    if (s_audio_inited) return ESP_OK;
+    if (s_audio_inited)
+        return ESP_OK;
 
     /* 1. Ensure PA CTRL (GPIO 46: 0 = Mute) is muted initially */
     /* (PA_EN GPIO 42 is latched ON in 2nd-stage bootloader)    */
     sub_audio_park_warm();
 
-    /* 2. Probe ES8311 silicon over I2C (two single-byte reads; ES8311 does not auto-increment 0xFD->0xFE) */
+    /* 2. Probe ES8311 silicon over I2C (two single-byte reads; ES8311 does not auto-increment
+     * 0xFD->0xFE) */
     uint16_t chip_id = 0x0000;
     sub_audio_read_chip_id(&chip_id);
-    if(chip_id != 0x8311) {
+    if (chip_id != 0x8311) {
         ESP_LOGE(TAG, "Chip ID NOT Valid (0x%04X)", chip_id);
         s_audio_inited = false;
         return ESP_ERR_INVALID_VERSION;
@@ -318,22 +329,26 @@ esp_err_t sub_audio_init(void)
 
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(16000),
-        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
-        .gpio_cfg = {
-            .mclk = HAL_PIN_I2S_MCLK,
-            .bclk = HAL_PIN_I2S_SCLK,
-            .ws   = HAL_PIN_I2S_LRCK,
-            .dout = HAL_PIN_I2S_DSDIN,
-            .din  = I2S_GPIO_UNUSED,
-            .invert_flags = {
-                .mclk_inv = false,
-                .bclk_inv = false,
-                .ws_inv   = false,
+        .slot_cfg =
+            I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+        .gpio_cfg =
+            {
+                .mclk = HAL_PIN_I2S_MCLK,
+                .bclk = HAL_PIN_I2S_SCLK,
+                .ws   = HAL_PIN_I2S_LRCK,
+                .dout = HAL_PIN_I2S_DSDIN,
+                .din  = I2S_GPIO_UNUSED,
+                .invert_flags =
+                    {
+                        .mclk_inv = false,
+                        .bclk_inv = false,
+                        .ws_inv   = false,
+                    },
             },
-        },
     };
-    std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256; /* 16 kHz * 256 = 4.096 MHz required for ES8311 PLL */
-    std_cfg.slot_cfg.slot_mask    = I2S_STD_SLOT_LEFT;
+    std_cfg.clk_cfg.mclk_multiple =
+        I2S_MCLK_MULTIPLE_256; /* 16 kHz * 256 = 4.096 MHz required for ES8311 PLL */
+    std_cfg.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
 
     err = i2s_channel_init_std_mode(s_tx_chan, &std_cfg);
     if (err != ESP_OK) {
@@ -355,7 +370,8 @@ esp_err_t sub_audio_init(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     } else {
-        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", s_volume_pct);
+        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)",
+                 s_volume_pct);
     }
 
     /* Set Volume, LOG scale, for humans ear holes */
@@ -365,24 +381,20 @@ esp_err_t sub_audio_init(void)
 
     sub_audio_flush_frame(); // 20ms flush
 
-    /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) with Direct-to-Task Handshake */
+    /* 6. Spawn audio background worker task at priority 6 (> LVGL priority 5) with Direct-to-Task
+     * Handshake */
     if (s_audio_queue == NULL) {
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
             TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
-            BaseType_t res = xTaskCreatePinnedToCore(
-                audio_worker_task,
-                "h1os_audio_worker",
-                4096,
-                (void *)current_task,
-                6,
-                &s_audio_task_handle,
-                tskNO_AFFINITY
-            );
+            BaseType_t   res = xTaskCreatePinnedToCore(audio_worker_task, "h1os_audio_worker", 4096,
+                                                       (void *)current_task, 6, &s_audio_task_handle,
+                                                       tskNO_AFFINITY);
             if (res == pdPASS) {
                 /* Block until worker signals, or timeout after 500ms */
                 if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
-                    ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
+                    ESP_LOGE(TAG,
+                             "Audio worker task startup timeout (>500ms). Deleting orphan task.");
                     vTaskDelete(s_audio_task_handle);
                     s_audio_task_handle = NULL;
                     vQueueDelete(s_audio_queue);
@@ -406,9 +418,11 @@ esp_err_t sub_audio_init(void)
 
 /*
  * Warm Idle between sounds during an active Flow B UI session:
- * - Mutes external NS4168 Class-D amplifier (HAL_PIN_PA_CTRL = 0 -> H-bridge off, zero speaker hiss)
- * - Keeps I2S MCLK/LRCK running (streaming 0x0000 via auto_clear) and ES8311 CSM in State S3 at s_volume_pct
- *   so short button clicks (35 ms) are not swallowed by ES8311 CSM clock recovery or Reg 0x37 soft-ramp (80 ms)
+ * - Mutes external NS4168 Class-D amplifier (HAL_PIN_PA_CTRL = 0 -> H-bridge off, zero speaker
+ * hiss)
+ * - Keeps I2S MCLK/LRCK running (streaming 0x0000 via auto_clear) and ES8311 CSM in State S3 at
+ * s_volume_pct so short button clicks (35 ms) are not swallowed by ES8311 CSM clock recovery or Reg
+ * 0x37 soft-ramp (80 ms)
  */
 static void sub_audio_park_warm(void)
 {
@@ -421,7 +435,7 @@ esp_err_t sub_audio_standby(void)
 {
     /* 1. Mute external amplifier first */
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
-    
+
     /* Wait 25ms to allow amplifier H-bridge to completely turn off (prevents pop) */
     vTaskDelay(pdMS_TO_TICKS(25));
 
@@ -436,7 +450,7 @@ esp_err_t sub_audio_standby(void)
     es8311_write_reg(0x17, 0x00);
     es8311_write_reg(0x15, 0x00);
     es8311_write_reg(0x45, 0x00);
-    
+
     /* 4. Power down analog reference & VMID */
     es8311_write_reg(0x0D, 0xFC); /* Fully collapse analog bias & VMID for <1uA standby */
 
@@ -461,20 +475,21 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
     const uint32_t sample_rate   = 16000;
     const uint32_t total_samples = (sample_rate * duration_ms) / 1000;
     const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);
-    
-    int16_t buffer[FRAME_SIZE];
+
+    int16_t  buffer[FRAME_SIZE];
     uint32_t samples_generated = 0;
-    
+
     float phase      = 0.0f;
     float phase_step = (2.0f * (float)M_PI * (float)frequency_hz) / (float)sample_rate;
 
     while (samples_generated < total_samples) {
         size_t chunk_size = total_samples - samples_generated;
-        if (chunk_size > FRAME_SIZE) chunk_size = FRAME_SIZE;
+        if (chunk_size > FRAME_SIZE)
+            chunk_size = FRAME_SIZE;
 
         for (size_t i = 0; i < chunk_size; i++) {
             uint32_t idx = samples_generated + (uint32_t)i;
-            float env = 1.0f;
+            float    env = 1.0f;
             if (ramp_samples > 0) {
                 if (idx < ramp_samples) {
                     env = (float)idx / (float)ramp_samples;
@@ -484,7 +499,8 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
             }
             buffer[i] = (int16_t)(sinf(phase) * 28000.0f * env);
             phase += phase_step;
-            if (phase >= 2.0f * (float)M_PI) phase -= 2.0f * (float)M_PI;
+            if (phase >= 2.0f * (float)M_PI)
+                phase -= 2.0f * (float)M_PI;
         }
 
         if (chunk_size < FRAME_SIZE) {
@@ -500,13 +516,15 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
 static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_count)
 {
-    if (samples == NULL || sample_count == 0) return;
+    if (samples == NULL || sample_count == 0)
+        return;
 
     int16_t buffer[FRAME_SIZE];
-    size_t samples_sent = 0;
+    size_t  samples_sent = 0;
     while (samples_sent < sample_count) {
         size_t chunk = sample_count - samples_sent;
-        if (chunk > FRAME_SIZE) chunk = FRAME_SIZE;
+        if (chunk > FRAME_SIZE)
+            chunk = FRAME_SIZE;
 
         memcpy(buffer, &samples[samples_sent], chunk * sizeof(int16_t));
         if (chunk < FRAME_SIZE) {
@@ -523,7 +541,8 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 {
     if (!s_audio_inited || s_tx_chan == NULL) {
         esp_err_t err = sub_audio_init();
-        if (err != ESP_OK) return err;
+        if (err != ESP_OK)
+            return err;
     }
 
     /* 1. Ensure I2S TX clocks (MCLK/BCLK/LRCK) are running */
@@ -547,20 +566,23 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 {
-    ESP_LOGI(TAG, "Playing tone: %lu Hz for %lu ms (Vol: %u%%)",
-             (unsigned long)frequency_hz, (unsigned long)duration_ms, s_volume_pct);
+    ESP_LOGI(TAG, "Playing tone: %lu Hz for %lu ms (Vol: %u%%)", (unsigned long)frequency_hz,
+             (unsigned long)duration_ms, s_volume_pct);
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     sub_audio_render_tone_samples(frequency_hz, duration_ms);
     return ESP_OK;
 }
 
-static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
+static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count,
+                                    uint32_t sample_rate_hz)
 {
     (void)sample_rate_hz; /* Pre-configured 16kHz */
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     sub_audio_render_pcm_samples(samples, sample_count);
     return ESP_OK;
@@ -571,46 +593,47 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
     ESP_LOGI(TAG, "Executing acoustic presentation chime (Type %u)...", type);
 
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     switch (type) {
-        case H1OS_CHIME_BOOT: /* 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
-            sub_audio_render_tone_samples(523, 70);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(659, 70);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(784, 70);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(1046, 150);
-            break;
+    case H1OS_CHIME_BOOT: /* 4-tone ascending harmonic chord (523 -> 659 -> 784 -> 1046 Hz) */
+        sub_audio_render_tone_samples(523, 70);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(659, 70);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(784, 70);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(1046, 150);
+        break;
 
-        case H1OS_CHIME_SLEEP: /* 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
-            sub_audio_render_tone_samples(1046, 80);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(784, 80);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(659, 140);
-            break;
+    case H1OS_CHIME_SLEEP: /* 3-tone descending sequence (1046 -> 784 -> 659 Hz) */
+        sub_audio_render_tone_samples(1046, 80);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(784, 80);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(659, 140);
+        break;
 
-        case H1OS_CHIME_SHUTDOWN: /* 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
-            sub_audio_render_tone_samples(784, 90);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(659, 90);
-            vTaskDelay(pdMS_TO_TICKS(15));
-            sub_audio_render_tone_samples(523, 180);
-            break;
+    case H1OS_CHIME_SHUTDOWN: /* 3-tone power-down sequence (784 -> 659 -> 523 Hz) */
+        sub_audio_render_tone_samples(784, 90);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(659, 90);
+        vTaskDelay(pdMS_TO_TICKS(15));
+        sub_audio_render_tone_samples(523, 180);
+        break;
 
-        case H1OS_CHIME_ALARM: /* Attention pulses */
-            for (int i = 0; i < 2; i++) {
-                sub_audio_render_tone_samples(1760, 80);
-                vTaskDelay(pdMS_TO_TICKS(10));
-                sub_audio_render_tone_samples(880, 80);
-                vTaskDelay(pdMS_TO_TICKS(20));
-            }
-            break;
+    case H1OS_CHIME_ALARM: /* Attention pulses */
+        for (int i = 0; i < 2; i++) {
+            sub_audio_render_tone_samples(1760, 80);
+            vTaskDelay(pdMS_TO_TICKS(10));
+            sub_audio_render_tone_samples(880, 80);
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
+        break;
 
-        default:
-            return ESP_ERR_INVALID_ARG;
+    default:
+        return ESP_ERR_INVALID_ARG;
     }
 
     return ESP_OK;
@@ -620,7 +643,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
 static void audio_worker_task(void *pvParameters)
 {
     TaskHandle_t creator_task = (TaskHandle_t)pvParameters;
-    audio_cmd_t cmd;
+    audio_cmd_t  cmd;
     ESP_LOGI(TAG, "Audio worker task initialized and active");
 
     /* Signal creator task that worker initialization is complete and loop is starting */
@@ -631,18 +654,20 @@ static void audio_worker_task(void *pvParameters)
     while (1) {
         if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
             s_audio_is_busy = true;
-            esp_err_t res = ESP_OK;
+            esp_err_t res   = ESP_OK;
 
             switch (cmd.type) {
-                case AUDIO_CMD_TONE:
-                    res = sub_audio_exec_tone(cmd.params.tone.frequency_hz, cmd.params.tone.duration_ms);
-                    break;
-                case AUDIO_CMD_CHIME:
-                    res = sub_audio_exec_chime(cmd.params.chime.chime_type);
-                    break;
-                case AUDIO_CMD_PCM:
-                    res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count, cmd.params.pcm.sample_rate_hz);
-                    break;
+            case AUDIO_CMD_TONE:
+                res =
+                    sub_audio_exec_tone(cmd.params.tone.frequency_hz, cmd.params.tone.duration_ms);
+                break;
+            case AUDIO_CMD_CHIME:
+                res = sub_audio_exec_chime(cmd.params.chime.chime_type);
+                break;
+            case AUDIO_CMD_PCM:
+                res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count,
+                                         cmd.params.pcm.sample_rate_hz);
+                break;
             }
 
             if (cmd.result) {
@@ -662,16 +687,18 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
 {
     if (s_audio_queue == NULL) {
         esp_err_t err = sub_audio_init();
-        if (err != ESP_OK) return err;
+        if (err != ESP_OK)
+            return err;
     }
 
-    audio_cmd_t local_cmd = *cmd;
-    SemaphoreHandle_t sync_sem = NULL;
-    esp_err_t exec_result = ESP_OK;
+    audio_cmd_t       local_cmd   = *cmd;
+    SemaphoreHandle_t sync_sem    = NULL;
+    esp_err_t         exec_result = ESP_OK;
 
     if (is_sync) {
         sync_sem = xSemaphoreCreateBinary();
-        if (sync_sem == NULL) return ESP_ERR_NO_MEM;
+        if (sync_sem == NULL)
+            return ESP_ERR_NO_MEM;
         local_cmd.done_sem = sync_sem;
         local_cmd.result   = &exec_result;
     } else {
@@ -680,7 +707,8 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
     }
 
     if (xQueueSend(s_audio_queue, &local_cmd, pdMS_TO_TICKS(wait_ms)) != pdTRUE) {
-        if (sync_sem) vSemaphoreDelete(sync_sem);
+        if (sync_sem)
+            vSemaphoreDelete(sync_sem);
         return ESP_ERR_TIMEOUT;
     }
 
@@ -695,30 +723,34 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
 
 esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
 {
-    if (data == NULL) return ESP_ERR_INVALID_ARG;
+    if (data == NULL)
+        return ESP_ERR_INVALID_ARG;
 
     audio_cmd_t cmd = {0};
 
     switch (type) {
     case SUB_AUDIO_TONE: {
         const uint32_t *params = (const uint32_t *)data;
-        if (len < 2 && len < (2 * sizeof(uint32_t))) return ESP_ERR_INVALID_ARG;
-        cmd.type = AUDIO_CMD_TONE;
+        if (len < 2 && len < (2 * sizeof(uint32_t)))
+            return ESP_ERR_INVALID_ARG;
+        cmd.type                     = AUDIO_CMD_TONE;
         cmd.params.tone.frequency_hz = params[0];
         cmd.params.tone.duration_ms  = params[1];
         break;
     }
     case SUB_AUDIO_CHIME: {
-        if (len < 1) return ESP_ERR_INVALID_ARG;
-        cmd.type = AUDIO_CMD_CHIME;
+        if (len < 1)
+            return ESP_ERR_INVALID_ARG;
+        cmd.type                    = AUDIO_CMD_CHIME;
         cmd.params.chime.chime_type = *(const uint8_t *)data;
         break;
     }
     case SUB_AUDIO_PCM: {
-        if (len == 0) return ESP_ERR_INVALID_ARG;
-        cmd.type = AUDIO_CMD_PCM;
-        cmd.params.pcm.samples = (const int16_t *)data;
-        cmd.params.pcm.sample_count = len;
+        if (len == 0)
+            return ESP_ERR_INVALID_ARG;
+        cmd.type                      = AUDIO_CMD_PCM;
+        cmd.params.pcm.samples        = (const int16_t *)data;
+        cmd.params.pcm.sample_count   = len;
         cmd.params.pcm.sample_rate_hz = 16000;
         break;
     }
@@ -731,8 +763,10 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
 
 bool sub_audio_is_busy(void)
 {
-    if (s_audio_is_busy) return true;
-    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0) return true;
+    if (s_audio_is_busy)
+        return true;
+    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0)
+        return true;
     return false;
 }
 
@@ -775,7 +809,8 @@ esp_err_t sub_audio_deinit(void)
 
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 {
-    if (volume_pct > 100) volume_pct = 100;
+    if (volume_pct > 100)
+        volume_pct = 100;
     s_volume_pct = volume_pct;
 
     /* If codec is currently active (not in standby), update DAC volume register immediately */

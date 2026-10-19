@@ -5,23 +5,25 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <algorithm>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
+#include "h1os_lvgl.h"
+
+#include "display/lv_display_private.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "esp_heap_caps.h"
-#include "sub_display.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "h1os.h"
 #include "hal_io.h"
 #include "hal_types.h"
-#include "h1os_lvgl.h"
-#include "h1os.h"
 #include "orch_display_sync.h"
-#include "display/lv_display_private.h"
 #include "sdkconfig.h"
+#include "sub_display.h"
+
+#include <algorithm>
+#include <stdio.h>
+#include <string.h>
 
 static const char *TAG = "h1os_lvgl";
 
@@ -31,24 +33,28 @@ static TaskHandle_t  s_lvgl_task_handle  = NULL;
 static bool          s_lvgl_task_running = false;
 static bool          s_first_boot_flush  = true;
 
-#define LVGL_I1_PALETTE_SIZE  8
+#define LVGL_I1_PALETTE_SIZE 8
 
 static void h1os_lvgl_port_task(void *pvParameters);
 
-bool h1os_lvgl_lock(uint32_t timeout_ms) {
+bool h1os_lvgl_lock(uint32_t timeout_ms)
+{
     lv_lock();
     return true;
 }
 
-void h1os_lvgl_unlock(void) {
+void h1os_lvgl_unlock(void)
+{
     lv_unlock();
 }
 
-static uint32_t lvgl_tick_get_cb(void) {
+static uint32_t lvgl_tick_get_cb(void)
+{
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
-static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
+static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
+{
     data->state = LV_INDEV_STATE_RELEASED;
     data->key   = 0;
 
@@ -56,10 +62,8 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
 
     static uint32_t s_prev_logged_btns = 0;
     if (btns != s_prev_logged_btns) {
-        ESP_LOGI(TAG, "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)",
-                 (unsigned long)btns,
-                 (btns & HAL_BTN_BOOT) ? 1 : 0,
-                 (btns & HAL_BTN_POWER) ? 1 : 0);
+        ESP_LOGI(TAG, "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)", (unsigned long)btns,
+                 (btns & HAL_BTN_BOOT) ? 1 : 0, (btns & HAL_BTN_POWER) ? 1 : 0);
         s_prev_logged_btns = btns;
     }
 
@@ -129,7 +133,8 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
         uint16_t x1 = area->x1;
         uint16_t x2 = x1 + area_w - 1;
         if (x1 < EPD_WIDTH) {
-            if (x2 >= EPD_WIDTH) x2 = EPD_WIDTH - 1;
+            if (x2 >= EPD_WIDTH)
+                x2 = EPD_WIDTH - 1;
 
             uint32_t first_byte = x1 >> 3;
             uint32_t last_byte  = x2 >> 3;
@@ -145,24 +150,24 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
                 if (first_byte == last_byte) {
                     uint8_t mask = left_mask & right_mask;
                     uint8_t val  = (*s >> shift) & mask;
-                    *d = (*d & ~mask) | val;
+                    *d           = (*d & ~mask) | val;
                     continue;
                 }
 
                 uint8_t carry = *s;
-                *d = (*d & ~left_mask) | ((carry >> shift) & left_mask);
+                *d            = (*d & ~left_mask) | ((carry >> shift) & left_mask);
                 d++;
 
                 for (uint32_t bx = first_byte + 1; bx < last_byte; bx++) {
                     s++;
                     uint8_t next = *s;
-                    *d++ = (carry << (8 - shift)) | (next >> shift);
-                    carry = next;
+                    *d++         = (carry << (8 - shift)) | (next >> shift);
+                    carry        = next;
                 }
 
                 s++;
                 uint8_t val = (carry << (8 - shift)) | (*s >> shift);
-                *d = (*d & ~right_mask) | (val & right_mask);
+                *d          = (*d & ~right_mask) | (val & right_mask);
             }
         }
     }
@@ -185,7 +190,8 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
-    if (s_lv_display != NULL) return ESP_OK;
+    if (s_lv_display != NULL)
+        return ESP_OK;
 
     esp_err_t ret = sub_display_init(is_wake_cycle);
     if (ret != ESP_OK) {
@@ -193,7 +199,8 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         return ret;
     }
 
-    /* On system boot, execute full OTP refresh; on sleep wake, execute differential partial refresh */
+    /* On system boot, execute full OTP refresh; on sleep wake, execute differential partial refresh
+     */
     s_first_boot_flush = !is_wake_cycle;
 
     lv_init();
@@ -210,7 +217,8 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
     uint32_t buffer_lines = 40;
     uint32_t stride       = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
     size_t   buf_size     = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
-    uint8_t  *buf1        = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    uint8_t *buf1 =
+        (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (buf1 == NULL) {
         buf1 = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_8BIT);
     }
@@ -240,7 +248,8 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
             lv_group_set_default(def_grp);
         }
         lv_indev_set_group(s_lv_keypad_indev, def_grp);
-        ESP_LOGI(TAG, "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
+        ESP_LOGI(TAG,
+                 "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
     }
 
     ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode (first flush: %s)",
@@ -255,10 +264,12 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh)
 
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 {
-    if (s_lvgl_task_handle != NULL) return ESP_OK;
+    if (s_lvgl_task_handle != NULL)
+        return ESP_OK;
 
     esp_err_t ret = h1os_lvgl_init(false);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     task_priority = (task_priority > 0) ? task_priority : 5;
     core_id       = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
@@ -267,15 +278,8 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
      * to eliminate task creation race where the port task exits on its first loop! */
     s_lvgl_task_running = true;
 
-    BaseType_t res = xTaskCreatePinnedToCore(
-        h1os_lvgl_port_task,
-        "h1os_lvgl",
-        8192,
-        NULL,
-        task_priority,
-        &s_lvgl_task_handle,
-        core_id
-    );
+    BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, "h1os_lvgl", 8192, NULL,
+                                             task_priority, &s_lvgl_task_handle, core_id);
 
     if (res != pdPASS) {
         s_lvgl_task_running = false;
@@ -300,7 +304,8 @@ esp_err_t h1os_lvgl_stop(void)
 
 bool h1os_lvgl_has_pending_tasks(void)
 {
-    if (s_lv_display == NULL) return false;
+    if (s_lv_display == NULL)
+        return false;
     /* Check if display refresh timer is actively scheduled / running */
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
@@ -312,7 +317,7 @@ bool h1os_lvgl_has_pending_tasks(void)
     return false;
 }
 
-lv_indev_t* h1os_lvgl_get_indev(void)
+lv_indev_t *h1os_lvgl_get_indev(void)
 {
     return s_lv_keypad_indev;
 }
@@ -322,7 +327,9 @@ static void h1os_lvgl_port_task(void *pvParameters)
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());
     while (s_lvgl_task_running) {
         uint32_t delay_ms = lv_timer_handler();
-        delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD) ? LV_DEF_REFR_PERIOD : delay_ms;
+        delay_ms          = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD)
+                                ? LV_DEF_REFR_PERIOD
+                                : delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
     s_lvgl_task_handle = NULL;
