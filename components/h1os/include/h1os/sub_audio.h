@@ -86,39 +86,6 @@ typedef enum {
  */
 esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len);
 
-/* Backwards-compatible inline helpers */
-static inline esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
-{
-    const uint32_t params[2] = { frequency_hz, duration_ms };
-    return sub_audio_play(SUB_AUDIO_TONE, params, sizeof(params));
-}
-
-static inline esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms)
-{
-    return sub_audio_play_tone(frequency_hz, duration_ms);
-}
-
-static inline esp_err_t sub_audio_play_chime(uint8_t type)
-{
-    return sub_audio_play(SUB_AUDIO_CHIME, &type, sizeof(type));
-}
-
-static inline esp_err_t sub_audio_play_chime_async(uint8_t type)
-{
-    return sub_audio_play_chime(type);
-}
-
-static inline esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
-{
-    (void)sample_rate_hz;
-    return sub_audio_play(SUB_AUDIO_PCM, samples, sample_count);
-}
-
-static inline esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
-{
-    return sub_audio_play_pcm(samples, sample_count, sample_rate_hz);
-}
-
 /**
  * @brief Check if audio playback is currently active or queue has pending items.
  *

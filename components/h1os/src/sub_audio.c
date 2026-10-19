@@ -5,7 +5,7 @@
  * @note TODO (Known Issue - Runtime Button Click Chime):
  *   - Multi-note presentation chimes (H1OS_CHIME_BOOT, H1OS_CHIME_SHUTDOWN) play reliably,
  *     and perceptual volume scaling (0%-100% LUT) is verified working.
- *   - Short runtime keypad click tones (`sub_audio_play_tone_async(1046, 35)`) execute in
+ *   - Short runtime keypad click tones (`sub_audio_play(SUB_AUDIO_TONE, ...)`) execute in
  *     `h1os_audio_worker` at the exact button-press timestamp, but still produce no audible
  *     output on hardware.
  *   - Next session: investigate I2S DMA circular buffer overwrite timing (`i2s_channel_write`
@@ -31,7 +31,7 @@
 
 static const char *TAG = "sub_audio";
 
-/* Defined REG MAP, Should be using defined REG MAP, or... NOT, IDK! */
+/* ES8311 Core Register Map */
 #define ES8311_REG_RESET        0x00
 #define ES8311_REG_SYS_PWR_ANA  0x0D
 #define ES8311_REG_SYS_LP_MOD   0x0F  /* Subsystem low power overrides: bit 7 = LPDAC */
