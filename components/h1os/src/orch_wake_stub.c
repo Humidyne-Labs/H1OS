@@ -1,7 +1,6 @@
 /**
  * @file orch_wake_stub.c
- * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sample
- * Burst)
+ * @brief Layer 3: RTC Fast Memory Deep Sleep Wake Stub Implementation (<3ms Flow A Sensor Sample Burst)
  *
  * SPDX-License-Identifier: MIT
  */
@@ -31,16 +30,18 @@
 #define SENS_TSENS_CLK_EN (1UL << 29)
 #endif
 
-#define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32)) /* GPIO 47 -> Bit 15 in Reg 1 */
-#define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32)) /* GPIO 48 -> Bit 16 in Reg 1 */
+// clang-format off
+#define SDA_BIT_MASK       (1UL << (HAL_PIN_I2C_SDA - 32)) /* GPIO 47 -> Bit 15 in Reg 1 */
+#define SCL_BIT_MASK       (1UL << (HAL_PIN_I2C_SCL - 32)) /* GPIO 48 -> Bit 16 in Reg 1 */
 
-#define I2C_ADDR_SHTC3 0x70
-#define I2C_ADDR_PCF85063 0x51
-#define RTC_REG_TIMER_VAL 0x10
+#define I2C_ADDR_SHTC3     0x70
+#define I2C_ADDR_PCF85063  0x51
+#define RTC_REG_TIMER_VAL  0x10
 
-#define RTC_TIMER_TE_BIT (1 << 2)
+#define RTC_TIMER_TE_BIT   (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
-#define RTC_TIMER_TCF_MIN (3 << 3)
+#define RTC_TIMER_TCF_MIN  (3 << 3)
+// clang-format on
 
 /* Fast Bit-Bang I2C Primitives running from RTC Fast Memory */
 static inline void RTC_IRAM_ATTR i2c_delay(void)

@@ -18,22 +18,24 @@
 extern "C" {
 #endif
 
-#define ORCH_RTC_MAGIC 0x534C4154 /* ASCII "SLAT" */
-#define ORCH_RING_CAPACITY 32
+// clang-format off
+#define ORCH_RTC_MAGIC              0x534C4154 /* ASCII "SLAT" */
+#define ORCH_RING_CAPACITY          32
 
 /** @brief ULP Dispatch Reason */
 typedef enum {
-    ULP_DISPATCH_NONE = 0,  ///< None
-    ULP_DISPATCH_SENSOR_SAMPLE,  ///< Sensor sample
-    ULP_DISPATCH_MAIN_WAKE,  ///< Main wake
+    ULP_DISPATCH_NONE = 0,           ///< None
+    ULP_DISPATCH_SENSOR_SAMPLE,      ///< Sensor sample
+    ULP_DISPATCH_MAIN_WAKE,          ///< Main wake
     ULP_DISPATCH_CRITICAL_SHUTDOWN,  ///< Shutdown
-    ULP_DISPATCH_BOOTLOADER_JUMP,  ///< Bootloader
-    ULP_DISPATCH_POWER_OFF  ///< Power off
+    ULP_DISPATCH_BOOTLOADER_JUMP,    ///< Bootloader
+    ULP_DISPATCH_POWER_OFF           ///< Power off
 } orch_ulp_dispatch_t;
 
-#define SAMPLE_FLAG_VALID_COLD 0x01 /* Bit 0: Passed successive-sample <= 0.20 C thermal delta gate */
-#define SAMPLE_FLAG_THERMAL_SETTLED 0x02 /* Bit 1: Consecutive settled pair verified                     */
-#define SAMPLE_DELTA_GATE_CENTI_C 20 /* Max successive sample delta: 20 centi-°C (0.20 °C)           */
+#define SAMPLE_FLAG_VALID_COLD      0x01 /* Bit 0: Passed successive-sample <= 0.20 C thermal delta gate */
+#define SAMPLE_FLAG_THERMAL_SETTLED 0x02 /* Bit 1: Consecutive settled pair verified */
+#define SAMPLE_DELTA_GATE_CENTI_C   20   /* Max successive sample delta: 20 centi-°C (0.20 °C) */
+// clang-format on
 
 typedef struct {
     int16_t shtc3_temp_centi_c;  ///< SHTC3 temp (centi-°C: 2350 = 23.50 °C)

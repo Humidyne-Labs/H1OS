@@ -1,17 +1,18 @@
 /*
  * SPDX-License-Identifier: MIT
- * ESP32-S3 ePaper BSP - Pure Event Mode ULP Coprocessor
+ * H1OS (Class-E Environmental Telemetry OS) - Pure Event Mode ULP-RISC-V Coprocessor
  *
- * Implements deterministic time slicing using external PCF85063A pulsed ticks on GPIO 5:
- *   - Tactile Buttons (GPIO 0 / GPIO 18): Immediate wake of Main CPU into Flow B (Interactive UI).
- *   - RTC INT Pulse (GPIO 5):
- *       * slice_counter < overflow_limit: Sensor poll tick (Flow A prep/sample), halts without
- * waking Main CPU.
- *       * slice_counter == overflow_limit: Periodic overflow reached, wake Main CPU for Flow B
- * display update.
- *       * slice_counter > overflow_limit: Post-overflow clamp, discard trailing ticks until Main
- * CPU re-arms.
- *   - Remainder Fraction: Fractional remainder (T_flow_b % T_flow_a) is discarded on Main CPU.
+ * Implements deterministic event monitoring and time slicing in deep sleep:
+ *   - Tactile Buttons (GPIO 0 / GPIO 18):
+ *       * 30ms hardware glitch filter.
+ *       * Wake-on-Release rule for short taps (50ms - 800ms) into Flow B (Interactive UI).
+ *       * Long hold classification (>2.5s): BOOT -> ROM Bootloader jump, POWER -> Instant power cut.
+ *   - RTC INT Countdown Timer (GPIO 5):
+ *       * slice_counter < overflow_limit: Sensor poll tick, wakes Core 0 for Flow A (<3ms sample burst).
+ *       * slice_counter >= overflow_limit: Periodic overflow reached, wakes Main CPU for Flow B display refresh.
+ *   - Battery Voltage Guard (ADC1_CH3 on GPIO 4):
+ *       * Linear calibrated battery sensing with Zero-Volt Cable Guard (USB power check).
+ *       * Emergency brownout shutdown dispatch when Vbat < 3.25V.
  */
 
 #include "soc/rtc_cntl_reg.h"
@@ -24,43 +25,44 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// clang-format off
 /* Exported symbols accessible by Main CPU via ulp_h1os.h */
-volatile uint32_t wake_counter = 0;
-volatile uint32_t last_wake_cause =
-    0; /* 1: BOOT, 2: POWER, 3: LONG OVERFLOW, 4: SENSOR TICK, 5: STUCK, 6: CRITICAL_BATTERY */
-volatile uint32_t last_wake_btn = 0;
-volatile uint32_t slice_counter = 0;
-volatile uint32_t overflow_limit = 5; /* Dynamic overflow limit set by Main CPU (e.g. 300s / 60s = 5) */
-volatile uint32_t rtc_int_stuck = 0; /* 1 if GPIO 5 failed to return HIGH within 50ms */
-volatile uint32_t dispatch_reason = 0; /* 1: SENSOR_SAMPLE, 2: MAIN_WAKE, 5: CRITICAL_SHUTDOWN */
+volatile uint32_t wake_counter    = 0;
+volatile uint32_t last_wake_cause = 0; /* 1: BOOT, 2: POWER, 3: LONG OVERFLOW, 4: SENSOR TICK, 5: STUCK, 6: CRITICAL_BATTERY */
+volatile uint32_t last_wake_btn   = 0;
+volatile uint32_t slice_counter   = 0;
+volatile uint32_t overflow_limit  = 5; /* Dynamic overflow limit set by Main CPU (e.g. 300s / 60s = 5) */
+volatile uint32_t rtc_int_stuck   = 0; /* 1 if GPIO 5 failed to return HIGH within 50ms */
+volatile uint32_t dispatch_reason = 0; /* 1: SENSOR_SAMPLE, 2: MAIN_WAKE, 3: CRITICAL_SHUTDOWN, 4: BOOTLOADER, 5: POWER_OFF */
 volatile uint32_t gpio_status_raw = 0;
-volatile uint32_t entry_ccount = 0;
-volatile uint32_t exit_ccount = 0;
+volatile uint32_t entry_ccount    = 0;
+volatile uint32_t exit_ccount     = 0;
 
 /* eFuse Linear Battery Calibration (scale & offset) */
-volatile uint32_t cal_scale = 3100;
-volatile int32_t cal_offset = 0;
-volatile uint32_t last_vbat_mv = 4000;
-volatile uint32_t vbat_raw_adc = 0;
-volatile uint32_t usb_connected = 0; /* 1 if Main CPU confirmed USB VBUS active */
+volatile uint32_t cal_scale       = 3100;
+volatile int32_t  cal_offset      = 0;
+volatile uint32_t last_vbat_mv    = 4000;
+volatile uint32_t vbat_raw_adc    = 0;
+volatile uint32_t usb_connected   = 0; /* 1 if Main CPU confirmed USB VBUS active */
 
-#define RTC_INT_PIN GPIO_NUM_5
-#define RTC_INT_TIMEOUT_US 50000 /* >3x the ~15.6ms PCF85063A pulse */
-#define RTC_INT_POLL_US 100
+#define RTC_INT_PIN         GPIO_NUM_5
+#define RTC_INT_TIMEOUT_US  50000   /* >3x the ~15.6ms PCF85063A pulse */
+#define RTC_INT_POLL_US     100
 
-#define BUTTON_DEBOUNCE_US 30000 /* 30ms glitch filter */
-#define BUTTON_HOLD_US 2500000 /* 2.5s hold threshold */
-#define BUTTON_TAP_MIN_MS 50
-#define BUTTON_TAP_MAX_MS 800
-#define BUTTON_POLL_US 10000 /* 10ms sampling interval */
+#define BUTTON_DEBOUNCE_US  30000   /* 30ms glitch filter */
+#define BUTTON_HOLD_US      2500000 /* 2.5s hold threshold */
+#define BUTTON_TAP_MIN_MS   50
+#define BUTTON_TAP_MAX_MS   800
+#define BUTTON_POLL_US      10000   /* 10ms sampling interval */
 
 /* Dispatch reason constants matching orch_state.h */
-#define ULP_DISPATCH_NONE 0
-#define ULP_DISPATCH_SENSOR_SAMPLE 1
-#define ULP_DISPATCH_MAIN_WAKE 2
+#define ULP_DISPATCH_NONE              0
+#define ULP_DISPATCH_SENSOR_SAMPLE     1
+#define ULP_DISPATCH_MAIN_WAKE         2
 #define ULP_DISPATCH_CRITICAL_SHUTDOWN 3
-#define ULP_DISPATCH_BOOTLOADER_JUMP 4
-#define ULP_DISPATCH_POWER_OFF 5
+#define ULP_DISPATCH_BOOTLOADER_JUMP   4
+#define ULP_DISPATCH_POWER_OFF         5
+// clang-format on
 
 static inline uint32_t ulp_raw_to_mv(int32_t raw)
 {
