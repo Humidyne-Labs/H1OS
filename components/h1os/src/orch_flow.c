@@ -96,16 +96,6 @@ bool orch_flow_is_thermal_lockout(void)
     return (orch_state_get()->valid_trend < 2);
 }
 
-void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec)
-{
-    (void)duration_sec;
-    orch_persisted_state_t *st = orch_state_get();
-    if (enable) {
-        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
-    } else {
-        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
-    }
-}
 
 static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
 {

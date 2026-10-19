@@ -63,7 +63,8 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
     if (s_app_lifecycle.presentation.on_chime != NULL) {
         s_app_lifecycle.presentation.on_chime(type, s_app_lifecycle.user_data);
     } else if (s_app_lifecycle.presentation.chime_mask & (1 << type)) {
-        sub_audio_play_chime_async((uint8_t)type);
+        uint8_t chime = (uint8_t)type;
+        sub_audio_play(SUB_AUDIO_CHIME, &chime, sizeof(chime));
     }
 }
 
@@ -475,8 +476,7 @@ static void execute_system_shutdown(bool force_clean_white)
     }
 
     /* Release battery LDO power latch (GPIO 17 LOW). On battery, power dies here. */
-    ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17)");
-    hal_io_release_power_latch();
+    sub_power_cut_power_latch();
     vTaskDelay(pdMS_TO_TICKS(200));
 
     /* Still running => powered from USB VBUS. Do NOT use sub_power_enter_deep_sleep():

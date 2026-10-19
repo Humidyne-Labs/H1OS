@@ -60,59 +60,64 @@ esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms);
 bool sub_audio_is_ready(void);
 
 /**
- * @brief Play raw 16-bit signed PCM audio samples synchronously.
- *
- * @param[in] samples Pointer to 16-bit signed Mono PCM samples.
- * @param[in] sample_count Number of int16_t samples.
- * @param[in] sample_rate_hz Sample rate in Hz (default: 16000).
- * @return ESP_OK on success.
+ * @brief Acoustic payload type for consolidated sub_audio_play dispatch.
  */
-esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz);
+typedef enum {
+    SUB_AUDIO_TONE = 0, /**< Synthesized square/sine tone (params: uint32_t frequency_hz, uint32_t duration_ms) */
+    SUB_AUDIO_CHIME,     /**< Standard acoustic presentation chime (params: uint8_t chime_type) */
+    SUB_AUDIO_PCM,       /**< Raw 16-bit Mono PCM buffer (params: const int16_t *samples, count = len) */
+} sub_audio_type_t;
 
 /**
- * @brief Play raw 16-bit signed PCM audio samples asynchronously in background worker task.
- * Note: Caller must ensure the buffer remains valid until playback finishes (e.g., const/static buffer).
+ * @brief Unified asynchronous audio playback dispatcher.
  *
- * @param[in] samples Pointer to 16-bit signed Mono PCM samples.
- * @param[in] sample_count Number of int16_t samples.
- * @param[in] sample_rate_hz Sample rate in Hz (default: 16000).
- * @return ESP_OK on success, ESP_ERR_NO_MEM / ESP_ERR_TIMEOUT if queue full.
+ * Enqueues the requested audio command into the background audio worker task.
+ *
+ * @param[in] type Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM.
+ * @param[in] data Pointer to payload data:
+ *                 - SUB_AUDIO_TONE: const uint32_t params[2] = { frequency_hz, duration_ms }
+ *                 - SUB_AUDIO_CHIME: const uint8_t *chime_type
+ *                 - SUB_AUDIO_PCM: const int16_t *samples
+ * @param[in] len  Length / sample count:
+ *                 - SUB_AUDIO_TONE: 2 (parameter count) or sizeof(params)
+ *                 - SUB_AUDIO_CHIME: 1 (byte count)
+ *                 - SUB_AUDIO_PCM: sample count (number of int16_t samples)
+ * @return ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
  */
-esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz);
+esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len);
 
-/**
- * @brief Play synthesized audio chime/tone synchronously.
- *
- * @param[in] frequency_hz Frequency in Hertz (e.g. 1000 for 1 kHz).
- * @param[in] duration_ms  Duration in milliseconds.
- * @return ESP_OK on success.
- */
-esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms);
+/* Backwards-compatible inline helpers */
+static inline esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+{
+    const uint32_t params[2] = { frequency_hz, duration_ms };
+    return sub_audio_play(SUB_AUDIO_TONE, params, sizeof(params));
+}
 
-/**
- * @brief Play synthesized audio chime/tone asynchronously via worker task.
- *
- * @param[in] frequency_hz Frequency in Hertz (e.g. 1000 for 1 kHz).
- * @param[in] duration_ms  Duration in milliseconds.
- * @return ESP_OK on success.
- */
-esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms);
+static inline esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms)
+{
+    return sub_audio_play_tone(frequency_hz, duration_ms);
+}
 
-/**
- * @brief Play standard H1OS acoustic presentation chime synchronously.
- *
- * @param[in] type Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM).
- * @return ESP_OK on success.
- */
-esp_err_t sub_audio_play_chime(uint8_t type);
+static inline esp_err_t sub_audio_play_chime(uint8_t type)
+{
+    return sub_audio_play(SUB_AUDIO_CHIME, &type, sizeof(type));
+}
 
-/**
- * @brief Play standard H1OS acoustic presentation chime asynchronously.
- *
- * @param[in] type Chime type (BOOT, WAKE, SLEEP, SHUTDOWN, ALARM).
- * @return ESP_OK on success.
- */
-esp_err_t sub_audio_play_chime_async(uint8_t type);
+static inline esp_err_t sub_audio_play_chime_async(uint8_t type)
+{
+    return sub_audio_play_chime(type);
+}
+
+static inline esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
+{
+    (void)sample_rate_hz;
+    return sub_audio_play(SUB_AUDIO_PCM, samples, sample_count);
+}
+
+static inline esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
+{
+    return sub_audio_play_pcm(samples, sample_count, sample_rate_hz);
+}
 
 /**
  * @brief Check if audio playback is currently active or queue has pending items.

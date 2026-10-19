@@ -45,13 +45,6 @@ orch_flow_type_t orch_flow_determine_wakeup(void);
  */
 bool orch_flow_is_thermal_lockout(void);
 
-/**
- * @brief Arm or disarm thermal lockout gatekeeper.
- *
- * @param[in] enable       True to arm thermal lockout (e.g. after display refresh or Wi-Fi).
- * @param[in] duration_sec Duration of lockout in seconds (typically 30-60s).
- */
-void orch_flow_set_thermal_lockout(bool enable, uint32_t duration_sec);
 
 /**
  * @brief Query current environmental telemetry through the Thermal Lockout MUX.

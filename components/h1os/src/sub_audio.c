@@ -150,23 +150,19 @@ static esp_err_t sub_audio_read_chip_id(uint16_t* chip_id)
 static esp_err_t sub_audio_flush_frame(void)
 {
     /* Stream 1 frame (256 samples / 16 ms) of zero samples so the tone completes
-     * cleanly through the DAC interpolation pipeline.
-     */
-    //uint8_t bootstrap = 0;
+     * cleanly through the DAC interpolation pipeline. */
     esp_err_t ret = ESP_OK;
     int16_t postroll[FRAME_SIZE] = {0};
-    //while(bootstrap++ < 4) {
     size_t postroll_written = 0;
     ret = i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
-    ret = ((ret == ESP_OK) && (postroll_written == FRAME_SIZE)) ? ESP_OK : ESP_ERR_INVALID_STATE; //confirm flush wright
+    ret = ((ret == ESP_OK) && (postroll_written == sizeof(postroll))) ? ESP_OK : ESP_ERR_INVALID_STATE;
     vTaskDelay(pdMS_TO_TICKS(20));
-    //}
     return ret;
 }
 
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 {
-    /* Assumed Device Probe Check? */
+    /* Probe device presence before waiting for CSM readiness */
     uint16_t chip_id = 0x0000;
     if(sub_audio_read_chip_id(&chip_id) != ESP_OK) 
         return ESP_ERR_INVALID_STATE;
@@ -416,8 +412,6 @@ esp_err_t sub_audio_init(void)
  */
 static void sub_audio_park_warm(void)
 {
-    // Rearming mute, BAD!! DO NOT EVER DO in WAKE!
-    
     /* Mute external PA and wait for H-bridge turn-off */
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     vTaskDelay(pdMS_TO_TICKS(25));
@@ -428,11 +422,11 @@ esp_err_t sub_audio_standby(void)
     /* 1. Mute external amplifier first */
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     
-    /* Wait 25ms to allow NS4150B amplifier H-bridge to completely turn off (prevents pop) */
+    /* Wait 25ms to allow amplifier H-bridge to completely turn off (prevents pop) */
     vTaskDelay(pdMS_TO_TICKS(25));
 
     /* 2. Soft-mute DAC digital modulator */
-    es8311_write_reg(0x31, 0x60); // <-- except for here, mute ok here. YAY!
+    es8311_write_reg(0x31, 0x60);
     es8311_write_reg(0x32, 0x00); /* Mute volume */
 
     /* 3. Power down analog stages FIRST while clocks are running */
@@ -501,7 +495,6 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
-    // 'NO' Delay here
 }
 
 /* Internal helper to stream raw 16-bit PCM buffer aligned to 256-sample DMA descriptors */
@@ -524,7 +517,6 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
         i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_sent += chunk;
     }
-    // No Delay, delay cuts samples durring playback
 }
 
 static esp_err_t sub_audio_prepare_and_unmute(void)
@@ -534,7 +526,7 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         if (err != ESP_OK) return err;
     }
 
-    // 1. Ensure I2S TX clocks (MCLK/BCLK/LRCK) are running 
+    /* 1. Ensure I2S TX clocks (MCLK/BCLK/LRCK) are running */
     if (s_tx_chan != NULL && !s_i2s_chan_enabled) {
         esp_err_t chan_err = i2s_channel_enable(s_tx_chan);
         if (chan_err == ESP_OK) {
@@ -544,15 +536,12 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         }
     }
 
-    // standby never entered at runtime
-
-    // 2. Unmute NS4168 Class-D amplifier if not already active
+    /* 2. Unmute NS4168 Class-D amplifier if not already active */
     if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
         gpio_set_level(HAL_PIN_PA_CTRL, 1);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    //sub_audio_flush_frame(); //20ms flush
     return ESP_OK;
 }
 
@@ -564,7 +553,6 @@ static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms
     if (ret != ESP_OK) return ret;
 
     sub_audio_render_tone_samples(frequency_hz, duration_ms);
-    // No Delay, delay cuts samples durring playback
     return ESP_OK;
 }
 
@@ -575,7 +563,6 @@ static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count,
     if (ret != ESP_OK) return ret;
 
     sub_audio_render_pcm_samples(samples, sample_count);
-    // No Delay, delay cuts samples durring playback
     return ESP_OK;
 }
 
@@ -618,16 +605,14 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
                 sub_audio_render_tone_samples(1760, 80);
                 vTaskDelay(pdMS_TO_TICKS(10));
                 sub_audio_render_tone_samples(880, 80);
-                vTaskDelay(pdMS_TO_TICKS(20)); // Delay ok, part of stream!
+                vTaskDelay(pdMS_TO_TICKS(20));
             }
             break;
 
         default:
-            // No Delay, delay cuts samples durring playback
             return ESP_ERR_INVALID_ARG;
     }
 
-    // No Delay, delay cuts samples durring playback
     return ESP_OK;
 }
 
@@ -708,57 +693,39 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
     return ESP_OK;
 }
 
-esp_err_t sub_audio_play_tone(uint32_t frequency_hz, uint32_t duration_ms)
+esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
 {
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_TONE,
-        .params.tone = { .frequency_hz = frequency_hz, .duration_ms = duration_ms },
-    };
-    return sub_audio_send_command(&cmd, true, 100);
-}
+    if (data == NULL) return ESP_ERR_INVALID_ARG;
 
-esp_err_t sub_audio_play_tone_async(uint32_t frequency_hz, uint32_t duration_ms)
-{
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_TONE,
-        .params.tone = { .frequency_hz = frequency_hz, .duration_ms = duration_ms },
-    };
-    return sub_audio_send_command(&cmd, false, 50);
-}
+    audio_cmd_t cmd = {0};
 
-esp_err_t sub_audio_play_chime(uint8_t type)
-{
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_CHIME,
-        .params.chime = { .chime_type = type },
-    };
-    return sub_audio_send_command(&cmd, true, 100);
-}
+    switch (type) {
+    case SUB_AUDIO_TONE: {
+        const uint32_t *params = (const uint32_t *)data;
+        if (len < 2 && len < (2 * sizeof(uint32_t))) return ESP_ERR_INVALID_ARG;
+        cmd.type = AUDIO_CMD_TONE;
+        cmd.params.tone.frequency_hz = params[0];
+        cmd.params.tone.duration_ms  = params[1];
+        break;
+    }
+    case SUB_AUDIO_CHIME: {
+        if (len < 1) return ESP_ERR_INVALID_ARG;
+        cmd.type = AUDIO_CMD_CHIME;
+        cmd.params.chime.chime_type = *(const uint8_t *)data;
+        break;
+    }
+    case SUB_AUDIO_PCM: {
+        if (len == 0) return ESP_ERR_INVALID_ARG;
+        cmd.type = AUDIO_CMD_PCM;
+        cmd.params.pcm.samples = (const int16_t *)data;
+        cmd.params.pcm.sample_count = len;
+        cmd.params.pcm.sample_rate_hz = 16000;
+        break;
+    }
+    default:
+        return ESP_ERR_INVALID_ARG;
+    }
 
-esp_err_t sub_audio_play_chime_async(uint8_t type)
-{
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_CHIME,
-        .params.chime = { .chime_type = type },
-    };
-    return sub_audio_send_command(&cmd, false, 50);
-}
-
-esp_err_t sub_audio_play_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
-{
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_PCM,
-        .params.pcm = { .samples = samples, .sample_count = sample_count, .sample_rate_hz = sample_rate_hz },
-    };
-    return sub_audio_send_command(&cmd, true, 100);
-}
-
-esp_err_t sub_audio_play_pcm_async(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
-{
-    audio_cmd_t cmd = {
-        .type = AUDIO_CMD_PCM,
-        .params.pcm = { .samples = samples, .sample_count = sample_count, .sample_rate_hz = sample_rate_hz },
-    };
     return sub_audio_send_command(&cmd, false, 50);
 }
 

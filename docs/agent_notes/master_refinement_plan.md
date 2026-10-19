@@ -340,9 +340,10 @@ graph LR
 ### Phase 3: Layer Integrity Enforcement & Dead Scaffolding Pruning
 - **Files:** `components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/sub_sdcard.c`
 - **Shopping List Tasks:**
-  - [ ] Route `h1os_shutdown()` exclusively through `sub_power_cut_power_latch()`
-  - [ ] Prune `orch_flow_set_thermal_lockout()` and unused NVS CRUD functions
-  - [ ] Purge commented-out trial loops and scratchpad developer notes across drivers
+  - [x] Route `h1os_shutdown()` exclusively through `sub_power_cut_power_latch()`
+  - [x] Prune `orch_flow_set_thermal_lockout()` (NVS CRUD preserved as application helper)
+  - [x] Consolidate audio playback into unified `sub_audio_play(type, data, len)`
+  - [x] Purge commented-out trial loops and scratchpad developer notes across drivers
 
 ### Phase 4: Mathematical & Hardware Register Optimizations
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_math.c`, `components/h1os/src/sub_display.cpp`

@@ -43,9 +43,6 @@ static void sdcard_mount_worker_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-// All ESP32 connected SD/MMC io has been fitted with external pullups of 10K
-// This function will fail on probe, due to the hardware configureation.
-// "bool sub_sdcard_probe(void)" has been pruned.
 
 esp_err_t sub_sdcard_mount_async(void)
 {
