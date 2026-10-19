@@ -106,6 +106,11 @@ The ESP32-S3 contains a hardware IEEE 754 single-precision floating point unit (
 ### Rule 10: Pointer Sanitization
 - Public API interfaces accepting pointer arguments must validate inputs against `NULL` prior to dereferencing.
 
+### Rule 11: Dynamic Frequency Scaling (DFS) & Turbo Blitz Invariants
+- **80 MHz Quiescent Baseline:** The main dual-core Xtensa CPU cores are gated down to an 80 MHz baseline during interactive standby, input polling, FreeRTOS idle, and quiescent sensor acquisition to minimize thermal dissipation and current draw.
+- **240 MHz LVGL Blitz:** During LVGL widget rendering, dirty rectangle calculation, font glyph rasterization, 1-bit monochrome pixel packing, and SSD1681 differential SPI frame transfer ("LVGL Blitz"), the CPU frequency must be bumped to 240 MHz via `sub_power_cpu_max_acquire()`. Upon completion of display flushing, the lock is released to drop back to 80 MHz immediately.
+- **240 MHz Audio Playback Invariant:** During I2S audio initialization and tone/chime playback, `sub_power_cpu_max_acquire()` must be held. Without this clock lock, APB frequency droop during DFS drops the I2S MCLK/BCLK dividers, causing playback pitch to shift octaves lower and triggering DMA FIFO underruns.
+
 ---
 
 ## 4. Layer 3: Compiler Hardening (CMake)

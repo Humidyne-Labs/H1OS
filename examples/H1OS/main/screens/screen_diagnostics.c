@@ -5,37 +5,51 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "screens.h"
-#include "h1os/h1os_lvgl.h"
-#include "h1os/orch_state.h"
-#include "h1os/h1os_version.h"
-#include "esp_system.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "h1os/h1os_lvgl.h"
+#include "h1os/h1os_version.h"
+#include "h1os/orch_state.h"
+#include "screens.h"
+
 #include <inttypes.h>
 
-static const char* get_reset_reason_str(esp_reset_reason_t reason)
+static const char *get_reset_reason_str(esp_reset_reason_t reason)
 {
     switch (reason) {
-        case ESP_RST_POWERON:   return "POWER_ON";
-        case ESP_RST_EXT:       return "EXTERNAL_PIN";
-        case ESP_RST_SW:        return "SW_RESTART";
-        case ESP_RST_PANIC:     return "EXCEPTION_PANIC";
-        case ESP_RST_INT_WDT:   return "INT_WATCHDOG";
-        case ESP_RST_TASK_WDT:  return "TASK_WATCHDOG";
-        case ESP_RST_DEEPSLEEP: return "DEEP_SLEEP";
-        case ESP_RST_BROWNOUT:  return "BROWNOUT";
-        default:                return "UNKNOWN";
+    case ESP_RST_POWERON:
+        return "POWER_ON";
+    case ESP_RST_EXT:
+        return "EXTERNAL_PIN";
+    case ESP_RST_SW:
+        return "SW_RESTART";
+    case ESP_RST_PANIC:
+        return "EXCEPTION_PANIC";
+    case ESP_RST_INT_WDT:
+        return "INT_WATCHDOG";
+    case ESP_RST_TASK_WDT:
+        return "TASK_WATCHDOG";
+    case ESP_RST_DEEPSLEEP:
+        return "DEEP_SLEEP";
+    case ESP_RST_BROWNOUT:
+        return "BROWNOUT";
+    default:
+        return "UNKNOWN";
     }
 }
 
-static const char* get_wake_causes_str(uint32_t causes)
+static const char *get_wake_causes_str(uint32_t causes)
 {
-    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) return "BOOT";
-    if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1))      return "EXT1_BUTTON_RTC";
-    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER))     return "HW_TIMER";
-    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))       return "ULP_MONITOR";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED))
+        return "BOOT";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1))
+        return "EXT1_BUTTON_RTC";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER))
+        return "HW_TIMER";
+    if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))
+        return "ULP_MONITOR";
     return "INTERNAL";
 }
 
@@ -52,7 +66,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_rst, LV_ALIGN_TOP_LEFT, 6, 28);
 
     // Row 2: Wake Causes
-    uint32_t causes    = esp_sleep_get_wakeup_causes();
+    uint32_t  causes   = esp_sleep_get_wakeup_causes();
     lv_obj_t *lbl_wake = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_wake, "Wake:   %s", get_wake_causes_str(causes));
     lv_obj_set_style_text_font(lbl_wake, H1OS_FONT_14, 0);
@@ -61,12 +75,24 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     // Row 3: ULP Monitor Dispatch
     const char *ulp_str = "NONE";
     switch (st->ulp_dispatch_reason) {
-        case ULP_DISPATCH_SENSOR_SAMPLE:     ulp_str = "SENSOR_SAMPLE"; break;
-        case ULP_DISPATCH_MAIN_WAKE:         ulp_str = "MAIN_WAKE";     break;
-        case ULP_DISPATCH_CRITICAL_SHUTDOWN: ulp_str = "CRIT_SHUTDOWN"; break;
-        case ULP_DISPATCH_BOOTLOADER_JUMP:   ulp_str = "BOOTLOADER";    break;
-        case ULP_DISPATCH_POWER_OFF:         ulp_str = "POWER_OFF";     break;
-        default:                             ulp_str = "NONE";          break;
+    case ULP_DISPATCH_SENSOR_SAMPLE:
+        ulp_str = "SENSOR_SAMPLE";
+        break;
+    case ULP_DISPATCH_MAIN_WAKE:
+        ulp_str = "MAIN_WAKE";
+        break;
+    case ULP_DISPATCH_CRITICAL_SHUTDOWN:
+        ulp_str = "CRIT_SHUTDOWN";
+        break;
+    case ULP_DISPATCH_BOOTLOADER_JUMP:
+        ulp_str = "BOOTLOADER";
+        break;
+    case ULP_DISPATCH_POWER_OFF:
+        ulp_str = "POWER_OFF";
+        break;
+    default:
+        ulp_str = "NONE";
+        break;
     }
 
     lv_obj_t *lbl_ulp = lv_label_create(scr);
@@ -75,25 +101,25 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_ulp, LV_ALIGN_TOP_LEFT, 6, 68);
 
     // Row 4: Heap Memory (Free / Minimum Ever Free)
-    uint32_t free_heap = esp_get_free_heap_size() / 1024;
-    uint32_t min_heap  = esp_get_minimum_free_heap_size() / 1024;
-    lv_obj_t *lbl_heap = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min",
-                          (unsigned long)free_heap, (unsigned long)min_heap);
+    uint32_t  free_heap = esp_get_free_heap_size() / 1024;
+    uint32_t  min_heap  = esp_get_minimum_free_heap_size() / 1024;
+    lv_obj_t *lbl_heap  = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min", (unsigned long)free_heap,
+                          (unsigned long)min_heap);
     lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
 
     // Row 5: FreeRTOS Task High Watermark
-    UBaseType_t hwm     = uxTaskGetStackHighWaterMark(NULL);
-    lv_obj_t *lbl_stack = lv_label_create(scr);
+    UBaseType_t hwm       = uxTaskGetStackHighWaterMark(NULL);
+    lv_obj_t   *lbl_stack = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_stack, "Stack:  %u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
     lv_obj_set_style_text_font(lbl_stack, H1OS_FONT_14, 0);
     lv_obj_align(lbl_stack, LV_ALIGN_TOP_LEFT, 6, 114);
 
     // Row 6: Wakes & Ring Buffer Head
     lv_obj_t *lbl_wakes = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)",
-                          (unsigned long)st->wake_count, st->ring_head);
+    lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)", (unsigned long)st->wake_count,
+                          st->ring_head);
     lv_obj_set_style_text_font(lbl_wakes, H1OS_FONT_14, 0);
     lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
 
@@ -105,8 +131,8 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     // Footer Bar: Version (left), Target (right) - shortened to fit 200px display
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32,
-                          h1os_version_get_major(), h1os_version_get_minor());
+    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32, h1os_version_get_major(),
+                          h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 

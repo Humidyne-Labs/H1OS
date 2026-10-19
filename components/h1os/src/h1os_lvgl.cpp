@@ -20,6 +20,7 @@
 #include "orch_display_sync.h"
 #include "sdkconfig.h"
 #include "sub_display.h"
+#include "sub_power.h"
 
 #include <algorithm>
 #include <stdio.h>
@@ -35,10 +36,22 @@ static bool          s_first_boot_flush  = true;
 
 #define LVGL_I1_PALETTE_SIZE 8
 
+struct CpuMaxTurboScope {
+    CpuMaxTurboScope()
+    {
+        sub_power_cpu_max_acquire();
+    }
+    ~CpuMaxTurboScope()
+    {
+        sub_power_cpu_max_release();
+    }
+};
+
 static void h1os_lvgl_port_task(void *pvParameters);
 
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
+    sub_power_cpu_max_acquire();
     lv_lock();
     return true;
 }
@@ -46,6 +59,7 @@ bool h1os_lvgl_lock(uint32_t timeout_ms)
 void h1os_lvgl_unlock(void)
 {
     lv_unlock();
+    sub_power_cpu_max_release();
 }
 
 static uint32_t lvgl_tick_get_cb(void)
@@ -80,6 +94,7 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
 static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
+    CpuMaxTurboScope  turbo;
     lv_color_format_t cf = lv_display_get_color_format(disp);
     if (cf != LV_COLOR_FORMAT_I1) {
         lv_display_flush_ready(disp);
@@ -326,10 +341,17 @@ static void h1os_lvgl_port_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());
     while (s_lvgl_task_running) {
+        bool need_blitz = h1os_lvgl_has_pending_tasks();
+        if (need_blitz) {
+            sub_power_cpu_max_acquire();
+        }
         uint32_t delay_ms = lv_timer_handler();
-        delay_ms          = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD)
-                                ? LV_DEF_REFR_PERIOD
-                                : delay_ms;
+        if (need_blitz) {
+            sub_power_cpu_max_release();
+        }
+        delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD)
+                       ? LV_DEF_REFR_PERIOD
+                       : delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
     s_lvgl_task_handle = NULL;

@@ -209,6 +209,9 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
              H1OS_SUBTITLE, h1os_version_get_string(), (unsigned long)st->sample_interval_sec,
              (unsigned long)st->flow_b_period_sec);
 
+    // 0. Initialize Dynamic Frequency Scaling (Gate CPU to 80 MHz baseline)
+    sub_power_init_dfs(s_app_lifecycle.session.enable_dfs_80mhz);
+
     // 1. Initialize Base Hardware I/O & Release Boot Pad Holds
     hal_io_early_init();
 

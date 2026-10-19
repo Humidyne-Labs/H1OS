@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define ULP_TEST_MAGIC 0x554C5032U /* "ULP2" */
 
@@ -8,28 +8,29 @@
 #define ULP_LOG_BUF_MASK (ULP_LOG_BUF_SIZE - 1U)
 
 typedef struct {
-    uint32_t head;                     /* Written by ULP */
-    uint32_t tail;                     /* Read / cleared by Main CPU */
-    char buffer[ULP_LOG_BUF_SIZE];
+    uint32_t head; /* Written by ULP */
+    uint32_t tail; /* Read / cleared by Main CPU */
+    char     buffer[ULP_LOG_BUF_SIZE];
 } ulp_log_ring_buf_t;
 
 typedef enum {
     TEST_MODE_UNINITIALIZED = 0,
-    TEST_MODE_TIMER_ONLY    = 1,   /* Stage 1: Pure Timer Mode (5s PMU Countdown - Proves pipeline first) */
-    TEST_MODE_EVENT_ONLY    = 2,   /* Stage 2: Pure Event Mode (RTC GPIO 18 with 30s fallback) */
-    TEST_MODE_DUAL_BOTH     = 3,   /* Stage 3: Dual Mode (Timer + GPIO 18 Concurrently) */
-    TEST_MODE_COMPLETE      = 4
+    TEST_MODE_TIMER_ONLY =
+        1, /* Stage 1: Pure Timer Mode (5s PMU Countdown - Proves pipeline first) */
+    TEST_MODE_EVENT_ONLY = 2, /* Stage 2: Pure Event Mode (RTC GPIO 18 with 30s fallback) */
+    TEST_MODE_DUAL_BOTH  = 3, /* Stage 3: Dual Mode (Timer + GPIO 18 Concurrently) */
+    TEST_MODE_COMPLETE   = 4
 } ulp_test_mode_t;
 
 /* Checkpoints for breadcrumb debugging inside ULP firmware */
-#define ULP_CP_ENTERED_MAIN      1
-#define ULP_CP_ISR_REGISTERED    2
-#define ULP_CP_PINS_SAMPLED      3
-#define ULP_CP_WAITING_RDY       4
-#define ULP_CP_RDY_CONFIRMED     5
-#define ULP_CP_WAKE_SIGNALED     6
-#define ULP_CP_CDC_CLEARED       7
-#define ULP_CP_HALTED            8
+#define ULP_CP_ENTERED_MAIN 1
+#define ULP_CP_ISR_REGISTERED 2
+#define ULP_CP_PINS_SAMPLED 3
+#define ULP_CP_WAITING_RDY 4
+#define ULP_CP_RDY_CONFIRMED 5
+#define ULP_CP_WAKE_SIGNALED 6
+#define ULP_CP_CDC_CLEARED 7
+#define ULP_CP_HALTED 8
 
 typedef struct {
     uint32_t magic;

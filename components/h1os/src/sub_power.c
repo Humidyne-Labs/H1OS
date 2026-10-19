@@ -13,6 +13,7 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -418,4 +419,60 @@ bool sub_power_connected_usb(void)
     bool usb_state = hal_check_usb_ll();
     ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
     return usb_state;
+}
+
+#if CONFIG_PM_ENABLE
+static esp_pm_lock_handle_t s_cpu_max_lock = NULL;
+#endif
+
+esp_err_t sub_power_init_dfs(bool enable_dfs)
+{
+#if CONFIG_PM_ENABLE
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz       = enable_dfs ? 240 : 80,
+        .min_freq_mhz       = 80,
+        .light_sleep_enable = false,
+    };
+    esp_err_t err = esp_pm_configure(&pm_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure DFS: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    if (enable_dfs && s_cpu_max_lock == NULL) {
+        err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "h1os_turbo", &s_cpu_max_lock);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create CPU MAX PM lock: %s", esp_err_to_name(err));
+            return err;
+        }
+    }
+
+    ESP_LOGI(TAG, "Dynamic Frequency Scaling initialized: %s (Base: 80 MHz, Max: %d MHz)",
+             enable_dfs ? "ENABLED" : "LOCKED", pm_config.max_freq_mhz);
+    return ESP_OK;
+#else
+    (void)enable_dfs;
+    ESP_LOGW(TAG, "CONFIG_PM_ENABLE disabled; DFS unavailable");
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t sub_power_cpu_max_acquire(void)
+{
+#if CONFIG_PM_ENABLE
+    if (s_cpu_max_lock != NULL) {
+        return esp_pm_lock_acquire(s_cpu_max_lock);
+    }
+#endif
+    return ESP_OK;
+}
+
+esp_err_t sub_power_cpu_max_release(void)
+{
+#if CONFIG_PM_ENABLE
+    if (s_cpu_max_lock != NULL) {
+        return esp_pm_lock_release(s_cpu_max_lock);
+    }
+#endif
+    return ESP_OK;
 }

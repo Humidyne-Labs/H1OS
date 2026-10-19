@@ -4,16 +4,16 @@
  */
 
 #include "esp_rom_gpio.h"
-#include "soc/gpio_reg.h"
-#include "soc/rtc_cntl_reg.h"
-#include "soc/gpio_sig_map.h"
 #include "hal/gpio_ll.h"
+#include "soc/gpio_reg.h"
+#include "soc/gpio_sig_map.h"
+#include "soc/rtc_cntl_reg.h"
 
 #define PIN_POWER_HOLD 17
 
 void bootloader_hooks_include(void)
 {
-    //Empty
+    // Empty
 }
 
 void bootloader_before_init(void)

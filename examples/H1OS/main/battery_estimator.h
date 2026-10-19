@@ -15,8 +15,8 @@
 #ifndef BATTERY_ESTIMATOR_H
 #define BATTERY_ESTIMATOR_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,9 +42,7 @@ uint32_t battery_get_soc_basis_pts(uint32_t vbat_mv);
  *         Returns -1.0f if delta_t is 0.
  *         Returns -2.0f if voltage increased/unchanged (charging or cell relaxation).
  */
-float battery_estimate_avg_current_ma(uint32_t nominal_mah,
-                                      uint32_t v1_mv,
-                                      uint32_t v2_mv,
+float battery_estimate_avg_current_ma(uint32_t nominal_mah, uint32_t v1_mv, uint32_t v2_mv,
                                       uint32_t delta_t_sec);
 
 /**
@@ -56,14 +54,14 @@ float battery_estimate_avg_current_ma(uint32_t nominal_mah,
  * @param delta_t_sec Elapsed duration in seconds.
  * @return int32_t Estimated current in µA, or negative error code.
  */
-static inline int32_t battery_estimate_avg_current_ua(uint32_t nominal_mah,
-                                                      uint32_t v1_mv,
-                                                      uint32_t v2_mv,
-                                                      uint32_t delta_t_sec)
+static inline int32_t battery_estimate_avg_current_ua(uint32_t nominal_mah, uint32_t v1_mv,
+                                                      uint32_t v2_mv, uint32_t delta_t_sec)
 {
     float i_ma = battery_estimate_avg_current_ma(nominal_mah, v1_mv, v2_mv, delta_t_sec);
-    if (i_ma < 0.0f) { return (int32_t)i_ma; }
-                       return (int32_t)(i_ma * 1000.0f);
+    if (i_ma < 0.0f) {
+        return (int32_t)i_ma;
+    }
+    return (int32_t)(i_ma * 1000.0f);
 }
 
 /**
@@ -74,7 +72,8 @@ static inline int32_t battery_estimate_avg_current_ua(uint32_t nominal_mah,
  * @param avg_current_ma  Measured or model average current in mA
  * @return float Estimated autonomy in days
  */
-float battery_estimate_remaining_days(uint32_t nominal_mah, uint32_t current_vbat_mv, float avg_current_ma);
+float battery_estimate_remaining_days(uint32_t nominal_mah, uint32_t current_vbat_mv,
+                                      float avg_current_ma);
 
 #ifdef __cplusplus
 }

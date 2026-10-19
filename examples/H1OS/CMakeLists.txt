@@ -10,6 +10,13 @@ elseif(NOT DEFINED IDF_PATH OR IDF_PATH STREQUAL "")
     message(FATAL_ERROR "IDF_PATH is not set. Set it to your ESP-IDF installation directory before configuring this project.")
 endif()
 
+# Standardize H1OS component requirements + project-specific overrides
+if(NOT DEFINED SDKCONFIG_DEFAULTS)
+    set(SDKCONFIG_DEFAULTS
+        "${CMAKE_CURRENT_LIST_DIR}/../../components/h1os/sdkconfig.defaults"
+        "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults"
+    )
+endif()
 
 include("${IDF_PATH}/tools/cmake/project.cmake")
 project(h1os)

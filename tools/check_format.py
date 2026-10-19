@@ -19,13 +19,13 @@ TARGET_DIRS = [
     Path("components/h1os/src"),
     Path("components/h1os/ulp"),
     Path("components/h1os/bootloader_components/h1os_boot_hook"),
+    Path("examples"),
 ]
 
-EXCLUDE_DIRS = [
+EXCLUDE_DIRS = {
     "generated_fonts",
-    "build",
-    "build_prod",
-]
+    "managed_components",
+}
 
 EXTENSIONS = {".c", ".cpp", ".h", ".hpp"}
 
@@ -37,8 +37,11 @@ def find_source_files(repo_root: Path):
         if not target_path.exists():
             continue
         for root, dirs, files in os.walk(target_path):
-            # Prune excluded directories
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            # Prune excluded directories (exact match or build* directories)
+            dirs[:] = [
+                d for d in dirs
+                if d not in EXCLUDE_DIRS and not d.startswith("build")
+            ]
             for file in files:
                 p = Path(root) / file
                 if p.suffix.lower() in EXTENSIONS:

@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.3.0-dev] - 2026-10-18
 
 ### 🚀 Added
+- **Standardized Hybrid Component Configuration Baseline** (`components/h1os/sdkconfig.defaults`, `CMakeLists.txt`, `CMakePresets.json`):
+  - Created component-level `sdkconfig.defaults` establishing the single source of truth for all hardware and silicon invariants (ESP32-S3-PICO-1-N8R8, 8MB QIO Flash @ 80MHz, 8MB Octal PSRAM @ 80MHz, ULP RISC-V coprocessor, FreeRTOS 1000Hz, and 1-bit monochrome LVGL v9 display engine).
+  - Wired chained `SDKCONFIG_DEFAULTS` in `examples/H1OS/CMakeLists.txt`, `examples/boilerplate/CMakeLists.txt`, and `CMakePresets.json` (`components/h1os/sdkconfig.defaults;sdkconfig.defaults`).
+  - Pruned `examples/H1OS/sdkconfig.defaults` (from 199 to 58 lines) and `examples/boilerplate/sdkconfig.defaults` (from 125 to 17 lines) to strictly application-specific overrides.
+- **Dynamic Frequency Scaling (DFS) & Turbo Execution Invariants** (`sub_power.h/.c`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `sub_audio.c`, `B3_firmware_standards.md`):
+  - **80 MHz Quiescent Baseline:** Enabled automatic DFS gating with CPU cores constrained to 80 MHz during interactive standby, input polling, FreeRTOS idle, and sensor acquisition (`sub_power_init_dfs`).
+  - **240 MHz LVGL Blitz:** Integrated RAII `CpuMaxTurboScope` and task-level turbo boost (`sub_power_cpu_max_acquire()`) during LVGL rendering, font glyph rasterization, 1-bit pixel packing, and SSD1681 differential SPI frame transfer, dropping cores back to 80 MHz immediately upon flush completion.
+  - **240 MHz I2S Audio Clock Invariant:** Integrated turbo clock locks into `sub_audio_init()` and `audio_worker_task()`, preventing APB frequency droop during DFS from reducing I2S MCLK/BCLK dividers and ensuring chimes/tones never shift octaves lower or cause DMA underruns.
+  - Formalized Rule 11 in `B3_firmware_standards.md` and `.agents/skills/h1os-firmware-standards/SKILL.md`.
+- **API Versioning Header & Query Primitives** (`components/h1os/include/h1os/h1os_version.h`):
+  - Introduced unified versioning header with semantic version macros (`MAJOR`, `MINOR`, `PATCH`, `TAG`, `STRING`, `CODE`, `CHECK`) and inline getters (`h1os_version_get_string()`, `_major()`, `_minor()`, `_patch()`, `_build_date()`, `_build_time()`, `_code()`).
+  - Integrated dynamic version reporting into `examples/H1OS/main/main.c`, `screens/screen_diagnostics.c`, and `examples/boilerplate/main/main.c`.
 - **Three-Tier Firmware Engineering & Safety Standards** (`.clang-format`, `tools/check_format.py`, `.agents/skills/h1os-firmware-standards/SKILL.md`, `docs/architecture/B3_firmware_standards.md`):
   - **Layer 1 (Automated Formatting):** Deployed root `.clang-format` (LLVM base, C++17, Linux braces, 4-space indent, 100-col limit, right-aligned pointers, scoped consecutive alignment) with automated CLI formatting tool `tools/check_format.py` supporting both in-place formatting and `--check` CI dry-run validation.
   - **Layer 2 (10 Embedded Safety Rules):** Formalized strict safety invariants across firmware layers: fixed-width types (`<stdint.h>`), FPU32 single-precision discipline, zero runtime `malloc`, guard-clause early exit pattern, checked return codes (`[[nodiscard]]`), bounded stacks, non-blocking ISRs, inter-core volatile coherency for RTC Slow Memory, exhaustive enum default trapping, and pointer sanitization.

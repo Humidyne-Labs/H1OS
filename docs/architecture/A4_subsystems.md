@@ -86,6 +86,7 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer);
 - **12 dB ADC Curve Fitting**: Reads `GPIO 4` (ADC1_CH3 across 200kΩ/200kΩ divider) with 16-sample trimmed mean.
 - **Zero-Volt Cable Guard**: If latch is asserted and $V_{\text{bat}} \approx 0\text{mV}$, detects instrument is running from USB VBUS without a battery; bypasses low-battery shutdown.
 - **Hardware Sleep Entry**: Configures EXT1 wakeup and puts CPU into deep sleep.
+- **Dynamic Frequency Scaling (DFS)**: Gates CPU cores to an 80 MHz baseline during quiescent wait/polling periods, while providing `sub_power_cpu_max_acquire()` and `sub_power_cpu_max_release()` to burst the clock to 240 MHz turbo during compute-heavy operations (LVGL rendering blitz and I2S audio synthesis).
 
 ```c
 esp_err_t sub_power_init(void);
@@ -94,6 +95,9 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct);
 bool      sub_power_is_usb_powered(void);
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask);
 void      sub_power_cut_power_latch(void);
+esp_err_t sub_power_init_dfs(bool enable_dfs);
+esp_err_t sub_power_cpu_max_acquire(void);
+esp_err_t sub_power_cpu_max_release(void);
 ```
 
 ---
@@ -101,6 +105,7 @@ void      sub_power_cut_power_latch(void);
 ### 3.5 `sub_audio.c/.h` (Audio Codec & Amplifier Subsystem)
 - **Software Standby**: Keeps `PA_EN` (`GPIO 42`) held LOW and writes the ES8311 software standby register sequence to avoid ESD diode I2C clamping (see [Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-clamps-shared-i2c-bus-to-07v)).
 - **Tone Synthesizer**: Generates hardware beeps and chimes via I2S.
+- **I2S Playback Clock Lock Invariant**: During I2S audio initialization and tone/chime playback, `sub_power_cpu_max_acquire()` is held to guarantee the system PLL runs at full 240 MHz clock speed. Without this clock lock, APB frequency droop during DFS drops the I2S MCLK/BCLK dividers, causing playback pitch to shift octaves lower and introducing DMA buffer underruns.
 
 ```c
 esp_err_t sub_audio_init(void);

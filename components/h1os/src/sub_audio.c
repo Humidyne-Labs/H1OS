@@ -27,6 +27,7 @@
 #include "h1os/h1os.h"
 #include "h1os/hal_i2c.h"
 #include "h1os/hal_types.h"
+#include "h1os/sub_power.h"
 
 #include <math.h>
 #include <string.h>
@@ -299,6 +300,8 @@ esp_err_t sub_audio_init(void)
     if (s_audio_inited)
         return ESP_OK;
 
+    sub_power_cpu_max_acquire();
+
     /* 1. Ensure PA CTRL (GPIO 46: 0 = Mute) is muted initially */
     /* (PA_EN GPIO 42 is latched ON in 2nd-stage bootloader)    */
     sub_audio_park_warm();
@@ -310,6 +313,7 @@ esp_err_t sub_audio_init(void)
     if (chip_id != 0x8311) {
         ESP_LOGE(TAG, "Chip ID NOT Valid (0x%04X)", chip_id);
         s_audio_inited = false;
+        sub_power_cpu_max_release();
         return ESP_ERR_INVALID_VERSION;
     } else {
         ESP_LOGI(TAG, "Chip ID Valid (0x%04X)", chip_id);
@@ -324,6 +328,7 @@ esp_err_t sub_audio_init(void)
     esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2S TX channel: %s", esp_err_to_name(err));
+        sub_power_cpu_max_release();
         return err;
     }
 
@@ -355,6 +360,7 @@ esp_err_t sub_audio_init(void)
         ESP_LOGE(TAG, "Failed to init I2S std mode: %s", esp_err_to_name(err));
         i2s_del_channel(s_tx_chan);
         s_tx_chan = NULL;
+        sub_power_cpu_max_release();
         return err;
     }
 
@@ -399,19 +405,23 @@ esp_err_t sub_audio_init(void)
                     s_audio_task_handle = NULL;
                     vQueueDelete(s_audio_queue);
                     s_audio_queue = NULL;
+                    sub_power_cpu_max_release();
                     return ESP_ERR_TIMEOUT;
                 }
             } else {
                 ESP_LOGE(TAG, "Failed to create audio worker task: %d", res);
                 vQueueDelete(s_audio_queue);
                 s_audio_queue = NULL;
+                sub_power_cpu_max_release();
                 return ESP_ERR_NO_MEM;
             }
         } else {
+            sub_power_cpu_max_release();
             return ESP_ERR_NO_MEM;
         }
     }
 
+    sub_power_cpu_max_release();
     s_audio_inited = true;
     return ESP_OK;
 }
@@ -654,7 +664,9 @@ static void audio_worker_task(void *pvParameters)
     while (1) {
         if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
             s_audio_is_busy = true;
-            esp_err_t res   = ESP_OK;
+            sub_power_cpu_max_acquire(); // Bump CPU clock to 240 MHz for precise I2S bit clock and
+                                         // synthesis
+            esp_err_t res = ESP_OK;
 
             switch (cmd.type) {
             case AUDIO_CMD_TONE:
@@ -678,6 +690,7 @@ static void audio_worker_task(void *pvParameters)
                 xSemaphoreGive(cmd.done_sem);
             }
 
+            sub_power_cpu_max_release(); // Gate CPU back down to 80 MHz baseline
             s_audio_is_busy = false;
         }
     }

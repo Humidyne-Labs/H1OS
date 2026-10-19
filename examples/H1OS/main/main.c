@@ -4,33 +4,36 @@
  *
  * Demonstrates the H1OS Class-E Luxury Environmental Telemetry Operating System
  * on the Waveshare ESP32-S3 ePaper 1.54" V2 (200x200 Monochrome EPD, 188 DPI):
- *  - Modular Screens (screen_env_hero, screen_psychrometrics, screen_system_health, screen_diagnostics).
+ *  - Modular Screens (screen_env_hero, screen_psychrometrics, screen_system_health,
+ * screen_diagnostics).
  *  - Tactile Keypad Navigation:
  *      * Short-press BOOT (GPIO 0): Step forward (1 -> 2 -> 3 -> 4 -> 1) with 15ms audio tick.
  *      * Short-press POWER (GPIO 18): Step backward (4 -> 3 -> 2 -> 1 -> 4) with 15ms audio tick.
- *      * Long-press POWER (GPIO 18 >= 2s): Power-down chime & orderly hardware shutdown (h1os_shutdown).
+ *      * Long-press POWER (GPIO 18 >= 2s): Power-down chime & orderly hardware shutdown
+ * (h1os_shutdown).
  *  - Synthesized Audio Feedback (ES8311 I2S Codec & NS4168 Amp).
  *  - 30-Second Inactivity Sleep with 80 MHz DFS Power Droop.
  *
  * SPDX-License-Identifier: MIT
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
-#include <inttypes.h>
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
 #include "h1os/h1os.h"
+#include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_version.h"
 #include "h1os/hal_io.h"
-#include "h1os/h1os_lvgl.h"
 #include "h1os/sub_audio.h"
 #include "h1os/sub_power.h"
 #include "h1os/sub_sdcard.h"
-#include "screens.h"
 #include "humid1_cyber_wave.h"
+#include "screens.h"
+
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 static const char *TAG = "h1os_demo";
 
@@ -40,12 +43,12 @@ typedef struct {
     uint32_t total_uptime_sec;
     uint32_t cycle_counter;
     /**********************
-     *   0 = ENV HERO, 
-     *   1 = PSYCHROMETRICS, 
-     *   2 = HEALTH, 
-     *   3 = DIAGNOSTICS 
+     *   0 = ENV HERO,
+     *   1 = PSYCHROMETRICS,
+     *   2 = HEALTH,
+     *   3 = DIAGNOSTICS
      **********************/
-    uint8_t  active_page;
+    uint8_t active_page;
 } app_rtc_persisted_state_t;
 
 RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {0};
@@ -63,22 +66,22 @@ static void update_active_display(void)
     h1os_get_telemetry(&telem);
 
     switch (s_app_state.active_page) {
-        case H1OS_SCREEN_ENV_HERO:
-            screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
-            break;
-        case H1OS_SCREEN_PSYCHROMETRICS:
-            screen_psychrometrics_render(&telem, keypad_event_cb);
-            break;
-        case H1OS_SCREEN_SYSTEM_HEALTH:
-            screen_system_health_render(&telem, keypad_event_cb);
-            break;
-        case H1OS_SCREEN_DIAGNOSTICS:
-            screen_diagnostics_render(&telem, keypad_event_cb);
-            break;
-        default:
-            s_app_state.active_page = H1OS_SCREEN_ENV_HERO;
-            screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
-            break;
+    case H1OS_SCREEN_ENV_HERO:
+        screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
+        break;
+    case H1OS_SCREEN_PSYCHROMETRICS:
+        screen_psychrometrics_render(&telem, keypad_event_cb);
+        break;
+    case H1OS_SCREEN_SYSTEM_HEALTH:
+        screen_system_health_render(&telem, keypad_event_cb);
+        break;
+    case H1OS_SCREEN_DIAGNOSTICS:
+        screen_diagnostics_render(&telem, keypad_event_cb);
+        break;
+    default:
+        s_app_state.active_page = H1OS_SCREEN_ENV_HERO;
+        screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
+        break;
     }
 }
 
@@ -89,7 +92,8 @@ static bool s_is_shutting_down = false;
  * ========================================================================= */
 static void keypad_event_cb(lv_event_t *e)
 {
-    if (s_is_shutting_down) return;
+    if (s_is_shutting_down)
+        return;
 
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -110,7 +114,7 @@ static void keypad_event_cb(lv_event_t *e)
 
         if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT) {
             // BOOT Button: Forward Cycle (Non-blocking acoustic feedback)
-            const uint32_t tone_fwd[] = { 1046, 50 };
+            const uint32_t tone_fwd[] = {1046, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_fwd, sizeof(tone_fwd));
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad forward (BOOT): Navigating to page %u/%u",
@@ -119,9 +123,10 @@ static void keypad_event_cb(lv_event_t *e)
             return;
         } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT || key == LV_KEY_ENTER) {
             // POWER Button: Reverse Cycle (Non-blocking acoustic feedback)
-            const uint32_t tone_rev[] = { 880, 50 };
+            const uint32_t tone_rev[] = {880, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
-            s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
+            s_app_state.active_page =
+                (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
                      s_app_state.active_page + 1, H1OS_NUM_SCREENS);
             update_active_display();
@@ -135,11 +140,9 @@ static void keypad_event_cb(lv_event_t *e)
 static void app_on_boot(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")",
-             h1os_version_get_string(),
-             h1os_version_get_build_date(),
-             h1os_version_get_build_time(),
-             h1os_version_get_code());
-    s_app_state.cycle_counter = 1;
+             h1os_version_get_string(), h1os_version_get_build_date(),
+             h1os_version_get_build_time(), h1os_version_get_code());
+    s_app_state.cycle_counter  = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
     screen_base_set_awake_badge(true);
@@ -158,7 +161,8 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
     ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx, ButtonWake: %d)",
-             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes, ctx->woke_from_button);
+             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes,
+             ctx->woke_from_button);
 
     if (ctx->woke_from_button) {
         /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
@@ -206,7 +210,7 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         h1os_lvgl_unlock();
 
         /* Hold splash graphic briefly so it is visible before primary UI transition */
-        vTaskDelay(pdMS_TO_TICKS(2*1000));
+        vTaskDelay(pdMS_TO_TICKS(2 * 1000));
     }
 }
 
@@ -216,19 +220,20 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
 void app_main(void)
 {
     h1os_lifecycle_t lifecycle = {
-        .session = {
-            .inactivity_timeout_sec = 30,
-            .flow_a_period_sec      = 60,
-            .flow_b_period_sec      = 300,
-        },
-        .presentation = {
-            .chime_mask = (1 << H1OS_CHIME_BOOT) |
-                          (1 << H1OS_CHIME_SHUTDOWN),
+        .session =
+            {
+                .inactivity_timeout_sec = 30,
+                .flow_a_period_sec      = 60,
+                .flow_b_period_sec      = 300,
+            },
+        .presentation =
+            {
+                .chime_mask = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
 
-            .on_chime   = NULL,
-            .on_splash  = app_on_splash,
-            .volume_pct = 40,
-        },
+                .on_chime   = NULL,
+                .on_splash  = app_on_splash,
+                .volume_pct = 40,
+            },
         .on_boot      = app_on_boot,
         .on_wake      = app_on_wake,
         .on_pre_sleep = app_on_pre_sleep,
@@ -241,4 +246,3 @@ void app_main(void)
         ESP_LOGE(TAG, "h1os_start failed: %s", esp_err_to_name(err));
     }
 }
-

@@ -5,11 +5,11 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "screens.h"
+#include "battery_estimator.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
 #include "h1os/sub_sdcard.h"
-#include "battery_estimator.h"
+#include "screens.h"
 
 void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
@@ -39,7 +39,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
 
     // Row 3: MicroSD Storage
     lv_obj_t *lbl_sd = lv_label_create(scr);
-    uint32_t sd_mb = 0;
+    uint32_t  sd_mb  = 0;
     if (sub_sdcard_is_mounted() && sub_sdcard_get_capacity_mb(&sd_mb) == ESP_OK) {
         lv_label_set_text_fmt(lbl_sd, "MicroSD:     %.1f GB OK", (float)sd_mb / 1024.0f);
     } else {
@@ -61,8 +61,8 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_align(lbl_mcu, LV_ALIGN_TOP_LEFT, 6, 130);
 
     lv_obj_t *lbl_delta = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)",
-                          telem->trinode_delta_c, telem->trinode_confidence_pct);
+    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)", telem->trinode_delta_c,
+                          telem->trinode_confidence_pct);
     lv_obj_set_style_text_font(lbl_delta, H1OS_FONT_14, 0);
     lv_obj_align(lbl_delta, LV_ALIGN_TOP_LEFT, 6, 150);
 

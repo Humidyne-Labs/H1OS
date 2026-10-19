@@ -10,13 +10,16 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
 #include "esp_log.h"
 #include "h1os/h1os.h"
 #include "h1os/h1os_lvgl.h"
+#include "h1os/h1os_version.h"
 #include "lvgl.h"
+
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 static const char *TAG = "boilerplate_app";
 
@@ -52,7 +55,7 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
 
     // Divider Line (Y = 22, X: 4 to 196)
     static lv_point_precise_t div_pts[] = {{4, 22}, {196, 22}};
-    lv_obj_t *div = lv_line_create(scr);
+    lv_obj_t                 *div       = lv_line_create(scr);
     lv_line_set_points(div, div_pts, 2);
     lv_obj_set_style_line_width(div, 1, 0);
     lv_obj_set_style_line_color(div, lv_color_black(), 0);
@@ -98,7 +101,8 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
 
     // 5. Footer Bar
     lv_obj_t *lbl_foot = lv_label_create(scr);
-    lv_label_set_text(lbl_foot, "H1OS v2.0 READY");
+    lv_label_set_text_fmt(lbl_foot, "%s v%" PRIu32 ".%" PRIu32 " READY", H1OS_NAME,
+                          h1os_version_get_major(), h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
@@ -118,8 +122,10 @@ static void update_display(void)
  * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
-    ESP_LOGI(TAG, "Application booted cleanly from power-on reset");
-    s_app_state.cycle_counter = 1;
+    ESP_LOGI(TAG, "Application booted cleanly (H1OS %s, built %s %s, code 0x%08" PRIx32 ")",
+             h1os_version_get_string(), h1os_version_get_build_date(),
+             h1os_version_get_build_time(), h1os_version_get_code());
+    s_app_state.cycle_counter  = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
     update_display();
 }
@@ -150,20 +156,25 @@ void app_main(void)
     ESP_LOGI(TAG, "Starting H1OS Application Boilerplate");
 
     h1os_lifecycle_t lifecycle = {
-        .on_boot                    = app_on_boot,
-        .on_wake                    = app_on_wake,
-        .on_pre_sleep               = app_on_pre_sleep,
-        .on_shutdown                = app_on_shutdown,
-        .presentation = {
-            .on_splash              = NULL,
-            .on_chime               = NULL,
-            .chime_mask             = 0,
-        },
-        .session = {
-            .inactivity_timeout_sec = 30,
-            .enable_dfs_80mhz       = true,
-        },
-        .user_data                  = NULL,
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_pre_sleep = app_on_pre_sleep,
+        .on_shutdown  = app_on_shutdown,
+        .presentation =
+            {
+                .on_splash  = NULL,
+                .on_chime   = NULL,
+                .chime_mask = 0,
+                .volume_pct = 50,
+            },
+        .session =
+            {
+                .inactivity_timeout_sec = 30,
+                .enable_dfs_80mhz       = true,
+                .flow_a_period_sec      = 60,
+                .flow_b_period_sec      = 300,
+            },
+        .user_data = NULL,
     };
 
     esp_err_t ret = h1os_start(&lifecycle);

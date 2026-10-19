@@ -103,6 +103,30 @@ void sub_power_cut_power_latch(void);
  */
 bool sub_power_connected_usb(void);
 
+/**
+ * @brief Initialize Dynamic Frequency Scaling (DFS) power management.
+ * Gates CPU cores to 80 MHz baseline during quiescent and interactive periods,
+ * while allowing transient 240 MHz turbo scaling during heavy UI/compute bursts.
+ *
+ * @param[in] enable_dfs Enable DFS scaling (true = 80MHz base / 240MHz max; false = locked 80MHz).
+ * @return ESP_OK on success, or an error code.
+ */
+esp_err_t sub_power_init_dfs(bool enable_dfs);
+
+/**
+ * @brief Acquire 240 MHz CPU performance lock (e.g. during LVGL rendering blitz).
+ * Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_power_cpu_max_acquire(void);
+
+/**
+ * @brief Release 240 MHz CPU performance lock.
+ * Allows CPU cores to gate back down to 80 MHz baseline.
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_power_cpu_max_release(void);
+
 #ifdef __cplusplus
 }
 #endif
