@@ -10,6 +10,7 @@ sdkconfig.*
 # NOT Tracking Logs
 *.log
 
-# Tracking .vscode
-# /.vscode/
+# Python artifacts
+__pycache__/
+*.py[cod]
 

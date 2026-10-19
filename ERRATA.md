@@ -12,6 +12,10 @@ During low-level driver development and metrological evaluation of H1OS, several
 
 While H1OS implements software mitigations across Layers 1–3, these defects introduce parasitic power draw, restrict autonomous coprocessor operation, and induce thermal biases that require hardware correction in **Rev B**.
 
+> [!IMPORTANT]
+> **ULP RISC-V Silicon Invariant Empirically Proven (ERR-S1):**
+> Rigorous empirical testing on ESP32-S3 silicon (`examples/riscv_test`) confirmed that the internal ULP sleep timer (`RTC_CNTL_ULP_CP_SLP_TIMER_EN = 1`) **completely masks and suppresses external RTC GPIO comparator wakeups** from releasing ULP clock gating during deep sleep. With both bits armed (`0xA0000000`, `TIMER_EN=1, GPIO_ENA=1, CLR=0`), tactile button presses on GPIO 18 registered `0` ULP wakeups while the 15-second timer countdown was active. When `TIMER_EN=0` (`0x20000000`), the exact same pin woke the ULP instantly in 1.3 seconds. Therefore, the H1OS doctrine of **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) with periodic intervals offloaded to the external PCF85063A RTC on `GPIO 5` is an absolute silicon mandate.
+
 | ID | Hardware Subsystem | Defect Description | Rev B Proposed Solution |
 | :--- | :--- | :--- | :--- |
 | **E1** | SHTC3 Environmental Sensor | Inadequate thermal relief & PCB heat conduction | Deep U-slot tongue, necked traces, no copper planes |
@@ -22,6 +26,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E6** | System Power Latch | Fragile software latch on `GPIO 17` (`BAT_CTRL`) | Hardware push-button IC (e.g., LTC2954 / MAX16054) |
 | **E7** | Tactile Buttons (`BOOT`/`PWR`) | External 10 kΩ pull-up resistors without RC filtering | Standard 10 kΩ pull-ups with 100 nF RC filter |
 | **E8** | SSD1681 E-Paper Display | Shared `MOSI/SDA` line for glass thermistor read `0x1B` | Dedicated `MISO` trace or discrete bezel thermistor |
+| **E9** | Slow Clock Domain | Missing 32.768 kHz crystal; pins 15/16 multiplexed to I2S | Dedicated 32.768 kHz crystal on XTAL32K pads (route I2S elsewhere) |
 
 ---
 
@@ -266,6 +271,29 @@ Standard ESP-IDF full-duplex SPI master drivers (which utilize hardware DMA) can
 
 ---
 
+### Errata E9: Missing Physical 32.768 kHz RTC Crystal (XTAL32K Pin Multiplexing)
+
+#### 1. Physical Defect Analysis
+The ESP32-S3 SoC provides dedicated crystal oscillator pins on `GPIO 15` (`XTAL_32K_P`) and `GPIO 16` (`XTAL_32K_N`) to drive an external 32.768 kHz quartz crystal for high-precision, low-drift RTC timekeeping and deterministic slow-clock cycle timing.
+
+On the Waveshare ESP32-S3 ePaper 1.54" V2 development board, **no external 32.768 kHz crystal is populated**. Instead, the PCB layout assigns `GPIO 15` to the ES8311 audio codec bit clock (`I2S_SCLK`) and `GPIO 16` to codec serial audio data in (`I2S_ASDOUT`).
+
+#### 2. Firmware & Architectural Impact
+1. **Mandatory Internal RC Clock:** The system cannot use `CONFIG_RTC_CLK_SRC_EXT_CRYS=y`. Attempting to enable external crystal causes boot-time clock initialization lockup or crash. Firmware must configure `CONFIG_RTC_CLK_SRC_INT_RC=y`.
+2. **Frequency Drift:** The internal 136 kHz RC oscillator exhibits significant thermal drift ($\sim \pm 5\%$) compared to quartz crystals ($\pm 20\,\text{ppm}$), requiring dynamic hardware calibration via `esp_clk_slowclk_cal_get()` / `ulp_set_wakeup_period()`.
+3. **CDC Sync Speed:** While frequency stability is lower, the higher nominal frequency ($\sim 136\,\text{kHz}$ vs $32.768\,\text{kHz}$) yields a shorter clock period ($T \approx 7.35\,\mu\text{s}$ vs $30.5\,\mu\text{s}$). The required TRM $\ge 3$ slow clock cycles for CDC clear synchronizers is achieved in $\ge 22.05\,\mu\text{s}$, meaning standard $120\,\mu\text{s}$ pulses provide $>16$ cycles of safety margin.
+
+#### 3. Current H1OS Firmware Mitigations
+- Configured `CONFIG_RTC_CLK_SRC_INT_RC=y` strictly across all build profiles.
+- Relies on the external discrete calendar RTC (PCF85063A on `GPIO 47/48`, INT on `GPIO 5`) for metrological calendar timekeeping and long-interval wakeups.
+- Configured ULP timer delays using microsecond-calibrated APIs (`ulp_set_wakeup_period()`).
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **Preserve XTAL32K for Slow Clock:** Populate a high-precision $32.768\,\text{kHz}$ ($\pm 20\,\text{ppm}$, $6\,\text{pF}$ or $9\,\text{pF}$ load capacitance) crystal with matching tuning capacitors on `GPIO 15` and `GPIO 16`.
+- **Relocate I2S Audio Bus:** Reassign `I2S_SCLK` and `I2S_ASDOUT` to available high-speed digital matrix pins (e.g., `GPIO 1/2` or `GPIO 7/21`).
+
+---
+
 ## 3. Summary of Rev B BOM & Schematic Modifications
 
 | Component Type | Part Number / Spec | Reference Designator | Purpose |
@@ -278,3 +306,114 @@ Standard ESP-IDF full-duplex SPI master drivers (which utilize hardware DMA) can
 | **Button Filters** | 100 nF 0402 16V X7R Caps | `C_BTN1`, `C_BTN2` | Hardware RC contact debounce |
 | **ESD Suppressors** | STMicroelectronics USBLC6-2 | `D_ESD1`, `D_ESD2` | Button & MicroSD ESD protection |
 | **Slot Milling** | 2.0 mm PCB Routing Path | `MECHANICAL` | SHTC3 cantilevered thermal isolation tab |
+
+---
+
+## 4. Silicon & Peripheral Controller Nuances (ESP32-S3 & Codec)
+
+### ERR-S1: ESP32-S3 PMU Hardware Timer Suppression of RTC GPIO Wakeup
+
+- **Component:** ESP32-S3 Low-Power Controller (PMU / RTC Controller)
+- **Subsystem:** ULP-RISC-V Coprocessor Wakeup Logic
+- **Affects:** ESP32-S3-PICO-1-N8R8 (all silicon revisions)
+- **Severity:** High (Architectural Invariant / Blocking if Unmitigated)
+
+#### Description
+In ESP-IDF and the ESP32-S3 Technical Reference Manual, the ULP-RISC-V coprocessor supports two primary wakeup sources controlled via `RTC_CNTL_ULP_CP_TIMER_REG`:
+1. `RTC_CNTL_ULP_CP_SLP_TIMER_EN` (bit 31) — Periodic countdown timer in `RTC_SLOW_CLK` ticks.
+2. `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` (bit 29) — External RTC GPIO comparator edge/level event.
+
+Hardware characterization in `examples/riscv_test` using real-time register readback and slow-clock cycle counting proves that **the hardware sleep countdown timer overrides and completely suppresses RTC GPIO comparator wakeups from releasing ULP core clock gating**:
+
+```
+Stage 2 (Pure Event Mode):
+  RTC_CNTL_ULP_CP_TIMER_REG = 0x20000000 (TIMER_EN=0, GPIO_ENA=1, CLR=0)
+  Elapsed Ticks: 178,866 (~1.31s)
+  ULP GPIO Wake Count: 1 (Instant tactile button wake)
+  ULP Timer Wake Count: 0
+
+Stage 3 (Dual Mode):
+  RTC_CNTL_ULP_CP_TIMER_REG = 0xA0000000 (TIMER_EN=1, GPIO_ENA=1, CLR=0)
+  Elapsed Ticks: 2,170,788 (~15.96s)
+  ULP GPIO Wake Count: 0 (Ignored all tactile button presses!)
+  ULP Timer Wake Count: 1 (Woke strictly upon 15s timer expiration)
+```
+
+#### Root Cause & Silicon RTL Arbitration
+1. **Timer FSM Clock Gate Priority:** In the ESP32-S3 RTC controller state machine, asserting `RTC_CNTL_ULP_CP_SLP_TIMER_EN` places the ULP clock release logic under the control of the hardware countdown timer. While this countdown is active, transitions on external RTC GPIOs do not release the ULP core from halt.
+2. **Debunking the "Stuck Clear" Hypothesis:** Register readback directly from the ULP core (`ULP_CP_TIMER_REG = 0xA0000000`) verified that `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` was strictly `0`, proving that the suppression is caused by silicon arbitration and not by an un-cleared reset latch.
+3. **ESP-IDF Driver Corroboration:** Espressif's low-level driver explicitly models wakeup sources as a mutually exclusive enum (`ulp_riscv_wakeup_source_t`: `TIMER` or `GPIO`, never a union), and `ulp_riscv_config_and_run()` deliberately clears `RTC_CNTL_ULP_CP_SLP_TIMER_EN` before arming `GPIO_WAKEUP_ENA`.
+
+#### Architectural Conclusions & Mandates
+1. **Pure Event Mode Mandate:** The ULP coprocessor must be configured and operated exclusively in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) with `RTC_CNTL_ULP_CP_SLP_TIMER_EN = 0`.
+2. **External Quartz Timebase:** All periodic timebases must be generated externally via the PCF85063A RTC on `GPIO 5`, ensuring periodic events enter as peer RTC GPIO transitions under `GPIO_WAKEUP_ENA`.
+3. **Independent Safety Fallback:** The host CPU sleep timer (`esp_sleep_enable_timer_wakeup()`) operates on a separate RTC hardware circuit and remains active as an uncompromised watchdog fallback.
+
+---
+
+### ERR-S2: ES8311 Register 0x37 Uncalibrated Digital EQ Filter Distortion
+
+- **Component:** Everest Semiconductor ES8311 Audio Codec
+- **Subsystem:** Audio DAC Signal Path
+- **Severity:** Medium (severe audio buzzing, acoustic distortion, and phase clipping)
+
+#### Description
+The manufacturer datasheet states that the internal digital equalizer (EQ) block is disabled by default upon reset. In physical silicon, failing to write `0x08` to Register `0x37` leaves the hardware EQ filter active in the digital DAC path. Because no valid biquad coefficients are loaded, the uncalibrated filter stages severely distort and clip the output.
+
+#### Mitigation & Architecture Mandate
+During codec initialization in `sub_audio.c`:
+1. Write `0x08` to Register `0x37` unconditionally to disable the digital volume fade ramp and bypass/disable the uncalibrated digital EQ filter block.
+2. Program Register `0x0F` to `0x80` to configure Low-Power DAC mode, which provides substantial battery power savings with imperceptible audio impact through the NS4168 amplifier.
+
+---
+
+### ERR-S3: ESP32-S3 Clock Domain Crossing (CDC) Wake Latch Bounce
+
+- **Component:** ESP32-S3 Low-Power Controller (RTC IO / PMU)
+- **Subsystem:** ULP Coprocessor Wake Latch (`RTC_CNTL_ULP_CP_TIMER_REG`)
+- **Severity:** High (intermittent sleep re-entry freeze and runaway spurious wakes)
+
+#### Description
+When clearing the ULP coprocessor wake latch via `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR`, the RTC state machine operates on the slow clock domain ($f_{\text{slow}} \approx 136\text{ kHz}$, period $T_{\text{cycle}} \approx 7.35\ \mu\text{s}$).
+
+Per the ESP32-S3 Technical Reference Manual, synchronizing level-clearing pulses across the slow clock domain requires the clear signal to be asserted for **$\ge 3$ slow clock cycles** ($\ge 22.05\ \mu\text{s}$ on 136 kHz RC). If pulsed for less than this duration, the clear signal is missed by the synchronizer flip-flops. Furthermore, if `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` is left asserted while the ULP halts, or if `RTC_GPIO_STATUS_W1TC_REG` is cleared *after* the controller pulse, the active status latch immediately re-triggers the wake gate.
+
+#### Mitigation & Architecture Mandate
+1. **120 µs Clear Pulse Duration:** Any pulse on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` must be delayed for $\ge 120\ \mu\text{s}$ (`ulp_riscv_delay_us(120)` in ULP, `esp_rom_delay_us(120)` in Xtensa core), guaranteeing $> 16$ slow clock cycles on the 136 kHz internal RC oscillator.
+2. **Explicit Deassertion:** `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` must be explicitly cleared (`CLEAR_PERI_REG_MASK`) after the delay.
+3. **Peripheral Status Clear Order:** `RTC_GPIO_STATUS_W1TC_REG` must be written *first*, followed by the controller pulse, ensuring the level comparator is unasserted before resetting the controller latch.
+
+---
+
+### ERR-S4: PCF85063A Open-Drain Pulse Duration Pre-Sleep Race
+
+- **Component:** NXP / Nexperia PCF85063A Real-Time Clock
+- **Subsystem:** Countdown Timer `/INT` Output on `GPIO 5`
+- **Severity:** High (immediate false wakeups and missed edge transitions on sleep re-entry)
+
+#### Description
+When configured in pulsed timer mode (`TI_TP = 1` in Register `0x11`), the PCF85063A generates an active-low open-drain pulse on `/INT` (`GPIO 5`) with a fixed hardware duration of $1/64\text{ s} \approx 15.625\text{ ms}$. Flow A bare-metal sensor sample bursts execute in $<3.0\text{ ms}$. If Flow A attempts to re-enter deep sleep while the physical `/INT` line is still held LOW by the RTC chip ($t < 15.6\text{ ms}$), the RTC IO level comparator detects a continuous LOW state upon sleep arming, causing immediate false re-triggers.
+
+#### Mitigation & Architecture Mandate
+1. **Dual-Sided Pulse Drain Barrier:**
+   - **In ULP:** On intermediate tick slices, the ULP waits in a polling loop (`ulp_riscv_gpio_get_level(GPIO_NUM_5) == 0`) with a 50 ms timeout until the line returns HIGH before clearing latches and re-arming `GPIO_WAKEUP_ENA`.
+   - **In Main CPU:** In `sub_power_enter_deep_sleep_mode()`, the Main CPU executes an atomic hardware wait until `GPIO 5` is released and reads HIGH.
+2. **Stuck-Line Fault Trap:** If `GPIO 5` fails to return HIGH within 50 ms, the ULP logs `rtc_int_stuck = 1`, bypasses `GPIO_WAKEUP_ENA` re-arming to prevent runaway infinite wake loops, and wakes the Main CPU to report hardware failure.
+
+---
+
+### ERR-S5: ADC1 Oneshot Multi-Unit Driver Collision (`ESP_ERR_NOT_FOUND`)
+
+- **Component:** ESP-IDF `adc_oneshot` Driver
+- **Subsystem:** ADC1 Controller (`GPIO 4` Battery ADC)
+- **Affects:** ESP32-S3 ESP-IDF v5.4 & v6.1
+- **Severity:** Medium (battery readout failure and uncalibrated LUT fallbacks)
+
+#### Description
+When the ULP coprocessor uses ADC1 for battery voltage monitoring, `ulp_riscv_adc_init()` claims the hardware unit lock in ESP-IDF (`s_adc_unit_claim(0) = true`). If the main application later attempts to initialize `adc_oneshot_new_unit()` with default settings (`.ulp_mode = ADC_ULP_MODE_DISABLE`), the driver returns `ESP_ERR_NOT_FOUND` because ADC1 is already claimed.
+
+#### Mitigation & Architecture Mandate
+1. **Shared ULP Mode Allocation:** `sub_power_init()` must configure `adc_oneshot_unit_init_cfg_t` with `.ulp_mode = ADC_ULP_MODE_RISCV`.
+2. **Initialization Sequence:** `sub_power_init()` must execute *before* `sub_power_init_ulp()`, ensuring the eFuse calibration curve handle is valid before battery calculation parameters are passed to the ULP.
+3. **Eliminate Redundant Allocation:** `ulp_riscv_adc_init()` is not called separately if `sub_power_init()` has already configured ADC1 unit and channel 3 for shared operation.
+

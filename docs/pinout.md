@@ -8,7 +8,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 
 | GPIO | Signal Name | Target Peripheral | Direction / Mode | Electrical Characteristic & Polarity | Default State / Initialization | Notes |
 |---|---|---|---|---|---|---|
-| **IO0** | `BOOT0` | Tactile Button / Bootloader | Digital Input | **Active LOW** (0 = Pressed, 1 = Idle) | `INPUT_PULLUP` enabled | Internal pull-up required (no external pull resistor) |
+| **IO0** | `BOOT0` | Tactile Button / Bootloader | Digital Input | **Active LOW** (0 = Pressed, 1 = Idle) | External 10kΩ pull-up | Tactile boot / navigation key with external 10kΩ pull-up to 3.3V on PCB |
 | **IO1** | `IO1` | Expansion Header | GPIO / Output | Push-Pull | Tristate / User | Available GPIO header |
 | **IO2** | `IO2` | Expansion Header | GPIO / Output | Push-Pull | Tristate / User | Available GPIO header |
 | **IO3** | `LED_GREEN` | User Status Indicator | Digital Output | **Open-Drain, Active LOW** (0 = ON, 1 = OFF) | `1` (OFF) | Cathode connected to IO3; drive 0 to illuminate |
@@ -26,7 +26,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 | **IO15** | `I2S_SCLK` | Audio Codec (ES8311) | I2S0 BCLK Output | Bit / Serial Clock | Driven by I2S driver | Continuous clocking for mono/stereo audio frames |
 | **IO16** | `I2S_ASDOUT` | Audio Codec (ES8311) | I2S0 DIN Input | Serial Audio Data In from Codec | Driven by I2S driver | Codec microphone / ADC data line |
 | **IO17** | `BAT_Control` | Power Management | Digital Output | **Active HIGH** (1 = Hold ON, 0 = OFF) | `1` (Power Latched) | Must be driven HIGH at boot and frozen with `gpio_deep_sleep_hold_en()` |
-| **IO18** | `BAT_KEY` | Power Management | Digital Input | **Active LOW** (0 = Pressed, 1 = Idle) | `INPUT_PULLUP` enabled | Hardware battery power key / wakeup trigger |
+| **IO18** | `BAT_KEY` | Power Management | Digital Input | **Active LOW** (0 = Pressed, 1 = Idle) | External 10kΩ pull-up | Hardware battery power key / wakeup trigger with external 10kΩ pull-up to 3.3V on PCB |
 | **IO19** | `U_N` | USB-JTAG-Serial / D- | USB Native / Output | Differential D- | USB PHY | Native USB negative line |
 | **IO20** | `U_P` | USB-JTAG-Serial / D+ | USB Native / Output | Differential D+ | USB PHY | Native USB positive line |
 | **IO21** | `IO21` | Expansion / Unused | GPIO | Floating | Tristate | Available GPIO |

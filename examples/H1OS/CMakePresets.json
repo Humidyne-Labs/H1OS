@@ -18,7 +18,7 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.dev"
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.dev"
       },
       "vendor": {
         "espressif/vscode-esp-idf": {
@@ -50,7 +50,7 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.prod"
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.prod"
       }
     },
     {
@@ -65,7 +65,7 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.ci"
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.ci"
       }
     }
   ]

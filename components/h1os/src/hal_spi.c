@@ -1,12 +1,14 @@
 /**
  * @file hal_spi.c
  * @brief Layer 1 HAL SPI Master Bus Driver Implementation
- * 
+ *
  * SPDX-License-Identifier: MIT
  */
 
 #include "h1os/hal_spi.h"
+
 #include "esp_log.h"
+
 #include <string.h>
 
 static const char *TAG = "HAL_SPI";
@@ -16,11 +18,13 @@ static spi_device_handle_t s_spi_read_dev = NULL;
 
 static bool s_is_inited = false;
 
-static inline void epd_set_cs(uint8_t level) {
+static inline void epd_set_cs(uint8_t level)
+{
     gpio_set_level(HAL_PIN_EPD_CS, level);
 }
 
-static inline void epd_set_dc(uint8_t level) {
+static inline void epd_set_dc(uint8_t level)
+{
     gpio_set_level(HAL_PIN_EPD_DC, level);
 }
 
@@ -32,7 +36,8 @@ esp_err_t hal_spi_init(void)
 
     // 1. Configure DC, RST, and CS GPIO pins as manual outputs
     gpio_config_t epd_ctrl_cfg = {
-        .pin_bit_mask = (1ULL << HAL_PIN_EPD_DC) | (1ULL << HAL_PIN_EPD_RST) | (1ULL << HAL_PIN_EPD_CS),
+        .pin_bit_mask =
+            (1ULL << HAL_PIN_EPD_DC) | (1ULL << HAL_PIN_EPD_RST) | (1ULL << HAL_PIN_EPD_CS),
         .mode         = GPIO_MODE_OUTPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -86,9 +91,9 @@ esp_err_t hal_spi_init(void)
 
     // 5. Half-Duplex 3-Wire Read Device (2 MHz, Mode 0) for on-glass temp readout
     spi_device_interface_config_t rdevcfg = {
-        .clock_speed_hz = 2 * 1000 * 1000,  // 2 MHz read speed
+        .clock_speed_hz = 2 * 1000 * 1000, // 2 MHz read speed
         .mode           = 0,
-        .spics_io_num   = -1,               // Manual CS
+        .spics_io_num   = -1, // Manual CS
         .flags          = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_3WIRE,
         .queue_size     = 1,
     };
@@ -99,7 +104,9 @@ esp_err_t hal_spi_init(void)
     }
 
     s_is_inited = true;
-    ESP_LOGD(TAG, "SPI2 bus initialized with DMA (20 MHz write, 2 MHz half-duplex read) on CS=%d, SCK=%d, MOSI=%d",
+    ESP_LOGD(TAG,
+             "SPI2 bus initialized with DMA (20 MHz write, 2 MHz half-duplex read) on CS=%d, "
+             "SCK=%d, MOSI=%d",
              HAL_PIN_EPD_CS, HAL_PIN_EPD_SCK, HAL_PIN_EPD_MOSI);
     return ESP_OK;
 }
@@ -136,8 +143,8 @@ esp_err_t hal_spi_write_cmd(uint8_t cmd)
 
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
-    t.flags = SPI_TRANS_USE_TXDATA;
-    t.length = 8;
+    t.flags      = SPI_TRANS_USE_TXDATA;
+    t.length     = 8;
     t.tx_data[0] = cmd;
 
     esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t);
@@ -156,7 +163,7 @@ esp_err_t hal_spi_write_data(const uint8_t *data, size_t len)
 
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
-    t.length = len * 8;
+    t.length    = len * 8;
     t.tx_buffer = data;
 
     esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t);
@@ -175,7 +182,7 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
 
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
-    t.length = HAL_EPD_FRAME_SIZE_BYTES * 8;
+    t.length    = HAL_EPD_FRAME_SIZE_BYTES * 8;
     t.tx_buffer = frame_buffer;
 
     /* Use interrupt-driven GDMA transmit so FreeRTOS yields CPU during 2ms 5KB transfer */
@@ -197,11 +204,11 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     epd_set_dc(0);
     spi_transaction_t t_cmd;
     memset(&t_cmd, 0, sizeof(t_cmd));
-	
+
     t_cmd.flags      = SPI_TRANS_USE_TXDATA;
     t_cmd.length     = 8;
     t_cmd.tx_data[0] = cmd;
-	
+
     esp_err_t ret = spi_device_polling_transmit(s_spi_dev, &t_cmd);
     if (ret != ESP_OK) {
         epd_set_cs(1);
@@ -214,10 +221,10 @@ esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
     esp_rom_delay_us(5);
     spi_transaction_t t_read;
     memset(&t_read, 0, sizeof(t_read));
-	
+
     t_read.flags    = SPI_TRANS_USE_RXDATA;
     t_read.rxlength = len * 8;
-	
+
     ret = spi_device_polling_transmit(s_spi_read_dev, &t_read);
 
     // 4. De-assert CS#

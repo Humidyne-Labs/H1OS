@@ -4,6 +4,47 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-dev] - 2026-10-18
+
+### 🚀 Added
+- **Standardized Hybrid Component Configuration Baseline** (`components/h1os/sdkconfig.defaults`, `CMakeLists.txt`, `CMakePresets.json`):
+  - Created component-level `sdkconfig.defaults` establishing the single source of truth for all hardware and silicon invariants (ESP32-S3-PICO-1-N8R8, 8MB QIO Flash @ 80MHz, 8MB Octal PSRAM @ 80MHz, ULP RISC-V coprocessor, FreeRTOS 1000Hz, and 1-bit monochrome LVGL v9 display engine).
+  - Wired chained `SDKCONFIG_DEFAULTS` in `examples/H1OS/CMakeLists.txt`, `examples/boilerplate/CMakeLists.txt`, and `CMakePresets.json` (`components/h1os/sdkconfig.defaults;sdkconfig.defaults`).
+  - Pruned `examples/H1OS/sdkconfig.defaults` (from 199 to 58 lines) and `examples/boilerplate/sdkconfig.defaults` (from 125 to 17 lines) to strictly application-specific overrides.
+- **Dynamic Frequency Scaling (DFS) & Turbo Execution Invariants** (`sub_power.h/.c`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `sub_audio.c`, `B3_firmware_standards.md`):
+  - **80 MHz Quiescent Baseline:** Enabled automatic DFS gating with CPU cores constrained to 80 MHz during interactive standby, input polling, FreeRTOS idle, and sensor acquisition (`sub_power_init_dfs`).
+  - **240 MHz LVGL Blitz:** Integrated RAII `CpuMaxTurboScope` and task-level turbo boost (`sub_power_cpu_max_acquire()`) during LVGL rendering, font glyph rasterization, 1-bit pixel packing, and SSD1681 differential SPI frame transfer, dropping cores back to 80 MHz immediately upon flush completion.
+  - **240 MHz I2S Audio Clock Invariant:** Integrated turbo clock locks into `sub_audio_init()` and `audio_worker_task()`, preventing APB frequency droop during DFS from reducing I2S MCLK/BCLK dividers and ensuring chimes/tones never shift octaves lower or cause DMA underruns.
+  - Formalized Rule 11 in `B3_firmware_standards.md` and `.agents/skills/h1os-firmware-standards/SKILL.md`.
+- **API Versioning Header & Query Primitives** (`components/h1os/include/h1os/h1os_version.h`):
+  - Introduced unified versioning header with semantic version macros (`MAJOR`, `MINOR`, `PATCH`, `TAG`, `STRING`, `CODE`, `CHECK`) and inline getters (`h1os_version_get_string()`, `_major()`, `_minor()`, `_patch()`, `_build_date()`, `_build_time()`, `_code()`).
+  - Integrated dynamic version reporting into `examples/H1OS/main/main.c`, `screens/screen_diagnostics.c`, and `examples/boilerplate/main/main.c`.
+- **Three-Tier Firmware Engineering & Safety Standards** (`.clang-format`, `tools/check_format.py`, `.agents/skills/h1os-firmware-standards/SKILL.md`, `docs/architecture/B3_firmware_standards.md`):
+  - **Layer 1 (Automated Formatting):** Deployed root `.clang-format` (LLVM base, C++17, Linux braces, 4-space indent, 100-col limit, right-aligned pointers, scoped consecutive alignment) with automated CLI formatting tool `tools/check_format.py` supporting both in-place formatting and `--check` CI dry-run validation.
+  - **Layer 2 (10 Embedded Safety Rules):** Formalized strict safety invariants across firmware layers: fixed-width types (`<stdint.h>`), FPU32 single-precision discipline, zero runtime `malloc`, guard-clause early exit pattern, checked return codes (`[[nodiscard]]`), bounded stacks, non-blocking ISRs, inter-core volatile coherency for RTC Slow Memory, exhaustive enum default trapping, and pointer sanitization.
+  - **Layer 3 (Compiler Hardening):** Injected private compiler flags on `${COMPONENT_LIB}` in `components/h1os/CMakeLists.txt` (`-Wall`, `-Wextra`, `-Werror`, `-Wshadow`, `-Wdouble-promotion`, `-Wformat=2`, `-Wno-format-nonliteral`, `-Wstrict-prototypes`, `-Wno-missing-field-initializers`), transforming embedded best practices into automated build-time blockers.
+  - **Agent Skill Integration:** Created `.agents/skills/h1os-firmware-standards/SKILL.md` to equip AI coding assistants with authoritative firmware constraints, compile flag rationale, and architectural rules.
+- **Three-Series Architecture Taxonomy (Option 2)** (`docs/architecture/`):
+  - Reorganized internal engineering documentation into a clean 3-series taxonomy:
+    - **Series A (Silicon & Hardware):** `A0_system_governance.md` – `A7_sensor_psychrometrics.md`.
+    - **Series B (Developer & Application Layer):** `B1_api_and_services.md`, `B2_state_machine.md`, `B3_firmware_standards.md`.
+    - **Series C (Operations & Governance):** `C1_benchmarks_and_verification.md` – `C4_changelog_policy.md`.
+  - Resolved filename collisions and cross-linked references across `README.md` and architecture manifests.
+
+### 🛠️ Fixed & Refactored
+- **Codebase Consolidation & Pruning (Phases 1–5)**:
+  - **Phase 1 (Cold-Boot & ULP Hardening):** Enforced 30 ms ULP glitch filter, Wake-on-Release rule, CDC power latch ordering, eFuse linear battery scaling ($M \cdot X + B$), and bootloader GPIO 17 latch validation.
+  - **Phase 2 (Fast Wake Stub & Drain Centralization):** Installed Flow A wake stub in `sub_power.c` and centralized the PCF85063A 50 ms drain barrier. Deleted legacy `orch_flow_execute_sensor_sample()` and FreeRTOS Flow A branch.
+  - **Phase 3 (Audio Dispatch Consolidation & Backward-Compatibility Purge):** Consolidated acoustic playback into a single typed entry point `sub_audio_play(type, data, len)` (`SUB_AUDIO_TONE`, `SUB_AUDIO_CHIME`, `SUB_AUDIO_PCM`). Completely removed deprecated backwards-compatible wrappers (`sub_audio_play_tone`, `sub_audio_play_chime`, `sub_audio_play_pcm`, `sub_audio_play_tone_async`, etc.) for a clean, forward-moving developer API.
+  - **Phase 4 (Algorithmic Optimization & DMA Streamlining):** Replaced $O(N^2)$ bubble sort in `sub_power_read_battery()` with $O(N)$ in-place insertion sort. Unified psychrometric reconstruction in `orch_math_calc_psychrometrics()` with single-pass Magnus evaluation (1 `expf` and 1 `logf`). Consolidated 4 duplicate SPI transaction sequences into `epd_commit_ram_dma()`.
+  - **Phase 5 (Modular Sizing & Monolith Decomposition):** Decomposed `h1os_start()` (reduced from 120 lines to 8 lines), `orch_flow_transition_to_sleep()`, and `orch_flow_query_telemetry()`. Replaced 30+ separate ES8311 init calls with table-driven register arrays (`s_es8311_init_pre_charge`, `s_es8311_init_post_charge`).
+- **Telemetry Logging Double-Promotion Remediation** (`orch_flow.c`, `sub_display.cpp`):
+  - Explicitly cast float arguments to `(double)` in `ESP_LOGI` variadic formatters, eliminating `-Wdouble-promotion` errors while retaining single-precision FPU execution on arithmetic expressions.
+- **Example Boilerplate Alignment** (`examples/H1OS/main/main.c`, `screens/screen_diagnostics.c`):
+  - Updated `main.c` to evaluate `h1os_start()` return status per Rule 5 checked return code standards.
+  - Expanded ULP dispatch reason rendering in `screen_diagnostics.c` with an exhaustive `switch` block covering `BOOTLOADER` and `POWER_OFF` dispatch modes.
+  - Synchronized H1OS semantic version definitions in `h1os.h` to `2.1.0-alpha`.
+
 ## [2.2.0-prod] - 2026-10-16
 
 ### 🚀 Added

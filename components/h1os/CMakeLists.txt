@@ -133,3 +133,19 @@ if(CONFIG_ULP_COPROC_ENABLED)
     set(ulp_exp_dep_srcs "src/hal_io.c" "src/orch_wake_stub.c" "src/sub_power.c" "src/orch_flow.c" "src/h1os_lifecycle.c")
     ulp_embed_binary(${ulp_app_name} "${ulp_sources}" "${ulp_exp_dep_srcs}")
 endif()
+
+# -----------------------------------------------------------------------------
+# Compiler Hardening & Safety Enforcements (H1OS Layer 3)
+# -----------------------------------------------------------------------------
+target_compile_options(${COMPONENT_LIB} PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    -Wshadow
+    -Wdouble-promotion
+    -Wformat=2
+    -Wno-format-nonliteral
+    $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+    -Wno-missing-field-initializers
+)
+

@@ -10,10 +10,11 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <time.h>
 #include "esp_err.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {

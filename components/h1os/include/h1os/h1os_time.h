@@ -7,11 +7,12 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "esp_err.h"
+
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
-#include "esp_err.h"
 
 #ifdef __cplusplus
 extern "C" {

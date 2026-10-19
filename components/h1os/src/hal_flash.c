@@ -1,11 +1,12 @@
 /**
  * @file hal_flash.c
  * @brief Layer 1 HAL Raw Flash Partition Storage Implementation
- * 
+ *
  * SPDX-License-Identifier: MIT
  */
 
 #include "h1os/hal_flash.h"
+
 #include "esp_log.h"
 #include "esp_partition.h"
 
@@ -19,8 +20,7 @@ esp_err_t hal_flash_init(void)
         return ESP_OK;
     }
 
-    s_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
-                                      ESP_PARTITION_SUBTYPE_ANY,
+    s_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY,
                                       HAL_PARTITION_EPD_FRAME);
     if (!s_part) {
         ESP_LOGE(TAG, "Partition '%s' not found in partition table!", HAL_PARTITION_EPD_FRAME);

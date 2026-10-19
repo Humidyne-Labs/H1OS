@@ -5,12 +5,13 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "screens.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
 #include "h1os/orch_state.h"
+#include "screens.h"
 
-void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count, lv_event_cb_t event_cb)
+void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
+                            lv_event_cb_t event_cb)
 {
     lv_obj_t *scr = screen_base_create("HUMIDYNE LABS", "1/4", event_cb);
 
@@ -33,7 +34,7 @@ void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
 
     // Subtle Divider (Y = 88)
     static lv_point_precise_t mid_pts[] = {{4, 88}, {196, 88}};
-    lv_obj_t *mid_line = lv_line_create(scr);
+    lv_obj_t                 *mid_line  = lv_line_create(scr);
     lv_line_set_points(mid_line, mid_pts, 2);
     lv_obj_set_style_line_width(mid_line, 1, 0);
     lv_obj_set_style_line_color(mid_line, lv_color_black(), 0);
@@ -46,8 +47,8 @@ void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
     lv_obj_set_style_text_font(lbl_stat, H1OS_FONT_14, 0);
     lv_obj_align(lbl_stat, LV_ALIGN_TOP_LEFT, 6, 100);
 
-    orch_persisted_state_t *st = orch_state_get();
-    lv_obj_t *lbl_vp = lv_label_create(scr);
+    orch_persisted_state_t *st     = orch_state_get();
+    lv_obj_t               *lbl_vp = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_vp, "Vapor P:  %.1f hPa", st->vapor_pressure_hpa);
     lv_obj_set_style_text_font(lbl_vp, H1OS_FONT_14, 0);
     lv_obj_align(lbl_vp, LV_ALIGN_TOP_LEFT, 6, 126);

@@ -15,10 +15,11 @@ H1OS turns the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32
 > 📘 **Looking for documentation?**
 > - **[H1OS Developer Guide & Reference Manual](docs/guide.md)**
 > - **[API Reference](docs/api.md)**
-> - **[Tri-Node Temperature & Psychrometric Sensor Operation](docs/architecture/12_temperature_sensor_operation.md)**
+> - **[Tri-Node Temperature & Psychrometric Sensor Operation](docs/architecture/A7_sensor_psychrometrics.md)**
+> - **[Firmware Engineering & Safety Standards](docs/architecture/B3_firmware_standards.md)**
 > - **[Hardware Errata & PCB Rev B Guide](ERRATA.md)**
 > - **[Hardware Pinout Map](docs/pinout.md)**
-> - **[Hardware Verification & Benchmarking Plan](docs/architecture/11_benchmarks.md)**
+> - **[Hardware Verification & Benchmarking Plan](docs/architecture/C1_benchmarks_and_verification.md)**
 > - **[Historical Engineering Archive Digest](docs/history.md)**
 
 ---

@@ -15,9 +15,10 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,14 +41,6 @@ esp_err_t sub_sdcard_mount_async(void);
  * @brief Unmount MicroSD card and release hardware bus resources.
  */
 esp_err_t sub_sdcard_unmount(void);
-
-/**
- * @brief Fast pre-flight probe to detect if MicroSD card is physically present in the slot.
- * Returns in < 5ms without running full 1-second SDMMC retry timeout loops.
- * 
- * @return true if card appears present, false otherwise.
- */
-bool sub_sdcard_probe(void);
 
 /**
  * @brief Check if MicroSD card is mounted and ready for I/O.

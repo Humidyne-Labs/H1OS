@@ -6,11 +6,13 @@
  */
 
 #include "h1os/orch_display_sync.h"
+
+#include "esp_log.h"
+#include "h1os/hal_flash.h"
 #include "h1os/orch_state.h"
 #include "h1os/sub_display.h"
-#include "h1os/hal_flash.h"
-#include "esp_log.h"
 #include "sdkconfig.h"
+
 #include <string.h>
 
 #ifndef CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT
@@ -33,7 +35,8 @@ esp_err_t orch_display_sync_save_if_dirty(void)
     }
 
     uint8_t *fb = sub_display_get_framebuffer();
-    if (fb == NULL) return ESP_ERR_INVALID_STATE;
+    if (fb == NULL)
+        return ESP_ERR_INVALID_STATE;
 
     /* Write to epd_frame raw flash partition */
     esp_err_t err = hal_flash_write_frame(fb, EPD_BUFFER_SIZE);
@@ -55,7 +58,8 @@ esp_err_t orch_display_sync_restore_to_framebuffer(void)
     }
 
     uint8_t *fb = sub_display_get_framebuffer();
-    if (fb == NULL) return ESP_ERR_INVALID_STATE;
+    if (fb == NULL)
+        return ESP_ERR_INVALID_STATE;
 
     esp_err_t err = hal_flash_read_frame(fb, EPD_BUFFER_SIZE);
     if (err == ESP_OK) {
@@ -74,7 +78,9 @@ bool orch_display_sync_should_full_refresh(void)
 
     /* Anti-Ghosting partial refresh threshold (default 6: 6 x 4h = 24h max) */
     if (st->epd_partial_refresh_count >= CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT) {
-        ESP_LOGI(TAG, "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh required",
+        ESP_LOGI(TAG,
+                 "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh "
+                 "required",
                  (unsigned)st->epd_partial_refresh_count, CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
         return true;
     }
@@ -92,7 +98,7 @@ void orch_display_sync_record_partial_refresh(void)
 
 void orch_display_sync_record_full_refresh(void)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    orch_persisted_state_t *st    = orch_state_get();
     st->epd_partial_refresh_count = 0;
     ESP_LOGI(TAG, "Full OTP refresh recorded: anti-ghosting counter reset to 0");
 }

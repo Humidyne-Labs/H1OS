@@ -8,9 +8,27 @@ description: >-
 
 # GitHub Flavored Markdown (GFM) Specification & Authoring Guide
 
-This skill governs the authoring, formatting, and structural validation of all documentation in the repository. It enforces strict compliance with the GitHub Flavored Markdown (GFM) specification, CommonMark, MathJax rendering engine rules, and GitHub's Mermaid diagram parser.
+This skill governs the authoring, formatting, and structural validation of documentation across the repository. It enforces strict compliance with the GitHub Flavored Markdown (GFM) specification, CommonMark, MathJax rendering engine rules, and GitHub's Mermaid diagram parser.
 
 ---
+
+## 0. Scope & Exemption Boundary
+
+To prevent layout distortion and maintain tool fluidity, documentation is partitioned into two distinct categories:
+
+1. **In-Scope (Strict GFM & MathJax Compliance Mandatory):**
+   - All official, public-facing repository documentation:
+     - Root documents: `README.md`, `ERRATA.md`, `CHANGELOG.md`
+     - Architecture specifications: `docs/architecture/*.md`
+     - Driver manuals: `docs/drivers/*.md`
+     - System reference guides: `docs/pinout.md`, `docs/guide.md`, `docs/history.md`, `docs/api.md`
+
+2. **Out-of-Scope (Exempt from Strict GFM Syntax):**
+   - Internal agent scratch notes, working logs, planning artifacts, and telemetry dumps:
+     - `docs/agent_notes/`
+     - `docs/logs/`
+     - Agent conversation artifacts (`<appDataDir>/brain/<conversation-id>/...`)
+   - *Rationale:* Internal working documents frequently utilize custom HTML line-breaks (`<br>`), multi-line cell layouts, and raw diagnostic dumps that render awkwardly or distort formatting when forced into strict GFM syntax. Internal files are not required to follow the strict GFM parser constraints.
 
 ## 1. LaTeX Mathematical Expressions (MathJax)
 

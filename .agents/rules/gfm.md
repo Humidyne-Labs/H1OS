@@ -1,6 +1,9 @@
 # Markdown and GFM Formatting Rules
 
-All documentation (`.md`) across this repository must strictly adhere to the GitHub Flavored Markdown (GFM) specification.
+All public documentation (`.md`) across this repository must strictly adhere to the GitHub Flavored Markdown (GFM) specification.
+
+> [!NOTE]
+> **Scope & Exemption Boundary:** Strict GFM rules apply exclusively to public-facing documentation (`README.md`, `ERRATA.md`, `CHANGELOG.md`, `docs/architecture/`, `docs/drivers/`, `docs/pinout.md`, etc.). Internal agent scratch notes, telemetry dumps, and working artifacts (`docs/agent_notes/`, `docs/logs/`, brain artifacts) are exempt from strict GFM syntax to avoid rendering distortion.
 
 Refer to the skill [`.agents/skills/gfm/SKILL.md`](../skills/gfm/SKILL.md) for full reference.
 
