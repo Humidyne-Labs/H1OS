@@ -74,12 +74,12 @@ void bootloader_after_init(void)
 {
     /* Validate critical battery power latch (GPIO 17 / BAT_CTRL) */
     uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g6_hold  = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
+    uint32_t g17_out = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g6_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
 
     if (g17_hold == 0 || g17_out == 0) {
-        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]",
-                 (unsigned long)g17_out, (unsigned long)g17_hold);
+        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]", (unsigned long)g17_out,
+                 (unsigned long)g17_hold);
         /* Re-assert latch immediately to prevent impending brownout drop */
         gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD, 1);
         gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);

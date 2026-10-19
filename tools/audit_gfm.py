@@ -4,12 +4,12 @@ import sys
 
 def audit_markdown():
     in_scope_files = []
-    
+
     # Audit root markdown files
     for f in os.listdir("."):
         if f.endswith(".md"):
             in_scope_files.append(os.path.abspath(f))
-            
+
     # Audit docs/ public folders
     docs_dir = os.path.abspath("docs")
     if os.path.exists(docs_dir):

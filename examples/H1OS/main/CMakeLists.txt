@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS 
+    SRCS
         "main.c"
         "battery_estimator.c"
         "humid1_cyber_wave.c"
@@ -8,10 +8,10 @@ idf_component_register(
         "screens/screen_psychrometrics.c"
         "screens/screen_system_health.c"
         "screens/screen_diagnostics.c"
-    INCLUDE_DIRS 
+    INCLUDE_DIRS
         "."
         "screens"
-    REQUIRES 
+    REQUIRES
         h1os
         freertos
         lvgl

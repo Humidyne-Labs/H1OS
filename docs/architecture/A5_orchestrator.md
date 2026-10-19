@@ -53,13 +53,13 @@ typedef struct {
     uint32_t                boot_count;
     uint32_t                wake_count;
     uint8_t                 flags;
-    
+
     // ULP Reactive Monitor Dispatch State
     ulp_dispatch_reason_t   ulp_dispatch_reason;
     uint16_t                last_vbat_mv;
     uint32_t                sample_interval_sec;     // Nominal 60s
     uint32_t                wake_timestamp_epoch;    // Time of last active wake
-    
+
     // Dynamic Sliding Ambient Floor & EWMA State
     int16_t                 amb_floor_temp_centi_c;
     float                   reconstructed_amb_temp_c;
@@ -67,7 +67,7 @@ typedef struct {
     float                   reconstructed_dew_point_c;
     float                   vapor_pressure_hpa;
     bool                    ewma_inited;
-    
+
     // 32-Slot Ring Buffer
     orch_tri_node_sample_t  ring[ORCH_RING_CAPACITY];
     uint8_t                 ring_head;

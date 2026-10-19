@@ -158,7 +158,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 ### 4.4 ES8311 Register 0x37 Digital Equalizer Silicon Errata & Low-Power Default
 - **The Issue:** Severe harmonic distortion and intolerable acoustic buzzing ("sounds like death on 3 wheels") during synthesized audio tone playback.
 - **Root Cause:** The Everest Semiconductor ES8311 datasheet incorrectly states that the internal digital equalizer (EQ) block defaults to disabled. In physical silicon, failing to explicitly write `0x08` to Register `0x37` leaves the hardware EQ filter active in the audio signal path. With no biquad coefficients loaded, the uncalibrated filter stages severely distort and clip the output.
-- **The Solution:** 
+- **The Solution:**
   1. Register `0x37` must be explicitly written with `0x08` during codec initialization, bypassing/disabling the uncalibrated digital EQ block and disabling the digital fade-in/out ramp.
   2. Default to Low-Power DAC mode (`0x0F = 0x80`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible while delivering valuable energy savings.
 
@@ -174,10 +174,10 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 
 ### 4.7 Silicon Invariant: Hardware Timer Suppression of RTC GPIO Wakeups (ERR-001)
 - **The Issue:** Exploring whether the ESP32-S3 internal ULP sleep timer and external RTC GPIO wakeups can run concurrently to handle periodic sampling and tactile key responsiveness simultaneously.
-- **The Empirical Reality:** Rigorous empirical testing on silicon (`examples/riscv_test`) definitively confirmed that **the internal PMU timer suppresses RTC GPIO comparator wakeups**. 
+- **The Empirical Reality:** Rigorous empirical testing on silicon (`examples/riscv_test`) definitively confirmed that **the internal PMU timer suppresses RTC GPIO comparator wakeups**.
   - In **Stage 2 (Pure Event Mode, `0x20000000`)**, tapping GPIO 18 woke the coprocessor in 1.3 seconds (`ticks=178866`, `ULP GPIO Wake Count = 1`).
   - In **Stage 3 (Dual Mode, `0xA0000000`)**, with `TIMER_EN=1` and `GPIO_ENA=1` armed concurrently and `CLR=0` verified in hardware registers, tactile button presses were completely masked from releasing ULP core clock gating. The core remained halted for the full 15.96s countdown (`ticks=2170788`, `ULP GPIO Wake Count = 0`), waking solely on timer expiration.
-- **The Architectural Mandate:** 
+- **The Architectural Mandate:**
   1. The ULP must operate exclusively in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`).
   2. All periodic intervals are offloaded to the external PCF85063A RTC on `GPIO 5`, which pulses as a peer GPIO event under `GPIO_WAKEUP_ENA`.
   3. Main-CPU sleep timers (`esp_sleep_enable_timer_wakeup()`) remain an independent, unaffected safety watchdog.

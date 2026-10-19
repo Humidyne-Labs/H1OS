@@ -28,11 +28,11 @@
 
 static const char *TAG = "h1os_lvgl";
 
-static lv_display_t *s_lv_display        = NULL;
-static lv_indev_t   *s_lv_keypad_indev   = NULL;
-static TaskHandle_t  s_lvgl_task_handle  = NULL;
-static bool          s_lvgl_task_running = false;
-static bool          s_first_boot_flush  = true;
+static lv_display_t *s_lv_display = NULL;
+static lv_indev_t *s_lv_keypad_indev = NULL;
+static TaskHandle_t s_lvgl_task_handle = NULL;
+static bool s_lvgl_task_running = false;
+static bool s_first_boot_flush = true;
 
 #define LVGL_I1_PALETTE_SIZE 8
 
@@ -70,7 +70,7 @@ static uint32_t lvgl_tick_get_cb(void)
 static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     data->state = LV_INDEV_STATE_RELEASED;
-    data->key   = 0;
+    data->key = 0;
 
     uint32_t btns = (uint32_t)hal_io_read_buttons();
 
@@ -83,18 +83,18 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
     if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
-        data->key   = LV_KEY_RIGHT;
+        data->key = LV_KEY_RIGHT;
         h1os_reset_session_timer();
     } else if (btns & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
-        data->key   = LV_KEY_ENTER;
+        data->key = LV_KEY_ENTER;
         h1os_reset_session_timer();
     }
 }
 
 static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    CpuMaxTurboScope  turbo;
+    CpuMaxTurboScope turbo;
     lv_color_format_t cf = lv_display_get_color_format(disp);
     if (cf != LV_COLOR_FORMAT_I1) {
         lv_display_flush_ready(disp);
@@ -107,11 +107,11 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
         return;
     }
 
-    const uint8_t *src_buf  = px_map + LVGL_I1_PALETTE_SIZE;
-    uint8_t       *dest_buf = sub_display_get_framebuffer();
+    const uint8_t *src_buf = px_map + LVGL_I1_PALETTE_SIZE;
+    uint8_t *dest_buf = sub_display_get_framebuffer();
 
-    uint16_t area_w     = (area->x2 - area->x1 + 1);
-    uint16_t area_h     = (area->y2 - area->y1 + 1);
+    uint16_t area_w = (area->x2 - area->x1 + 1);
+    uint16_t area_h = (area->y2 - area->y1 + 1);
     uint32_t src_stride = lv_draw_buf_width_to_stride(area_w, LV_COLOR_FORMAT_I1);
 
     if (dest_buf == NULL || src_buf == NULL || area_w == 0 || area_h == 0) {
@@ -133,10 +133,10 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     // Fast Path: Byte-aligned X offset and width
     if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
         uint16_t bytes_per_line = area_w >> 3;
-        uint16_t start_byte_x   = area->x1 >> 3;
+        uint16_t start_byte_x = area->x1 >> 3;
 
         const uint8_t *src = src_buf;
-        uint8_t       *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
+        uint8_t *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
 
         for (uint16_t y = 0; y < area_h; y++) {
             memcpy(dst, src, bytes_per_line);
@@ -152,37 +152,37 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
                 x2 = EPD_WIDTH - 1;
 
             uint32_t first_byte = x1 >> 3;
-            uint32_t last_byte  = x2 >> 3;
-            uint8_t  shift      = x1 & 7;
+            uint32_t last_byte = x2 >> 3;
+            uint8_t shift = x1 & 7;
 
-            uint8_t left_mask  = 0xFF >> shift;
+            uint8_t left_mask = 0xFF >> shift;
             uint8_t right_mask = 0xFF << (7 - (x2 & 7));
 
             for (uint16_t y = 0; y < area_h; y++) {
                 const uint8_t *s = src_buf + (y * src_stride);
-                uint8_t       *d = dest_buf + ((y_start + y) * epd_stride) + first_byte;
+                uint8_t *d = dest_buf + ((y_start + y) * epd_stride) + first_byte;
 
                 if (first_byte == last_byte) {
                     uint8_t mask = left_mask & right_mask;
-                    uint8_t val  = (*s >> shift) & mask;
-                    *d           = (*d & ~mask) | val;
+                    uint8_t val = (*s >> shift) & mask;
+                    *d = (*d & ~mask) | val;
                     continue;
                 }
 
                 uint8_t carry = *s;
-                *d            = (*d & ~left_mask) | ((carry >> shift) & left_mask);
+                *d = (*d & ~left_mask) | ((carry >> shift) & left_mask);
                 d++;
 
                 for (uint32_t bx = first_byte + 1; bx < last_byte; bx++) {
                     s++;
                     uint8_t next = *s;
-                    *d++         = (carry << (8 - shift)) | (next >> shift);
-                    carry        = next;
+                    *d++ = (carry << (8 - shift)) | (next >> shift);
+                    carry = next;
                 }
 
                 s++;
                 uint8_t val = (carry << (8 - shift)) | (*s >> shift);
-                *d          = (*d & ~right_mask) | (val & right_mask);
+                *d = (*d & ~right_mask) | (val & right_mask);
             }
         }
     }
@@ -230,10 +230,9 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
     lv_display_set_color_format(s_lv_display, LV_COLOR_FORMAT_I1);
 
     uint32_t buffer_lines = 40;
-    uint32_t stride       = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
-    size_t   buf_size     = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
-    uint8_t *buf1 =
-        (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    uint32_t stride = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
+    size_t buf_size = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
+    uint8_t *buf1 = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (buf1 == NULL) {
         buf1 = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_8BIT);
     }
@@ -263,8 +262,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
             lv_group_set_default(def_grp);
         }
         lv_indev_set_group(s_lv_keypad_indev, def_grp);
-        ESP_LOGI(TAG,
-                 "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
+        ESP_LOGI(TAG, "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
     }
 
     ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode (first flush: %s)",
@@ -287,14 +285,14 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
         return ret;
 
     task_priority = (task_priority > 0) ? task_priority : 5;
-    core_id       = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
+    core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
 
     /* Architectural Invariant: Must set running flag BEFORE spawning task on Core 1
      * to eliminate task creation race where the port task exits on its first loop! */
     s_lvgl_task_running = true;
 
-    BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, "h1os_lvgl", 8192, NULL,
-                                             task_priority, &s_lvgl_task_handle, core_id);
+    BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, "h1os_lvgl", 8192, NULL, task_priority,
+                                             &s_lvgl_task_handle, core_id);
 
     if (res != pdPASS) {
         s_lvgl_task_running = false;
@@ -349,9 +347,7 @@ static void h1os_lvgl_port_task(void *pvParameters)
         if (need_blitz) {
             sub_power_cpu_max_release();
         }
-        delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD)
-                       ? LV_DEF_REFR_PERIOD
-                       : delay_ms;
+        delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD) ? LV_DEF_REFR_PERIOD : delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
     s_lvgl_task_handle = NULL;

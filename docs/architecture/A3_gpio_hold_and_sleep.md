@@ -68,7 +68,7 @@ On actual ESP32-S3 silicon, when an RTC IO pad is held in `RTC_CNTL_PAD_HOLD_REG
 > [!CAUTION]
 > **The Invariant Pad Hold Rule:**
 > Wake pins (`HAL_PIN_BUTTON_BOOT` GPIO 0, `HAL_PIN_BUTTON_POWER` GPIO 18, `HAL_PIN_RTC_INT` GPIO 5) and analog sensing inputs (`HAL_PIN_BATTERY_ADC` GPIO 4) **MUST NEVER** have pad holds enabled (`RTC_CNTL_PAD_HOLD_REG`).
-> 
+>
 > Prior to entering deep sleep, software must explicitly enforce `rtc_gpio_hold_dis()` on every wake and sensing input.
 
 ---
@@ -87,7 +87,7 @@ stateDiagram-v2
         BL_Hook --> BL_Latch
     }
     Bootloader --> MainApp_Boot: Handoff to Xtensa LX7
-    
+
     state MainApp_Active {
         MainApp_Boot --> Flow_Execution: hal_io_early_init()
         state Flow_Execution {
@@ -105,7 +105,7 @@ stateDiagram-v2
     }
 
     Deep_Sleep --> Bootloader: ULP Raises Wake Interrupt (Reset Vector)
-    
+
     state Shutdown_Sequence {
         Cut_Power: sub_power_cut_power_latch()
         Unhold_BAT: Clear Hold & Drive BAT_CTRL LOW
@@ -145,10 +145,10 @@ void sub_power_cut_power_latch(void)
 {
     // 1. Release global digital sleep hold
     gpio_deep_sleep_hold_dis();
-    
+
     // 2. Explicitly release RTC pad hold on BAT_CTRL
     gpio_hold_dis(HAL_PIN_POWER_HOLD);
-    
+
     // 3. Drive pin LOW to release hardware battery LDO enable
     gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
     gpio_set_level(HAL_PIN_POWER_HOLD, 0);
@@ -175,7 +175,7 @@ sequenceDiagram
     HAL->>RTC_HW: Configure Pure Event Mode (TIMER_EN=0, GPIO_WAKEUP_ENA=1)
     HAL->>RTC_HW: esp_deep_sleep_start()
     Note over RTC_HW,ULP: Main CPU in Deep Sleep — Master Rails Latched
-    
+
     alt Event: PCF85063A Alarm / Button Tap
         RTC_HW->>ULP: Wakeup Coprocessor (GPIO Event Strobe)
         ULP->>ULP: Snapshot RTC_GPIO_STATUS_REG & Live Pin Levels
@@ -189,7 +189,7 @@ sequenceDiagram
     Boot->>Orch: Handoff to App -> hal_io_early_init()
     Orch->>HAL: hal_io_release_pad_holds() (CS, RST, LED, PA_CTRL)
     Note over Orch: Master rails (17, 6, 42) remain latched!
-    
+
     alt Flow Branching
         Orch->>Orch: If wake_cause == SENSOR_TICK -> Execute Flow A (Burst Sample)
         Orch->>Orch: If wake_cause == MAIN_WAKE / BUTTON -> Execute Flow B (Interactive UI)
@@ -235,7 +235,7 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         gpio_num_t pin = wake_pins[i];
         rtc_gpio_init(pin);
         rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
-        
+
         // CRITICAL: Disarm pad hold to keep input transmission gate open!
         rtc_gpio_hold_dis(pin);
 

@@ -11,7 +11,7 @@ description: Conservative, verified C/C++ firmware generation and patching for E
 - **No Autopilot / Auto-Commit:** Generate the code and stop. Do not attempt to automatically stage, commit, or trigger secondary build loops without confirmation.
 
 ## 2. API Grounding & Zero Hallucination
-- **ESP-IDF Registry Check:** Only use standard, existing ESP-IDF APIs and drivers. 
+- **ESP-IDF Registry Check:** Only use standard, existing ESP-IDF APIs and drivers.
 - **No Invented APIs:** If an API function or macro name is uncertain, do not guess standard-sounding names (e.g., `esp_sleep_enable_ulp_gpio_wakeup()`). Query the local ESP-IDF docs/MCP server or inspect project header files first.
 - **Diagnostics First:** Assume a `clangd` language server is active. Ensure all referenced types, macros, and function declarations have concrete header `#include` statements present in the file.
 

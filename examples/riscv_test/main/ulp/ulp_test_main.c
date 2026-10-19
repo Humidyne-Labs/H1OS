@@ -24,19 +24,19 @@
 #include <stdint.h>
 
 /* Exported shared telemetry structure (accessible via ulp_test_data on Main CPU) */
-volatile test_shared_data_t test_data = {.magic                 = ULP_TEST_MAGIC,
-                                         .test_stage            = TEST_MODE_UNINITIALIZED,
-                                         .ulp_entry_count       = 0,
-                                         .ulp_gpio_wake_count   = 0,
-                                         .ulp_timer_wake_count  = 0,
-                                         .ulp_isr_fired_count   = 0,
-                                         .ulp_last_isr_source   = 0xFF,
-                                         .ulp_last_gpio_status  = 0,
-                                         .ulp_pin_levels        = 0,
-                                         .ulp_cycle_count       = 0,
-                                         .ulp_step_checkpoint   = 0,
-                                         .ulp_rdy_timeout       = 0,
-                                         .ulp_completed         = 0,
+volatile test_shared_data_t test_data = {.magic = ULP_TEST_MAGIC,
+                                         .test_stage = TEST_MODE_UNINITIALIZED,
+                                         .ulp_entry_count = 0,
+                                         .ulp_gpio_wake_count = 0,
+                                         .ulp_timer_wake_count = 0,
+                                         .ulp_isr_fired_count = 0,
+                                         .ulp_last_isr_source = 0xFF,
+                                         .ulp_last_gpio_status = 0,
+                                         .ulp_pin_levels = 0,
+                                         .ulp_cycle_count = 0,
+                                         .ulp_step_checkpoint = 0,
+                                         .ulp_rdy_timeout = 0,
+                                         .ulp_completed = 0,
                                          .sleep_start_rtc_ticks = 0,
                                          .ulp_elapsed_rtc_ticks = 0,
                                          .log_buf = {.head = 0, .tail = 0, .buffer = {0}}};
@@ -61,13 +61,13 @@ static void ulp_log_puts(const char *s)
 static void ulp_log_put_u32(uint32_t val, int base, int min_width, char pad_char)
 {
     char buf[12];
-    int  i = 0;
+    int i = 0;
     if (val == 0) {
         buf[i++] = '0';
     } else {
         while (val > 0) {
             uint32_t rem = val % base;
-            buf[i++]     = (rem < 10) ? ('0' + rem) : ('a' + rem - 10);
+            buf[i++] = (rem < 10) ? ('0' + rem) : ('a' + rem - 10);
             val /= base;
         }
     }
@@ -99,8 +99,8 @@ static void ulp_printf(const char *fmt, ...)
             continue;
         }
         p++;
-        char pad   = ' ';
-        int  width = 0;
+        char pad = ' ';
+        int width = 0;
         if (*p == '0') {
             pad = '0';
             p++;
@@ -154,14 +154,14 @@ static void ulp_printf(const char *fmt, ...)
 int main(void)
 {
     test_data.ulp_entry_count++;
-    test_data.ulp_rdy_timeout     = 0;
+    test_data.ulp_rdy_timeout = 0;
     test_data.ulp_step_checkpoint = ULP_CP_ENTERED_MAIN;
-    uint32_t start_c              = ULP_RISCV_GET_CCOUNT();
-    uint32_t timer_reg            = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
-    test_data.ulp_reg_timer_val   = timer_reg;
+    uint32_t start_c = ULP_RISCV_GET_CCOUNT();
+    uint32_t timer_reg = READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG);
+    test_data.ulp_reg_timer_val = timer_reg;
 
-    ulp_printf("[ULP] >>> EXECUTION ENTRY #%u <<< (stage=%u, ccount=%u)\n",
-               test_data.ulp_entry_count, test_data.test_stage, start_c);
+    ulp_printf("[ULP] >>> EXECUTION ENTRY #%u <<< (stage=%u, ccount=%u)\n", test_data.ulp_entry_count,
+               test_data.test_stage, start_c);
     ulp_printf("[ULP] ULP_CP_TIMER_REG=0x%08x (TIMER_EN=%d GPIO_ENA=%d CLR=%d)\n", timer_reg,
                (timer_reg & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0,
                (timer_reg & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0,
@@ -182,35 +182,34 @@ int main(void)
 
     /* 1. Read hardware RTC slow clock timer ticks to measure elapsed time from sleep start */
     SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
-    uint32_t now_ticks              = READ_PERI_REG(RTC_CNTL_TIME0_REG);
-    uint32_t elapsed_ticks          = now_ticks - test_data.sleep_start_rtc_ticks;
+    uint32_t now_ticks = READ_PERI_REG(RTC_CNTL_TIME0_REG);
+    uint32_t elapsed_ticks = now_ticks - test_data.sleep_start_rtc_ticks;
     test_data.ulp_elapsed_rtc_ticks = elapsed_ticks;
 
     /* 2. Snapshot raw RTC IO interrupt status register */
-    uint32_t rtcio_int_st          = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
+    uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     test_data.ulp_last_gpio_status = rtcio_int_st;
 
     /* 3. Sample live levels of tested RTC GPIO lines:
      *    Bit 0: GPIO 18 (PWR button)
      *    Bit 1: GPIO 0  (BOOT button - monitoring only)
      */
-    int b18                       = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-    int b0                        = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-    test_data.ulp_pin_levels      = ((b18 ? 1U : 0U) | ((b0 ? 1U : 0U) << 1));
+    int b18 = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    int b0 = ulp_riscv_gpio_get_level(GPIO_NUM_0);
+    test_data.ulp_pin_levels = ((b18 ? 1U : 0U) | ((b0 ? 1U : 0U) << 1));
     test_data.ulp_step_checkpoint = ULP_CP_PINS_SAMPLED;
 
-    ulp_printf("[ULP] Pins Sampled: PWR(18)=%d BOOT(0)=%d RTC_IO_STATUS=0x%08x (ticks=%u)\n", b18,
-               b0, rtcio_int_st, elapsed_ticks);
+    ulp_printf("[ULP] Pins Sampled: PWR(18)=%d BOOT(0)=%d RTC_IO_STATUS=0x%08x (ticks=%u)\n", b18, b0, rtcio_int_st,
+               elapsed_ticks);
 
     /* 4. Evaluate triggers:
      * - In Stage 2 (Pure Event Mode): Hardware PMU timer is strictly disabled.
      *   Any wake while Main CPU is asleep is 100% a physical RTC GPIO event!
      * - In Dual or Timer Mode: GPIO triggered if pin is physically LOW or latch caught it.
      */
-    bool timer_enabled =
-        (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
+    bool timer_enabled = (READ_PERI_REG(RTC_CNTL_ULP_CP_TIMER_REG) & RTC_CNTL_ULP_CP_SLP_TIMER_EN) != 0;
     uint32_t min_timer_ticks = (test_data.test_stage == TEST_MODE_TIMER_ONLY) ? 400000U : 1300000U;
-    bool     timer_expired   = timer_enabled && (elapsed_ticks >= min_timer_ticks);
+    bool timer_expired = timer_enabled && (elapsed_ticks >= min_timer_ticks);
 
     bool gpio_triggered = false;
     if (test_data.test_stage == TEST_MODE_EVENT_ONLY) {
@@ -221,8 +220,8 @@ int main(void)
 
     if (gpio_triggered) {
         test_data.ulp_gpio_wake_count++;
-        ulp_printf("[ULP] Wake Classified: RTC_GPIO_EVENT (b18=%d, latch=0x%08x, ticks=%u)\n", b18,
-                   rtcio_int_st, elapsed_ticks);
+        ulp_printf("[ULP] Wake Classified: RTC_GPIO_EVENT (b18=%d, latch=0x%08x, ticks=%u)\n", b18, rtcio_int_st,
+                   elapsed_ticks);
 
         /* Drain IO if tactile button is still held down */
         if (b18 == 0) {
@@ -260,8 +259,8 @@ int main(void)
         return 0;
     } else if (timer_expired) {
         test_data.ulp_timer_wake_count++;
-        ulp_printf("[ULP] Wake Classified: PMU_TIMER_EVENT (ticks=%u >= %u, timer_en=1)\n",
-                   elapsed_ticks, min_timer_ticks);
+        ulp_printf("[ULP] Wake Classified: PMU_TIMER_EVENT (ticks=%u >= %u, timer_en=1)\n", elapsed_ticks,
+                   min_timer_ticks);
 
         test_data.ulp_cycle_count = ULP_RISCV_GET_CCOUNT() - start_c;
         asm volatile("fence" ::: "memory");
@@ -288,8 +287,8 @@ int main(void)
     } else {
         /* Filter transient sleep-entry glitch: pin is HIGH and timer has not reached countdown
          * threshold */
-        ulp_printf("[ULP] Transient Glitch Filtered (b18=%d, ticks=%u < min %u). Resuming sleep.\n",
-                   b18, elapsed_ticks, min_timer_ticks);
+        ulp_printf("[ULP] Transient Glitch Filtered (b18=%d, ticks=%u < min %u). Resuming sleep.\n", b18, elapsed_ticks,
+                   min_timer_ticks);
 
         /* Clear transient latch and halt without waking Main CPU */
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);

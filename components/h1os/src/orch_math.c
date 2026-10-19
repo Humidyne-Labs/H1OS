@@ -20,7 +20,7 @@ float orch_math_calc_sat_vapor_pressure(float temp_c)
 
 float orch_math_calc_vapor_pressure(float temp_c, float rh_pct)
 {
-    float es      = orch_math_calc_sat_vapor_pressure(temp_c);
+    float es = orch_math_calc_sat_vapor_pressure(temp_c);
     float rh_norm = rh_pct / 100.0f;
     if (rh_norm < 0.0f)
         rh_norm = 0.0f;
@@ -58,8 +58,8 @@ float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor
     return rh;
 }
 
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa,
-                                   float *out_dew_c, float *out_rh_amb)
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa, float *out_dew_c,
+                                   float *out_rh_amb)
 {
     float rh_norm = rh_pct / 100.0f;
     if (rh_norm <= 0.0001f)
@@ -69,8 +69,8 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c
 
     /* Single evaluation of Magnus saturation term at sensor temperature */
     float term_t = (MAGNUS_A * temp_c) / (MAGNUS_B + temp_c);
-    float es     = 6.112f * expf(term_t);
-    float vp     = rh_norm * es;
+    float es = 6.112f * expf(term_t);
+    float vp = rh_norm * es;
 
     if (out_vp_hpa) {
         *out_vp_hpa = vp;
@@ -79,7 +79,7 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c
     if (out_dew_c) {
         /* gamma = ln(RH/100) + (17.625 * T) / (243.04 + T) */
         float gamma = logf(rh_norm) + term_t;
-        *out_dew_c  = (MAGNUS_B * gamma) / (MAGNUS_A - gamma);
+        *out_dew_c = (MAGNUS_B * gamma) / (MAGNUS_A - gamma);
     }
 
     if (out_rh_amb) {

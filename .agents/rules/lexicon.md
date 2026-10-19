@@ -4,7 +4,7 @@ This rule establishes strict terminology guidelines for all code, architecture d
 
 ## Disciplinary Grounding
 
-We adhere strictly to professional **Embedded Systems Hardware and Software Engineering** standards. 
+We adhere strictly to professional **Embedded Systems Hardware and Software Engineering** standards.
 
 Informal jargon, military slang, pop-culture metaphors, and ideological commentary are strictly prohibited. Always replace non-technical language with standard IEEE, ISO/IEC, and semiconductor industry nomenclature.
 

@@ -31,15 +31,15 @@ graph TD;
 ---
 
 ## 3. Purely Reactive Wake Events
- 
+
 ### 3.1 Condition 1: Internal Periodic Timer Expired
 1. ULP wakes from its internal RTC timer (which was armed only because $T_{\text{rtc}} \ge (N_{\text{ulp}} \times T_{\text{sleep}}) + T_{\text{sleep}}$).
 2. Sets `ULP_DISPATCH_SENSOR_SAMPLE` in `orch_persisted_state_t`.
 3. Triggers `ulp_riscv_wakeup_main_processor()` to launch Core 0 into the Flow A Wake Stub.
 4. Core 0 logs the SHTC3 reading, updates `ulp_cnt`, evaluates next-sleep lookahead, re-arms the timer if window remains clear, and returns to deep sleep.
- 
+
 ### 3.2 Condition 2: External Hardware Interrupts (`EXTINT` / Edge)
- 
+
 #### A. PCF85063A Hardware Countdown Timer (`GPIO 5` Transition LOW)
 - When the external PCF85063A countdown timer reaches zero, `GPIO 5` pulls LOW.
 - **Why Hardware Countdown Timer, Not Calendar Alarm:**

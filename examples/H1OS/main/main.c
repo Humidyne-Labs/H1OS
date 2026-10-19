@@ -117,18 +117,17 @@ static void keypad_event_cb(lv_event_t *e)
             const uint32_t tone_fwd[] = {1046, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_fwd, sizeof(tone_fwd));
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
-            ESP_LOGI(TAG, "Keypad forward (BOOT): Navigating to page %u/%u",
-                     s_app_state.active_page + 1, H1OS_NUM_SCREENS);
+            ESP_LOGI(TAG, "Keypad forward (BOOT): Navigating to page %u/%u", s_app_state.active_page + 1,
+                     H1OS_NUM_SCREENS);
             update_active_display();
             return;
         } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT || key == LV_KEY_ENTER) {
             // POWER Button: Reverse Cycle (Non-blocking acoustic feedback)
             const uint32_t tone_rev[] = {880, 50};
             sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
-            s_app_state.active_page =
-                (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-            ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
-                     s_app_state.active_page + 1, H1OS_NUM_SCREENS);
+            s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
+            ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u", s_app_state.active_page + 1,
+                     H1OS_NUM_SCREENS);
             update_active_display();
         }
     }
@@ -139,10 +138,9 @@ static void keypad_event_cb(lv_event_t *e)
  * ========================================================================= */
 static void app_on_boot(void *user_data)
 {
-    ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")",
-             h1os_version_get_string(), h1os_version_get_build_date(),
-             h1os_version_get_build_time(), h1os_version_get_code());
-    s_app_state.cycle_counter  = 1;
+    ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
+             h1os_version_get_build_date(), h1os_version_get_build_time(), h1os_version_get_code());
+    s_app_state.cycle_counter = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
     screen_base_set_awake_badge(true);
@@ -161,8 +159,7 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
     ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx, ButtonWake: %d)",
-             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes,
-             ctx->woke_from_button);
+             (unsigned long)s_app_state.cycle_counter, (unsigned long)ctx->wakeup_causes, ctx->woke_from_button);
 
     if (ctx->woke_from_button) {
         /* First Click: Intercepted by ULP to wake Flow B; Flow B toggles awake badge */
@@ -223,22 +220,22 @@ void app_main(void)
         .session =
             {
                 .inactivity_timeout_sec = 30,
-                .flow_a_period_sec      = 60,
-                .flow_b_period_sec      = 300,
+                .flow_a_period_sec = 60,
+                .flow_b_period_sec = 300,
             },
         .presentation =
             {
                 .chime_mask = (1 << H1OS_CHIME_BOOT) | (1 << H1OS_CHIME_SHUTDOWN),
 
-                .on_chime   = NULL,
-                .on_splash  = app_on_splash,
+                .on_chime = NULL,
+                .on_splash = app_on_splash,
                 .volume_pct = 40,
             },
-        .on_boot      = app_on_boot,
-        .on_wake      = app_on_wake,
+        .on_boot = app_on_boot,
+        .on_wake = app_on_wake,
         .on_pre_sleep = app_on_pre_sleep,
-        .on_shutdown  = app_on_shutdown,
-        .user_data    = NULL,
+        .on_shutdown = app_on_shutdown,
+        .user_data = NULL,
     };
 
     esp_err_t err = h1os_start(&lifecycle);

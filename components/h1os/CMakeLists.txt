@@ -124,7 +124,7 @@ add_dependencies(${COMPONENT_LIB} generate_h1os_fonts)
 target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS})
 
 # -----------------------------------------------------------------------------
-# ULP CoProc 
+# ULP CoProc
 # -----------------------------------------------------------------------------
 
 if(CONFIG_ULP_COPROC_ENABLED)

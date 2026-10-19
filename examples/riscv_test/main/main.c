@@ -39,10 +39,10 @@ static const char *TAG = "RISCV_TEST";
 
 /* Persisted across deep sleep cycles in RTC Slow Memory */
 RTC_DATA_ATTR static uint32_t s_current_test = 0;
-RTC_DATA_ATTR static uint32_t s_boot_count   = 0;
-RTC_DATA_ATTR static bool     s_stage1_pass  = false;
-RTC_DATA_ATTR static bool     s_stage2_pass  = false;
-RTC_DATA_ATTR static bool     s_stage3_pass  = false;
+RTC_DATA_ATTR static uint32_t s_boot_count = 0;
+RTC_DATA_ATTR static bool s_stage1_pass = false;
+RTC_DATA_ATTR static bool s_stage2_pass = false;
+RTC_DATA_ATTR static bool s_stage3_pass = false;
 
 extern const uint8_t ulp_riscv_test_bin_start[] asm("_binary_ulp_riscv_test_bin_start");
 extern const uint8_t ulp_riscv_test_bin_end[] asm("_binary_ulp_riscv_test_bin_end");
@@ -86,11 +86,10 @@ static void configure_rtc_pins(void)
 
 static void log_pin_levels_pre_sleep(void)
 {
-    int pwr_lvl  = rtc_gpio_get_level(PIN_BUTTON_PWR);
+    int pwr_lvl = rtc_gpio_get_level(PIN_BUTTON_PWR);
     int boot_lvl = rtc_gpio_get_level(PIN_BUTTON_BOOT);
 
-    ESP_LOGI(TAG, "Pre-Sleep Pin Levels Check: PWR (GPIO 18) = %d, BOOT (GPIO 0) = %d", pwr_lvl,
-             boot_lvl);
+    ESP_LOGI(TAG, "Pre-Sleep Pin Levels Check: PWR (GPIO 18) = %d, BOOT (GPIO 0) = %d", pwr_lvl, boot_lvl);
     if (pwr_lvl == 0) {
         ESP_LOGW(TAG, "WARNING: PWR (GPIO 18) is LOW prior to deep sleep! May trigger immediate "
                       "wake or indicates button held down.");
@@ -148,9 +147,9 @@ static void dump_and_clear_ulp_ring_buffer(test_shared_data_t *d)
 
 static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_data_t *d)
 {
-    bool is_ulp_wake   = (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) != 0;
+    bool is_ulp_wake = (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) != 0;
     bool is_timer_wake = (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) != 0;
-    bool is_trap_wake  = (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) != 0;
+    bool is_trap_wake = (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) != 0;
 
     const char *stage_name = "UNKNOWN";
     if (stage == TEST_MODE_TIMER_ONLY)
@@ -180,10 +179,10 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
                 s_stage2_pass = true;
         } else if (stage == TEST_MODE_DUAL_BOTH) {
             if (d->ulp_gpio_wake_count > 0) {
-                verdict       = "PASS: CONCURRENT GPIO WAKE PREEMPTED TIMER";
+                verdict = "PASS: CONCURRENT GPIO WAKE PREEMPTED TIMER";
                 s_stage3_pass = true;
             } else {
-                verdict       = "CONFIRMED SILICON INVARIANT (ERR-001): TIMER SUPPRESSED GPIO WAKE";
+                verdict = "CONFIRMED SILICON INVARIANT (ERR-001): TIMER SUPPRESSED GPIO WAKE";
                 s_stage3_pass = false;
             }
         }
@@ -194,17 +193,15 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     printf(" [RISC-V TEST] TELEMETRY DUMP: %s\n", stage_name);
     printf("========================================================================\n");
     printf(" Boot Count / Sleep Wake # : %lu\n", (unsigned long)s_boot_count);
-    printf(" Main Wake Causes Bitmask  : 0x%08lX (ULP: %s, TIMER: %s, TRAP: %s)\n",
-           (unsigned long)causes, is_ulp_wake ? "YES" : "NO",
-           is_timer_wake ? "YES (30s FALLBACK)" : "NO", is_trap_wake ? "YES (CRASH!)" : "NO");
+    printf(" Main Wake Causes Bitmask  : 0x%08lX (ULP: %s, TIMER: %s, TRAP: %s)\n", (unsigned long)causes,
+           is_ulp_wake ? "YES" : "NO", is_timer_wake ? "YES (30s FALLBACK)" : "NO",
+           is_trap_wake ? "YES (CRASH!)" : "NO");
     printf(" Shared Structure Magic    : 0x%08lX (%s)\n", (unsigned long)d->magic,
            (d->magic == ULP_TEST_MAGIC) ? "VALID" : "CORRUPTED");
     printf(" Stage Configured in ULP   : %lu\n", (unsigned long)d->test_stage);
     printf(" ULP Checkpoint Reached    : %s\n", get_checkpoint_name(d->ulp_step_checkpoint));
-    printf(" ULP Hand-Off Status       : %lu (0=Init, 1=Success, 2=Early Wake)\n",
-           (unsigned long)d->ulp_completed);
-    printf(" ULP RDY_FOR_WAKEUP Status : %s\n",
-           (d->ulp_rdy_timeout != 0) ? "TIMEOUT / AWAKE CHECK" : "OK");
+    printf(" ULP Hand-Off Status       : %lu (0=Init, 1=Success, 2=Early Wake)\n", (unsigned long)d->ulp_completed);
+    printf(" ULP RDY_FOR_WAKEUP Status : %s\n", (d->ulp_rdy_timeout != 0) ? "TIMEOUT / AWAKE CHECK" : "OK");
     printf(" ULP Total Entry Count     : %lu\n", (unsigned long)d->ulp_entry_count);
     printf(" ULP GPIO Wake Count       : %lu\n", (unsigned long)d->ulp_gpio_wake_count);
     printf(" ULP Timer Wake Count      : %lu\n", (unsigned long)d->ulp_timer_wake_count);
@@ -212,13 +209,11 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     printf(" Last ISR Source GPIO      : %ld\n", (long)d->ulp_last_isr_source);
     printf(" Raw RTC_GPIO_STATUS_REG   : 0x%08lX\n", (unsigned long)d->ulp_last_gpio_status);
     printf(" Raw RTC_CNTL_ULP_CP_TIMER : 0x%08lX (TIMER_EN=%d, GPIO_ENA=%d, CLR=%d)\n",
-           (unsigned long)d->ulp_reg_timer_val,
-           (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
+           (unsigned long)d->ulp_reg_timer_val, (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_SLP_TIMER_EN) ? 1 : 0),
            (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA) ? 1 : 0),
            (int)((d->ulp_reg_timer_val & RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR) ? 1 : 0));
-    printf(" Sampled Pin Levels        : PWR(18)=%d, BOOT(0)=%d (Raw: 0x%08lX)\n",
-           (int)(d->ulp_pin_levels & 1U), (int)((d->ulp_pin_levels >> 1) & 1U),
-           (unsigned long)d->ulp_pin_levels);
+    printf(" Sampled Pin Levels        : PWR(18)=%d, BOOT(0)=%d (Raw: 0x%08lX)\n", (int)(d->ulp_pin_levels & 1U),
+           (int)((d->ulp_pin_levels >> 1) & 1U), (unsigned long)d->ulp_pin_levels);
     const char *trigger_desc = "UNKNOWN / NONE";
     if (d->ulp_timer_wake_count > 0 && d->ulp_gpio_wake_count == 0) {
         trigger_desc = "INTERNAL PMU TIMER (Countdown Expired)";
@@ -273,14 +268,14 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     ESP_LOGI(TAG, "Will automatically wake in 5.0 seconds via internal 136 kHz RC timer...");
     ESP_LOGI(TAG, "========================================================================");
 
-    d->test_stage           = TEST_MODE_TIMER_ONLY;
-    d->ulp_completed        = 0;
-    d->ulp_gpio_wake_count  = 0;
+    d->test_stage = TEST_MODE_TIMER_ONLY;
+    d->ulp_completed = 0;
+    d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
-    d->ulp_isr_fired_count  = 0;
-    d->ulp_last_isr_source  = 0xFF;
-    d->ulp_step_checkpoint  = 0;
-    d->ulp_rdy_timeout      = 0;
+    d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
+    d->ulp_step_checkpoint = 0;
+    d->ulp_rdy_timeout = 0;
 
     /* Cleanly disarm RTC GPIO wake detector and clear stale latches */
     rtc_gpio_wakeup_disable(PIN_BUTTON_PWR);
@@ -318,14 +313,14 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     ESP_LOGI(TAG, "ACTION REQUIRED: Press tactile PWR (GPIO 18) button to wake!");
     ESP_LOGI(TAG, "========================================================================");
 
-    d->test_stage           = TEST_MODE_EVENT_ONLY;
-    d->ulp_completed        = 0;
-    d->ulp_gpio_wake_count  = 0;
+    d->test_stage = TEST_MODE_EVENT_ONLY;
+    d->ulp_completed = 0;
+    d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
-    d->ulp_isr_fired_count  = 0;
-    d->ulp_last_isr_source  = 0xFF;
-    d->ulp_step_checkpoint  = 0;
-    d->ulp_rdy_timeout      = 0;
+    d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
+    d->ulp_step_checkpoint = 0;
+    d->ulp_rdy_timeout = 0;
 
     /* Strictly ensure PMU timer is disabled */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
@@ -367,14 +362,14 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     ESP_LOGI(TAG, "Host USB CDC reconnect takes ~3s. Waking before 15s proves GPIO wake.");
     ESP_LOGI(TAG, "========================================================================");
 
-    d->test_stage           = TEST_MODE_DUAL_BOTH;
-    d->ulp_completed        = 0;
-    d->ulp_gpio_wake_count  = 0;
+    d->test_stage = TEST_MODE_DUAL_BOTH;
+    d->ulp_completed = 0;
+    d->ulp_gpio_wake_count = 0;
     d->ulp_timer_wake_count = 0;
-    d->ulp_isr_fired_count  = 0;
-    d->ulp_last_isr_source  = 0xFF;
-    d->ulp_step_checkpoint  = 0;
-    d->ulp_rdy_timeout      = 0;
+    d->ulp_isr_fired_count = 0;
+    d->ulp_last_isr_source = 0xFF;
+    d->ulp_step_checkpoint = 0;
+    d->ulp_rdy_timeout = 0;
 
     /* Clear stale RTC GPIO wake latches before arming */
     clear_stale_rtc_gpio_wake_latch();
@@ -408,9 +403,9 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
 
 void app_main(void)
 {
-    esp_reset_reason_t  reset_reason = esp_reset_reason();
-    uint32_t            wake_causes  = esp_sleep_get_wakeup_causes();
-    test_shared_data_t *p_data       = (test_shared_data_t *)&ulp_test_data;
+    esp_reset_reason_t reset_reason = esp_reset_reason();
+    uint32_t wake_causes = esp_sleep_get_wakeup_causes();
+    test_shared_data_t *p_data = (test_shared_data_t *)&ulp_test_data;
 
     /* Force RTC peripheral power domain to remain ON to stabilize RTC GPIO comparator */
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -419,11 +414,11 @@ void app_main(void)
 
     if (reset_reason != ESP_RST_DEEPSLEEP || s_current_test == 0) {
         /* Cold Boot / Power-On Reset */
-        s_boot_count   = 0;
+        s_boot_count = 0;
         s_current_test = TEST_MODE_TIMER_ONLY;
-        s_stage1_pass  = false;
-        s_stage2_pass  = false;
-        s_stage3_pass  = false;
+        s_stage1_pass = false;
+        s_stage2_pass = false;
+        s_stage3_pass = false;
 
         printf("\n\n");
         printf("************************************************************************\n");
@@ -437,8 +432,8 @@ void app_main(void)
 
         ESP_LOGI(TAG, "Loading ULP-RISC-V firmware binary (%u bytes)...",
                  (unsigned)(ulp_riscv_test_bin_end - ulp_riscv_test_bin_start));
-        ESP_ERROR_CHECK(ulp_riscv_load_binary(ulp_riscv_test_bin_start,
-                                              (ulp_riscv_test_bin_end - ulp_riscv_test_bin_start)));
+        ESP_ERROR_CHECK(
+            ulp_riscv_load_binary(ulp_riscv_test_bin_start, (ulp_riscv_test_bin_end - ulp_riscv_test_bin_start)));
         fflush(stdout);
         vTaskDelay(pdMS_TO_TICKS(1500));
         p_data->log_buf.head = 0;
@@ -473,24 +468,16 @@ void app_main(void)
             printf("\n");
             printf("************************************************************************\n");
             if (s_stage1_pass && s_stage2_pass && !s_stage3_pass) {
-                printf(
-                    "*  TEST SUITE COMPLETE: SILICON ERRATA ERR-001 DEFINITIVELY VERIFIED!  *\n");
-                printf(
-                    "*  Stage 1 (Pure Timer Mode) : PASS (ULP woke on PMU countdown)        *\n");
-                printf(
-                    "*  Stage 2 (Pure Event Mode) : PASS (ULP woke on physical GPIO 18 tap) *\n");
-                printf(
-                    "*  Stage 3 (Dual Arm Mode)   : TIMER_EN MASKS GPIO_WAKEUP_ENA (PROVEN) *\n");
-                printf(
-                    "*  Architecture Mandate      : Pure Event Mode + External PCF85063A    *\n");
+                printf("*  TEST SUITE COMPLETE: SILICON ERRATA ERR-001 DEFINITIVELY VERIFIED!  *\n");
+                printf("*  Stage 1 (Pure Timer Mode) : PASS (ULP woke on PMU countdown)        *\n");
+                printf("*  Stage 2 (Pure Event Mode) : PASS (ULP woke on physical GPIO 18 tap) *\n");
+                printf("*  Stage 3 (Dual Arm Mode)   : TIMER_EN MASKS GPIO_WAKEUP_ENA (PROVEN) *\n");
+                printf("*  Architecture Mandate      : Pure Event Mode + External PCF85063A    *\n");
             } else if (s_stage1_pass && s_stage2_pass && s_stage3_pass) {
-                printf(
-                    "*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY! (PASS)     *\n");
-                printf(
-                    "*  Concurrent Wakeup Observed: GPIO preempted timer!                   *\n");
+                printf("*  TEST SUITE COMPLETE: ALL 3 MODES VALIDATED SUCCESSFULLY! (PASS)     *\n");
+                printf("*  Concurrent Wakeup Observed: GPIO preempted timer!                   *\n");
             } else {
-                printf(
-                    "*  TEST SUITE FINISHED: ONE OR MORE STAGES FAILED                      *\n");
+                printf("*  TEST SUITE FINISHED: ONE OR MORE STAGES FAILED                      *\n");
                 printf("*  Stage 1: %-4s | Stage 2: %-4s | Stage 3: %-4s                       *\n",
                        s_stage1_pass ? "PASS" : "FAIL", s_stage2_pass ? "PASS" : "FAIL",
                        s_stage3_pass ? "PASS" : "FAIL");
@@ -517,11 +504,11 @@ void app_main(void)
             vTaskDelay(pdMS_TO_TICKS(500));
 
             /* Reset test state and re-arm Stage 1 */
-            s_boot_count         = 0;
-            s_stage1_pass        = false;
-            s_stage2_pass        = false;
-            s_stage3_pass        = false;
-            s_current_test       = TEST_MODE_TIMER_ONLY;
+            s_boot_count = 0;
+            s_stage1_pass = false;
+            s_stage2_pass = false;
+            s_stage3_pass = false;
+            s_current_test = TEST_MODE_TIMER_ONLY;
             p_data->log_buf.head = 0;
             p_data->log_buf.tail = 0;
 

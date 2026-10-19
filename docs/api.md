@@ -4540,7 +4540,7 @@ Defined in h1os/sub_power.h:121
 
 Acquire 240 MHz CPU performance lock (e.g.
 
-during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock. 
+during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
 #### Returns
 ESP_OK on success.
 
@@ -4556,7 +4556,7 @@ Defined in h1os/sub_power.h:128
 
 Release 240 MHz CPU performance lock.
 
-Allows CPU cores to gate back down to 80 MHz baseline. 
+Allows CPU cores to gate back down to 80 MHz baseline.
 #### Returns
 ESP_OK on success.
 
@@ -5701,7 +5701,7 @@ Defined in sub_power.c:460
 
 Acquire 240 MHz CPU performance lock (e.g.
 
-during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock. 
+during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
 #### Returns
 ESP_OK on success.
 
@@ -5717,7 +5717,7 @@ Defined in sub_power.c:470
 
 Release 240 MHz CPU performance lock.
 
-Allows CPU cores to gate back down to 80 MHz baseline. 
+Allows CPU cores to gate back down to 80 MHz baseline.
 #### Returns
 ESP_OK on success.
 

@@ -31,22 +31,19 @@ extern "C" {
 /**
  * @brief Helper macro to compute a 32-bit numeric version code.
  */
-#define H1OS_VERSION_VAL(major, minor, patch)                                                      \
-    (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
+#define H1OS_VERSION_VAL(major, minor, patch) (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
 
 /**
  * @brief Current H1OS version encoded as a single 32-bit unsigned integer:
  * (MAJOR << 16) | (MINOR << 8) | PATCH
  * Example: 2.1.0 => 0x00020100
  */
-#define H1OS_VERSION_CODE                                                                          \
-    H1OS_VERSION_VAL(H1OS_VERSION_MAJOR, H1OS_VERSION_MINOR, H1OS_VERSION_PATCH)
+#define H1OS_VERSION_CODE H1OS_VERSION_VAL(H1OS_VERSION_MAJOR, H1OS_VERSION_MINOR, H1OS_VERSION_PATCH)
 
 /**
  * @brief Compile-time version check macro: true if current version >= specified version.
  */
-#define H1OS_VERSION_CHECK(major, minor, patch)                                                    \
-    (H1OS_VERSION_CODE >= H1OS_VERSION_VAL(major, minor, patch))
+#define H1OS_VERSION_CHECK(major, minor, patch) (H1OS_VERSION_CODE >= H1OS_VERSION_VAL(major, minor, patch))
 
 /* =========================================================================
  * Build Metadata

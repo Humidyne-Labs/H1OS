@@ -20,15 +20,14 @@ esp_err_t hal_flash_init(void)
         return ESP_OK;
     }
 
-    s_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY,
-                                      HAL_PARTITION_EPD_FRAME);
+    s_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, HAL_PARTITION_EPD_FRAME);
     if (!s_part) {
         ESP_LOGE(TAG, "Partition '%s' not found in partition table!", HAL_PARTITION_EPD_FRAME);
         return ESP_ERR_NOT_FOUND;
     }
 
-    ESP_LOGD(TAG, "Found partition '%s' at offset 0x%08" PRIx32 ", size 0x%08" PRIx32,
-             s_part->label, s_part->address, s_part->size);
+    ESP_LOGD(TAG, "Found partition '%s' at offset 0x%08" PRIx32 ", size 0x%08" PRIx32, s_part->label, s_part->address,
+             s_part->size);
     return ESP_OK;
 }
 

@@ -14,8 +14,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *TAG               = "sub_nvs";
-static bool        s_nvs_initialized = false;
+static const char *TAG = "sub_nvs";
+static bool s_nvs_initialized = false;
 
 esp_err_t sub_nvs_init(void)
 {
@@ -26,8 +26,7 @@ esp_err_t sub_nvs_init(void)
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG,
-                 "NVS partition truncated or version mismatch; erasing and re-initializing...");
+        ESP_LOGW(TAG, "NVS partition truncated or version mismatch; erasing and re-initializing...");
         err = nvs_flash_erase();
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to erase NVS partition: %s", esp_err_to_name(err));
@@ -54,7 +53,7 @@ esp_err_t sub_nvs_set_str(const char *key, const char *value)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -74,12 +73,12 @@ esp_err_t sub_nvs_get_str(const char *key, char *out_val, size_t max_len)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
     if (err != ESP_OK)
         return err;
 
     size_t required_len = max_len;
-    err                 = nvs_get_str(handle, key, out_val, &required_len);
+    err = nvs_get_str(handle, key, out_val, &required_len);
     nvs_close(handle);
     return err;
 }
@@ -92,7 +91,7 @@ esp_err_t sub_nvs_set_u32(const char *key, uint32_t value)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -112,7 +111,7 @@ esp_err_t sub_nvs_get_u32(const char *key, uint32_t *out_val)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -129,7 +128,7 @@ esp_err_t sub_nvs_set_blob(const char *key, const void *data, size_t len)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -149,7 +148,7 @@ esp_err_t sub_nvs_get_blob(const char *key, void *out_data, size_t *inout_len)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -166,7 +165,7 @@ esp_err_t sub_nvs_erase_key(const char *key)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK)
         return err;
 
@@ -184,7 +183,7 @@ esp_err_t sub_nvs_erase_all(void)
         sub_nvs_init();
 
     nvs_handle_t handle;
-    esp_err_t    err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK)
         return err;
 

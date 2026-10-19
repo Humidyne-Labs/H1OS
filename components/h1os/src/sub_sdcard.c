@@ -21,9 +21,9 @@
 
 static const char *TAG = "sub_sdcard";
 
-static sdmmc_card_t *s_sd_card             = NULL;
-static TaskHandle_t  s_mount_task          = NULL;
-static bool          s_card_absent_latched = false;
+static sdmmc_card_t *s_sd_card = NULL;
+static TaskHandle_t s_mount_task = NULL;
+static bool s_card_absent_latched = false;
 
 static void sdcard_mount_worker_task(void *pvParameters)
 {
@@ -39,8 +39,7 @@ static void sdcard_mount_worker_task(void *pvParameters)
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Asynchronous MicroSD mount successful.");
     } else {
-        ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)",
-                 esp_err_to_name(err));
+        ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)", esp_err_to_name(err));
     }
     s_mount_task = NULL;
     vTaskDelete(NULL);
@@ -59,8 +58,7 @@ esp_err_t sub_sdcard_mount_async(void)
         return ESP_OK;
     }
 
-    BaseType_t res =
-        xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
+    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
     return (res == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
@@ -80,22 +78,22 @@ esp_err_t sub_sdcard_mount(void)
      * based on SD card volume geometry and sector count. */
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
-        .max_files              = 1,
-        .allocation_unit_size   = 0, /* 0 = Auto-determine cluster allocation unit */
+        .max_files = 1,
+        .allocation_unit_size = 0, /* 0 = Auto-determine cluster allocation unit */
     };
 
-    sdmmc_host_t host       = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz       = SDMMC_FREQ_DEFAULT;
-    host.flags              = SDMMC_HOST_FLAG_1BIT;
-    host.command_timeout_ms = 3; // set for 3ms command timeout
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    host.flags = SDMMC_HOST_FLAG_1BIT;
+    host.command_timeout_ms = 3;  // set for 3ms command timeout
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    slot_config.width               = 1;
-    slot_config.clk                 = HAL_PIN_SD_CLK;
-    slot_config.cmd                 = HAL_PIN_SD_MOSI;
-    slot_config.d0                  = HAL_PIN_SD_MISO;
-    slot_config.cd                  = SDMMC_SLOT_NO_CD;
-    slot_config.wp                  = SDMMC_SLOT_NO_WP;
+    slot_config.width = 1;
+    slot_config.clk = HAL_PIN_SD_CLK;
+    slot_config.cmd = HAL_PIN_SD_MOSI;
+    slot_config.d0 = HAL_PIN_SD_MISO;
+    slot_config.cd = SDMMC_SLOT_NO_CD;
+    slot_config.wp = SDMMC_SLOT_NO_WP;
 
     /* Temporarily silence low-level SD driver error noise during card discovery */
     esp_log_level_set("sdmmc_common", ESP_LOG_NONE);
@@ -106,8 +104,7 @@ esp_err_t sub_sdcard_mount(void)
     esp_log_level_set("SD_HOST", ESP_LOG_NONE);
     esp_log_level_set("SD_TRANS", ESP_LOG_NONE);
 
-    esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config,
-                                            &mount_config, &s_sd_card);
+    esp_err_t ret = esp_vfs_fat_sdmmc_mount(SUB_SDCARD_MOUNT_POINT, &host, &slot_config, &mount_config, &s_sd_card);
 
     /* Restore normal warning level for future operations */
     esp_log_level_set("sdmmc_common", ESP_LOG_WARN);
@@ -120,13 +117,11 @@ esp_err_t sub_sdcard_mount(void)
 
     if (ret != ESP_OK) {
         s_sd_card = NULL;
-        s_card_absent_latched =
-            true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
+        s_card_absent_latched = true; /* Latch absence: do not re-probe on deep-sleep wake sessions */
         gpio_reset_pin(HAL_PIN_SD_CLK);
         gpio_reset_pin(HAL_PIN_SD_MOSI);
         gpio_reset_pin(HAL_PIN_SD_MISO);
-        ESP_LOGD(TAG, "MicroSD card not detected in slot (%s). Absent state latched.",
-                 esp_err_to_name(ret));
+        ESP_LOGD(TAG, "MicroSD card not detected in slot (%s). Absent state latched.", esp_err_to_name(ret));
         return ret;
     }
 
@@ -141,7 +136,7 @@ esp_err_t sub_sdcard_unmount(void)
     }
 
     esp_err_t ret = esp_vfs_fat_sdcard_unmount(SUB_SDCARD_MOUNT_POINT, s_sd_card);
-    s_sd_card     = NULL;
+    s_sd_card = NULL;
     gpio_reset_pin(HAL_PIN_SD_CLK);
     gpio_reset_pin(HAL_PIN_SD_MOSI);
     gpio_reset_pin(HAL_PIN_SD_MISO);
@@ -163,7 +158,7 @@ esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
     if (s_sd_card == NULL)
         return ESP_ERR_INVALID_STATE;
 
-    uint64_t bytes   = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;
+    uint64_t bytes = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;
     *out_capacity_mb = (uint32_t)(bytes / (1024 * 1024));
     return ESP_OK;
 }

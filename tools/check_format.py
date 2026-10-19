@@ -25,6 +25,8 @@ TARGET_DIRS = [
 EXCLUDE_DIRS = {
     "generated_fonts",
     "managed_components",
+    ".git",
+    ".gemini",
 }
 
 EXTENSIONS = {".c", ".cpp", ".h", ".hpp"}

@@ -38,14 +38,14 @@ static const char *TAG = "orch_flow";
 
 #define ORCH_HISTORICAL_EWMA_ALPHA 0.25f /* Light EWMA alpha for long-term temp_historical */
 #define ORCH_LEAKAGE_MARGIN_C 0.30f /* SHTC3_avg > Die_avg + 0.30 C board heat leakage margin */
-#define ORCH_TRINODE_SPAN_C 15.0f   /* Linear confidence 0-100% span (15.0 C delta = 0%) */
+#define ORCH_TRINODE_SPAN_C 15.0f /* Linear confidence 0-100% span (15.0 C delta = 0%) */
 
 #include "ulp_h1os.h"
 
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
-    uint32_t                causes = esp_sleep_get_wakeup_causes();
-    orch_persisted_state_t *st     = orch_state_get();
+    uint32_t causes = esp_sleep_get_wakeup_causes();
+    orch_persisted_state_t *st = orch_state_get();
 
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
         /* System boot / Power On Reset */
@@ -53,20 +53,20 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (EFUSE.rd_sys_part1_data4.blk_version_major != 0) {
             uint32_t cal_temp = EFUSE.rd_sys_part1_data4.temp_calib;
             /* BIT(8) is sign (1: negative, 0: positive); magnitude in 0.1 C (10 centi-C) */
-            int32_t cal_deci_c    = ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp)
-                                                               : (int32_t)((uint8_t)cal_temp);
+            int32_t cal_deci_c =
+                ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp) : (int32_t)((uint8_t)cal_temp);
             st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);
         } else {
             st->tsens_cal_centi_c = 0;
         }
-        uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
-        uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
+        uint32_t g17_out = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
+        uint32_t g17_oe = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
         uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> 17) & 1U;
         ESP_LOGI(TAG,
                  "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C) | BL Hook "
                  "GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
-                 (unsigned long)st->boot_count, (double)st->tsens_cal_centi_c / 100.0,
-                 (unsigned long)g17_out, (unsigned long)g17_oe, (unsigned long)g17_hold);
+                 (unsigned long)st->boot_count, (double)st->tsens_cal_centi_c / 100.0, (unsigned long)g17_out,
+                 (unsigned long)g17_oe, (unsigned long)g17_hold);
         return ORCH_FLOW_BOOT;
     }
 
@@ -74,8 +74,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     /* Check for ULP Coprocessor crash / trap */
     if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
-        ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx",
-                 (unsigned long)causes);
+        ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
@@ -123,24 +122,23 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
 
     ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
     for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
-        shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
+        shtc3T_ring[i] = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
-        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
-        epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c / 100.0f;
-        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i, (double)shtc3T_ring[i],
-                 (double)shtc3RH_ring[i], (double)mcuT_ring[i], (double)epdT_ring[i]);
+        mcuT_ring[i] = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
+        epdT_ring[i] = (float)st->ring[i].epd_glass_centi_c / 100.0f;
+        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i, (double)shtc3T_ring[i], (double)shtc3RH_ring[i],
+                 (double)mcuT_ring[i], (double)epdT_ring[i]);
     }
 }
 
 static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
 {
-    uint32_t count =
-        (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
-    int16_t  current_low  = INT16_MAX;
-    int16_t  current_high = INT16_MIN;
-    int32_t  sum_shtc3    = 0;
-    int32_t  sum_die      = 0;
-    uint32_t valid_cnt    = 0;
+    uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
+    int16_t current_low = INT16_MAX;
+    int16_t current_high = INT16_MIN;
+    int32_t sum_shtc3 = 0;
+    int32_t sum_die = 0;
+    uint32_t valid_cnt = 0;
 
     for (uint32_t i = 0; i < count; i++) {
         if (st->ring[i].quality_flags & SAMPLE_FLAG_VALID_COLD) {
@@ -169,22 +167,22 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
         }
     }
 
-    st->window_low_temp_centi_c  = current_low;
+    st->window_low_temp_centi_c = current_low;
     st->window_high_temp_centi_c = current_high;
-    st->amb_floor_temp_centi_c   = current_low;
-    st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
-    st->window_avg_die_c         = ((float)sum_die / (float)valid_cnt) / 100.0f;
+    st->amb_floor_temp_centi_c = current_low;
+    st->window_avg_shtc3_c = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
+    st->window_avg_die_c = ((float)sum_die / (float)valid_cnt) / 100.0f;
 }
 
-static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid,
-                                                  float t_die, float t_glass, const char **out_mode)
+static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid, float t_die, float t_glass,
+                                                  const char **out_mode)
 {
-    float       t_amb = t_valid;
-    const char *mode  = "SETTLED(T_valid)";
+    float t_amb = t_valid;
+    const char *mode = "SETTLED(T_valid)";
 
     if (st->valid_trend < 2) {
         float min_ref = (t_glass < t_die) ? t_glass : t_die;
-        t_amb         = (min_ref < t_valid) ? min_ref : t_valid;
+        t_amb = (min_ref < t_valid) ? min_ref : t_valid;
         st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
         mode = "CASE_A_UNSETTLED";
     } else if (st->window_avg_shtc3_c > (st->window_avg_die_c + ORCH_LEAKAGE_MARGIN_C)) {
@@ -213,8 +211,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     /* 1. Cold-Boot / Empty Ring Buffer Guard (total_samples == 0):
      *    Do not fabricate or compute any temperatures on cold boot before Flow A has sampled. */
     if (st->total_samples == 0) {
-        ESP_LOGI(TAG,
-                 "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
+        ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
                  (double)st->last_glass_temp_centi_c / 100.0);
         if (out_temp_c)
             *out_temp_c = 0.0f;
@@ -227,7 +224,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 
     /* 2. Read current Glass Temp (cached pre-display in sub_display_init) and Die Temp (from Flow A
      * ring) */
-    float                  t_glass    = (float)st->last_glass_temp_centi_c / 100.0f;
+    float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
     orch_tri_node_sample_t latest_raw = {0};
     orch_state_get_latest_sample(&latest_raw);
     float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
@@ -239,31 +236,29 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     orch_tri_node_sample_t valid_samp = {0};
     orch_state_get_latest_valid_sample(&valid_samp);
 
-    float t_valid  = (float)valid_samp.shtc3_temp_centi_c / 100.0f;
+    float t_valid = (float)valid_samp.shtc3_temp_centi_c / 100.0f;
     float rh_valid = (float)valid_samp.shtc3_rh_centi_pct / 100.0f;
 
     if (!st->ewma_inited) {
         st->temp_historical_c = t_valid;
         st->rh_historical_pct = rh_valid;
-        st->ewma_inited       = true;
+        st->ewma_inited = true;
     } else {
-        st->temp_historical_c =
-            orch_math_update_ewma(t_valid, st->temp_historical_c, ORCH_HISTORICAL_EWMA_ALPHA);
-        st->rh_historical_pct =
-            orch_math_update_ewma(rh_valid, st->rh_historical_pct, ORCH_HISTORICAL_EWMA_ALPHA);
+        st->temp_historical_c = orch_math_update_ewma(t_valid, st->temp_historical_c, ORCH_HISTORICAL_EWMA_ALPHA);
+        st->rh_historical_pct = orch_math_update_ewma(rh_valid, st->rh_historical_pct, ORCH_HISTORICAL_EWMA_ALPHA);
     }
 
     /* 5. Tri-Node Composite Mean & 0-100% Linear Confidence Score */
-    float t_trinode     = (t_valid + t_die + t_glass) / 3.0f;
+    float t_trinode = (t_valid + t_die + t_glass) / 3.0f;
     float delta_trinode = t_valid - t_trinode;
-    float conf          = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
+    float conf = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
     if (conf < 0.0f)
         conf = 0.0f;
     if (conf > 100.0f)
         conf = 100.0f;
 
-    st->trinode_temp_c         = t_trinode;
-    st->trinode_delta_c        = delta_trinode;
+    st->trinode_temp_c = t_trinode;
+    st->trinode_delta_c = delta_trinode;
     st->trinode_confidence_pct = (uint8_t)(conf + 0.5f);
 
     /* 6. Dynamic Ambient Selection (T_amb):
@@ -274,30 +269,28 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     float t_amb = orch_flow_evaluate_ambient_selection(st, t_valid, t_die, t_glass, &amb_mode);
 
     /* 7. Psychrometric Math (Single-pass Magnus equations from T_valid, RH_valid, and T_amb) */
-    float vp     = 0.0f;
-    float dew    = 0.0f;
+    float vp = 0.0f;
+    float dew = 0.0f;
     float rh_amb = 0.0f;
     orch_math_calc_psychrometrics(t_valid, rh_valid, t_amb, &vp, &dew, &rh_amb);
 
-    st->reconstructed_amb_temp_c  = t_amb;
-    st->reconstructed_amb_rh_pct  = rh_amb;
+    st->reconstructed_amb_temp_c = t_amb;
+    st->reconstructed_amb_rh_pct = rh_amb;
     st->reconstructed_dew_point_c = dew;
-    st->vapor_pressure_hpa        = vp;
+    st->vapor_pressure_hpa = vp;
 
     ESP_LOGI(TAG,
              "Flow A Ring: samples=%lu head=%u trend=%u | Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC "
              "flags=0x%02X]",
              (unsigned long)st->total_samples, st->ring_head, st->valid_trend,
-             (double)latest_raw.shtc3_temp_centi_c / 100.0,
-             (double)latest_raw.shtc3_rh_centi_pct / 100.0, (double)t_die,
-             latest_raw.quality_flags);
-    ESP_LOGI(
-        TAG,
-        "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | T_valid=%.2fC WinAvg[SHTC3=%.2fC "
-        "Die=%.2fC] Hist=%.2fC | Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
-        amb_mode, (double)t_amb, (double)rh_amb, (double)t_valid, (double)st->window_avg_shtc3_c,
-        (double)st->window_avg_die_c, (double)st->temp_historical_c, (double)t_glass,
-        (double)t_trinode, (double)delta_trinode, st->trinode_confidence_pct);
+             (double)latest_raw.shtc3_temp_centi_c / 100.0, (double)latest_raw.shtc3_rh_centi_pct / 100.0,
+             (double)t_die, latest_raw.quality_flags);
+    ESP_LOGI(TAG,
+             "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | T_valid=%.2fC WinAvg[SHTC3=%.2fC "
+             "Die=%.2fC] Hist=%.2fC | Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
+             amb_mode, (double)t_amb, (double)rh_amb, (double)t_valid, (double)st->window_avg_shtc3_c,
+             (double)st->window_avg_die_c, (double)st->temp_historical_c, (double)t_glass, (double)t_trinode,
+             (double)delta_trinode, st->trinode_confidence_pct);
 
     /* Dump internal debug arrays modularly */
     orch_flow_dump_ring_debug(st);
@@ -351,7 +344,7 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
      * Note: Countdown timer arming is handled exclusively inside sub_power_enter_deep_sleep_mode()
      * to eliminate back-to-back I2C STOP/START/RELOAD cycles and avoid asynchronous clock-domain
      * collisions! */
-    uint32_t sample_sec         = orch_state_get()->sample_interval_sec;
+    uint32_t sample_sec = orch_state_get()->sample_interval_sec;
     uint32_t internal_sleep_sec = 0;
     if (sample_sec > 0 && sample_sec < sleep_sec) {
         internal_sleep_sec = sample_sec;
@@ -363,8 +356,7 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
              (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
 
     /* 7. Enter hardware deep sleep with buttons and RTC INT wake sources */
-    uint64_t wake_mask =
-        (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
+    uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
 }
 

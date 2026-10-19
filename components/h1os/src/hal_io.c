@@ -49,43 +49,43 @@ esp_err_t hal_io_early_init(void)
     // 2. Ensure Audio Amplifier is muted (GPIO 46 = 0)
     gpio_config_t pa_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_PA_CTRL),
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&pa_cfg);
-    gpio_set_level(HAL_PIN_PA_CTRL, 0); // Standby Mute
+    gpio_set_level(HAL_PIN_PA_CTRL, 0);  // Standby Mute
 
     // 3. User Status LED (GPIO 3: Open-Drain, 1 = OFF)
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
-        .mode         = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .mode = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_cfg);
-    gpio_set_level(HAL_PIN_STATUS_LED, 1); // LED OFF
+    gpio_set_level(HAL_PIN_STATUS_LED, 1);  // LED OFF
 
     // 4. Tactile Buttons (GPIO 0 & GPIO 18: Inputs with external 10k pull-ups on hardware; internal
     // pull-ups disabled to prevent parallel leakage)
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
-        .mode         = GPIO_MODE_INPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&btn_cfg);
 
     // 5. RTC INT (GPIO 5: Input with internal pull-up)
     gpio_config_t rtc_int_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_RTC_INT),
-        .mode         = GPIO_MODE_INPUT,
-        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&rtc_int_cfg);
 
@@ -107,7 +107,7 @@ esp_err_t hal_io_release_power_latch(void)
 #define HAL_LEDC_MODE LEDC_LOW_SPEED_MODE
 #define HAL_LEDC_CHANNEL LEDC_CHANNEL_0
 #define HAL_LEDC_DUTY_RES LEDC_TIMER_10_BIT /* 0..1023 */
-#define HAL_LEDC_FREQUENCY 5000             /* 5 kHz */
+#define HAL_LEDC_FREQUENCY 5000 /* 5 kHz */
 
 static bool s_led_pwm_active = false;
 
@@ -124,25 +124,25 @@ esp_err_t hal_led_pwm_init(void)
     gpio_reset_pin(HAL_PIN_STATUS_LED);
 
     ledc_timer_config_t timer_cfg = {
-        .speed_mode      = HAL_LEDC_MODE,
+        .speed_mode = HAL_LEDC_MODE,
         .duty_resolution = HAL_LEDC_DUTY_RES,
-        .timer_num       = HAL_LEDC_TIMER,
-        .freq_hz         = HAL_LEDC_FREQUENCY,
-        .clk_cfg         = LEDC_AUTO_CLK,
-        .deconfigure     = false,
+        .timer_num = HAL_LEDC_TIMER,
+        .freq_hz = HAL_LEDC_FREQUENCY,
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
     };
     esp_err_t err = ledc_timer_config(&timer_cfg);
     if (err != ESP_OK)
         return err;
 
     ledc_channel_config_t ch_cfg = {
-        .gpio_num   = HAL_PIN_STATUS_LED,
+        .gpio_num = HAL_PIN_STATUS_LED,
         .speed_mode = HAL_LEDC_MODE,
-        .channel    = HAL_LEDC_CHANNEL,
-        .intr_type  = LEDC_INTR_DISABLE,
-        .timer_sel  = HAL_LEDC_TIMER,
-        .duty       = 0,
-        .hpoint     = 0,
+        .channel = HAL_LEDC_CHANNEL,
+        .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = HAL_LEDC_TIMER,
+        .duty = 0,
+        .hpoint = 0,
         .flags =
             {
                 .output_invert = 1, /* Invert for Active LOW / Open-Drain: Duty 0 = Output 1 (OFF),
@@ -189,9 +189,9 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
     return ledc_fade_start(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
-static TaskHandle_t  s_breath_task       = NULL;
+static TaskHandle_t s_breath_task = NULL;
 static volatile bool s_breathing_running = false;
-static uint32_t      s_breath_period_ms  = 2000;
+static uint32_t s_breath_period_ms = 2000;
 
 static void led_breath_task(void *arg)
 {
@@ -202,7 +202,7 @@ static void led_breath_task(void *arg)
 
         /* Fade in: 0% -> 100% */
         hal_led_fade_to(100, half);
-        TickType_t start    = xTaskGetTickCount();
+        TickType_t start = xTaskGetTickCount();
         TickType_t duration = pdMS_TO_TICKS(half);
         while (s_breathing_running && (xTaskGetTickCount() - start < duration)) {
             vTaskDelay(pdMS_TO_TICKS(50));
@@ -243,10 +243,10 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     }
 
     s_breathing_running = true;
-    BaseType_t res      = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, &s_breath_task);
+    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, &s_breath_task);
     if (res != pdPASS) {
         s_breathing_running = false;
-        s_breath_task       = NULL;
+        s_breath_task = NULL;
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -258,7 +258,7 @@ esp_err_t hal_led_stop_breathing(void)
         return ESP_OK;
     }
     s_breathing_running = false;
-    int wait_cycles     = 15;
+    int wait_cycles = 15;
     while (s_breath_task != NULL && wait_cycles-- > 0) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -295,10 +295,10 @@ esp_err_t hal_led_pwm_deinit(void)
     // Restore to static open-drain GPIO
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
-        .mode         = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .mode = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1);

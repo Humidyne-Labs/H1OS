@@ -44,8 +44,7 @@ esp_err_t hal_i2c_deinit(void);
  * @param timeout_ms Timeout budget in milliseconds.
  * @return ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
  */
-esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t write_len,
-                        uint32_t timeout_ms);
+esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t write_len, uint32_t timeout_ms);
 
 /**
  * @brief Executes an atomic register read transaction over I2C.
@@ -69,8 +68,8 @@ esp_err_t hal_i2c_read(uint8_t dev_addr, uint8_t *read_data, size_t read_len, ui
  * @param timeout_ms Timeout budget in milliseconds.
  * @return ESP_OK on success, ESP_ERR_TIMEOUT, or NACK error.
  */
-esp_err_t hal_i2c_write_read(uint8_t dev_addr, const uint8_t *write_data, size_t write_len,
-                             uint8_t *read_data, size_t read_len, uint32_t timeout_ms);
+esp_err_t hal_i2c_write_read(uint8_t dev_addr, const uint8_t *write_data, size_t write_len, uint8_t *read_data,
+                             size_t read_len, uint32_t timeout_ms);
 
 /**
  * @brief Probes if an I2C device with given 7-bit address responds on the bus.

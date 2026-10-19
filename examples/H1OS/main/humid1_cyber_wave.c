@@ -5034,17 +5034,17 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t humid1_cyber_wave_map[] = {
 const lv_image_dsc_t humid1_cyber_wave = {
     .header =
         {
-            .magic      = LV_IMAGE_HEADER_MAGIC,
-            .cf         = LV_COLOR_FORMAT_I1,
-            .flags      = 0,
-            .w          = 200,
-            .h          = 200,
-            .stride     = 25,
+            .magic = LV_IMAGE_HEADER_MAGIC,
+            .cf = LV_COLOR_FORMAT_I1,
+            .flags = 0,
+            .w = 200,
+            .h = 200,
+            .stride = 25,
             .reserved_2 = 0,
         },
-    .data_size  = sizeof(humid1_cyber_wave_map),
-    .data       = humid1_cyber_wave_map,
-    .reserved   = NULL,
+    .data_size = sizeof(humid1_cyber_wave_map),
+    .data = humid1_cyber_wave_map,
+    .reserved = NULL,
     .reserved_2 = NULL,
 };
 

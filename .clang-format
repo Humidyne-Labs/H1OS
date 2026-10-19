@@ -7,16 +7,18 @@ Standard: c++17
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
-ColumnLimit: 100
+ColumnLimit: 120
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+BinPackArguments: true
+BinPackParameters: true
 
 # Bracing & Alignment
 BreakBeforeBraces: Linux
-AlignConsecutiveAssignments: Consecutive
-AlignConsecutiveDeclarations: Consecutive
-AlignTrailingComments: true
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignTrailingComments: false
 PointerAlignment: Right
 
 # Includes
@@ -26,5 +28,6 @@ IncludeBlocks: Regroup
 # Spacing & Empty Lines
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
-SpacesBeforeTrailingComments: 1
+SpacesBeforeTrailingComments: 2
+ReflowComments: false
 ...

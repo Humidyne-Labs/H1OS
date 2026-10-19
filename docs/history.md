@@ -8,7 +8,7 @@
 
 ## 1. Overview & Purpose
 
-During early board bring-up and driver prototyping (v1.0.0 through v1.3.1), several architectural plans, power profiling notes, font conversion experiments, and code audits were authored. To keep the active repository concise, clean, and cohesive, the original archive files have been retired. 
+During early board bring-up and driver prototyping (v1.0.0 through v1.3.1), several architectural plans, power profiling notes, font conversion experiments, and code audits were authored. To keep the active repository concise, clean, and cohesive, the original archive files have been retired.
 
 This digest preserves the critical technical rationale, empirical findings, and physics-based models that inform current H1OS development.
 
@@ -46,7 +46,7 @@ This digest preserves the critical technical rationale, empirical findings, and 
 
 ### 2.8 Deep Sleep Hardware Power Profiling (`docs/archive/dev-action/hardware-notes.md`)
 - **Summary:** Comprehensive current measurements across power rails and component sleep states, including quiescent drains for the ETA6098 charger and MP1605 buck regulator.
-- **Current Takeaway:** 
+- **Current Takeaway:**
   - ESP32-S3 Deep Sleep (RTC slow memory retained, ULP halted): $\sim 7.0\,\mu\text{A}$.
   - ES8311 Audio Codec (Software Power-Down register `0x0D`): $< 1.0\,\mu\text{A}$.
   - PCF85063A RTC (CLKOUT disabled `COF[2:0] = 111`): $\sim 0.22\,\mu\text{A}$.
@@ -57,7 +57,7 @@ This digest preserves the critical technical rationale, empirical findings, and 
 
 ### 2.9 Tri-Node Sensing & Psychrometric Foundation (`docs/archive/dev-action/HUMIDITRON_TRI_NODE_ULP_ACTION_PLAN.md`)
 - **Summary:** Introduced the physical explanation of PCB thermal drift and established the Tri-Node Psychrometric architecture.
-- **Current Takeaway:** 
+- **Current Takeaway:**
   - PCB self-heating warms the sensor die via copper trace conduction ($T_{\text{die}} > T_{\text{air}}$), which inflates saturation vapor pressure $e_s(T_{\text{die}})$ and depresses measured relative humidity ($RH$).
   - Actual water vapor pressure ($e$) and Dew Point ($T_{\text{dew}}$) are thermodynamic invariants.
   - Tri-node cross-correlation combines: Node 1 (SHTC3 ambient), Node 2 (SSD1681 on-glass thermistor via SPI Command `0x1B`), and Node 3 (ESP32-S3 TSENS on-chip silicon).

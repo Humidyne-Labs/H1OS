@@ -231,18 +231,18 @@ System battery power distribution is controlled by `GPIO 17` (`BAT_CTRL`).
 ---
 
 ### Errata E7: Tactile Button Pull-Up Resistors & Noise Sensitivity
- 
+
 #### 1. Physical Layout Analysis
 The tactile buttons (`BOOT` on `GPIO 0` and `POWER` on `GPIO 18`) utilize external $10\,\text{k}\Omega$ pull-up resistors to the 3.3V rail.
- 
+
 #### 2. Electrical & Timing Impact
 1. **Pull-Up Value:** At $10\,\text{k}\Omega$, static pull-up strength is standard and avoids excessive idle current while maintaining reasonable edge rise time.
 2. **Noise Coupling & Debounce:** Due to trace routing length across the board, switch contacts remain susceptible to mechanical bounce and localized RF noise transients from the ESP32-S3 and Class-D audio amplifier if not filtered in hardware.
- 
+
 #### 3. Current H1OS Firmware Mitigations
 - In `hal_io.c`, the SoC internal pull-ups ($\sim 45\,\text{k}\Omega$) are enabled in parallel with the external $10\,\text{k}\Omega$ pull-ups (and RTC pull-ups are enabled during deep sleep) to stiffen the line.
 - Hardware debouncing and glitch filtering ($\ge 30\,\text{ms}$) are handled at the ULP coprocessor monitor (in sleep) and via LVGL keypad indev debouncing (in active wake).
- 
+
 #### 4. Rev B Hardware Redesign Recommendations
 - Maintain $10\,\text{k}\Omega$ ($1\%$) pull-up resistors.
 - Place a **$100\,\text{nF}$** ceramic capacitor in parallel with each switch's contacts (forming a passive hardware low-pass RC filter with $\tau = 1\,\text{ms}$ to absorb mechanical contact bounce).

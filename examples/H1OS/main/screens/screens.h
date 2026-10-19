@@ -46,8 +46,7 @@ void screen_base_set_awake_badge(bool is_awake);
 /**
  * @brief Render Screen 1: Primary Environmental Hero (Page 1/4)
  */
-void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
-                            lv_event_cb_t event_cb);
+void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count, lv_event_cb_t event_cb);
 
 /**
  * @brief Render Screen 2: Psychrometrics Engine & Invariants (Page 2/4)

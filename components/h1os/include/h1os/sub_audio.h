@@ -66,7 +66,7 @@ bool sub_audio_is_ready(void);
 typedef enum {
     SUB_AUDIO_TONE = 0, /**< Synthesized square/sine tone (params: uint32_t frequency_hz, uint32_t
                            duration_ms) */
-    SUB_AUDIO_CHIME,    /**< Standard acoustic presentation chime (params: uint8_t chime_type) */
+    SUB_AUDIO_CHIME, /**< Standard acoustic presentation chime (params: uint8_t chime_type) */
     SUB_AUDIO_PCM, /**< Raw 16-bit Mono PCM buffer (params: const int16_t *samples, count = len) */
 } sub_audio_type_t;
 

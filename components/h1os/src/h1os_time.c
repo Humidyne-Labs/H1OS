@@ -17,8 +17,8 @@
 
 static const char *TAG = "h1os_time";
 
-static h1os_time_sync_cb_t s_sync_cb        = NULL;
-static void               *s_sync_user_data = NULL;
+static h1os_time_sync_cb_t s_sync_cb = NULL;
+static void *s_sync_user_data = NULL;
 
 esp_err_t h1os_time_set_timezone(const char *tz_str)
 {
@@ -33,14 +33,14 @@ esp_err_t h1os_time_set_timezone(const char *tz_str)
 
 esp_err_t h1os_time_register_sync_cb(h1os_time_sync_cb_t cb, void *user_data)
 {
-    s_sync_cb        = cb;
+    s_sync_cb = cb;
     s_sync_user_data = user_data;
     return ESP_OK;
 }
 
 esp_err_t h1os_time_sync_system_to_rtc(void)
 {
-    time_t    now;
+    time_t now;
     struct tm timeinfo;
     time(&now);
     localtime_r(&now, &timeinfo);
@@ -48,8 +48,8 @@ esp_err_t h1os_time_sync_system_to_rtc(void)
     esp_err_t ret = sub_rtc_set_time(&timeinfo);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Synchronized PCF85063A RTC from POSIX clock: %04d-%02d-%02d %02d:%02d:%02d",
-                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour,
-                 timeinfo.tm_min, timeinfo.tm_sec);
+                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min,
+                 timeinfo.tm_sec);
     } else {
         ESP_LOGE(TAG, "Failed to write PCF85063A RTC: %s", esp_err_to_name(ret));
     }
@@ -73,9 +73,8 @@ esp_err_t h1os_time_sync_rtc_to_system(void)
 
     struct timeval tv = {.tv_sec = t, .tv_usec = 0};
     settimeofday(&tv, NULL);
-    ESP_LOGI(TAG, "Synchronized POSIX clock from PCF85063A: %04d-%02d-%02d %02d:%02d:%02d",
-             tm_target.tm_year + 1900, tm_target.tm_mon + 1, tm_target.tm_mday, tm_target.tm_hour,
-             tm_target.tm_min, tm_target.tm_sec);
+    ESP_LOGI(TAG, "Synchronized POSIX clock from PCF85063A: %04d-%02d-%02d %02d:%02d:%02d", tm_target.tm_year + 1900,
+             tm_target.tm_mon + 1, tm_target.tm_mday, tm_target.tm_hour, tm_target.tm_min, tm_target.tm_sec);
     return ESP_OK;
 }
 
@@ -86,8 +85,7 @@ esp_err_t h1os_time_sync_now(uint32_t timeout_ms)
         return ESP_ERR_NOT_SUPPORTED;
     }
 
-    ESP_LOGI(TAG, "Invoking external time sync callback (timeout: %lu ms)...",
-             (unsigned long)timeout_ms);
+    ESP_LOGI(TAG, "Invoking external time sync callback (timeout: %lu ms)...", (unsigned long)timeout_ms);
     esp_err_t ret = s_sync_cb(timeout_ms, s_sync_user_data);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Time acquisition successful; committing to hardware RTC");
@@ -103,7 +101,7 @@ esp_err_t h1os_time_get_formatted(h1os_time_format_t fmt, char *dest, size_t max
     if (dest == NULL || max_len == 0)
         return ESP_ERR_INVALID_ARG;
 
-    time_t    now;
+    time_t now;
     struct tm timeinfo;
     time(&now);
     localtime_r(&now, &timeinfo);
@@ -135,7 +133,7 @@ esp_err_t h1os_time_get_date_formatted(h1os_date_format_t fmt, char *dest, size_
     if (dest == NULL || max_len == 0)
         return ESP_ERR_INVALID_ARG;
 
-    time_t    now;
+    time_t now;
     struct tm timeinfo;
     time(&now);
     localtime_r(&now, &timeinfo);

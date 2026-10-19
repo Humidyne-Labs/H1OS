@@ -92,13 +92,13 @@ void orch_display_sync_record_partial_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count++;
-    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d",
-             (unsigned)st->epd_partial_refresh_count, CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
+    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d", (unsigned)st->epd_partial_refresh_count,
+             CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
 }
 
 void orch_display_sync_record_full_refresh(void)
 {
-    orch_persisted_state_t *st    = orch_state_get();
+    orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count = 0;
     ESP_LOGI(TAG, "Full OTP refresh recorded: anti-ghosting counter reset to 0");
 }

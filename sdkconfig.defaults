@@ -39,7 +39,7 @@ CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n
 CONFIG_RTC_CLK_SRC_INT_RC=y
 
 # =========================================================================
-# Ultra Low Power (ULP) Coprocessor 
+# Ultra Low Power (ULP) Coprocessor
 # (umm.. the last one turns on the interrupts that ive been trying to use)
 #                                                (for the last 3 days....)
 # =========================================================================

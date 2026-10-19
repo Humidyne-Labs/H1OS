@@ -61,8 +61,7 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec);
 
 typedef enum {
-    SUB_POWER_SLEEP_FULL_CYCLE =
-        0, /**< Normal Flow B sleep: arms PCF85063A countdown & resets slice_counter */
+    SUB_POWER_SLEEP_FULL_CYCLE = 0, /**< Normal Flow B sleep: arms PCF85063A countdown & resets slice_counter */
     SUB_POWER_SLEEP_FLOW_A_BURST /**< Flow A sample sleep: preserves running PCF85063A countdown &
                                     slice_counter */
 } sub_power_sleep_mode_t;
@@ -76,8 +75,7 @@ typedef enum {
  * @param[in] mode Full cycle or Flow A burst mode.
  * @return Does not return on success (enters deep sleep).
  */
-esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask,
-                                          sub_power_sleep_mode_t mode);
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode);
 
 /**
  * @brief Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).

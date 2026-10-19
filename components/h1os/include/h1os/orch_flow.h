@@ -23,11 +23,11 @@ extern "C" {
 #endif
 
 typedef enum {
-    ORCH_FLOW_BOOT = 0,        /**< Initial system boot / power-on reset.          */
-    ORCH_FLOW_A_SAMPLE,        /**< Headless sensor sample burst.                  */
-    ORCH_FLOW_B_MAIN_WAKE,     /**< Full UI wake / Button wake / RTC timer expiry. */
+    ORCH_FLOW_BOOT = 0, /**< Initial system boot / power-on reset.          */
+    ORCH_FLOW_A_SAMPLE, /**< Headless sensor sample burst.                  */
+    ORCH_FLOW_B_MAIN_WAKE, /**< Full UI wake / Button wake / RTC timer expiry. */
     ORCH_FLOW_BOOTLOADER_JUMP, /**< ROM bootloader download mode.                  */
-    ORCH_FLOW_CRITICAL_OFF     /**< Low battery shutdown or power cut.             */
+    ORCH_FLOW_CRITICAL_OFF /**< Low battery shutdown or power cut.             */
 } orch_flow_type_t;
 
 /**

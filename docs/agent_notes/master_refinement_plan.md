@@ -47,15 +47,15 @@ graph TD
         DS_Active -->|"Hardware Interrupt"| ULP_Wake["ULP Wakes in RTC Slow Memory"]
         ULP_Wake --> ULP_ADC["Read ADC1_CH3 with 17-Point LUT Interpolation"]
         ULP_ADC --> ULP_Check{"Evaluate Trigger"}
-        
+
         ULP_Check -- "GPIO 0 or 18 == 0" --> ULP_BtnWake["Immediate Wake on Press-Down!<br/>(User finger still on switch!)"]
         ULP_Check -- "GPIO 5 Pulse (slice < limit)" --> ULP_Tick["Set DISPATCH_SENSOR_SAMPLE"]
         ULP_Check -- "GPIO 5 Pulse (slice >= limit)" --> ULP_Overflow["Set DISPATCH_MAIN_WAKE"]
-        
+
         ULP_BtnWake --> ULP_Pulse["Pulse WAKEUP_CLR for 120us"]
         ULP_Tick --> ULP_Pulse
         ULP_Overflow --> ULP_Pulse
-        
+
         ULP_Pulse --> ULP_HazardClr["Clear RTC_GPIO_STATUS_W1TC_REG<br/>(Hazard: Cleared AFTER pulse)"]
         ULP_HazardClr --> ULP_Halt["ulp_riscv_halt()"]
     end
@@ -104,19 +104,19 @@ graph TD
     subgraph Deep_Sleep_Hardware ["Phase 3: Deep Sleep Standby (<15 uA)"]
         Enter_DS --> Standby_Sleep["Dual-Core Xtensa & SPI Flash OFF"]
         Standby_Sleep -->|"Hardware Event"| ULP_Realined["ULP Coprocessor Wakes in RTC Slow Memory"]
-        
+
         subgraph ULP_Engine ["ULP Deterministic State Machine"]
             ULP_Realined --> ULP_Filter["30ms Glitch Filter & Outlier Noise Rejection"]
             ULP_Filter -- Spurious / Bounce --> ULP_Drop["Discard Noise & ulp_riscv_halt()"]
             ULP_Filter -- Valid Event --> ULP_ADC_Linear["Read ADC1_CH3 via eFuse Linear Equation (V = (raw*m)/4096 + b)"]
-            
+
             ULP_ADC_Linear --> ULP_CritCheck{"Vbat < 3.25V & Vbat > 100mV?"}
             ULP_CritCheck -- Yes --> ULP_SetCrit["Set ULP_DISPATCH_CRITICAL_SHUTDOWN"] --> ULP_Signal
-            
+
             ULP_CritCheck -- No --> ULP_Classify{"Classify Trigger"}
             ULP_Classify -- "RTC Pulse (slice < limit)" --> ULP_SetA["Set ULP_DISPATCH_SENSOR_SAMPLE"] --> ULP_Signal
             ULP_Classify -- "RTC Pulse (slice >= limit)" --> ULP_SetB["Set ULP_DISPATCH_MAIN_WAKE"] --> ULP_Signal
-            
+
             ULP_Classify -- "Tactile Button (GPIO 0 / 18)" --> ULP_HoldLoop["Track Button Hold Duration (T_hold)"]
             ULP_HoldLoop --> ULP_HoldCheck{"T_hold > 2500ms?"}
             ULP_HoldCheck -- "Yes & BOOT (GPIO 0)" --> ULP_SetBL["Set ULP_DISPATCH_BOOTLOADER_JUMP"] --> ULP_Signal
@@ -125,7 +125,7 @@ graph TD
             ULP_ReleaseWait --> ULP_TapCheck{"50ms <= T_hold <= 800ms?"}
             ULP_TapCheck -- "Valid Tap Release" --> ULP_SetTap["Set ULP_DISPATCH_MAIN_WAKE<br/>(Finger is UP! Clean LVGL Input)"] --> ULP_Signal
             ULP_TapCheck -- "Invalid / Stray" --> ULP_Drop
-            
+
             subgraph ULP_Signal ["Clean CDC Wake Sequence"]
                 SIG_ClearW1TC["1. Clear Peripheral Status (RTC_GPIO_STATUS_W1TC_REG)"] --> SIG_Spin["2. Spin on RTC_CNTL_RDY_FOR_WAKEUP"]
                 SIG_Spin --> SIG_WakeCPU["3. ulp_riscv_wakeup_main_processor()"]
@@ -137,14 +137,14 @@ graph TD
 
     subgraph Wake_Execution ["Phase 4: Fast RTC Stub vs. Flow B UI Session"]
         SIG_WakeCPU --> Wake_Router{"Evaluate Wake Reason"}
-        
+
         Wake_Router -- "ULP_DISPATCH_SENSOR_SAMPLE" --> Fast_RTC_Stub["bsp_wake_stub() on Core 0 in RTC Fast IRAM (<3ms)"]
         Fast_RTC_Stub --> Stub_I2C["Read SHTC3 (Bit-Bang I2C) & MCU TSENS"]
         Fast_RTC_Stub --> Stub_DeltaGate["Evaluate 0.20C Successive-Sample Thermal Gate"]
         Fast_RTC_Stub --> Stub_Commit["Commit Sample to RTC Slow Memory ring[32]"]
         Fast_RTC_Stub --> Stub_Sleep["esp_wake_stub_sleep(): Back to Deep Sleep (<15uA)"]
         Stub_Sleep --> Standby_Sleep
-        
+
         Wake_Router -- "MAIN_WAKE / Tap / Boot / Fault" --> Full_OS_Boot["Boot Full OS into h1os_start()"]
         Full_OS_Boot --> FlowB_Arbiter{"Inspect Dispatch Reason"}
         FlowB_Arbiter -- "BOOTLOADER_JUMP" --> Jump_ROM["Jump to ROM Download Bootloader"]

@@ -75,8 +75,8 @@ float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor
  * @param[out] out_dew_c     Output dew point in Celsius (optional, can be NULL).
  * @param[out] out_rh_amb    Output reconstructed ambient RH in percent (optional, can be NULL).
  */
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa,
-                                   float *out_dew_c, float *out_rh_amb);
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa, float *out_dew_c,
+                                   float *out_rh_amb);
 
 /**
  * @brief Calculate absolute humidity (vapor density) in grams per cubic meter (g/m³).
