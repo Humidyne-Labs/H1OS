@@ -181,7 +181,7 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
     ESP_LOGI(TAG, "================================================================================");
 }
 
-esp_err_t h1os_start(const h1os_lifecycle_t *config)
+static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config)
 {
     if (config != NULL) {
         s_app_lifecycle = *config;
@@ -210,29 +210,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     // 3. Initialize Persistent Storage Subsystem
     sub_nvs_init();
 
-    // 3. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
+    // 4. Inspect Flow Arbiter (Flow B Interactive UI vs Critical Off / Bootloader Jump)
     orch_flow_type_t flow = orch_flow_determine_wakeup();
     h1os_log_flow_banner(flow);
 
     /* Dump ULP execution trace and telemetry on every wake */
     if (flow != ORCH_FLOW_BOOT) {
         debug_dump_ulp_telemetry();
-    }
-
-
-    if (flow == ORCH_FLOW_CRITICAL_OFF) {
-        ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");
-        h1os_shutdown();
-        return ESP_OK;
-    }
-
-    if (flow == ORCH_FLOW_BOOTLOADER_JUMP) {
-        ESP_LOGW(TAG, "Entering ROM bootloader jump mode via RTC_CNTL_FORCE_DOWNLOAD_BOOT...");
-        sub_display_wait_busy(pdMS_TO_TICKS(5000));
-        sub_audio_standby();
-        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-        esp_restart();
-        return ESP_OK;
     }
 
     /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
@@ -243,7 +227,31 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
          * on the first quiescent Flow A deep-sleep pulse (60s). */
     }
 
-    // 4. Flow B Interactive UI Boot
+    return flow;
+}
+
+static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
+{
+    if (flow == ORCH_FLOW_CRITICAL_OFF) {
+        ESP_LOGW(TAG, "Critical shutdown requested! Powering down.");
+        h1os_shutdown();
+        return true;
+    }
+
+    if (flow == ORCH_FLOW_BOOTLOADER_JUMP) {
+        ESP_LOGW(TAG, "Entering ROM bootloader jump mode via RTC_CNTL_FORCE_DOWNLOAD_BOOT...");
+        sub_display_wait_busy(pdMS_TO_TICKS(5000));
+        sub_audio_standby();
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+        esp_restart();
+        return true;
+    }
+
+    return false;
+}
+
+static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
+{
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
     bool is_wake     = (flow != ORCH_FLOW_BOOT);
     bool is_rtc_wake = false;
@@ -344,6 +352,17 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     }
 
     return ESP_OK;
+}
+
+esp_err_t h1os_start(const h1os_lifecycle_t *config)
+{
+    orch_flow_type_t flow = h1os_early_system_bringup(config);
+
+    if (h1os_handle_non_ui_flows(flow)) {
+        return ESP_OK;
+    }
+
+    return h1os_launch_interactive_session(flow);
 }
 
 esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)

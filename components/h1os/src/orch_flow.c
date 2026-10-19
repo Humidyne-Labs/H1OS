@@ -137,32 +137,8 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
     }
 }
 
-esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c)
+static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
 {
-    orch_persisted_state_t *st = orch_state_get();
-
-    /* Flow B Invariant: Never query SHTC3 (0x70) in Flow B!
-     * All calculations operate on the 32-sample RTC ring buffer populated by Flow A,
-     * the pre-display SSD1681 Glass Thermistor (st->last_glass_temp_centi_c), and MCU Die TSENS. */
-
-    /* 1. Cold-Boot / Empty Ring Buffer Guard (total_samples == 0):
-     *    Do not fabricate or compute any temperatures on cold boot before Flow A has sampled. */
-    if (st->total_samples == 0) {
-        ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
-                 (float)st->last_glass_temp_centi_c / 100.0f);
-        if (out_temp_c) *out_temp_c = 0.0f;
-        if (out_rh_pct) *out_rh_pct = 0.0f;
-        if (out_dew_c)  *out_dew_c  = 0.0f;
-        return ESP_OK;
-    }
-
-    /* 2. Read current Glass Temp (cached pre-display in sub_display_init) and Die Temp (from Flow A ring) */
-    float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
-    orch_tri_node_sample_t latest_raw = {0};
-    orch_state_get_latest_sample(&latest_raw);
-    float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
-
-    /* 3. Scan 32-Sample Ring Buffer: Compute Valid Window Floor, Ceiling, & Short-Term Averages */
     uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
     int16_t current_low  = INT16_MAX;
     int16_t current_high = INT16_MIN;
@@ -198,6 +174,60 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     st->amb_floor_temp_centi_c   = current_low;
     st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
     st->window_avg_die_c         = ((float)sum_die   / (float)valid_cnt) / 100.0f;
+}
+
+static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid, float t_die, float t_glass, const char **out_mode)
+{
+    float t_amb = t_valid;
+    const char *mode = "SETTLED(T_valid)";
+
+    if (st->valid_trend < 2) {
+        float min_ref = (t_glass < t_die) ? t_glass : t_die;
+        t_amb = (min_ref < t_valid) ? min_ref : t_valid;
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+        mode = "CASE_A_UNSETTLED";
+    } else if (st->window_avg_shtc3_c > (st->window_avg_die_c + ORCH_LEAKAGE_MARGIN_C)) {
+        t_amb = (t_die < t_glass) ? t_die : t_glass;
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+        mode = "CASE_B_LEAKAGE";
+    } else {
+        t_amb = t_valid;
+        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
+    }
+
+    if (out_mode) {
+        *out_mode = mode;
+    }
+    return t_amb;
+}
+
+esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c)
+{
+    orch_persisted_state_t *st = orch_state_get();
+
+    /* Flow B Invariant: Never query SHTC3 (0x70) in Flow B!
+     * All calculations operate on the 32-sample RTC ring buffer populated by Flow A,
+     * the pre-display SSD1681 Glass Thermistor (st->last_glass_temp_centi_c), and MCU Die TSENS. */
+
+    /* 1. Cold-Boot / Empty Ring Buffer Guard (total_samples == 0):
+     *    Do not fabricate or compute any temperatures on cold boot before Flow A has sampled. */
+    if (st->total_samples == 0) {
+        ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
+                 (float)st->last_glass_temp_centi_c / 100.0f);
+        if (out_temp_c) *out_temp_c = 0.0f;
+        if (out_rh_pct) *out_rh_pct = 0.0f;
+        if (out_dew_c)  *out_dew_c  = 0.0f;
+        return ESP_OK;
+    }
+
+    /* 2. Read current Glass Temp (cached pre-display in sub_display_init) and Die Temp (from Flow A ring) */
+    float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
+    orch_tri_node_sample_t latest_raw = {0};
+    orch_state_get_latest_sample(&latest_raw);
+    float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
+
+    /* 3. Scan 32-Sample Ring Buffer: Compute Valid Window Floor, Ceiling, & Short-Term Averages */
+    orch_flow_scan_ring_metrics(st);
 
     /* 4. Tier 1 (Current Valid Sample) & Tier 3 (Long-Term temp_historical Light EWMA) */
     orch_tri_node_sample_t valid_samp = {0};
@@ -230,21 +260,8 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
      *    - Case A (valid_trend < 2): Promote min(T_glass, T_die, T_valid)
      *    - Case B (window_avg_shtc3 > window_avg_die + margin): Promote min(T_die, T_glass)
      *    - Typical Settled: Use unsmoothed T_valid directly */
-    float t_amb = t_valid;
-    const char *amb_mode = "SETTLED(T_valid)";
-    if (st->valid_trend < 2) {
-        float min_ref = (t_glass < t_die) ? t_glass : t_die;
-        t_amb = (min_ref < t_valid) ? min_ref : t_valid;
-        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
-        amb_mode = "CASE_A_UNSETTLED";
-    } else if (st->window_avg_shtc3_c > (st->window_avg_die_c + ORCH_LEAKAGE_MARGIN_C)) {
-        t_amb = (t_die < t_glass) ? t_die : t_glass;
-        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
-        amb_mode = "CASE_B_LEAKAGE";
-    } else {
-        t_amb = t_valid;
-        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
-    }
+    const char *amb_mode = NULL;
+    float t_amb = orch_flow_evaluate_ambient_selection(st, t_valid, t_die, t_glass, &amb_mode);
 
     /* 7. Psychrometric Math (Single-pass Magnus equations from T_valid, RH_valid, and T_amb) */
     float vp     = 0.0f;
@@ -276,15 +293,8 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     return ESP_OK;
 }
 
-esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
+static void orch_flow_quiesce_peripherals(void)
 {
-    if (sleep_sec == 0) {
-        ESP_LOGE(TAG, "Lifecycle error: sleep_sec is 0. Aborting sleep transition.");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
-
     /* 1. Wait for LVGL render and flush pipeline to drain completely (including badge update) */
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
@@ -314,7 +324,10 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 
     /* 5. Put SSD1681 display controller into Deep Sleep Mode 1 (1.0 µA) */
     sub_display_enter_deep_sleep();
+}
 
+static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
+{
     /* 6. Sub-Interval Sensor Timing & Centralized RTC Countdown Arming:
      * Note: Countdown timer arming is handled exclusively inside sub_power_enter_deep_sleep_mode()
      * to eliminate back-to-back I2C STOP/START/RELOAD cycles and avoid asynchronous clock-domain collisions! */
@@ -332,5 +345,17 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
                          (1ULL << HAL_PIN_BUTTON_POWER) |
                          (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
+}
+
+esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
+{
+    if (sleep_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle error: sleep_sec is 0. Aborting sleep transition.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
+    orch_flow_quiesce_peripherals();
+    return orch_flow_execute_sleep(sleep_sec);
 }
 

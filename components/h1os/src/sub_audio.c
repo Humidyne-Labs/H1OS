@@ -195,73 +195,96 @@ bool sub_audio_is_ready(void)
     return (sub_audio_wait_until_ready(10) == ESP_OK);
 }
 
+typedef struct {
+    uint8_t reg;
+    uint8_t val;
+} es8311_reg_entry_t;
+
+/* Phase 1: Clock tree, bias initialization, and VMID fast charging */
+static const es8311_reg_entry_t s_es8311_init_pre_charge[] = {
+    /* 1. Silicon errata I2C noise immunity lock (must be written twice first) */
+    { 0x44, 0x08 },
+    { 0x44, 0x08 },
+
+    /* 2. Wake analog baseline and begin smooth VMID capacitor charge */
+    { 0x0D, 0xFA },
+
+    /* 3. Clock tree setup (16kHz Philips I2S master clocking) */
+    { 0x01, 0x30 },
+    { 0x02, 0x00 },
+    { 0x03, 0x10 },
+    { 0x16, 0x24 }, /* ADC volume scale baseline */
+    { 0x04, 0x20 }, /* DAC OSR = 0x20 for 16kHz Fs */
+    { 0x05, 0x00 },
+    { 0x0B, 0x00 },
+    { 0x0C, 0x00 },
+
+    /* 4. Analog bias & VMID buffer configuration */
+    { 0x10, 0x1F }, /* Bias generator current nominal */
+    { 0x11, 0x7F }, /* Connect external C_VMID filter cap */
+
+    /* 5. State machine power on & I2S slave mode */
+    { 0x00, 0x80 }, /* CSM power on, slave mode */
+    { 0x01, 0x3F }, /* MCLK pin input, all clocks active */
+    { 0x06, 0x03 }, /* BCLK divider = 4 */
+    { 0x07, 0x00 }, /* Master LRCK divider high byte */
+    { 0x08, 0xFF }, /* Master LRCK divider low byte */
+
+    /* 6. Signal routing and high-pass filters */
+    { 0x13, 0x10 }, /* Reference bias configuration */
+    { 0x1B, 0x0A },
+    { 0x1C, 0x6A },
+    { 0x44, 0x58 }, /* Internal reference signal routing */
+
+    /* 7. Serial Data Port (SDP) configuration (16-bit mono Left I2S) */
+    { 0x09, 0x0C }, /* SDP_IN: 16-bit Philips I2S, unmuted */
+    { 0x0A, 0x0C }, /* SDP_OUT: 16-bit Philips I2S, unmuted */
+};
+
+/* Phase 2: Post-charge low-noise analog reference, EQ bypass errata, and unmuting */
+static const es8311_reg_entry_t s_es8311_init_post_charge[] = {
+    /* Power on DAC and lock low-noise analog reference (Fixes Hiss) */
+    { 0x17, 0xBF }, /* ALC baseline */
+    { 0x0E, 0x02 }, /* Power down Mic/ADC Modulator; keep VROI on */
+    { 0x12, 0x00 }, /* DAC analog stage power ON */
+    { 0x14, 0x1A }, /* ADC input termination (no floating mic hum) */
+    { 0x0D, 0x01 }, /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
+    { 0x15, 0x40 },
+
+    /* SILICON ERRATA (Reg 0x37 = 0x08): Explicitly disables volume fade ramp and bypasses/disables EQ */
+    { 0x37, 0x08 },
+    { 0x45, 0x00 },
+
+    /* DAC unmuted permanently (30sec + view time) for warm sessions */
+    { 0x31, 0x00 },
+};
+
+static esp_err_t es8311_write_table(const es8311_reg_entry_t *table, size_t count)
+{
+    esp_err_t ret = ESP_OK;
+    for (size_t i = 0; i < count; i++) {
+        ret |= es8311_write_reg(table[i].reg, table[i].val);
+    }
+    return ret;
+}
+
 static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
-    /* 1. Silicon errata I2C noise immunity lock (must be written twice first) */
-    ret |= es8311_write_reg(0x44, 0x08);
-    ret |= es8311_write_reg(0x44, 0x08);
-
-    /* 2. Wake analog baseline and begin smooth VMID capacitor charge */
-    ret |= es8311_write_reg(0x0D, 0xFA);
-
-    /* 3. Clock tree setup (16kHz Philips I2S master clocking) */
-    ret |= es8311_write_reg(0x01, 0x30);
-    ret |= es8311_write_reg(0x02, 0x00);
-    ret |= es8311_write_reg(0x03, 0x10);
-    ret |= es8311_write_reg(0x16, 0x24); /* ADC volume scale baseline */
-    ret |= es8311_write_reg(0x04, 0x20); /* DAC OSR = 0x20 for 16kHz Fs */
-    ret |= es8311_write_reg(0x05, 0x00);
-    ret |= es8311_write_reg(0x0B, 0x00);
-    ret |= es8311_write_reg(0x0C, 0x00);
-
-    /* 4. Analog bias & VMID buffer configuration */
-    ret |= es8311_write_reg(0x10, 0x1F); /* Bias generator current nominal */
-    ret |= es8311_write_reg(0x11, 0x7F); /* Connect external C_VMID filter cap */
-
-    /* 5. State machine power on & I2S slave mode */
-    ret |= es8311_write_reg(0x00, 0x80); /* CSM power on, slave mode */
-    ret |= es8311_write_reg(0x01, 0x3F); /* MCLK pin input, all clocks active */
-    ret |= es8311_write_reg(0x06, 0x03); /* BCLK divider = 4 */
-    ret |= es8311_write_reg(0x07, 0x00); /* Master LRCK divider high byte */
-    ret |= es8311_write_reg(0x08, 0xFF); /* Master LRCK divider low byte */
-
-    /* 6. Signal routing and high-pass filters */
-    ret |= es8311_write_reg(0x13, 0x10); /* Reference bias configuration */
-    ret |= es8311_write_reg(0x1B, 0x0A);
-    ret |= es8311_write_reg(0x1C, 0x6A);
-    ret |= es8311_write_reg(0x44, 0x58); /* Internal reference signal routing */
-
-    /* 7. Serial Data Port (SDP) configuration (16-bit mono Left I2S) */
-    ret |= es8311_write_reg(0x09, 0x0C); /* SDP_IN: 16-bit Philips I2S, unmuted */
-    ret |= es8311_write_reg(0x0A, 0x0C); /* SDP_OUT: 16-bit Philips I2S, unmuted */
+    /* 1-7. Execute pre-charge configuration sequence */
+    ret |= es8311_write_table(s_es8311_init_pre_charge,
+                              sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
 
     /* 8. Allow C_VMID fast-charge (0x0D = 0xFA) to saturate to AVDD/2 (1.65V) before switching to low-noise normal mode */
     vTaskDelay(pdMS_TO_TICKS(35));
 
-    /* Power on DAC and lock low-noise analog reference (Fixes Hiss) */
-    ret |= es8311_write_reg(0x17, 0xBF); /* ALC baseline */
-    ret |= es8311_write_reg(0x0E, 0x02); /* Power down Mic/ADC Modulator; keep VROI on */
-    ret |= es8311_write_reg(0x12, 0x00); /* DAC analog stage power ON */
-    ret |= es8311_write_reg(0x14, 0x1A); /* ADC input termination (no floating mic hum) */
-    ret |= es8311_write_reg(0x0D, 0x01); /* CRITICAL FIX: Analog reference & normal VMID buffer ON */
-    ret |= es8311_write_reg(0x15, 0x40);
+    /* 9. Execute post-charge configuration sequence */
+    ret |= es8311_write_table(s_es8311_init_post_charge,
+                              sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
 
-    /* 9. Modulator dither, Silicon Errata EQ bypass & low-power bias configuration:
-     * - SILICON ERRATA (Reg 0x37 = 0x08): The ES8311 datasheet incorrectly states that the digital
-     *   equalizer (EQ) is disabled by default. In physical silicon, failing to write 0x08 leaves
-     *   the digital EQ block active in the signal path without configured biquad filter coefficients,
-     *   producing catastrophic phase distortion and harsh buzzing ("sounds like death on 3 wheels").
-     *   Programming 0x08 explicitly disables the volume fade ramp and bypasses/disables the EQ.
-     * - LOW-POWER MODE (Reg 0x0F = 0x80): Standard default; the noise floor difference through the
-     *   NS4168 Class-D amplifier is completely negligible while saving dynamic battery power. */
-    ret |= es8311_write_reg(0x37, 0x08); /* SILICON ERRATA: Mandatory EQ bypass (0x08) & ramp disable */
-    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00); /* LPDAC low-power bias default */
-    ret |= es8311_write_reg(0x45, 0x00);
-
-    /* DAC unmuted permanently (30sec + view time) for warm sessions */
-    ret |= es8311_write_reg(0x31, 0x00);
+    /* Dynamic Low-Power Mode (Reg 0x0F = 0x80): Standard default; negligible noise floor delta saves dynamic power */
+    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00);
 
     return ret;
 }

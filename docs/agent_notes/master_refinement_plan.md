@@ -354,8 +354,8 @@ graph LR
 ### Phase 5: Function Decomposition & System Verification
 - **Files:** `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/h1os_lifecycle.c`
 - **Shopping List Tasks:**
-  - [ ] Decompose `orch_flow_query_telemetry()` into scanner, evaluator, and coordinator
-  - [ ] Decompose `orch_flow_transition_to_sleep()` into peripheral quiescer and sleep executor
-  - [ ] Convert `es8311_init_dac_registers()` to a static table-driven loader
-  - [ ] Decompose `h1os_start()` into bringup, non-UI dispatch, and session launch
-  - [ ] Verify clean compilation under ESP-IDF v6.1 and record binary size reductions
+  - [x] Decompose `orch_flow_query_telemetry()` into scanner, evaluator, and coordinator
+  - [x] Decompose `orch_flow_transition_to_sleep()` into peripheral quiescer and sleep executor
+  - [x] Convert `es8311_init_dac_registers()` to a static table-driven loader
+  - [x] Decompose `h1os_start()` into bringup, non-UI dispatch, and session launch
+  - [x] Verify clean compilation under ESP-IDF v6.1 and record binary size reductions
