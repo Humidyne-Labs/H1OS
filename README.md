@@ -69,10 +69,10 @@ H1OS enforces a strict unidirectional dependency model: **Upper layers call lowe
 
 ```mermaid
 graph TD
-    L4["Layer 4: Application API & Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h)"]
-    L3["Layer 3: Core Middleware & Orchestration (orch_flow, orch_math, orch_state, ULP Monitor)"]
+    L4["Layer 4: Application API and Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h)"]
+    L3["Layer 3: Core Middleware and Orchestration (orch_flow, orch_math, orch_state, ULP Monitor)"]
     L2["Layer 2: Peripheral Subsystems (sub_display, sub_sensor, sub_rtc, sub_power, sub_audio, sub_sdcard)"]
-    L1["Layer 1: Hardware Abstraction Layer & ESP-IDF (hal_io, hal_i2c, hal_spi, hal_flash, FreeRTOS)"]
+    L1["Layer 1: Hardware Abstraction Layer and ESP-IDF (hal_io, hal_i2c, hal_spi, hal_flash, FreeRTOS)"]
     L4 --> L3
     L3 --> L2
     L2 --> L1

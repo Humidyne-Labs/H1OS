@@ -116,7 +116,7 @@ stateDiagram-v2
 ```
 
 ### 4.1 Master Rails Latched in 2nd-Stage Bootloader
-The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/bootloader_components/h1os_boot_hook/h1os_boot_hook.c)) executes within $<25\text{ ms}$ of silicon reset. It configures and locks the three hardware master rails:
+The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](../../components/h1os/bootloader_components/h1os_boot_hook/h1os_boot_hook.c)) executes within $<25\text{ ms}$ of silicon reset. It configures and locks the three hardware master rails:
 1. `HAL_PIN_POWER_HOLD` (GPIO 17, `RTCIO 17`):
    - Driven HIGH (`GPIO_OUT_REG` bit 17).
    - Latched via `RTC_CNTL_PAD_HOLD_REG.GPIO_PIN17_HOLD = 1`.
@@ -131,7 +131,7 @@ The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](file:///c:/Users/Matt/Docume
    - **Anti-Clamping Invariant:** Keeping the audio rail energized prevents the ES8311 codec's internal ESD protection diodes from forward-biasing and clamping the shared I2C bus (`GPIO 47`/`48`) to 0.7 V. Hardware mute during boot and deep sleep is enforced by driving `HAL_PIN_PA_CTRL` (GPIO 46) LOW.
 
 ### 4.2 Application Static Sleep Isolation
-Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/src/hal_io.c#L318) isolates static outputs to prevent parasitic leakage currents through external components:
+Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](../../components/h1os/src/hal_io.c) isolates static outputs to prevent parasitic leakage currents through external components:
 - `HAL_PIN_EPD_CS` (GPIO 11 / `RTCIO 11`): Driven HIGH, latched via `gpio_hold_en()`.
 - `HAL_PIN_EPD_RST` (GPIO 9 / `RTCIO 9`): Driven HIGH, latched via `gpio_hold_en()`.
 - `HAL_PIN_PA_CTRL` (GPIO 46, Digital IO): Driven LOW (Mute), latched via `gpio_hold_en()`.
@@ -139,7 +139,7 @@ Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](file:///c:/Use
 - `gpio_deep_sleep_hold_en()` is called once to activate the digital autohold domain for GPIO 42 and GPIO 46.
 
 ### 4.3 Intentional Depower (System Shutdown)
-The only condition under which `HAL_PIN_POWER_HOLD` (GPIO 17) is unlatched is a commanded system shutdown ([`sub_power_cut_power_latch()`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/src/sub_power.c#L400)):
+The only condition under which `HAL_PIN_POWER_HOLD` (GPIO 17) is unlatched is a commanded system shutdown ([`sub_power_cut_power_latch()`](../../components/h1os/src/sub_power.c)):
 ```c
 void sub_power_cut_power_latch(void)
 {

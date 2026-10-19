@@ -64,7 +64,7 @@ graph TD;
     end
 
     subgraph AUDIO_BUS ["I2S0 Audio Interface"]
-        I2S_STREAM["ES8311 DAC (BCLK=IO21, WS=IO45, DOUT=IO40)"];
+        I2S_STREAM["ES8311 DAC (MCLK=IO14, BCLK=IO15, WS=IO38, DOUT=IO45, DIN=IO16)"];
         NS4168_AMP["NS4168 Class-D Amp (PA_EN=IO42 Active Low, PA_CTRL=IO46 Active High)"];
     end
 

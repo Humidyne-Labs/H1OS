@@ -98,7 +98,7 @@ graph TD;
 
 ## 3. Flow A Specification: Bare-Metal Sensor Acquisition & Thermal Gating
 
-Flow A runs **strictly** inside [`bsp_wake_stub()`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/h1os/src/orch_wake_stub.c) in RTC Fast IRAM every `sample_interval_sec` (`60s`) while Flow B is sleeping.
+Flow A runs **strictly** inside [`bsp_wake_stub()`](../../components/h1os/src/orch_wake_stub.c) in RTC Fast IRAM every `sample_interval_sec` (`60s`) while Flow B is sleeping.
 
 ### 3.1 SHTC3 & Low-Power Die Temp Acquisition Sequence
 1. **Wake & Zero-Hour Check:**

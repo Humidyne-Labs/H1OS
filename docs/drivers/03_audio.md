@@ -6,10 +6,11 @@
 - **Amplifier IC:** Nuvoton / National NS4168 3W Mono Class-D Audio Power Amplifier
 - **Control Interface:** Shared Master I2C (`I2C_NUM_0`, 7-Bit Address: `0x18`)
 - **Digital Audio Interface:** I2S0 Master Mode (Standard Philips Format)
-  - Bit Clock (BCLK): `GPIO 21`
-  - Word Select / LR Clock (LRCK): `GPIO 45`
-  - Serial Data Out / DSDIN: `GPIO 40`
-  - Master Clock (MCLK): Unused (Codec derives clock internally from BCLK)
+  - Master Clock (MCLK): `GPIO 14` (`HAL_PIN_I2S_MCLK`, $256 \times F_s$)
+  - Bit / Serial Clock (BCLK / SCLK): `GPIO 15` (`HAL_PIN_I2S_SCLK`)
+  - Word Select / LR Clock (LRCK / WS): `GPIO 38` (`HAL_PIN_I2S_LRCK`)
+  - Serial Audio Data Out to Codec (DSDIN / DOUT): `GPIO 45` (`HAL_PIN_I2S_DSDIN`)
+  - Serial Audio Data In from Codec (ASDOUT / DIN): `GPIO 16` (`HAL_PIN_I2S_ASDOUT`)
 - **Power & Control Pins:**
   - `PA_EN` (`GPIO 42`): Audio Subsystem Power Rail (Active LOW: `0 = Power ON`, `1 = Power OFF`)
   - `PA_CTRL` (`GPIO 46`): NS4168 Amplifier Enable / Mute (Active HIGH: `1 = Amp Enabled`, `0 = Muted / Shutdown`)

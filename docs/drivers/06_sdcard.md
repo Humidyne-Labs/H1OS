@@ -4,12 +4,12 @@
 - **Storage Media:** MicroSD / SDHC / SDXC
 - **Controller Interface:** ESP32-S3 SDMMC Host Peripheral (1-Bit Mode)
 - **Pin Assignment:**
-  - Clock (CLK): `GPIO 39` (`BSP_PIN_SD_CLK`)
-  - Command (CMD): `GPIO 41` (`BSP_PIN_SD_MOSI`)
-  - Data Line 0 (D0): `GPIO 40` (`BSP_PIN_SD_MISO`)
+  - Clock (CLK): `GPIO 39` (`HAL_PIN_SD_CLK`)
+  - Command (CMD): `GPIO 41` (`HAL_PIN_SD_MOSI`)
+  - Data Line 0 (D0): `GPIO 40` (`HAL_PIN_SD_MISO`)
   - Card Detect (CD): Not Connected (`SDMMC_SLOT_NO_CD`)
   - Write Protect (WP): Not Connected (`SDMMC_SLOT_NO_WP`)
-- **Mount Point:** `/sdcard` (`BSP_SDCARD_MOUNT_POINT`)
+- **Mount Point:** `/sdcard` (`SUB_SDCARD_MOUNT_POINT`)
 - **Operating Frequency:** 20 MHz (`SDMMC_FREQ_DEFAULT`)
 
 ---
@@ -35,9 +35,9 @@ host.flags        = SDMMC_HOST_FLAG_1BIT;
 
 sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
 slot_config.width = 1;
-slot_config.clk   = (gpio_num_t)BSP_PIN_SD_CLK;
-slot_config.cmd   = (gpio_num_t)BSP_PIN_SD_MOSI;
-slot_config.d0    = (gpio_num_t)BSP_PIN_SD_MISO;
+slot_config.clk   = (gpio_num_t)HAL_PIN_SD_CLK;
+slot_config.cmd   = (gpio_num_t)HAL_PIN_SD_MOSI;
+slot_config.d0    = (gpio_num_t)HAL_PIN_SD_MISO;
 slot_config.cd    = SDMMC_SLOT_NO_CD;
 slot_config.wp    = SDMMC_SLOT_NO_WP;
 ```
@@ -63,9 +63,10 @@ $$
 $$
 
 ```c
-float bsp_sdcard_get_capacity_gb(void) {
-    if (s_sd_card == NULL) return 0.0f;
-    return (float)(s_sd_card->csd.capacity) / 2048.0f / 1024.0f;
+esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb) {
+    if (s_sd_card == NULL || out_capacity_mb == NULL) return ESP_ERR_INVALID_STATE;
+    *out_capacity_mb = (uint32_t)((uint64_t)s_sd_card->csd.capacity * s_sd_card->csd.sector_size / (1024 * 1024));
+    return ESP_OK;
 }
 ```
 
@@ -75,5 +76,5 @@ float bsp_sdcard_get_capacity_gb(void) {
 
 Before system shutdown or entering deep sleep:
 1. Flush any open file descriptors.
-2. Call `esp_vfs_fat_sdcard_unmount(BSP_SDCARD_MOUNT_POINT, s_sd_card);`.
+2. Call `sub_sdcard_unmount()` (`esp_vfs_fat_sdcard_unmount(SUB_SDCARD_MOUNT_POINT, s_sd_card)`).
 3. Tristate or deinitialize the SDMMC bus handles to prevent parasitic leakage through the SD card pins.
