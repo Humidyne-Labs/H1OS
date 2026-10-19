@@ -82,79 +82,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
-        if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) {
-            return ORCH_FLOW_A_SAMPLE;
-        }
+        /* All non-critical, non-bootloader ULP wakeups reaching full OS boot are Flow B Main Wakes */
         return ORCH_FLOW_B_MAIN_WAKE;
-    }
-
-    if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER)) {
-        st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
-        return ORCH_FLOW_A_SAMPLE;
     }
 
     /* All non-boot wakeups reaching the OS are Flow B Main Wakes */
     return ORCH_FLOW_B_MAIN_WAKE;
-}
-
-void orch_flow_execute_sensor_sample(void)
-{
-    orch_persisted_state_t *st = orch_state_get();
-
-    uint16_t raw_t  = 0;
-    uint16_t raw_rh = 0;
-
-    esp_err_t err = sub_sensor_read_shtc3_raw(&raw_t, &raw_rh, false);
-    if (err == ESP_OK) {
-        int16_t temp_centi_c  = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
-        uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-
-        float die_c = 0.0f;
-        sub_sensor_init();
-        sub_sensor_read_mcu_die_temp(&die_c);
-        sub_sensor_deinit();
-        int16_t die_centi_c = (int16_t)(die_c * 100.0f);
-
-        /* Evaluate successive-sample delta gate */
-        uint8_t q_flags = 0;
-        if (st->total_samples == 0) {
-            q_flags = 0;
-            st->valid_trend = 0;
-        } else {
-            uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
-            int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
-            int16_t diff = temp_centi_c - prev_t;
-            if (diff < 0) diff = -diff;
-
-            if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
-                st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
-                q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
-                if (st->valid_trend < 2) {
-                    st->valid_trend = 2;
-                } else {
-                    st->valid_trend++;
-                }
-            } else {
-                q_flags = 0;
-                st->valid_trend = 0;
-            }
-        }
-
-        orch_tri_node_sample_t sample = {
-            .shtc3_temp_centi_c = temp_centi_c,
-            .shtc3_rh_centi_pct = rh_centi_pct,
-            .mcu_tsens_centi_c  = die_centi_c,
-            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
-            .timestamp_sec      = (uint32_t)time(NULL),
-            .quality_flags      = q_flags,
-        };
-        orch_state_push_sample(&sample);
-        ESP_LOGI(TAG, "Flow A Sensor Sample committed: T=%.2f C, RH=%.2f %%, Die=%.2f C (Ring: %u/32, Trend: %u)",
-                 (float)temp_centi_c / 100.0f, (float)rh_centi_pct / 100.0f,
-                 (float)die_centi_c / 100.0f, st->ring_head, st->valid_trend);
-    } else {
-        ESP_LOGW(TAG, "Flow A SHTC3 read failed: %s", esp_err_to_name(err));
-    }
 }
 
 bool orch_flow_is_thermal_lockout(void)
@@ -393,16 +326,7 @@ esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
     ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
              (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
 
-    /* 7. Drain GPIO 5 pulse: Wait for external PCF85063A ~15.6ms open-drain pulse to release HIGH.
-     * Bounded to 25ms timeout. Entering deep sleep while the line is held LOW causes immediate
-     * false triggers, missed edge transitions, and PMU arbitration aborts! */
-    uint32_t drain_wait_us = 0;
-    while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 25000) {
-        esp_rom_delay_us(500);
-        drain_wait_us += 500;
-    }
-
-    /* 8. Enter hardware deep sleep with buttons and RTC INT wake sources */
+    /* 7. Enter hardware deep sleep with buttons and RTC INT wake sources */
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
                          (1ULL << HAL_PIN_BUTTON_POWER) |
                          (1ULL << HAL_PIN_RTC_INT);

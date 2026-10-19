@@ -332,10 +332,10 @@ graph LR
 ### Phase 2: Flow A Wake Stub Bridge Enablement & OS Runtime Pruning
 - **Files:** `components/h1os/src/sub_power.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/h1os_lifecycle.c`
 - **Shopping List Tasks:**
-  - [ ] Hook `orch_wake_stub_install()` into `sub_power_enter_deep_sleep_mode()`
-  - [ ] Delete `orch_flow_execute_sensor_sample()` from `orch_flow.c`
-  - [ ] Remove `ORCH_FLOW_A_SAMPLE` FreeRTOS execution branch from `h1os_lifecycle.c`
-  - [ ] Centralize PCF85063A open-drain pulse drain barrier in `sub_power.c` and remove duplicates from `orch_flow.c` and `h1os_lifecycle.c`
+  - [x] Hook `orch_wake_stub_install()` into `sub_power_enter_deep_sleep_mode()`
+  - [x] Delete `orch_flow_execute_sensor_sample()` from `orch_flow.c`
+  - [x] Remove `ORCH_FLOW_A_SAMPLE` FreeRTOS execution branch from `h1os_lifecycle.c`
+  - [x] Centralize PCF85063A open-drain pulse drain barrier in `sub_power.c` and remove duplicates from `orch_flow.c` and `h1os_lifecycle.c`
 
 ### Phase 3: Layer Integrity Enforcement & Dead Scaffolding Pruning
 - **Files:** `components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/orch_flow.c`, `components/h1os/src/sub_audio.c`, `components/h1os/src/sub_sdcard.c`

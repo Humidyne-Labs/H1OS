@@ -36,14 +36,6 @@ typedef enum {
  */
 orch_flow_type_t orch_flow_determine_wakeup(void);
 
-/**
- * @brief Execute Flow A Headless Sensor Sample Burst.
- *
- * Powers on sensor rail, takes rapid low-power SHTC3 reading in <4ms,
- * commits sample to RTC Slow Memory ring buffer, and re-enters deep sleep immediately.
- * Zero measurable thermal impact on sensor cavity.
- */
-void orch_flow_execute_sensor_sample(void);
 
 /**
  * @brief Check whether system is in Thermal Lockout state.

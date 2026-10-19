@@ -235,33 +235,6 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         return ESP_OK;
     }
 
-    if (flow == ORCH_FLOW_A_SAMPLE) {
-        int64_t t_start_us = esp_timer_get_time();
-        ESP_LOGI(TAG, "Executing Flow A Sensor Sample Burst...");
-        orch_flow_execute_sensor_sample();
-        int64_t t_duration_us = esp_timer_get_time() - t_start_us;
-        ESP_LOGI(TAG, "[FLOW A METRICS] Execution duration: %lld us (%.2f ms) | Ring Head: %u/32",
-                 t_duration_us, (double)t_duration_us / 1000.0, orch_state_get()->ring_head);
-
-        /* Drain GPIO 5 pulse: Wait for external PCF85063A ~15.6ms open-drain pulse to release HIGH.
-         * Bounded to 25ms timeout. Entering deep sleep while the line is held LOW causes immediate
-         * false triggers, missed edge transitions, and PMU arbitration aborts! */
-        uint32_t drain_wait_us = 0;
-        while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 25000) {
-            esp_rom_delay_us(500);
-            drain_wait_us += 500;
-        }
-
-        /* Re-enter deep sleep immediately; display and audio remain untouched.
-         * Invariant: Use SUB_POWER_SLEEP_FLOW_A_BURST mode!
-         * Preserves the running external PCF85063A countdown and the ULP slice_counter accumulator
-         * so the Flow B UI timer advances towards overflow_limit across sample bursts. */
-        uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) |
-                             (1ULL << HAL_PIN_BUTTON_POWER) |
-                             (1ULL << HAL_PIN_RTC_INT);
-        return sub_power_enter_deep_sleep_mode(0, wake_mask, SUB_POWER_SLEEP_FLOW_A_BURST);
-    }
-
     /* Initialize and start ULP Coprocessor reactive monitor on cold boot */
     if (flow == ORCH_FLOW_BOOT) {
         sub_power_init_ulp(st->sample_interval_sec);

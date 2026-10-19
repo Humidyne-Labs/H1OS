@@ -9,6 +9,7 @@
 #include "h1os/orch_state.h"
 #include "h1os/orch_math.h"
 #include "h1os/hal_types.h"
+#include "ulp_h1os.h"
 #include "esp_wake_stub.h"
 #include "esp_sleep.h"
 #include "esp_attr.h"
@@ -230,8 +231,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
-    /* 1. Only pure internal timer wakeups (TIMER_EXPIRE = BIT(3)) are processed by the sensor stub */
-    if (cause != TIMER_EXPIRE) {
+    /* 1. Only sensor sample triggers (ULP_DISPATCH_SENSOR_SAMPLE or internal TIMER_EXPIRE)
+     * are processed by the fast RTC wake stub. User buttons, RTC overflow, or critical
+     * faults promote immediately to full OS boot. */
+    if (ulp_dispatch_reason != ULP_DISPATCH_SENSOR_SAMPLE && cause != TIMER_EXPIRE) {
         REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
         esp_default_wake_deep_sleep();
         return;

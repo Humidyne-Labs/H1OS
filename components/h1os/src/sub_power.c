@@ -345,6 +345,19 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     /* ULP coprocessor wake source for the main application */
     esp_sleep_enable_ulp_wakeup();
 
+    /* Install RTC Fast Memory deep sleep wake stub (<3ms Flow A sensor burst) */
+    orch_wake_stub_install();
+
+    /* Centralized PCF85063A open-drain pulse drain barrier:
+     * Wait for external PCF85063A ~15.6ms pulse on GPIO 5 to release HIGH before clearing latches.
+     * Bounded to 50ms timeout. Entering sleep or clearing latches while line is LOW causes
+     * immediate false wake loops, missed edge transitions, and PMU lockups (ERR-S4)! */
+    uint32_t drain_wait_us = 0;
+    while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
+        esp_rom_delay_us(500);
+        drain_wait_us += 500;
+    }
+
     /* 5. Clear lingering latches & enforce Pure Event Mode: TIMER_EN = 0, GPIO_WAKEUP_ENA = 1 */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
     REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
