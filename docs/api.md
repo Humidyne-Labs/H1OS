@@ -22,76 +22,6 @@
 
 ---
 
-### H1OS_NAME
-
-```cpp
-#define H1OS_NAME "H1OS"
-```
-
-Defined in h1os/h1os.h:34
-
----
-
-### H1OS_SUBTITLE
-
-```cpp
-#define H1OS_SUBTITLE "E-Class Environmental Operating System"
-```
-
-Defined in h1os/h1os.h:35
-
----
-
-### H1OS_VERSION_MAJOR
-
-```cpp
-#define H1OS_VERSION_MAJOR 2
-```
-
-Defined in h1os/h1os.h:36
-
----
-
-### H1OS_VERSION_MINOR
-
-```cpp
-#define H1OS_VERSION_MINOR 1
-```
-
-Defined in h1os/h1os.h:37
-
----
-
-### H1OS_VERSION_PATCH
-
-```cpp
-#define H1OS_VERSION_PATCH 0
-```
-
-Defined in h1os/h1os.h:38
-
----
-
-### H1OS_VERSION_TAG
-
-```cpp
-#define H1OS_VERSION_TAG "alpha"
-```
-
-Defined in h1os/h1os.h:39
-
----
-
-### H1OS_VERSION_STRING
-
-```cpp
-#define H1OS_VERSION_STRING "2.1.0-alpha"
-```
-
-Defined in h1os/h1os.h:40
-
----
-
 ### RTC_INT_PIN
 
 ```cpp
@@ -1324,6 +1254,132 @@ Defined in h1os_lvgl.cpp:36
 
 ---
 
+### H1OS_VERSION_MAJOR
+
+```cpp
+#define H1OS_VERSION_MAJOR 2
+```
+
+Defined in h1os/h1os_version.h:22
+
+---
+
+### H1OS_VERSION_MINOR
+
+```cpp
+#define H1OS_VERSION_MINOR 1
+```
+
+Defined in h1os/h1os_version.h:23
+
+---
+
+### H1OS_VERSION_PATCH
+
+```cpp
+#define H1OS_VERSION_PATCH 0
+```
+
+Defined in h1os/h1os_version.h:24
+
+---
+
+### H1OS_VERSION_TAG
+
+```cpp
+#define H1OS_VERSION_TAG "alpha"
+```
+
+Defined in h1os/h1os_version.h:25
+
+---
+
+### H1OS_VERSION_STRING
+
+```cpp
+#define H1OS_VERSION_STRING "2.1.0-alpha"
+```
+
+Defined in h1os/h1os_version.h:26
+
+---
+
+### H1OS_NAME
+
+```cpp
+#define H1OS_NAME "H1OS"
+```
+
+Defined in h1os/h1os_version.h:28
+
+---
+
+### H1OS_SUBTITLE
+
+```cpp
+#define H1OS_SUBTITLE "E-Class Environmental Operating System"
+```
+
+Defined in h1os/h1os_version.h:29
+
+---
+
+### H1OS_VERSION_VAL
+
+```cpp
+#define H1OS_VERSION_VAL(major, minor, patch) (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
+```
+
+Defined in h1os/h1os_version.h:34
+
+Helper macro to compute a 32-bit numeric version code.
+
+---
+
+### H1OS_VERSION_CODE
+
+```cpp
+#define H1OS_VERSION_CODE H1OS_VERSION_VAL(H1OS_VERSION_MAJOR, H1OS_VERSION_MINOR, H1OS_VERSION_PATCH)
+```
+
+Defined in h1os/h1os_version.h:42
+
+Current H1OS version encoded as a single 32-bit unsigned integer: (MAJOR << 16) | (MINOR << 8) | PATCH Example: 2.1.0 => 0x00020100.
+
+---
+
+### H1OS_VERSION_CHECK
+
+```cpp
+#define H1OS_VERSION_CHECK(major, minor, patch) (H1OS_VERSION_CODE >= H1OS_VERSION_VAL(major, minor, patch))
+```
+
+Defined in h1os/h1os_version.h:48
+
+Compile-time version check macro: true if current version >= specified version.
+
+---
+
+### H1OS_BUILD_DATE
+
+```cpp
+#define H1OS_BUILD_DATE __DATE__
+```
+
+Defined in h1os/h1os_version.h:54
+
+---
+
+### H1OS_BUILD_TIME
+
+```cpp
+#define H1OS_BUILD_TIME __TIME__
+```
+
+Defined in h1os/h1os_version.h:55
+
+---
+
 ### H1OS_PIN_POWER_HOLD
 
 ```cpp
@@ -1472,7 +1528,7 @@ Defined in orch_display_sync.c:19
 enum h1os_splash_type_t
 ```
 
-Defined in h1os/h1os.h:57
+Defined in h1os/h1os.h:51
 
 Splash screens.
 
@@ -1491,7 +1547,7 @@ Splash screens.
 enum h1os_chime_type_t
 ```
 
-Defined in h1os/h1os.h:65
+Defined in h1os/h1os.h:59
 
 Chime Types.
 
@@ -1688,7 +1744,7 @@ ULP Dispatch Reason.
 using h1os_boot_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:73
+Defined in h1os/h1os.h:67
 
 ---
 
@@ -1698,7 +1754,7 @@ Defined in h1os/h1os.h:73
 using h1os_wake_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:74
+Defined in h1os/h1os.h:68
 
 ---
 
@@ -1708,7 +1764,7 @@ Defined in h1os/h1os.h:74
 using h1os_pre_sleep_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:75
+Defined in h1os/h1os.h:69
 
 ---
 
@@ -1718,7 +1774,7 @@ Defined in h1os/h1os.h:75
 using h1os_shutdown_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:76
+Defined in h1os/h1os.h:70
 
 ---
 
@@ -1728,7 +1784,7 @@ Defined in h1os/h1os.h:76
 using h1os_splash_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:77
+Defined in h1os/h1os.h:71
 
 ---
 
@@ -1738,7 +1794,7 @@ Defined in h1os/h1os.h:77
 using h1os_chime_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:78
+Defined in h1os/h1os.h:72
 
 ---
 
@@ -1764,7 +1820,7 @@ Callback for external network/remote time acquisition (SNTP, GPS, BLE).
 static inline const char * h1os_get_version(void)
 ```
 
-Defined in h1os/h1os.h:151
+Defined in h1os/h1os.h:145
 
 Get the H1OS semantic version string.
 
@@ -1776,7 +1832,7 @@ Get the H1OS semantic version string.
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os/h1os.h:159
+Defined in h1os/h1os.h:153
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -1788,7 +1844,7 @@ Initialize H1OS and dispatch application lifecycle.
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os/h1os.h:164
+Defined in h1os/h1os.h:158
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -1800,7 +1856,7 @@ Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os/h1os.h:169
+Defined in h1os/h1os.h:163
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -1812,7 +1868,7 @@ Retrieve current Tri-Node environmental telemetry.
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os/h1os.h:174
+Defined in h1os/h1os.h:168
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -1824,7 +1880,7 @@ Put the platform into ultra-low-power deep sleep.
 void h1os_reset_session_timer(void)
 ```
 
-Defined in h1os/h1os.h:179
+Defined in h1os/h1os.h:173
 
 Reset the interactive session inactivity timer (extends session by timeout_sec).
 
@@ -1836,7 +1892,7 @@ Reset the interactive session inactivity timer (extends session by timeout_sec).
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os/h1os.h:186
+Defined in h1os/h1os.h:180
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -1851,7 +1907,7 @@ true if running in an interactive user session, false during unattended wakes.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os/h1os.h:191
+Defined in h1os/h1os.h:185
 
 Orderly system shutdown and physical battery power cut.
 
@@ -1863,7 +1919,7 @@ Orderly system shutdown and physical battery power cut.
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os/h1os.h:197
+Defined in h1os/h1os.h:191
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -6438,6 +6494,132 @@ Retrieve the LVGL keypad input device handle.
 
 ---
 
+### h1os_version_get_major
+
+`static` `inline`
+
+```cpp
+static inline uint32_t h1os_version_get_major(void)
+```
+
+Defined in h1os/h1os_version.h:64
+
+Retrieve major version number (e.g.
+
+2).
+
+---
+
+### h1os_version_get_minor
+
+`static` `inline`
+
+```cpp
+static inline uint32_t h1os_version_get_minor(void)
+```
+
+Defined in h1os/h1os_version.h:72
+
+Retrieve minor version number (e.g.
+
+1).
+
+---
+
+### h1os_version_get_patch
+
+`static` `inline`
+
+```cpp
+static inline uint32_t h1os_version_get_patch(void)
+```
+
+Defined in h1os/h1os_version.h:80
+
+Retrieve patch version number (e.g.
+
+0).
+
+---
+
+### h1os_version_get_tag
+
+`static` `inline`
+
+```cpp
+static inline const char * h1os_version_get_tag(void)
+```
+
+Defined in h1os/h1os_version.h:88
+
+Retrieve version tag string (e.g.
+
+"alpha", "prod", "rc1").
+
+---
+
+### h1os_version_get_string
+
+`static` `inline`
+
+```cpp
+static inline const char * h1os_version_get_string(void)
+```
+
+Defined in h1os/h1os_version.h:96
+
+Retrieve full semantic version string (e.g.
+
+"2.1.0-alpha").
+
+---
+
+### h1os_version_get_code
+
+`static` `inline`
+
+```cpp
+static inline uint32_t h1os_version_get_code(void)
+```
+
+Defined in h1os/h1os_version.h:104
+
+Retrieve 32-bit numeric version code.
+
+---
+
+### h1os_version_get_build_date
+
+`static` `inline`
+
+```cpp
+static inline const char * h1os_version_get_build_date(void)
+```
+
+Defined in h1os/h1os_version.h:112
+
+Retrieve compiler build date string (e.g.
+
+"Oct 18 2026").
+
+---
+
+### h1os_version_get_build_time
+
+`static` `inline`
+
+```cpp
+static inline const char * h1os_version_get_build_time(void)
+```
+
+Defined in h1os/h1os_version.h:120
+
+Retrieve compiler build time string (e.g.
+
+"21:45:00").
+
+---
+
 ### epd_reset_pulse
 
 `static`
@@ -8555,7 +8737,7 @@ Defined in sub_audio.c:68
 struct h1os_lifecycle_t
 ```
 
-Defined in h1os/h1os.h:80
+Defined in h1os/h1os.h:74
 
 ### Public Attributes
 
@@ -8579,7 +8761,7 @@ h1os_boot_cb_t on_boot
 
 Type: [`h1os_boot_cb_t`](#h1os_boot_cb_t)
 
-Defined in h1os/h1os.h:82
+Defined in h1os/h1os.h:76
 
 System boot / power-on reset hook.
 
@@ -8593,7 +8775,7 @@ h1os_wake_cb_t on_wake
 
 Type: [`h1os_wake_cb_t`](#h1os_wake_cb_t)
 
-Defined in h1os/h1os.h:83
+Defined in h1os/h1os.h:77
 
 Interactive wake hook (Timer / RTC Alarm / Button Tap).
 
@@ -8607,7 +8789,7 @@ h1os_pre_sleep_cb_t on_pre_sleep
 
 Type: [`h1os_pre_sleep_cb_t`](#h1os_pre_sleep_cb_t)
 
-Defined in h1os/h1os.h:84
+Defined in h1os/h1os.h:78
 
 Hook executed immediately prior to entering deep sleep.
 
@@ -8621,7 +8803,7 @@ h1os_shutdown_cb_t on_shutdown
 
 Type: [`h1os_shutdown_cb_t`](#h1os_shutdown_cb_t)
 
-Defined in h1os/h1os.h:85
+Defined in h1os/h1os.h:79
 
 Hook executed immediately prior to battery cut.
 
@@ -8633,7 +8815,7 @@ Hook executed immediately prior to battery cut.
 struct h1os_lifecycle_t::@325134365353002276205315372127306003103261015120 presentation
 ```
 
-Defined in h1os/h1os.h:93
+Defined in h1os/h1os.h:87
 
 ---
 
@@ -8643,7 +8825,7 @@ Defined in h1os/h1os.h:93
 struct h1os_lifecycle_t::@146034141124024227100041106135372254367321170003 session
 ```
 
-Defined in h1os/h1os.h:102
+Defined in h1os/h1os.h:96
 
 ---
 
@@ -8653,7 +8835,7 @@ Defined in h1os/h1os.h:102
 void * user_data
 ```
 
-Defined in h1os/h1os.h:104
+Defined in h1os/h1os.h:98
 
 
 
@@ -8663,7 +8845,7 @@ Defined in h1os/h1os.h:104
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:88
+Defined in h1os/h1os.h:82
 
 ### Public Attributes
 
@@ -8684,7 +8866,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:89
+Defined in h1os/h1os.h:83
 
 Custom splash rendering callback.
 
@@ -8698,7 +8880,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:90
+Defined in h1os/h1os.h:84
 
 Custom chime callback.
 
@@ -8710,7 +8892,7 @@ Custom chime callback.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:91
+Defined in h1os/h1os.h:85
 
 Hardware synthesized chime bitmask.
 
@@ -8722,7 +8904,7 @@ Hardware synthesized chime bitmask.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:92
+Defined in h1os/h1os.h:86
 
 Initial audio output volume (0 - 100%, default 60% if 0).
 
@@ -8734,7 +8916,7 @@ Initial audio output volume (0 - 100%, default 60% if 0).
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:96
+Defined in h1os/h1os.h:90
 
 ### Public Attributes
 
@@ -8753,7 +8935,7 @@ Defined in h1os/h1os.h:96
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:97
+Defined in h1os/h1os.h:91
 
 Inactivity sleep timer (default: 30s).
 
@@ -8765,7 +8947,7 @@ Inactivity sleep timer (default: 30s).
 bool enable_dfs_80mhz
 ```
 
-Defined in h1os/h1os.h:99
+Defined in h1os/h1os.h:93
 
 Enable 80 MHz power droop while waiting for input (default: true).
 
@@ -8777,7 +8959,7 @@ Enable 80 MHz power droop while waiting for input (default: true).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:100
+Defined in h1os/h1os.h:94
 
 Flow A headless sensor sample burst interval (default: 60s).
 
@@ -8789,7 +8971,7 @@ Flow A headless sensor sample burst interval (default: 60s).
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:101
+Defined in h1os/h1os.h:95
 
 Flow B main application wake interval (default: 120s).
 
@@ -8805,7 +8987,7 @@ Flow B main application wake interval (default: 120s).
 struct h1os_telemetry_t
 ```
 
-Defined in h1os/h1os.h:110
+Defined in h1os/h1os.h:104
 
 ### Public Attributes
 
@@ -8844,7 +9026,7 @@ Defined in h1os/h1os.h:110
 float ambient_temp_c
 ```
 
-Defined in h1os/h1os.h:112
+Defined in h1os/h1os.h:106
 
 Ambient temp C.
 
@@ -8856,7 +9038,7 @@ Ambient temp C.
 float ambient_temp_f
 ```
 
-Defined in h1os/h1os.h:113
+Defined in h1os/h1os.h:107
 
 Ambient temp F.
 
@@ -8868,7 +9050,7 @@ Ambient temp F.
 float ambient_rh_pct
 ```
 
-Defined in h1os/h1os.h:114
+Defined in h1os/h1os.h:108
 
 Ambient RH %.
 
@@ -8880,7 +9062,7 @@ Ambient RH %.
 float dew_point_c
 ```
 
-Defined in h1os/h1os.h:115
+Defined in h1os/h1os.h:109
 
 Dew point C.
 
@@ -8892,7 +9074,7 @@ Dew point C.
 float dew_point_f
 ```
 
-Defined in h1os/h1os.h:116
+Defined in h1os/h1os.h:110
 
 Dew point F.
 
@@ -8904,7 +9086,7 @@ Dew point F.
 float absolute_humidity_g
 ```
 
-Defined in h1os/h1os.h:117
+Defined in h1os/h1os.h:111
 
 Absolute humidity g.
 
@@ -8916,7 +9098,7 @@ Absolute humidity g.
 float window_low_c
 ```
 
-Defined in h1os/h1os.h:120
+Defined in h1os/h1os.h:114
 
 Valid Window Floor (min over valid 32-sample window).
 
@@ -8928,7 +9110,7 @@ Valid Window Floor (min over valid 32-sample window).
 float window_high_c
 ```
 
-Defined in h1os/h1os.h:121
+Defined in h1os/h1os.h:115
 
 Valid Window Ceiling (max over valid 32-sample window).
 
@@ -8940,7 +9122,7 @@ Valid Window Ceiling (max over valid 32-sample window).
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/h1os.h:122
+Defined in h1os/h1os.h:116
 
 Short-term valid SHTC3 window average.
 
@@ -8952,7 +9134,7 @@ Short-term valid SHTC3 window average.
 float window_avg_die_c
 ```
 
-Defined in h1os/h1os.h:123
+Defined in h1os/h1os.h:117
 
 Short-term valid MCU Die window average.
 
@@ -8964,7 +9146,7 @@ Short-term valid MCU Die window average.
 float temp_historical_c
 ```
 
-Defined in h1os/h1os.h:124
+Defined in h1os/h1os.h:118
 
 Long-term light EWMA temperature history.
 
@@ -8976,7 +9158,7 @@ Long-term light EWMA temperature history.
 float rh_historical_pct
 ```
 
-Defined in h1os/h1os.h:125
+Defined in h1os/h1os.h:119
 
 Long-term light EWMA relative humidity history.
 
@@ -8988,7 +9170,7 @@ Long-term light EWMA relative humidity history.
 float raw_shtc3_temp_c
 ```
 
-Defined in h1os/h1os.h:128
+Defined in h1os/h1os.h:122
 
 Raw SHTC3 temp C.
 
@@ -9000,7 +9182,7 @@ Raw SHTC3 temp C.
 float mcu_die_temp_c
 ```
 
-Defined in h1os/h1os.h:129
+Defined in h1os/h1os.h:123
 
 MCU die temp C.
 
@@ -9012,7 +9194,7 @@ MCU die temp C.
 float epd_glass_temp_c
 ```
 
-Defined in h1os/h1os.h:130
+Defined in h1os/h1os.h:124
 
 EPD glass temp C.
 
@@ -9024,7 +9206,7 @@ EPD glass temp C.
 float trinode_temp_c
 ```
 
-Defined in h1os/h1os.h:131
+Defined in h1os/h1os.h:125
 
 (T_valid + T_die + T_glass) / 3.0
 
@@ -9036,7 +9218,7 @@ Defined in h1os/h1os.h:131
 float trinode_delta_c
 ```
 
-Defined in h1os/h1os.h:132
+Defined in h1os/h1os.h:126
 
 T_valid - T_trinode.
 
@@ -9048,7 +9230,7 @@ T_valid - T_trinode.
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/h1os.h:133
+Defined in h1os/h1os.h:127
 
 0-100% linear confidence score
 
@@ -9060,7 +9242,7 @@ Defined in h1os/h1os.h:133
 bool is_thermally_settled
 ```
 
-Defined in h1os/h1os.h:136
+Defined in h1os/h1os.h:130
 
 Is thermally settled.
 
@@ -9072,7 +9254,7 @@ Is thermally settled.
 uint16_t valid_trend
 ```
 
-Defined in h1os/h1os.h:137
+Defined in h1os/h1os.h:131
 
 Consecutive thermally settled Flow A samples.
 
@@ -9084,7 +9266,7 @@ Consecutive thermally settled Flow A samples.
 uint32_t sample_count
 ```
 
-Defined in h1os/h1os.h:138
+Defined in h1os/h1os.h:132
 
 Sample count.
 
@@ -9096,7 +9278,7 @@ Sample count.
 uint16_t battery_mv
 ```
 
-Defined in h1os/h1os.h:139
+Defined in h1os/h1os.h:133
 
 Battery mV.
 
@@ -9108,7 +9290,7 @@ Battery mV.
 uint8_t battery_percent
 ```
 
-Defined in h1os/h1os.h:140
+Defined in h1os/h1os.h:134
 
 Battery percent.
 
@@ -9120,7 +9302,7 @@ Battery percent.
 bool is_usb_powered
 ```
 
-Defined in h1os/h1os.h:141
+Defined in h1os/h1os.h:135
 
 Is USB powered.
 
@@ -9173,7 +9355,7 @@ Defined in sub_audio.c:202
 struct h1os_wake_context_t
 ```
 
-Defined in h1os/h1os.h:45
+Defined in h1os/h1os.h:39
 
 ### Public Attributes
 
@@ -9196,7 +9378,7 @@ Defined in h1os/h1os.h:45
 esp_reset_reason_t reset_reason
 ```
 
-Defined in h1os/h1os.h:46
+Defined in h1os/h1os.h:40
 
 Reset reason.
 
@@ -9208,7 +9390,7 @@ Reset reason.
 uint32_t wakeup_causes
 ```
 
-Defined in h1os/h1os.h:47
+Defined in h1os/h1os.h:41
 
 Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).
 
@@ -9220,7 +9402,7 @@ Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).
 uint32_t boot_count
 ```
 
-Defined in h1os/h1os.h:48
+Defined in h1os/h1os.h:42
 
 Boot count.
 
@@ -9232,7 +9414,7 @@ Boot count.
 uint32_t deep_sleep_count
 ```
 
-Defined in h1os/h1os.h:49
+Defined in h1os/h1os.h:43
 
 Deep sleep count.
 
@@ -9244,7 +9426,7 @@ Deep sleep count.
 bool woke_from_button
 ```
 
-Defined in h1os/h1os.h:50
+Defined in h1os/h1os.h:44
 
 Woke from button.
 
@@ -9256,7 +9438,7 @@ Woke from button.
 uint8_t wake_button
 ```
 
-Defined in h1os/h1os.h:51
+Defined in h1os/h1os.h:45
 
 Wake button GPIO.
 
@@ -9268,7 +9450,7 @@ Wake button GPIO.
 uint32_t sleep_duration_sec
 ```
 
-Defined in h1os/h1os.h:52
+Defined in h1os/h1os.h:46
 
 Sleep duration in seconds.
 
@@ -9280,7 +9462,7 @@ Sleep duration in seconds.
 void * user_data
 ```
 
-Defined in h1os/h1os.h:53
+Defined in h1os/h1os.h:47
 
 User data.
 
@@ -9997,7 +10179,7 @@ Defined in sub_audio.c:60
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:96
+Defined in h1os/h1os.h:90
 
 ### Public Attributes
 
@@ -10016,7 +10198,7 @@ Defined in h1os/h1os.h:96
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:97
+Defined in h1os/h1os.h:91
 
 Inactivity sleep timer (default: 30s).
 
@@ -10028,7 +10210,7 @@ Inactivity sleep timer (default: 30s).
 bool enable_dfs_80mhz
 ```
 
-Defined in h1os/h1os.h:99
+Defined in h1os/h1os.h:93
 
 Enable 80 MHz power droop while waiting for input (default: true).
 
@@ -10040,7 +10222,7 @@ Enable 80 MHz power droop while waiting for input (default: true).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:100
+Defined in h1os/h1os.h:94
 
 Flow A headless sensor sample burst interval (default: 60s).
 
@@ -10052,7 +10234,7 @@ Flow A headless sensor sample burst interval (default: 60s).
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:101
+Defined in h1os/h1os.h:95
 
 Flow B main application wake interval (default: 120s).
 
@@ -10090,7 +10272,7 @@ Defined in sub_audio.c:63
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:88
+Defined in h1os/h1os.h:82
 
 ### Public Attributes
 
@@ -10111,7 +10293,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:89
+Defined in h1os/h1os.h:83
 
 Custom splash rendering callback.
 
@@ -10125,7 +10307,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:90
+Defined in h1os/h1os.h:84
 
 Custom chime callback.
 
@@ -10137,7 +10319,7 @@ Custom chime callback.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:91
+Defined in h1os/h1os.h:85
 
 Hardware synthesized chime bitmask.
 
@@ -10149,7 +10331,7 @@ Hardware synthesized chime bitmask.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:92
+Defined in h1os/h1os.h:86
 
 Initial audio output volume (0 - 100%, default 60% if 0).
 
