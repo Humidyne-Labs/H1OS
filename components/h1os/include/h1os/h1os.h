@@ -34,10 +34,10 @@ extern "C" {
 #define H1OS_NAME "H1OS"
 #define H1OS_SUBTITLE "E-Class Environmental Operating System"
 #define H1OS_VERSION_MAJOR 2
-#define H1OS_VERSION_MINOR 0
+#define H1OS_VERSION_MINOR 1
 #define H1OS_VERSION_PATCH 0
-#define H1OS_VERSION_TAG "dev"
-#define H1OS_VERSION_STRING "2.0.0-dev"
+#define H1OS_VERSION_TAG "alpha"
+#define H1OS_VERSION_STRING "2.1.0-alpha"
 
 /* =========================================================================
  * Lifecycle Types & Contexts

@@ -58,9 +58,14 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     // Row 3: ULP Monitor Dispatch
     const char *ulp_str = "NONE";
-    if (st->ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE) ulp_str = "SENSOR_SAMPLE";
-    else if (st->ulp_dispatch_reason == ULP_DISPATCH_MAIN_WAKE) ulp_str = "MAIN_WAKE";
-    else if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN) ulp_str = "CRIT_SHUTDOWN";
+    switch (st->ulp_dispatch_reason) {
+        case ULP_DISPATCH_SENSOR_SAMPLE:     ulp_str = "SENSOR_SAMPLE"; break;
+        case ULP_DISPATCH_MAIN_WAKE:         ulp_str = "MAIN_WAKE";     break;
+        case ULP_DISPATCH_CRITICAL_SHUTDOWN: ulp_str = "CRIT_SHUTDOWN"; break;
+        case ULP_DISPATCH_BOOTLOADER_JUMP:   ulp_str = "BOOTLOADER";    break;
+        case ULP_DISPATCH_POWER_OFF:         ulp_str = "POWER_OFF";     break;
+        default:                             ulp_str = "NONE";          break;
+    }
 
     lv_obj_t *lbl_ulp = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_ulp, "ULP:    %s", ulp_str);
@@ -98,7 +103,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     // Footer Bar: Version (left), Target (right) - shortened to fit 200px display
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text(lbl_foot_l, "H1OS v2.0");
+    lv_label_set_text(lbl_foot_l, "H1OS v2.1");
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 

@@ -230,6 +230,9 @@ void app_main(void)
         .user_data    = NULL,
     };
 
-    h1os_start(&lifecycle);
+    esp_err_t err = h1os_start(&lifecycle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "h1os_start failed: %s", esp_err_to_name(err));
+    }
 }
 

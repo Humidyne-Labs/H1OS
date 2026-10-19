@@ -55,7 +55,7 @@ Defined in h1os/h1os.h:36
 ### H1OS_VERSION_MINOR
 
 ```cpp
-#define H1OS_VERSION_MINOR 0
+#define H1OS_VERSION_MINOR 1
 ```
 
 Defined in h1os/h1os.h:37
@@ -75,7 +75,7 @@ Defined in h1os/h1os.h:38
 ### H1OS_VERSION_TAG
 
 ```cpp
-#define H1OS_VERSION_TAG "dev"
+#define H1OS_VERSION_TAG "alpha"
 ```
 
 Defined in h1os/h1os.h:39
@@ -85,7 +85,7 @@ Defined in h1os/h1os.h:39
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.0.0-dev"
+#define H1OS_VERSION_STRING "2.1.0-alpha"
 ```
 
 Defined in h1os/h1os.h:40
