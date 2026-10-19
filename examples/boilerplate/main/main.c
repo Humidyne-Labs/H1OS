@@ -26,6 +26,13 @@ typedef struct {
 
 RTC_DATA_ATTR static app_state_t s_app_state = {0};
 
+/**
+ * @brief Start render_starter_screen background operations.
+ *
+ * @param[in]    telem           Parameter telem.
+ *
+ * @return Return value of type static void.
+ */
 static void render_starter_screen(const h1os_telemetry_t *telem)
 {
     h1os_lvgl_lock(100);
@@ -94,6 +101,11 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     h1os_lvgl_unlock();
 }
 
+/**
+ * @brief Update display.
+ *
+ * @return Return value of type static void.
+ */
 static void update_display(void)
 {
     h1os_telemetry_t telem = {0};
@@ -101,6 +113,13 @@ static void update_display(void)
     render_starter_screen(&telem);
 }
 
+/**
+ * @brief App on boot.
+ *
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_boot(void *user_data)
 {
     ESP_LOGI(TAG, "Application booted cleanly (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
@@ -110,6 +129,14 @@ static void app_on_boot(void *user_data)
     update_display();
 }
 
+/**
+ * @brief App on wake.
+ *
+ * @param[in]    ctx             Parameter ctx.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 {
     s_app_state.cycle_counter++;
@@ -117,16 +144,34 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     update_display();
 }
 
+/**
+ * @brief App on pre sleep.
+ *
+ * @param[in]    sleep_sec       Parameter sleep_sec.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
     ESP_LOGI(TAG, "System entering deep sleep for %lu seconds", (unsigned long)sleep_sec);
 }
 
+/**
+ * @brief App on shutdown.
+ *
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_shutdown(void *user_data)
 {
     ESP_LOGI(TAG, "System shutting down");
 }
 
+/**
+ * @brief Application entry point.
+ */
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting H1OS Application Boilerplate");

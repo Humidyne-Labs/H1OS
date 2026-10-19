@@ -15,6 +15,11 @@ static const char *TAG = "HAL_FLASH";
 
 static const esp_partition_t *s_part = NULL;
 
+/**
+ * @brief Finds and verifies the dedicated "epd_frame" partition.
+ *
+ * @return ESP_OK on success, or ESP_ERR_NOT_FOUND if partition is missing.
+ */
 esp_err_t hal_flash_init(void)
 {
     if (s_part != NULL) {
@@ -27,11 +32,21 @@ esp_err_t hal_flash_init(void)
         return ESP_ERR_NOT_FOUND;
     }
 
-    ESP_LOGD(TAG, "Found partition '%s' at offset 0x%08" PRIx32 ", size 0x%08" PRIx32, s_part->label, s_part->address,
-             s_part->size);
+    ESP_LOGD(TAG, "Found partition '%s' at offset 0x%08" PRIx32 ", size 0x%08" PRIx32, 
+					s_part->label, 
+					s_part->address,
+					s_part->size);
     return ESP_OK;
 }
 
+/**
+ * @brief Reads the persisted 5000-byte EPD frame from flash.
+ *
+ * @param[out]   out_buffer      Destination buffer (must be at least 5000 bytes).
+ * @param[in]    len             Number of bytes to read (typically 5000).
+ *
+ * @return ESP_OK on success, or flash read error.
+ */
 esp_err_t hal_flash_read_frame(uint8_t *out_buffer, size_t len)
 {
     if (!s_part) {
@@ -48,6 +63,14 @@ esp_err_t hal_flash_read_frame(uint8_t *out_buffer, size_t len)
     return esp_partition_read(s_part, 0, out_buffer, len);
 }
 
+/**
+ * @brief Erases the partition sector and writes the 5000-byte frame.
+ *
+ * @param[in]    frame_data      Pointer to 5000-byte frame to commit.
+ * @param[in]    len             Length in bytes (must be <= partition size).
+ *
+ * @return ESP_OK on success, or flash write error.
+ */
 esp_err_t hal_flash_write_frame(const uint8_t *frame_data, size_t len)
 {
     if (!s_part) {

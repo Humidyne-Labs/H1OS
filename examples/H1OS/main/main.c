@@ -1,6 +1,6 @@
 /**
  * @file main.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief H1OS showcase application entry point and lifecycle orchestration
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -39,6 +39,11 @@ RTC_DATA_ATTR static app_rtc_persisted_state_t s_app_state = {0};
 static void update_active_display(void);
 static void keypad_event_cb(lv_event_t *e);
 
+/**
+ * @brief Updates active screen layout in the carousel based on current application state.
+ *
+ * @return Return value of type static void.
+ */
 static void update_active_display(void)
 {
     static h1os_telemetry_t telem;
@@ -66,6 +71,13 @@ static void update_active_display(void)
 
 static bool s_is_shutting_down = false;
 
+/**
+ * @brief Handles keypad navigation input events for switching carousel screens.
+ *
+ * @param[in]    e               LVGL event descriptor.
+ *
+ * @return Return value of type static void.
+ */
 static void keypad_event_cb(lv_event_t *e)
 {
     if (s_is_shutting_down)
@@ -106,6 +118,13 @@ static void keypad_event_cb(lv_event_t *e)
     }
 }
 
+/**
+ * @brief App on boot.
+ *
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_boot(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: BOOT initialized (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
@@ -121,6 +140,14 @@ static void app_on_boot(void *user_data)
     update_active_display();
 }
 
+/**
+ * @brief App on wake.
+ *
+ * @param[in]    ctx             Parameter ctx.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 {
     s_app_state.cycle_counter++;
@@ -143,6 +170,14 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     update_active_display();
 }
 
+/**
+ * @brief App on pre sleep.
+ *
+ * @param[in]    sleep_sec       Parameter sleep_sec.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: PRE-SLEEP hook (Duration: %lu s)", (unsigned long)sleep_sec);
@@ -151,6 +186,13 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
     sub_sdcard_unmount();
 }
 
+/**
+ * @brief App on shutdown.
+ *
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_shutdown(void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: SHUTDOWN hook executing");
@@ -158,6 +200,14 @@ static void app_on_shutdown(void *user_data)
     sub_sdcard_unmount();
 }
 
+/**
+ * @brief App on splash.
+ *
+ * @param[in]    type            Parameter type.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return Return value of type static void.
+ */
 static void app_on_splash(h1os_splash_type_t type, void *user_data)
 {
     ESP_LOGI(TAG, "Lifecycle: SPLASH hook executing (Type %d)", (int)type);
@@ -178,6 +228,9 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
     }
 }
 
+/**
+ * @brief Application entry point.
+ */
 void app_main(void)
 {
     h1os_lifecycle_t lifecycle = {

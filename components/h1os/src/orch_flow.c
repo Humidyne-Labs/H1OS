@@ -43,6 +43,11 @@ static const char *TAG = "orch_flow";
 
 #include "ulp_h1os.h"
 
+/**
+ * @brief Inspect system wake source and arbitrate target flow.
+ *
+ * @return Detected flow type.
+ */
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
     uint32_t causes = esp_sleep_get_wakeup_causes();
@@ -53,8 +58,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         if (EFUSE.rd_sys_part1_data4.blk_version_major != 0) {
             uint32_t cal_temp = EFUSE.rd_sys_part1_data4.temp_calib;
 
-            int32_t cal_deci_c =
-                ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp) : (int32_t)((uint8_t)cal_temp);
+            int32_t cal_deci_c = ((cal_temp & BIT(8)) != 0) ? -(int32_t)((uint8_t)cal_temp) : (int32_t)((uint8_t)cal_temp);
             st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);
         } else {
             st->tsens_cal_centi_c = 0;
@@ -62,11 +66,12 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         uint32_t g17_out = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
         uint32_t g17_oe = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
         uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> 17) & 1U;
-        ESP_LOGI(TAG,
-                 "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C) | BL Hook "
-                 "GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
-                 (unsigned long)st->boot_count, (double)st->tsens_cal_centi_c / 100.0, (unsigned long)g17_out,
-                 (unsigned long)g17_oe, (unsigned long)g17_hold);
+        ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C) | BL Hook GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
+						(unsigned long)st->boot_count, 
+						(double)st->tsens_cal_centi_c / 100.0, 
+						(unsigned long)g17_out,
+						(unsigned long)g17_oe, 
+						(unsigned long)g17_hold);
         return ORCH_FLOW_BOOT;
     }
 
@@ -79,8 +84,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
         st->ulp_dispatch_reason = (uint8_t)(ulp_dispatch_reason & 0xFF);
-        if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN ||
-            st->ulp_dispatch_reason == ULP_DISPATCH_POWER_OFF) {
+        if (st->ulp_dispatch_reason == ULP_DISPATCH_CRITICAL_SHUTDOWN || st->ulp_dispatch_reason == ULP_DISPATCH_POWER_OFF) {
             return ORCH_FLOW_CRITICAL_OFF;
         }
         if (st->ulp_dispatch_reason == ULP_DISPATCH_BOOTLOADER_JUMP) {
@@ -93,11 +97,25 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
+/**
+ * @brief Check whether system is in Thermal Lockout state.
+ *
+ * @details If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibrium.
+ *
+ * @return True if in lockout, False if in thermal equilibrium.
+ */
 bool orch_flow_is_thermal_lockout(void)
 {
     return (orch_state_get()->valid_trend < 2);
 }
 
+/**
+ * @brief Orch flow dump ring debug.
+ *
+ * @param[in]    st              Parameter st.
+ *
+ * @return Return value of type static void.
+ */
 static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
 {
     if (st == NULL)
@@ -119,11 +137,22 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
         mcuT_ring[i] = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
         epdT_ring[i] = (float)st->ring[i].epd_glass_centi_c / 100.0f;
-        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", i, (double)shtc3T_ring[i], (double)shtc3RH_ring[i],
-                 (double)mcuT_ring[i], (double)epdT_ring[i]);
+        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", 
+						i, 
+						(double)shtc3T_ring[i], 
+						(double)shtc3RH_ring[i],
+						(double)mcuT_ring[i], 
+						(double)epdT_ring[i]);
     }
 }
 
+/**
+ * @brief Orch flow scan ring metrics.
+ *
+ * @param[in]    st              Parameter st.
+ *
+ * @return Return value of type static void.
+ */
 static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
 {
     uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
@@ -166,8 +195,18 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
     st->window_avg_die_c = ((float)sum_die / (float)valid_cnt) / 100.0f;
 }
 
-static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid, float t_die, float t_glass,
-                                                  const char **out_mode)
+/**
+ * @brief Orch flow evaluate ambient selection.
+ *
+ * @param[in]    st              Parameter st.
+ * @param[in]    t_valid         Parameter t_valid.
+ * @param[in]    t_die           Parameter t_die.
+ * @param[in]    t_glass         Parameter t_glass.
+ * @param[in]    out_mode        Parameter out_mode.
+ *
+ * @return Return value of type static float.
+ */
+static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid, float t_die, float t_glass, const char **out_mode)
 {
     float t_amb = t_valid;
     const char *mode = "SETTLED(T_valid)";
@@ -192,13 +231,24 @@ static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, fl
     return t_amb;
 }
 
+/**
+ * @brief Query current environmental telemetry through the Thermal Lockout MUX.
+ *
+ * @details If in thermal equilibrium, takes fresh sensor reading. If in thermal lockout, transparently returns pristine cold reading from RTC ring buffer.
+ *
+ * @param[out]   out_temp_c      Reconstructed ambient temperature in Celsius.
+ * @param[out]   out_rh_pct      Reconstructed ambient relative humidity in percent.
+ * @param[out]   out_dew_c       True dew point in Celsius.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c)
 {
     orch_persisted_state_t *st = orch_state_get();
 
     if (st->total_samples == 0) {
         ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
-                 (double)st->last_glass_temp_centi_c / 100.0);
+						(double)st->last_glass_temp_centi_c / 100.0);
         if (out_temp_c)
             *out_temp_c = 0.0f;
         if (out_rh_pct)
@@ -256,17 +306,28 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     st->vapor_pressure_hpa = vp;
 
     ESP_LOGI(TAG,
-             "Flow A Ring: samples=%lu head=%u trend=%u | Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC "
-             "flags=0x%02X]",
-             (unsigned long)st->total_samples, st->ring_head, st->valid_trend,
-             (double)latest_raw.shtc3_temp_centi_c / 100.0, (double)latest_raw.shtc3_rh_centi_pct / 100.0,
-             (double)t_die, latest_raw.quality_flags);
-    ESP_LOGI(TAG,
-             "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | T_valid=%.2fC WinAvg[SHTC3=%.2fC "
-             "Die=%.2fC] Hist=%.2fC | Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
-             amb_mode, (double)t_amb, (double)rh_amb, (double)t_valid, (double)st->window_avg_shtc3_c,
-             (double)st->window_avg_die_c, (double)st->temp_historical_c, (double)t_glass, (double)t_trinode,
-             (double)delta_trinode, st->trinode_confidence_pct);
+             "Flow A Ring: samples=%lu head=%u trend=%u | Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
+				(unsigned long)st->total_samples, 
+				st->ring_head, st->valid_trend,
+				(double)latest_raw.shtc3_temp_centi_c / 100.0, 
+				(double)latest_raw.shtc3_rh_centi_pct / 100.0,
+				(double)t_die, 
+				latest_raw.quality_flags);
+				
+    ESP_LOGI(TAG, "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | "
+				  "T_valid=%.2fC WinAvg[SHTC3=%.2fC Die=%.2fC] Hist=%.2fC | "
+				  "Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
+					amb_mode, 
+					(double)t_amb, 
+					(double)rh_amb, 
+					(double)t_valid, 
+					(double)st->window_avg_shtc3_c,
+					(double)st->window_avg_die_c, 
+					(double)st->temp_historical_c, 
+					(double)t_glass, 
+					(double)t_trinode,
+					(double)delta_trinode, 
+					st->trinode_confidence_pct);
 
     orch_flow_dump_ring_debug(st);
 
@@ -279,6 +340,11 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     return ESP_OK;
 }
 
+/**
+ * @brief Orch flow quiesce peripherals.
+ *
+ * @return Return value of type static void.
+ */
 static void orch_flow_quiesce_peripherals(void)
 {
     if (h1os_lvgl_has_pending_tasks()) {
@@ -306,6 +372,13 @@ static void orch_flow_quiesce_peripherals(void)
     sub_display_enter_deep_sleep();
 }
 
+/**
+ * @brief Orch flow execute sleep.
+ *
+ * @param[in]    sleep_sec       Parameter sleep_sec.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
     uint32_t sample_sec = orch_state_get()->sample_interval_sec;
@@ -314,15 +387,21 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
         internal_sleep_sec = sample_sec;
     }
 
-    ESP_LOGI(TAG,
-             "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer "
-             "= %lus",
-             (unsigned long)sleep_sec, (unsigned long)internal_sleep_sec);
+    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
+					(unsigned long)sleep_sec, 
+					(unsigned long)internal_sleep_sec);
 
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
 }
 
+/**
+ * @brief Execute coordinated 8-step sleep transition sequence to deep sleep.
+ *
+ * @param[in]    sleep_sec       Sleep duration in seconds.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 {
     if (sleep_sec == 0) {

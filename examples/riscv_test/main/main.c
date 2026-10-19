@@ -43,6 +43,11 @@ RTC_DATA_ATTR static bool s_stage3_pass = false;
 extern const uint8_t ulp_riscv_test_bin_start[] asm("_binary_ulp_riscv_test_bin_start");
 extern const uint8_t ulp_riscv_test_bin_end[] asm("_binary_ulp_riscv_test_bin_end");
 
+/**
+ * @brief Clear stale rtc gpio wake latch.
+ *
+ * @return Return value of type static void.
+ */
 static void clear_stale_rtc_gpio_wake_latch(void)
 {
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
@@ -51,6 +56,11 @@ static void clear_stale_rtc_gpio_wake_latch(void)
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
 }
 
+/**
+ * @brief Configure rtc pins.
+ *
+ * @return Return value of type static void.
+ */
 static void configure_rtc_pins(void)
 {
     rtc_gpio_hold_dis(PIN_BUTTON_PWR);
@@ -69,6 +79,11 @@ static void configure_rtc_pins(void)
     rtc_gpio_pulldown_dis(PIN_BUTTON_BOOT);
 }
 
+/**
+ * @brief Log pin levels pre sleep.
+ *
+ * @return Return value of type static void.
+ */
 static void log_pin_levels_pre_sleep(void)
 {
     int pwr_lvl = rtc_gpio_get_level(PIN_BUTTON_PWR);
@@ -105,6 +120,13 @@ static const char *get_checkpoint_name(uint32_t cp)
     }
 }
 
+/**
+ * @brief Dump and clear ulp ring buffer.
+ *
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void dump_and_clear_ulp_ring_buffer(test_shared_data_t *d)
 {
     printf("\n************************************************************************\n");
@@ -130,6 +152,15 @@ static void dump_and_clear_ulp_ring_buffer(test_shared_data_t *d)
     fflush(stdout);
 }
 
+/**
+ * @brief Dump telemetry report.
+ *
+ * @param[in]    stage           Parameter stage.
+ * @param[in]    causes          Parameter causes.
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_data_t *d)
 {
     bool is_ulp_wake = (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) != 0;
@@ -219,6 +250,11 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     vTaskDelay(pdMS_TO_TICKS(1500));
 }
 
+/**
+ * @brief Prepare serial and pins before sleep.
+ *
+ * @return Return value of type static void.
+ */
 static void prepare_serial_and_pins_before_sleep(void)
 {
     log_pin_levels_pre_sleep();
@@ -226,6 +262,13 @@ static void prepare_serial_and_pins_before_sleep(void)
     vTaskDelay(pdMS_TO_TICKS(1500));
 }
 
+/**
+ * @brief Enter deep sleep guarded.
+ *
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void enter_deep_sleep_guarded(test_shared_data_t *d)
 {
     SET_PERI_REG_MASK(RTC_CNTL_TIME_UPDATE_REG, RTC_CNTL_TIME_UPDATE);
@@ -242,6 +285,13 @@ static void enter_deep_sleep_guarded(test_shared_data_t *d)
     }
 }
 
+/**
+ * @brief Arm stage 1 timer mode.
+ *
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void arm_stage_1_timer_mode(test_shared_data_t *d)
 {
     ESP_LOGI(TAG, "========================================================================");
@@ -283,6 +333,13 @@ static void arm_stage_1_timer_mode(test_shared_data_t *d)
     enter_deep_sleep_guarded(d);
 }
 
+/**
+ * @brief Arm stage 2 event mode.
+ *
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void arm_stage_2_event_mode(test_shared_data_t *d)
 {
     ESP_LOGI(TAG, "========================================================================");
@@ -325,6 +382,13 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
     enter_deep_sleep_guarded(d);
 }
 
+/**
+ * @brief Arm stage 3 dual mode.
+ *
+ * @param[in]    d               Parameter d.
+ *
+ * @return Return value of type static void.
+ */
 static void arm_stage_3_dual_mode(test_shared_data_t *d)
 {
     ESP_LOGI(TAG, "========================================================================");
@@ -367,6 +431,9 @@ static void arm_stage_3_dual_mode(test_shared_data_t *d)
     enter_deep_sleep_guarded(d);
 }
 
+/**
+ * @brief Application entry point.
+ */
 void app_main(void)
 {
     esp_reset_reason_t reset_reason = esp_reset_reason();

@@ -1,6 +1,6 @@
 /**
  * @file screen_system_health.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief Screen 3: System health, autonomy, and power page
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -12,6 +12,12 @@
 #include "h1os/sub_sdcard.h"
 #include "screens.h"
 
+/**
+ * @brief Renders Screen 3: System health, autonomy, and power page.
+ *
+ * @param[in]    telem           Pointer to validated environmental telemetry snapshot.
+ * @param[in]    event_cb        Keypad navigation callback.
+ */
 void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
     lv_obj_t *scr = screen_base_create("SYSTEM HEALTH", "3/4", event_cb);

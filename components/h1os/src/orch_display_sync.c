@@ -24,11 +24,19 @@ static const char *TAG = "orch_display_sync";
 
 static bool s_frame_dirty = false;
 
+/**
+ * @brief Mark the current display framebuffer as dirty (needs flash persistence on sleep).
+ */
 void orch_display_sync_mark_dirty(void)
 {
     s_frame_dirty = true;
 }
 
+/**
+ * @brief Save working display framebuffer to "epd_frame" flash partition if dirty.
+ *
+ * @return ESP_OK on success or if clean (no write needed).
+ */
 esp_err_t orch_display_sync_save_if_dirty(void)
 {
     if (!s_frame_dirty) {
@@ -50,6 +58,11 @@ esp_err_t orch_display_sync_save_if_dirty(void)
     return err;
 }
 
+/**
+ * @brief Restore framebuffer from "epd_frame" flash partition into display working buffer.
+ *
+ * @return ESP_OK on success, ESP_ERR_NOT_FOUND if partition empty/invalid.
+ */
 esp_err_t orch_display_sync_restore_to_framebuffer(void)
 {
     orch_persisted_state_t *st = orch_state_get();
@@ -72,29 +85,46 @@ esp_err_t orch_display_sync_restore_to_framebuffer(void)
     return err;
 }
 
+/**
+ * @brief Determine if a full OTP display refresh is required.
+ *
+ * @details Evaluates whether the anti-ghosting partial refresh limit has been reached.
+ *
+ * @return true if full refresh required, false if differential partial refresh is permitted.
+ */
 bool orch_display_sync_should_full_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
 
     if (st->epd_partial_refresh_count >= CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT) {
-        ESP_LOGI(TAG,
-                 "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh "
-                 "required",
-                 (unsigned)st->epd_partial_refresh_count, CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
+        ESP_LOGI(TAG, "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh required",
+						(unsigned)st->epd_partial_refresh_count, 
+						CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
         return true;
     }
 
     return false;
 }
 
+/**
+ * @brief Record execution of a differential partial refresh.
+ *
+ * @details Increments the accumulated partial refresh counter in persistent RTC memory.
+ */
 void orch_display_sync_record_partial_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count++;
-    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d", (unsigned)st->epd_partial_refresh_count,
-             CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
+    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d", 
+					(unsigned)st->epd_partial_refresh_count,
+					CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
 }
 
+/**
+ * @brief Record execution of a full OTP display refresh.
+ *
+ * @details Resets the accumulated partial refresh counter back to 0.
+ */
 void orch_display_sync_record_full_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
@@ -102,6 +132,13 @@ void orch_display_sync_record_full_refresh(void)
     ESP_LOGI(TAG, "Full OTP refresh recorded: anti-ghosting counter reset to 0");
 }
 
+/**
+ * @brief Get the accumulated count of partial refreshes since the last full refresh.
+ *
+ * @details ## Variables
+ *
+ * @return Return value of type uint16_t.
+ */
 uint16_t orch_display_sync_get_partial_count(void)
 {
     return orch_state_get()->epd_partial_refresh_count;

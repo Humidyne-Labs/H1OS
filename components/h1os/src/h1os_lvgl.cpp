@@ -50,6 +50,13 @@ struct CpuMaxTurboScope {
 
 static void h1os_lvgl_port_task(void *pvParameters);
 
+/**
+ * @brief Acquire LVGL reentrant mutex lock.
+ *
+ * @param[in]    timeout_ms      Parameter timeout_ms.
+ *
+ * @return True on success, false otherwise.
+ */
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
     sub_power_cpu_max_acquire();
@@ -57,17 +64,33 @@ bool h1os_lvgl_lock(uint32_t timeout_ms)
     return true;
 }
 
+/**
+ * @brief Release LVGL reentrant mutex lock.
+ */
 void h1os_lvgl_unlock(void)
 {
     lv_unlock();
     sub_power_cpu_max_release();
 }
 
+/**
+ * @brief Lvgl tick get cb.
+ *
+ * @return Return value of type static uint32_t.
+ */
 static uint32_t lvgl_tick_get_cb(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
+/**
+ * @brief Lvgl keypad read cb.
+ *
+ * @param[in]    indev           Parameter indev.
+ * @param[in]    data            Parameter data.
+ *
+ * @return Return value of type static void.
+ */
 static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     data->state = LV_INDEV_STATE_RELEASED;
@@ -77,8 +100,10 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
     static uint32_t s_prev_logged_btns = 0;
     if (btns != s_prev_logged_btns) {
-        ESP_LOGI(TAG, "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)", (unsigned long)btns,
-                 (btns & HAL_BTN_BOOT) ? 1 : 0, (btns & HAL_BTN_POWER) ? 1 : 0);
+        ESP_LOGI(TAG, "Hardware button event: btns=0x%02lx (BOOT=%d, PWR=%d)", 
+					  (unsigned long)btns,
+					  (btns & HAL_BTN_BOOT)  ? 1 : 0, 
+				      (btns & HAL_BTN_POWER) ? 1 : 0);
         s_prev_logged_btns = btns;
     }
 
@@ -93,6 +118,15 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
     }
 }
 
+/**
+ * @brief Lvgl display flush cb.
+ *
+ * @param[in]    disp            Parameter disp.
+ * @param[in]    area            Parameter area.
+ * @param[in]    px_map          Parameter px_map.
+ *
+ * @return Return value of type static void.
+ */
 static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     CpuMaxTurboScope turbo;
@@ -202,6 +236,13 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     lv_display_flush_ready(disp);
 }
 
+/**
+ * @brief Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
+ *
+ * @param[in]    is_wake_cycle   True if resuming from sleep (enables differential partial flush).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
     if (s_lv_display != NULL)
@@ -267,11 +308,24 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
     return ESP_OK;
 }
 
+/**
+ * @brief Explicitly override whether the first flush executes a full or partial refresh.
+ *
+ * @param[in]    full_refresh    True for full OTP flashing refresh, False for differential partial.
+ */
 void h1os_lvgl_set_first_flush_mode(bool full_refresh)
 {
     s_first_boot_flush = full_refresh;
 }
 
+/**
+ * @brief Start the LVGL background FreeRTOS task.
+ *
+ * @param[in]    task_priority   Parameter task_priority.
+ * @param[in]    core_id         Parameter core_id.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 {
     if (s_lvgl_task_handle != NULL)
@@ -286,8 +340,13 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 
     s_lvgl_task_running = true;
 
-    BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, "h1os_lvgl", 8192, NULL, task_priority,
-                                             &s_lvgl_task_handle, core_id);
+    BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task, 
+											 "h1os_lvgl", 
+											 8192, 
+											 NULL, 
+											 task_priority,
+                                             &s_lvgl_task_handle, 
+											 core_id);
 
     if (res != pdPASS) {
         s_lvgl_task_running = false;
@@ -297,6 +356,11 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
     return ESP_OK;
 }
 
+/**
+ * @brief Stop the LVGL background task.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_lvgl_stop(void)
 {
     if (s_lvgl_task_handle != NULL) {
@@ -310,6 +374,11 @@ esp_err_t h1os_lvgl_stop(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Check if the LVGL display pipeline has pending render/flush tasks.
+ *
+ * @return True on success, false otherwise.
+ */
 bool h1os_lvgl_has_pending_tasks(void)
 {
     if (s_lv_display == NULL)
@@ -329,6 +398,13 @@ lv_indev_t *h1os_lvgl_get_indev(void)
     return s_lv_keypad_indev;
 }
 
+/**
+ * @brief H1os lvgl port task.
+ *
+ * @param[in]    pvParameters    Parameter pvParameters.
+ *
+ * @return Return value of type static void.
+ */
 static void h1os_lvgl_port_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());

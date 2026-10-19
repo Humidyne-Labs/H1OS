@@ -1,6 +1,6 @@
 /**
  * @file screen_psychrometrics.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief Screen 2: Psychrometric engine and invariant metrics page
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -11,6 +11,12 @@
 #include "h1os/orch_state.h"
 #include "screens.h"
 
+/**
+ * @brief Renders Screen 2: Psychrometric engine and invariant metrics page.
+ *
+ * @param[in]    telem           Pointer to validated environmental telemetry snapshot.
+ * @param[in]    event_cb        Keypad navigation callback.
+ */
 void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
     lv_obj_t *scr = screen_base_create("PSYCHROMETRICS", "2/4", event_cb);

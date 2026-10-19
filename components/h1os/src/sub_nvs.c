@@ -18,6 +18,11 @@
 static const char *TAG = "sub_nvs";
 static bool s_nvs_initialized = false;
 
+/**
+ * @brief Initialize the NVS flash storage subsystem.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_init(void)
 {
     if (s_nvs_initialized)
@@ -46,6 +51,14 @@ esp_err_t sub_nvs_init(void)
     return err;
 }
 
+/**
+ * @brief Store a string value in NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[in]    value           Parameter value.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_set_str(const char *key, const char *value)
 {
     if (key == NULL || value == NULL)
@@ -66,6 +79,15 @@ esp_err_t sub_nvs_set_str(const char *key, const char *value)
     return err;
 }
 
+/**
+ * @brief Retrieve a string value from NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[out]   out_val         Parameter out_val.
+ * @param[in]    max_len         Parameter max_len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_get_str(const char *key, char *out_val, size_t max_len)
 {
     if (key == NULL || out_val == NULL || max_len == 0)
@@ -84,6 +106,14 @@ esp_err_t sub_nvs_get_str(const char *key, char *out_val, size_t max_len)
     return err;
 }
 
+/**
+ * @brief Store an unsigned 32-bit integer in NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[in]    value           Parameter value.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_set_u32(const char *key, uint32_t value)
 {
     if (key == NULL)
@@ -104,6 +134,14 @@ esp_err_t sub_nvs_set_u32(const char *key, uint32_t value)
     return err;
 }
 
+/**
+ * @brief Retrieve an unsigned 32-bit integer from NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[out]   out_val         Parameter out_val.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_get_u32(const char *key, uint32_t *out_val)
 {
     if (key == NULL || out_val == NULL)
@@ -121,6 +159,15 @@ esp_err_t sub_nvs_get_u32(const char *key, uint32_t *out_val)
     return err;
 }
 
+/**
+ * @brief Store a binary blob in NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[in]    data            Parameter data.
+ * @param[in]    len             Parameter len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_set_blob(const char *key, const void *data, size_t len)
 {
     if (key == NULL || data == NULL || len == 0)
@@ -141,6 +188,15 @@ esp_err_t sub_nvs_set_blob(const char *key, const void *data, size_t len)
     return err;
 }
 
+/**
+ * @brief Retrieve a binary blob from NVS.
+ *
+ * @param[in]    key             Parameter key.
+ * @param[out]   out_data        Parameter out_data.
+ * @param[out]   inout_len       Parameter inout_len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_get_blob(const char *key, void *out_data, size_t *inout_len)
 {
     if (key == NULL || out_data == NULL || inout_len == NULL || *inout_len == 0)
@@ -158,6 +214,13 @@ esp_err_t sub_nvs_get_blob(const char *key, void *out_data, size_t *inout_len)
     return err;
 }
 
+/**
+ * @brief Erase a specific key from NVS.
+ *
+ * @param[in]    key             Parameter key.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_erase_key(const char *key)
 {
     if (key == NULL)
@@ -178,6 +241,11 @@ esp_err_t sub_nvs_erase_key(const char *key)
     return err;
 }
 
+/**
+ * @brief Perform a factory reset wiping the entire H1OS NVS namespace.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_nvs_erase_all(void)
 {
     if (!s_nvs_initialized)

@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+"""
+H1OS GitHub-Flavored Markdown (GFM) Format and Link Auditor
+Audits public documentation for strict markdown compliance, broken anchors, and path formatting.
+
+Copyright (c) 2026 Humidyne Labs
+SPDX-License-Identifier: MIT
+"""
+
 import os
 import re
 import sys

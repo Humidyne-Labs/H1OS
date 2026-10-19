@@ -27,6 +27,14 @@ static temperature_sensor_handle_t s_tsens_handle = NULL;
 
 static bool s_tsens_inited = false;
 
+/**
+ * @brief Shtc3 calc crc.
+ *
+ * @param[in]    data            Parameter data.
+ * @param[in]    len             Parameter len.
+ *
+ * @return Return value of type static uint8_t.
+ */
 static uint8_t shtc3_calc_crc(const uint8_t *data, size_t len)
 {
     uint8_t crc = 0xFF;
@@ -43,6 +51,11 @@ static uint8_t shtc3_calc_crc(const uint8_t *data, size_t len)
     return crc;
 }
 
+/**
+ * @brief Initialize sensor hardware interfaces (internal TSENS handle).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sensor_init(void)
 {
     if (s_tsens_inited && s_tsens_handle != NULL) {
@@ -64,6 +77,11 @@ esp_err_t sub_sensor_init(void)
     return ret;
 }
 
+/**
+ * @brief Deinitialize internal sensor drivers to free resources.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_sensor_deinit(void)
 {
     if (s_tsens_inited && s_tsens_handle != NULL) {
@@ -75,6 +93,15 @@ esp_err_t sub_sensor_deinit(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Direct physical SHTC3 sensor readout (Wake -> Measure -> Read -> Sleep).
+ *
+ * @param[out]   out_raw_temp    Raw 16-bit Sensirion temperature register word.
+ * @param[out]   out_raw_rh      Raw 16-bit Sensirion relative humidity register word.
+ * @param[in]    low_power       True for 1ms fast low-power conversion, False for 15ms high-precision.
+ *
+ * @return ESP_OK on success, ESP_ERR_INVALID_CRC on CRC mismatch, or I2C bus error.
+ */
 esp_err_t sub_sensor_read_shtc3_raw(uint16_t *out_raw_temp, uint16_t *out_raw_rh, bool low_power)
 {
     if (out_raw_temp == NULL || out_raw_rh == NULL) {
@@ -128,6 +155,14 @@ esp_err_t sub_sensor_read_shtc3_raw(uint16_t *out_raw_temp, uint16_t *out_raw_rh
     return ESP_OK;
 }
 
+/**
+ * @brief Convert raw SHTC3 16-bit words into standard SI units.
+ *
+ * @param[in]    raw_temp        Raw temperature word.
+ * @param[in]    raw_rh          Raw relative humidity word.
+ * @param[out]   out_temp_c      Temperature in Celsius.
+ * @param[out]   out_rh_pct      Relative humidity in percent (0.0 to 100.0).
+ */
 void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *out_temp_c, float *out_rh_pct)
 {
     if (out_temp_c != NULL) {
@@ -143,6 +178,13 @@ void sub_sensor_convert_shtc3_units(uint16_t raw_temp, uint16_t raw_rh, float *o
     }
 }
 
+/**
+ * @brief Read ESP32-S3 internal silicon junction temperature via internal TSENS macro.
+ *
+ * @param[out]   out_die_temp_c  MCU die temperature in Celsius.
+ *
+ * @return ESP_OK on success, or driver error.
+ */
 esp_err_t sub_sensor_read_mcu_die_temp(float *out_die_temp_c)
 {
     if (out_die_temp_c == NULL) {

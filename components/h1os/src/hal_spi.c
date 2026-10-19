@@ -19,16 +19,35 @@ static spi_device_handle_t s_spi_read_dev = NULL;
 
 static bool s_is_inited = false;
 
+/**
+ * @brief Epd set cs.
+ *
+ * @param[in]    level           Parameter level.
+ *
+ * @return Return value of type static inline void.
+ */
 static inline void epd_set_cs(uint8_t level)
 {
     gpio_set_level(HAL_PIN_EPD_CS, level);
 }
 
+/**
+ * @brief Epd set dc.
+ *
+ * @param[in]    level           Parameter level.
+ *
+ * @return Return value of type static inline void.
+ */
 static inline void epd_set_dc(uint8_t level)
 {
     gpio_set_level(HAL_PIN_EPD_DC, level);
 }
 
+/**
+ * @brief Initializes SPI2 Master host with DMA channel enabled for display communication.
+ *
+ * @return ESP_OK on success, or driver error code.
+ */
 esp_err_t hal_spi_init(void)
 {
     if (s_is_inited) {
@@ -106,6 +125,11 @@ esp_err_t hal_spi_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Deinitializes SPI2 Master host and releases bus resources.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_spi_deinit(void)
 {
     if (!s_is_inited) {
@@ -127,6 +151,13 @@ esp_err_t hal_spi_deinit(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Transmits a single command byte to the SSD1681 controller (DC = 0).
+ *
+ * @param[in]    cmd             Command byte.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_spi_write_cmd(uint8_t cmd)
 {
     if (!s_is_inited || !s_spi_dev) {
@@ -147,6 +178,14 @@ esp_err_t hal_spi_write_cmd(uint8_t cmd)
     return ret;
 }
 
+/**
+ * @brief Transmits data bytes to the SSD1681 controller (DC = 1).
+ *
+ * @param[in]    data            Pointer to buffer containing payload.
+ * @param[in]    len             Length of data in bytes.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_spi_write_data(const uint8_t *data, size_t len)
 {
     if (!s_is_inited || !s_spi_dev || !data || len == 0) {
@@ -166,6 +205,13 @@ esp_err_t hal_spi_write_data(const uint8_t *data, size_t len)
     return ret;
 }
 
+/**
+ * @brief Transmits a full 5000-byte frame buffer via DMA transfer.
+ *
+ * @param[in]    frame_buffer    Pointer to 5000-byte buffer.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
 {
     if (!s_is_inited || !s_spi_dev || !frame_buffer) {
@@ -185,6 +231,17 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
     return ret;
 }
 
+/**
+ * @brief Reads data from SSD1681 (e.g.
+ *
+ * @details on-glass thermal sensor Cmd 0x1B).
+ *
+ * @param[in]    cmd             Command to write before reading.
+ * @param[out]   out_data        Buffer to receive read bytes.
+ * @param[in]    len             Number of bytes to read.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
 {
     if (!s_is_inited || !s_spi_dev || !s_spi_read_dev || !out_data || len == 0) {

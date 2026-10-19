@@ -39,6 +39,11 @@ static const uint8_t WF_PARTIAL_1IN54[159] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x00, 0x00, 0x00, 0x02, 0x17, 0x41, 0xB0, 0x32, 0x28};
 
+/**
+ * @brief Epd reset pulse.
+ *
+ * @return Return value of type static void.
+ */
 static void epd_reset_pulse(void)
 {
     gpio_set_level(HAL_PIN_EPD_RST, 0);
@@ -47,6 +52,15 @@ static void epd_reset_pulse(void)
     esp_rom_delay_us(10000);
 }
 
+/**
+ * @brief Synchronously wait for EPD panel to finish driving electrophoretic particles.
+ *
+ * @details Blocks on binary semaphore driven by GPIO 8 (BUSY) falling edge.
+ *
+ * @param[in]    timeout_ticks   Max FreeRTOS ticks to wait.
+ *
+ * @return ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
+ */
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
     esp_rom_delay_us(200);
@@ -64,6 +78,11 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
     return ESP_OK;
 }
 
+/**
+ * @brief Epd configure base registers.
+ *
+ * @return Return value of type static void.
+ */
 static void epd_configure_base_registers(void)
 {
     uint8_t d_drv[] = {0xC7, 0x00, 0x00};
@@ -87,6 +106,15 @@ static void epd_configure_base_registers(void)
     hal_spi_write_data(d_border, sizeof(d_border));
 }
 
+/**
+ * @brief Initialize SSD1681 display controller.
+ *
+ * @details Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization semaphore.
+ *
+ * @param[in]    is_wake_cycle   True if resuming from deep sleep with persistent framebuffer.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_init(bool is_wake_cycle)
 {
     if (s_inited)
@@ -130,8 +158,7 @@ esp_err_t sub_display_init(bool is_wake_cycle)
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 orch_state_get()->last_glass_temp_centi_c = glass_cc;
-                ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)",
-                         (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
+                ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)", (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
             }
         }
     }
@@ -150,11 +177,24 @@ uint8_t *sub_display_get_framebuffer(void)
     return s_current_frame;
 }
 
+/**
+ * @brief Clear active working framebuffer.
+ *
+ * @param[in]    color           0xFF for White, 0x00 for Black.
+ */
 void sub_display_clear(uint8_t color)
 {
     memset(s_current_frame, color, EPD_BUFFER_SIZE);
 }
 
+/**
+ * @brief Epd commit ram dma.
+ *
+ * @param[in]    ram_cmd         Parameter ram_cmd.
+ * @param[in]    frame_data      Parameter frame_data.
+ *
+ * @return Return value of type static void.
+ */
 static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
 {
     static const uint8_t d_x[] = {0x00};
@@ -169,6 +209,15 @@ static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
     hal_spi_write_frame_dma(frame_data);
 }
 
+/**
+ * @brief Synchronize previous frame into shadow buffer and hardware RAM 0x26.
+ *
+ * @details Essential on deep sleep wake to enable differential partial scanning against the glass.
+ *
+ * @param[in]    prev_frame      Pointer to 5000-byte pre-sleep image buffer.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
 {
     if (prev_frame == NULL)
@@ -183,6 +232,13 @@ esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
     return ESP_OK;
 }
 
+/**
+ * @brief Execute full display refresh (OTP factory waveform LUT).
+ *
+ * @details Synchronizes old frame RAM (0x26) with new frame RAM (0x24).
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_refresh_full(void)
 {
     int64_t t_start = esp_timer_get_time();
@@ -211,6 +267,13 @@ esp_err_t sub_display_refresh_full(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Clear display to pure white and trigger full OTP refresh.
+ *
+ * @details Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_clear_to_white_full(void)
 {
     memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
@@ -219,6 +282,13 @@ esp_err_t sub_display_clear_to_white_full(void)
     return sub_display_refresh_full();
 }
 
+/**
+ * @brief Epd load custom lut.
+ *
+ * @param[in]    lut_buffer      Parameter lut_buffer.
+ *
+ * @return Return value of type static void.
+ */
 static void epd_load_custom_lut(const uint8_t *lut_buffer)
 {
     if (lut_buffer == NULL)
@@ -240,6 +310,11 @@ static void epd_load_custom_lut(const uint8_t *lut_buffer)
     hal_spi_write_data(&lut_buffer[158], 1);
 }
 
+/**
+ * @brief Execute fast partial refresh (~300ms) with software LUT.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_refresh_partial(void)
 {
     int64_t t_start = esp_timer_get_time();
@@ -271,6 +346,13 @@ esp_err_t sub_display_refresh_partial(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Read SSD1681 on-glass integrated temperature sensor (SPI Cmd 0x1B).
+ *
+ * @param[out]   out_temp_c      Surface glass temperature in Celsius.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 {
     if (out_temp_c == NULL)
@@ -312,6 +394,13 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
     return err;
 }
 
+/**
+ * @brief Put SSD1681 into Deep Sleep Mode 1 (Command 0x10, Data 0x01 @ 1.0 µA).
+ *
+ * @details Crucially retains RAM contents while the 3.3V rail remains held.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_display_enter_deep_sleep(void)
 {
     sub_display_wait_busy(pdMS_TO_TICKS(5000));

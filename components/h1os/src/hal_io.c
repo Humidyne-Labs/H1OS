@@ -22,6 +22,13 @@
 
 static const char *TAG = "HAL_IO";
 
+/**
+ * @brief Early boot initialization of non-latched application pins.
+ *
+ * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader ([h1os_boot_hook.c](#h1os_boot_hookc)).
+ *
+ * @return ESP_OK on success, or driver error code.
+ */
 esp_err_t hal_io_early_init(void)
 {
     esp_log_level_set("*", ESP_LOG_INFO);
@@ -81,6 +88,13 @@ esp_err_t hal_io_early_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
+ *
+ * @details Strictly for system shutdown; assertion of GPIO 17 is handled exclusively by the 2nd-stage bootloader.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_io_release_power_latch(void)
 {
     gpio_deep_sleep_hold_dis();
@@ -90,14 +104,21 @@ esp_err_t hal_io_release_power_latch(void)
     return ESP_OK;
 }
 
-#define HAL_LEDC_TIMER LEDC_TIMER_0
-#define HAL_LEDC_MODE LEDC_LOW_SPEED_MODE
-#define HAL_LEDC_CHANNEL LEDC_CHANNEL_0
-#define HAL_LEDC_DUTY_RES LEDC_TIMER_10_BIT
+#define HAL_LEDC_TIMER     LEDC_TIMER_0
+#define HAL_LEDC_MODE      LEDC_LOW_SPEED_MODE
+#define HAL_LEDC_CHANNEL   LEDC_CHANNEL_0
+#define HAL_LEDC_DUTY_RES  LEDC_TIMER_10_BIT
 #define HAL_LEDC_FREQUENCY 5000
 
 static bool s_led_pwm_active = false;
 
+/**
+ * @brief Initializes LEDC hardware PWM controller for user LED on GPIO 3.
+ *
+ * @details Enables 10-bit hardware brightness resolution (0..100%) and hardware smooth fading.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_led_pwm_init(void)
 {
     if (s_led_pwm_active) {
@@ -143,6 +164,13 @@ esp_err_t hal_led_pwm_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Sets user LED brightness percentage using hardware PWM (0..100%).
+ *
+ * @param[in]    brightness_pct  Brightness percentage: 0 = OFF, 100 = Maximum.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
 {
     if (!s_led_pwm_active) {
@@ -158,6 +186,16 @@ esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
     return ledc_update_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL);
 }
 
+/**
+ * @brief Smoothly fades user LED to target brightness using hardware fade engine.
+ *
+ * @details Non-blocking: hardware timer interpolates duty cycle with zero CPU overhead.
+ *
+ * @param[in]    target_pct      Target brightness percentage (0..100%).
+ * @param[in]    duration_ms     Duration of fade transition in milliseconds.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
 {
     if (!s_led_pwm_active) {
@@ -177,6 +215,13 @@ static TaskHandle_t s_breath_task = NULL;
 static volatile bool s_breathing_running = false;
 static uint32_t s_breath_period_ms = 2000;
 
+/**
+ * @brief Led breath task.
+ *
+ * @param[in]    arg             Parameter arg.
+ *
+ * @return Return value of type static void.
+ */
 static void led_breath_task(void *arg)
 {
     while (s_breathing_running) {
@@ -207,6 +252,15 @@ static void led_breath_task(void *arg)
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+ *
+ * @details Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+ *
+ * @param[in]    cycle_period_ms Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0.
+ *
+ * @return ESP_OK on success, or ESP_FAIL if task creation fails.
+ */
 esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 {
     if (!s_led_pwm_active) {
@@ -234,6 +288,11 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     return ESP_OK;
 }
 
+/**
+ * @brief Stops the asynchronous breathing task and turns the LED off.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_led_stop_breathing(void)
 {
     if (!s_breathing_running && s_breath_task == NULL) {
@@ -254,11 +313,21 @@ esp_err_t hal_led_stop_breathing(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Queries whether the asynchronous breathing task is actively running.
+ *
+ * @return True if breathing task is active, false otherwise.
+ */
 bool hal_led_is_breathing(void)
 {
     return s_breathing_running;
 }
 
+/**
+ * @brief Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_led_pwm_deinit(void)
 {
     hal_led_stop_breathing();
@@ -285,6 +354,13 @@ esp_err_t hal_led_pwm_deinit(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Controls user status LED (GPIO 3, Active LOW).
+ *
+ * @param[in]    on              True to turn LED ON (drive 0); False to turn OFF (drive 1).
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_io_set_led(bool on)
 {
     if (s_breathing_running) {
@@ -297,6 +373,11 @@ esp_err_t hal_io_set_led(bool on)
     return gpio_set_level(HAL_PIN_STATUS_LED, on ? 0 : 1);
 }
 
+/**
+ * @brief Samples instantaneous state of hardware tactile buttons.
+ *
+ * @return Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
+ */
 hal_btn_mask_t hal_io_read_buttons(void)
 {
     hal_btn_mask_t mask = HAL_BTN_NONE;
@@ -309,6 +390,16 @@ hal_btn_mask_t hal_io_read_buttons(void)
     return mask;
 }
 
+/**
+ * @brief Configures and locks dynamic peripheral lines prior to deep sleep.
+ *
+ * @details * Latches GPIO 11 (EPD_CS) and GPIO 9 (EPD_RST) HIGH via gpio_hold_en().
+ * Holds amplifier mute GPIO 46 (PA_CTRL) LOW.
+ * Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18).
+ * Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_io_isolate_sleep_pads(void)
 {
     gpio_set_level(HAL_PIN_EPD_CS, 1);
@@ -334,6 +425,11 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t hal_io_release_pad_holds(void)
 {
     gpio_deep_sleep_hold_dis();
@@ -350,6 +446,11 @@ esp_err_t hal_io_release_pad_holds(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Check if USB Serial/JTAG is connected to an active host via SOF packets.
+ *
+ * @return true if USB host connection detected, false otherwise.
+ */
 bool hal_check_usb_ll(void)
 {
     REG_WRITE(USB_SERIAL_JTAG_INT_CLR_REG, USB_SERIAL_JTAG_SOF_INT_CLR);

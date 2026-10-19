@@ -14,3 +14,4 @@ sdkconfig.*
 __pycache__/
 *.py[cod]
 
+/h1os_backup_20261019_182851/

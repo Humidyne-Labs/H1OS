@@ -48,21 +48,53 @@ static const char *TAG = "sub_rtc";
 #define TIMER_INT_ENABLE_BIT (1 << 1)
 #define TIMER_PULSE_MODE_BIT (1 << 0)
 
+/**
+ * @brief Bcd2dec.
+ *
+ * @param[in]    val             Parameter val.
+ *
+ * @return Return value of type static inline uint8_t.
+ */
 static inline uint8_t bcd2dec(uint8_t val)
 {
     return ((val >> 4) * 10) + (val & 0x0F);
 }
 
+/**
+ * @brief Dec2bcd.
+ *
+ * @param[in]    val             Parameter val.
+ *
+ * @return Return value of type static inline uint8_t.
+ */
 static inline uint8_t dec2bcd(uint8_t val)
 {
     return ((val / 10) << 4) | (val % 10);
 }
 
+/**
+ * @brief Pcf85063 read reg.
+ *
+ * @param[in]    reg             Parameter reg.
+ * @param[in]    val             Parameter val.
+ * @param[in]    len             Parameter len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t pcf85063_read_reg(uint8_t reg, uint8_t *val, size_t len)
 {
     return hal_i2c_write_read(HAL_I2C_ADDR_PCF85063, &reg, 1, val, len, pdMS_TO_TICKS(50));
 }
 
+/**
+ * @brief Pcf85063 write reg.
+ *
+ * @param[in]    reg             Parameter reg.
+ * @param[in]    val             Parameter val.
+ * @param[in]    len             Parameter len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t pcf85063_write_reg(uint8_t reg, const uint8_t *val, size_t len)
 {
     uint8_t buf[16];
@@ -73,11 +105,26 @@ static esp_err_t pcf85063_write_reg(uint8_t reg, const uint8_t *val, size_t len)
     return hal_i2c_write(HAL_I2C_ADDR_PCF85063, buf, len + 1, pdMS_TO_TICKS(50));
 }
 
+/**
+ * @brief Pcf85063 write reg u8.
+ *
+ * @param[in]    reg             Parameter reg.
+ * @param[in]    val             Parameter val.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t pcf85063_write_reg_u8(uint8_t reg, uint8_t val)
 {
     return pcf85063_write_reg(reg, &val, 1);
 }
 
+/**
+ * @brief Initialize PCF85063A RTC.
+ *
+ * @details Disables CLKOUT push-pull square wave to eliminate continuous trace leakage, verifies oscillator status, and clears residual timer/alarm flags.
+ *
+ * @return ESP_OK on success, or an I2C communication error.
+ */
 esp_err_t sub_rtc_init(void)
 {
     uint8_t ctrl1 = 0;
@@ -114,6 +161,13 @@ esp_err_t sub_rtc_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Read current date and time into POSIX struct tm.
+ *
+ * @param[out]   out_time        Pointer to struct tm populated with current RTC timestamp.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_rtc_get_time(struct tm *out_time)
 {
     if (out_time == NULL) {
@@ -138,6 +192,13 @@ esp_err_t sub_rtc_get_time(struct tm *out_time)
     return ESP_OK;
 }
 
+/**
+ * @brief Set RTC calendar date and time.
+ *
+ * @param[in]    time            Pointer to struct tm containing target timestamp.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_rtc_set_time(const struct tm *time)
 {
     if (time == NULL) {
@@ -166,6 +227,15 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
     return err;
 }
 
+/**
+ * @brief Arm hardware countdown timer.
+ *
+ * @details Drives open-drain interrupt line GPIO 5 LOW upon expiration.
+ *
+ * @param[in]    seconds         Countdown interval in seconds (1 to 15300s).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 {
     if (seconds == 0 || seconds > 15300) {
@@ -232,6 +302,11 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
     return ESP_OK;
 }
 
+/**
+ * @brief Cancel and disarm hardware countdown timer.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_rtc_cancel_countdown(void)
 {
     pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0);
@@ -242,6 +317,15 @@ esp_err_t sub_rtc_cancel_countdown(void)
     return pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
 }
 
+/**
+ * @brief Read remaining seconds on the active countdown timer.
+ *
+ * @details Used for zero-hour collision avoidance.
+ *
+ * @param[out]   out_sec         Remaining seconds until countdown expiration.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec)
 {
     if (out_sec == NULL)
@@ -272,6 +356,16 @@ esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec)
     return ESP_OK;
 }
 
+/**
+ * @brief Inspect and acknowledge RTC interrupt flags.
+ *
+ * @details Clears TF (Timer Flag) and AF (Alarm Flag) in Control_2 to deassert GPIO 5.
+ *
+ * @param[out]   out_alarm       Set to true if an alarm interrupt triggered.
+ * @param[out]   out_timer       Set to true if a countdown timer interrupt triggered.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer)
 {
     uint8_t ctrl2 = 0;

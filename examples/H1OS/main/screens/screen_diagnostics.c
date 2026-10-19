@@ -1,6 +1,6 @@
 /**
  * @file screen_diagnostics.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief Screen 4: Verbose system diagnostics page
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -54,6 +54,12 @@ static const char *get_wake_causes_str(uint32_t causes)
     return "INTERNAL";
 }
 
+/**
+ * @brief Renders Screen 4: Verbose hardware register and memory diagnostics page.
+ *
+ * @param[in]    telem           Pointer to validated environmental telemetry snapshot.
+ * @param[in]    event_cb        Keypad navigation callback.
+ */
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "4/4", event_cb);

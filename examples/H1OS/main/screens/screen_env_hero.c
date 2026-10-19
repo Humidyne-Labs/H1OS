@@ -1,6 +1,6 @@
 /**
  * @file screen_env_hero.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief Screen 1: Primary environmental hero display page
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -11,6 +11,13 @@
 #include "h1os/orch_state.h"
 #include "screens.h"
 
+/**
+ * @brief Renders Screen 1: Primary environmental hero telemetry page.
+ *
+ * @param[in]    telem           Pointer to validated environmental telemetry snapshot.
+ * @param[in]    cycle_count     Monotonic update cycle count.
+ * @param[in]    event_cb        Keypad navigation callback.
+ */
 void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count, lv_event_cb_t event_cb)
 {
     lv_obj_t *scr = screen_base_create("HUMIDYNE LABS", "1/4", event_cb);

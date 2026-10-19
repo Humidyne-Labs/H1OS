@@ -32,8 +32,8 @@
 #endif
 
 // clang-format off
-#define SDA_BIT_MASK       (1UL << (HAL_PIN_I2C_SDA - 32))
-#define SCL_BIT_MASK       (1UL << (HAL_PIN_I2C_SCL - 32))
+#define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32))
+#define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32))
 
 #define I2C_ADDR_SHTC3     0x70
 #define I2C_ADDR_PCF85063  0x51
@@ -44,38 +44,73 @@
 #define RTC_TIMER_TCF_MIN  (3 << 3)
 // clang-format on
 
+/**
+ * @brief I2c delay.
+ *
+ * @return Return value of type static inline void RTC_IRAM_ATTR.
+ */
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
     esp_rom_delay_us(5);
 }
 
+/**
+ * @brief Sda high.
+ *
+ * @return Return value of type static inline void RTC_IRAM_ATTR.
+ */
 static inline void RTC_IRAM_ATTR sda_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
 }
 
+/**
+ * @brief Sda low.
+ *
+ * @return Return value of type static inline void RTC_IRAM_ATTR.
+ */
 static inline void RTC_IRAM_ATTR sda_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
 }
 
+/**
+ * @brief Scl high.
+ *
+ * @return Return value of type static inline void RTC_IRAM_ATTR.
+ */
 static inline void RTC_IRAM_ATTR scl_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
 }
 
+/**
+ * @brief Scl low.
+ *
+ * @return Return value of type static inline void RTC_IRAM_ATTR.
+ */
 static inline void RTC_IRAM_ATTR scl_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SCL_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SCL_BIT_MASK);
 }
 
+/**
+ * @brief Sda read.
+ *
+ * @return Return value of type static inline uint8_t RTC_IRAM_ATTR.
+ */
 static inline uint8_t RTC_IRAM_ATTR sda_read(void)
 {
     return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
 }
 
+/**
+ * @brief Start i2c_start background operations.
+ *
+ * @return Return value of type static void RTC_IRAM_ATTR.
+ */
 static void RTC_IRAM_ATTR i2c_start(void)
 {
     sda_high();
@@ -87,6 +122,11 @@ static void RTC_IRAM_ATTR i2c_start(void)
     i2c_delay();
 }
 
+/**
+ * @brief Stop i2c_stop background operations.
+ *
+ * @return Return value of type static void RTC_IRAM_ATTR.
+ */
 static void RTC_IRAM_ATTR i2c_stop(void)
 {
     sda_low();
@@ -97,6 +137,13 @@ static void RTC_IRAM_ATTR i2c_stop(void)
     i2c_delay();
 }
 
+/**
+ * @brief I2c write byte.
+ *
+ * @param[in]    byte            Parameter byte.
+ *
+ * @return True on success, false otherwise.
+ */
 static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
 {
     for (int i = 7; i >= 0; i--) {
@@ -122,6 +169,13 @@ static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
     return ack;
 }
 
+/**
+ * @brief I2c read byte.
+ *
+ * @param[in]    ack             Parameter ack.
+ *
+ * @return Return value of type static uint8_t RTC_IRAM_ATTR.
+ */
 static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
 {
     uint8_t byte = 0;
@@ -152,6 +206,14 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
     return byte;
 }
 
+/**
+ * @brief Shtc3 crc8.
+ *
+ * @param[in]    data            Parameter data.
+ * @param[in]    len             Parameter len.
+ *
+ * @return Return value of type static uint8_t RTC_IRAM_ATTR.
+ */
 static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 {
     uint8_t crc = 0xFF;
@@ -168,6 +230,14 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
     return crc;
 }
 
+/**
+ * @brief Wake stub read die temp centi c.
+ *
+ * @param[in]    cal_centi_c     Parameter cal_centi_c.
+ * @param[in]    fallback_centi_c Parameter fallback_centi_c.
+ *
+ * @return Return value of type static int16_t RTC_IRAM_ATTR.
+ */
 static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c, int16_t fallback_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
@@ -199,6 +269,11 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
     return (int16_t)t_centi;
 }
 
+/**
+ * @brief Shtc3 send sleep.
+ *
+ * @return Return value of type static void RTC_IRAM_ATTR.
+ */
 static void RTC_IRAM_ATTR shtc3_send_sleep(void)
 {
     i2c_start();
@@ -209,6 +284,13 @@ static void RTC_IRAM_ATTR shtc3_send_sleep(void)
     i2c_stop();
 }
 
+/**
+ * @brief Master RTC Wake Stub entry function.
+ *
+ * @details Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
+ *
+ * @return Return value of type void RTC_IRAM_ATTR.
+ */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
     PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
@@ -344,8 +426,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             uint8_t timer_mode = i2c_read_byte(false);
             if (timer_mode & RTC_TIMER_TE_BIT) {
                 rtc_timer_active = true;
-                rem_sec = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN) ? ((uint32_t)timer_val * 60U)
-                                                                                   : (uint32_t)timer_val;
+                rem_sec = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN) ? ((uint32_t)timer_val * 60U) : (uint32_t)timer_val;
             }
         }
     }
@@ -373,6 +454,11 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     esp_wake_stub_sleep(&bsp_wake_stub);
 }
 
+/**
+ * @brief Install the RTC deep sleep wake stub.
+ *
+ * @details Called before entering deep sleep to arm the ultra-fast wake stub handler.
+ */
 void orch_wake_stub_install(void)
 {
     esp_set_deep_sleep_wake_stub(bsp_wake_stub);

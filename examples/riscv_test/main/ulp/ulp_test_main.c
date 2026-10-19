@@ -35,12 +35,26 @@ volatile test_shared_data_t test_data = {.magic = ULP_TEST_MAGIC,
                                          .ulp_elapsed_rtc_ticks = 0,
                                          .log_buf = {.head = 0, .tail = 0, .buffer = {0}}};
 
+/**
+ * @brief Ulp log putc.
+ *
+ * @param[in]    c               Parameter c.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_log_putc(char c)
 {
     test_data.log_buf.buffer[test_data.log_buf.head & ULP_LOG_BUF_MASK] = c;
     test_data.log_buf.head++;
 }
 
+/**
+ * @brief Ulp log puts.
+ *
+ * @param[in]    s               Parameter s.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_log_puts(const char *s)
 {
     if (!s)
@@ -50,6 +64,16 @@ static void ulp_log_puts(const char *s)
     }
 }
 
+/**
+ * @brief Ulp log put u32.
+ *
+ * @param[in]    val             Parameter val.
+ * @param[in]    base            Parameter base.
+ * @param[in]    min_width       Parameter min_width.
+ * @param[in]    pad_char        Parameter pad_char.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_log_put_u32(uint32_t val, int base, int min_width, char pad_char)
 {
     char buf[12];
@@ -71,6 +95,13 @@ static void ulp_log_put_u32(uint32_t val, int base, int min_width, char pad_char
     }
 }
 
+/**
+ * @brief Ulp log put i32.
+ *
+ * @param[in]    val             Parameter val.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_log_put_i32(int32_t val)
 {
     if (val < 0) {
@@ -80,6 +111,13 @@ static void ulp_log_put_i32(int32_t val)
     ulp_log_put_u32((uint32_t)val, 10, 0, ' ');
 }
 
+/**
+ * @brief Ulp printf.
+ *
+ * @param[in]    fmt             Parameter fmt.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_printf(const char *fmt, ...)
 {
     va_list args;
@@ -143,6 +181,11 @@ static void ulp_printf(const char *fmt, ...)
     va_end(args);
 }
 
+/**
+ * @brief Main.
+ *
+ * @return Return value of type int.
+ */
 int main(void)
 {
     test_data.ulp_entry_count++;

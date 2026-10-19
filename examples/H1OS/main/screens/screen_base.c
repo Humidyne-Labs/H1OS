@@ -1,6 +1,6 @@
 /**
  * @file screen_base.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief Common base layout builder for 200x200 monochrome e-Paper screens
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -72,6 +72,11 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     return scr;
 }
 
+/**
+ * @brief Sets awake session pill badge in top-right header.
+ *
+ * @param[in]    is_awake        True if interactive session active, false for unattended sleep.
+ */
 void screen_base_set_awake_badge(bool is_awake)
 {
     if (s_active_badge == NULL || s_active_badge_lbl == NULL)

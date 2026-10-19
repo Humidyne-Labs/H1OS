@@ -84,6 +84,13 @@ static const uint8_t es8311_perceptual_vol_table[101] = {
     0xAC, 0xAD, 0xAE, 0xAE, 0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 0xB3, 0xB3, 0xB4, 0xB5, 0xB5, 0xB6, 0xB6,
     0xB7, 0xB7, 0xB8, 0xB9, 0xB9, 0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 0xBD, 0xBE, 0xBE, 0xBF, 0xBF};
 
+/**
+ * @brief Volume pct to es8311 reg.
+ *
+ * @param[in]    pct             Parameter pct.
+ *
+ * @return Return value of type static inline uint8_t.
+ */
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 {
     if (pct > 100)
@@ -94,17 +101,40 @@ static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 static void audio_worker_task(void *pvParameters);
 static void sub_audio_park_warm(void);
 
+/**
+ * @brief Es8311 write reg.
+ *
+ * @param[in]    reg             Parameter reg.
+ * @param[in]    val             Parameter val.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 {
     uint8_t buf[2] = {reg, val};
     return hal_i2c_write(HAL_I2C_ADDR_ES8311, buf, sizeof(buf), pdMS_TO_TICKS(50));
 }
 
+/**
+ * @brief Es8311 read reg.
+ *
+ * @param[in]    reg             Parameter reg.
+ * @param[in]    val             Parameter val.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *val)
 {
     return hal_i2c_write_read(HAL_I2C_ADDR_ES8311, &reg, 1, val, 1, pdMS_TO_TICKS(50));
 }
 
+/**
+ * @brief Sub audio read chip id.
+ *
+ * @param[in]    chip_id         Parameter chip_id.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 {
     if (s_tx_chan != NULL && !s_i2s_chan_enabled)
@@ -124,6 +154,11 @@ static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio flush frame.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_OK;
@@ -135,6 +170,13 @@ static esp_err_t sub_audio_flush_frame(void)
     return ret;
 }
 
+/**
+ * @brief Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
+ *
+ * @param[in]    timeout_ms      Maximum wait time in milliseconds.
+ *
+ * @return ESP_OK if codec is verified and in active CSM state, or error.
+ */
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 {
     uint16_t chip_id = 0x0000;
@@ -160,6 +202,11 @@ esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
     return ESP_ERR_TIMEOUT;
 }
 
+/**
+ * @brief Quick status check of whether ES8311 codec is ready.
+ *
+ * @return true if communication and active CSM state verified.
+ */
 bool sub_audio_is_ready(void)
 {
     return (sub_audio_wait_until_ready(10) == ESP_OK);
@@ -170,8 +217,8 @@ typedef struct {
     uint8_t val;
 } es8311_reg_entry_t;
 
-static const es8311_reg_entry_t s_es8311_init_pre_charge[] = {
-
+static const es8311_reg_entry_t s_es8311_init_pre_charge[] = 
+{
     {0x44, 0x08},
     {0x44, 0x08},
 
@@ -204,8 +251,8 @@ static const es8311_reg_entry_t s_es8311_init_pre_charge[] = {
     {0x0A, 0x0C},
 };
 
-static const es8311_reg_entry_t s_es8311_init_post_charge[] = {
-
+static const es8311_reg_entry_t s_es8311_init_post_charge[] = 
+{
     {0x17, 0xBF},
     {0x0E, 0x02},
     {0x12, 0x00},
@@ -219,6 +266,14 @@ static const es8311_reg_entry_t s_es8311_init_post_charge[] = {
     {0x31, 0x00},
 };
 
+/**
+ * @brief Es8311 write table.
+ *
+ * @param[in]    table           Parameter table.
+ * @param[in]    count           Parameter count.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t es8311_write_table(const es8311_reg_entry_t *table, size_t count)
 {
     esp_err_t ret = ESP_OK;
@@ -228,23 +283,32 @@ static esp_err_t es8311_write_table(const es8311_reg_entry_t *table, size_t coun
     return ret;
 }
 
+/**
+ * @brief Initialize es8311_init_dac_registers module resources.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
-    ret |= es8311_write_table(s_es8311_init_pre_charge,
-                              sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_pre_charge, sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
 
     vTaskDelay(pdMS_TO_TICKS(35));
 
-    ret |= es8311_write_table(s_es8311_init_post_charge,
-                              sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
-
+    ret |= es8311_write_table(s_es8311_init_post_charge, sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
     ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00);
 
     return ret;
 }
 
+/**
+ * @brief Initialize ES8311 codec and NS4168 amplifier.
+ *
+ * @details Configures I2S audio bus and sets codec to active run mode.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_audio_init(void)
 {
     if (s_audio_inited)
@@ -330,8 +394,13 @@ esp_err_t sub_audio_init(void)
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
             TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
-            BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task, "h1os_audio_worker", 4096, (void *)current_task,
-                                                     6, &s_audio_task_handle, tskNO_AFFINITY);
+            BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task, 
+														"h1os_audio_worker", 
+														4096, 
+														(void *)current_task, 
+														6, 
+														&s_audio_task_handle, 
+														tskNO_AFFINITY);
             if (res == pdPASS) {
                 if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
                     ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
@@ -360,12 +429,24 @@ esp_err_t sub_audio_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio park warm.
+ *
+ * @return Return value of type static void.
+ */
 static void sub_audio_park_warm(void)
 {
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     vTaskDelay(pdMS_TO_TICKS(25));
 }
 
+/**
+ * @brief Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0x00 @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
+ *
+ * @details Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_audio_standby(void)
 {
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
@@ -397,6 +478,14 @@ esp_err_t sub_audio_standby(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio render tone samples.
+ *
+ * @param[in]    frequency_hz    Parameter frequency_hz.
+ * @param[in]    duration_ms     Parameter duration_ms.
+ *
+ * @return Return value of type static void.
+ */
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 {
     const uint32_t sample_rate = 16000;
@@ -440,6 +529,14 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
     }
 }
 
+/**
+ * @brief Sub audio render pcm samples.
+ *
+ * @param[in]    samples         Parameter samples.
+ * @param[in]    sample_count    Parameter sample_count.
+ *
+ * @return Return value of type static void.
+ */
 static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_count)
 {
     if (samples == NULL || sample_count == 0)
@@ -463,6 +560,11 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
     }
 }
 
+/**
+ * @brief Sub audio prepare and unmute.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_prepare_and_unmute(void)
 {
     if (!s_audio_inited || s_tx_chan == NULL) {
@@ -488,6 +590,14 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio exec tone.
+ *
+ * @param[in]    frequency_hz    Parameter frequency_hz.
+ * @param[in]    duration_ms     Parameter duration_ms.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 {
     ESP_LOGI(TAG, "Playing tone: %lu Hz for %lu ms (Vol: %u%%)", (unsigned long)frequency_hz,
@@ -500,6 +610,15 @@ static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio exec pcm.
+ *
+ * @param[in]    samples         Parameter samples.
+ * @param[in]    sample_count    Parameter sample_count.
+ * @param[in]    sample_rate_hz  Parameter sample_rate_hz.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count, uint32_t sample_rate_hz)
 {
     (void)sample_rate_hz;
@@ -511,6 +630,13 @@ static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count,
     return ESP_OK;
 }
 
+/**
+ * @brief Sub audio exec chime.
+ *
+ * @param[in]    type            Parameter type.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 {
     ESP_LOGI(TAG, "Executing acoustic presentation chime (Type %u)...", type);
@@ -562,6 +688,13 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
     return ESP_OK;
 }
 
+/**
+ * @brief Audio worker task.
+ *
+ * @param[in]    pvParameters    Parameter pvParameters.
+ *
+ * @return Return value of type static void.
+ */
 static void audio_worker_task(void *pvParameters)
 {
     TaskHandle_t creator_task = (TaskHandle_t)pvParameters;
@@ -587,8 +720,7 @@ static void audio_worker_task(void *pvParameters)
                 res = sub_audio_exec_chime(cmd.params.chime.chime_type);
                 break;
             case AUDIO_CMD_PCM:
-                res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count,
-                                         cmd.params.pcm.sample_rate_hz);
+                res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count, cmd.params.pcm.sample_rate_hz);
                 break;
             }
 
@@ -606,6 +738,15 @@ static void audio_worker_task(void *pvParameters)
     }
 }
 
+/**
+ * @brief Sub audio send command.
+ *
+ * @param[in]    cmd             Parameter cmd.
+ * @param[in]    is_sync         Parameter is_sync.
+ * @param[in]    wait_ms         Parameter wait_ms.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, uint32_t wait_ms)
 {
     if (s_audio_queue == NULL) {
@@ -644,6 +785,17 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
     return ESP_OK;
 }
 
+/**
+ * @brief Unified asynchronous audio playback dispatcher.
+ *
+ * @details Enqueues the requested audio command into the background audio worker task.
+ *
+ * @param[in]    type            Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM.
+ * @param[in]    data            Parameter data.
+ * @param[in]    len             Parameter len.
+ *
+ * @return ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
+ */
 esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
 {
     if (data == NULL)
@@ -684,6 +836,11 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
     return sub_audio_send_command(&cmd, false, 50);
 }
 
+/**
+ * @brief Check if audio playback is currently active or queue has pending items.
+ *
+ * @return true if playing or queued, false if idle in standby.
+ */
 bool sub_audio_is_busy(void)
 {
     if (s_audio_is_busy)
@@ -693,6 +850,13 @@ bool sub_audio_is_busy(void)
     return false;
 }
 
+/**
+ * @brief Wait until background audio worker completes all playback and enters standby.
+ *
+ * @param[in]    timeout_ms      Maximum time to wait in milliseconds.
+ *
+ * @return ESP_OK if idle, ESP_ERR_TIMEOUT if still active.
+ */
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 {
     uint32_t elapsed = 0;
@@ -703,6 +867,11 @@ esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
     return sub_audio_is_busy() ? ESP_ERR_TIMEOUT : ESP_OK;
 }
 
+/**
+ * @brief Teardown audio subsystem, stop background worker task, and delete I2S channel.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_audio_deinit(void)
 {
     sub_audio_standby();
@@ -730,6 +899,15 @@ esp_err_t sub_audio_deinit(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
+ *
+ * @details Persists across standby/wake cycles.
+ *
+ * @param[in]    volume_pct      Volume percentage (0 - 100).
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 {
     if (volume_pct > 100)
@@ -743,11 +921,25 @@ esp_err_t sub_audio_set_volume(uint8_t volume_pct)
     return ESP_OK;
 }
 
+/**
+ * @brief Get currently configured output volume percentage (0 - 100).
+ *
+ * @return Current volume percentage.
+ */
 uint8_t sub_audio_get_volume(void)
 {
     return s_volume_pct;
 }
 
+/**
+ * @brief Configure ES8311 DAC power mode (Low-Power vs Normal).
+ *
+ * @details In low-power mode (default upon init), ES8311 operates with LPDAC enabled (Reg 0x0F bit 7 = 1), significantly reducing active DAC bias current. Normal mode provides standard bias.
+ *
+ * @param[in]    enable          true for Low-Power Mode (default), false for Normal Power Mode.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 {
     s_low_power_mode = enable;
@@ -757,6 +949,11 @@ esp_err_t sub_audio_set_low_power_mode(bool enable)
     return ESP_OK;
 }
 
+/**
+ * @brief Query whether audio subsystem is in Low-Power Mode.
+ *
+ * @return true if Low-Power Mode is active, false if Normal Power Mode.
+ */
 bool sub_audio_get_low_power_mode(void)
 {
     return s_low_power_mode;

@@ -21,6 +21,13 @@ static const char *TAG = "h1os_time";
 static h1os_time_sync_cb_t s_sync_cb = NULL;
 static void *s_sync_user_data = NULL;
 
+/**
+ * @brief Configure POSIX timezone string.
+ *
+ * @param[in]    tz_str          Parameter tz_str.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_set_timezone(const char *tz_str)
 {
     if (tz_str == NULL || strlen(tz_str) == 0 || strlen(tz_str) > 64) {
@@ -32,6 +39,14 @@ esp_err_t h1os_time_set_timezone(const char *tz_str)
     return ESP_OK;
 }
 
+/**
+ * @brief Register external time sync callback.
+ *
+ * @param[in]    cb              Parameter cb.
+ * @param[in]    user_data       Parameter user_data.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_register_sync_cb(h1os_time_sync_cb_t cb, void *user_data)
 {
     s_sync_cb = cb;
@@ -39,6 +54,11 @@ esp_err_t h1os_time_register_sync_cb(h1os_time_sync_cb_t cb, void *user_data)
     return ESP_OK;
 }
 
+/**
+ * @brief Synchronize internal system clock into PCF85063A RTC hardware.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_sync_system_to_rtc(void)
 {
     time_t now;
@@ -49,7 +69,11 @@ esp_err_t h1os_time_sync_system_to_rtc(void)
     esp_err_t ret = sub_rtc_set_time(&timeinfo);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Synchronized PCF85063A RTC from POSIX clock: %04d-%02d-%02d %02d:%02d:%02d",
-                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min,
+                 timeinfo.tm_year + 1900, 
+				 timeinfo.tm_mon + 1, 
+				 timeinfo.tm_mday, 
+				 timeinfo.tm_hour, 
+				 timeinfo.tm_min,
                  timeinfo.tm_sec);
     } else {
         ESP_LOGE(TAG, "Failed to write PCF85063A RTC: %s", esp_err_to_name(ret));
@@ -57,6 +81,11 @@ esp_err_t h1os_time_sync_system_to_rtc(void)
     return ret;
 }
 
+/**
+ * @brief Synchronize PCF85063A RTC hardware into internal POSIX system clock.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_sync_rtc_to_system(void)
 {
     struct tm tm_target;
@@ -74,11 +103,23 @@ esp_err_t h1os_time_sync_rtc_to_system(void)
 
     struct timeval tv = {.tv_sec = t, .tv_usec = 0};
     settimeofday(&tv, NULL);
-    ESP_LOGI(TAG, "Synchronized POSIX clock from PCF85063A: %04d-%02d-%02d %02d:%02d:%02d", tm_target.tm_year + 1900,
-             tm_target.tm_mon + 1, tm_target.tm_mday, tm_target.tm_hour, tm_target.tm_min, tm_target.tm_sec);
+    ESP_LOGI(TAG, "Synchronized POSIX clock from PCF85063A: %04d-%02d-%02d %02d:%02d:%02d", 
+					tm_target.tm_year + 1900,
+					tm_target.tm_mon + 1, 
+					tm_target.tm_mday, 
+					tm_target.tm_hour, 
+					tm_target.tm_min, 
+					tm_target.tm_sec);
     return ESP_OK;
 }
 
+/**
+ * @brief Trigger time synchronization using registered callback.
+ *
+ * @param[in]    timeout_ms      Parameter timeout_ms.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_sync_now(uint32_t timeout_ms)
 {
     if (s_sync_cb == NULL) {
@@ -97,6 +138,15 @@ esp_err_t h1os_time_sync_now(uint32_t timeout_ms)
     return ret;
 }
 
+/**
+ * @brief Format current local time into destination buffer.
+ *
+ * @param[in]    fmt             Parameter fmt.
+ * @param[in]    dest            Parameter dest.
+ * @param[in]    max_len         Parameter max_len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_get_formatted(h1os_time_format_t fmt, char *dest, size_t max_len)
 {
     if (dest == NULL || max_len == 0)
@@ -129,6 +179,15 @@ esp_err_t h1os_time_get_formatted(h1os_time_format_t fmt, char *dest, size_t max
     return (written > 0) ? ESP_OK : ESP_FAIL;
 }
 
+/**
+ * @brief Format current local date into destination buffer.
+ *
+ * @param[in]    fmt             Parameter fmt.
+ * @param[in]    dest            Parameter dest.
+ * @param[in]    max_len         Parameter max_len.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_time_get_date_formatted(h1os_date_format_t fmt, char *dest, size_t max_len)
 {
     if (dest == NULL || max_len == 0)

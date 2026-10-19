@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+"""
+H1OS Public Documentation Audit Tool
+Verifies absolute file URI avoidance, deprecated component references, and markdown link integrity.
+
+Copyright (c) 2026 Humidyne Labs
+SPDX-License-Identifier: MIT
+"""
+
 import os
 import glob
 import re

@@ -14,10 +14,20 @@
 
 #define PIN_POWER_HOLD 17
 
+/**
+ * @brief Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
+ */
 void bootloader_hooks_include(void)
 {
 }
 
+/**
+ * @brief FIRST HOOK: Executes before any bootloader hardware initialization.
+ *
+ * @details * Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here).
+* Immediately latches BAT_CTRL (GPIO 17) HIGH in < 25ms.
+* Explicitly connects SIG_GPIO_OUT_IDX to prevent reliance on reset defaults.
+ */
 void bootloader_before_init(void)
 {
     REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(PIN_POWER_HOLD));

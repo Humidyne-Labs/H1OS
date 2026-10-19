@@ -1,6 +1,6 @@
 /**
  * @file humid1_cyber_wave.c
- * @brief H1OS showcase application: modular 4-screen environmental telemetry
+ * @brief HUMID1 cyber-wave EPD boot graphic asset
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT

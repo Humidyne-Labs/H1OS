@@ -25,12 +25,18 @@ orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
     return &s_persisted_state;
 }
 
+/**
+ * @brief Reset persisted RTC state to default values.
+ *
+ * @return Return value of type void RTC_IRAM_ATTR.
+ */
 void RTC_IRAM_ATTR orch_state_reset(void)
 {
     uint8_t *p = (uint8_t *)&s_persisted_state;
     for (size_t i = 0; i < sizeof(s_persisted_state); i++) {
         p[i] = 0;
     }
+	
     s_persisted_state.magic = ORCH_RTC_MAGIC;
     s_persisted_state.sample_interval_sec = 0;
     s_persisted_state.flow_b_period_sec = 0;
@@ -41,6 +47,13 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     s_persisted_state.trinode_confidence_pct = 0;
 }
 
+/**
+ * @brief Push a new Tri-Node telemetry sample into the RTC ring buffer.
+ *
+ * @param[in]    sample          Pointer to sample data to commit.
+ *
+ * @return Return value of type void RTC_IRAM_ATTR.
+ */
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)
 {
     if (sample == NULL)
@@ -52,6 +65,13 @@ void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)
     st->total_samples++;
 }
 
+/**
+ * @brief Get the latest committed sample from the ring buffer.
+ *
+ * @param[out]   out_sample      Destination pointer.
+ *
+ * @return true if reading present, false if buffer empty.
+ */
 bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample)
 {
     if (out_sample == NULL)
@@ -66,6 +86,15 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample)
     return true;
 }
 
+/**
+ * @brief Get the newest sample in the ring buffer marked SAMPLE_FLAG_VALID_COLD.
+ *
+ * @details Falls back to the latest sample if no sample has been marked valid yet.
+ *
+ * @param[out]   out_sample      Destination pointer.
+ *
+ * @return true if a sample is returned, false if buffer empty.
+ */
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample)
 {
     if (out_sample == NULL)
@@ -77,8 +106,7 @@ bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample)
 
     uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
     for (uint32_t step = 1; step <= count; step++) {
-        uint8_t idx =
-            (uint8_t)((st->ring_head + ORCH_RING_CAPACITY - (step % ORCH_RING_CAPACITY)) % ORCH_RING_CAPACITY);
+        uint8_t idx = (uint8_t)((st->ring_head + ORCH_RING_CAPACITY - (step % ORCH_RING_CAPACITY)) % ORCH_RING_CAPACITY);
         if (st->ring[idx].quality_flags & SAMPLE_FLAG_VALID_COLD) {
             *out_sample = st->ring[idx];
             return true;

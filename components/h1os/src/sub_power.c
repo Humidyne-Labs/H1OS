@@ -42,10 +42,31 @@ static bool s_cali_valid = false;
 static const struct {
     uint16_t mv;
     uint8_t pct;
-} s_lipo_table[] = {{4200, 100}, {4060, 92}, {3980, 85}, {3920, 75}, {3870, 65}, {3820, 55}, {3780, 45}, {3750, 35}, {3720, 25}, {3680, 15}, {3600, 8}, {3450, 3}, {3300, 0}};
+} s_lipo_table[] = {
+						{4200, 100}, 
+						{4060, 92}, 
+						{3980, 85}, 
+						{3920, 75}, 
+						{3870, 65}, 
+						{3820, 55}, 
+						{3780, 45}, 
+						{3750, 35}, 
+						{3720, 25}, 
+						{3680, 15}, 
+						{3600, 8}, 
+						{3450, 3}, 
+						{3300, 0}
+					};
 
 #define LIPO_TABLE_SIZE (sizeof(s_lipo_table) / sizeof(s_lipo_table[0]))
 
+/**
+ * @brief Mv to percent.
+ *
+ * @param[in]    mv              Parameter mv.
+ *
+ * @return Return value of type static uint8_t.
+ */
 static uint8_t mv_to_percent(uint16_t mv)
 {
     if (mv >= s_lipo_table[0].mv)
@@ -64,6 +85,11 @@ static uint8_t mv_to_percent(uint16_t mv)
     return 0;
 }
 
+/**
+ * @brief Initialize Battery ADC subsystem (ADC1 Channel 3 on GPIO 4 with 12 dB atten and eFuse cal).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_power_init(void)
 {
     if (s_adc_handle != NULL)
@@ -107,6 +133,11 @@ esp_err_t sub_power_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Deinitialize ADC handles.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_power_deinit(void)
 {
     if (s_cali_valid && s_cali_handle != NULL) {
@@ -124,6 +155,14 @@ esp_err_t sub_power_deinit(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Sample calibrated battery voltage with 16-sample trimmed outlier filtering.
+ *
+ * @param[out]   out_mv          Battery voltage in millivolts (e.g. 3850 mV).
+ * @param[out]   out_pct         Estimated state of charge (0 to 100%).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 {
     if (out_mv == NULL)
@@ -183,6 +222,14 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
     return ESP_OK;
 }
 
+/**
+ * @brief Extract linear calibration coefficients (scale and offset) for ULP coprocessor hand-off.
+ *
+ * @param[out]   out_scale       Multiplier scaled by 4096.
+ * @param[out]   out_offset_mv   Voltage offset in millivolts.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_mv)
 {
     if (out_scale == NULL || out_offset_mv == NULL)
@@ -206,6 +253,15 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
     return ESP_OK;
 }
 
+/**
+ * @brief Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
+ *
+ * @details Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration, configures the periodic wake timer (Flow A period), and arms the coprocessor.
+ *
+ * @param[in]    flow_a_period_sec Periodic wake interval for Flow A telemetry in seconds.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 {
     uint32_t causes = esp_sleep_get_wakeup_causes();
@@ -220,8 +276,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         sub_power_init();
 
         sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
-        ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV", (unsigned long)ulp_cal_scale,
-                 (long)ulp_cal_offset);
+        ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV", (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
         ulp_dispatch_reason = 0;
         ulp_last_wake_btn = 0;
         ulp_last_vbat_mv = 4000;
@@ -250,6 +305,17 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
     return ESP_OK;
 }
 
+/**
+ * @brief Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
+ *
+ * @details Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
+ *
+ * @param[in]    sleep_seconds   Timer duration in seconds (0 = timer disabled).
+ * @param[in]    ext1_pins_mask  Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
+ * @param[in]    mode            Full cycle or Flow A burst mode.
+ *
+ * @return Does not return on success (enters deep sleep).
+ */
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 {
     (void)sleep_seconds;
@@ -287,9 +353,14 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     ESP_LOGI(TAG,
              "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> FullSlices=%lu, Remainder=%lus -> "
              "TotalOverflowLimit=%lu (SliceAcc=%lu, USB=%lu)",
-             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST", (unsigned long)flow_a_sec,
-             (unsigned long)flow_b_sec, (unsigned long)full_slices, (unsigned long)remainder, (unsigned long)overflow,
-             (unsigned long)ulp_slice_counter, (unsigned long)ulp_usb_connected);
+             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST", 
+			 (unsigned long)flow_a_sec,
+             (unsigned long)flow_b_sec, 
+			 (unsigned long)full_slices, 
+			 (unsigned long)remainder, 
+			 (unsigned long)overflow,
+             (unsigned long)ulp_slice_counter, 
+			 (unsigned long)ulp_usb_connected);
 
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
@@ -340,30 +411,53 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     ESP_LOGI(TAG, "Pre-Sleep Audit: ULP_CP_TIMER=0x%08lx, GPIO_STATUS=0x%08lx",
-             (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG), (unsigned long)REG_READ(RTC_GPIO_STATUS_REG));
+					(unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG), 
+					(unsigned long)REG_READ(RTC_GPIO_STATUS_REG));
     ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
-             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)), (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
-             (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
+					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)), 
+					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
+					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
 
-    ESP_LOGI(TAG,
-             "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, "
-             "Wake: ULP)...",
-             (unsigned long)flow_a_sec, (unsigned long)overflow);
+    ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
+					(unsigned long)flow_a_sec, 
+					(unsigned long)overflow);
     esp_deep_sleep_start();
     return ESP_OK;
 }
 
+/**
+ * @brief Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).
+ *
+ * @details Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
+ *
+ * @param[in]    sleep_seconds   Timer duration in seconds (0 = timer disabled).
+ * @param[in]    ext1_pins_mask  Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
+ *
+ * @return Does not return on success (enters deep sleep).
+ */
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 {
     return sub_power_enter_deep_sleep_mode(sleep_seconds, ext1_pins_mask, SUB_POWER_SLEEP_FULL_CYCLE);
 }
 
+/**
+ * @brief Power off system completely by releasing battery power latch (GPIO 17).
+ *
+ * @details Used for critical low-battery shutdown or explicit user power-off.
+ */
 void sub_power_cut_power_latch(void)
 {
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");
     hal_io_release_power_latch();
 }
 
+/**
+ * @brief Check to see if USB is connected.
+ *
+ * @details Used for charger detection.
+ *
+ * @return true if usb is connected, or false if disconnected.
+ */
 bool sub_power_connected_usb(void)
 {
     bool usb_state = hal_check_usb_ll();
@@ -375,6 +469,15 @@ bool sub_power_connected_usb(void)
 static esp_pm_lock_handle_t s_cpu_max_lock = NULL;
 #endif
 
+/**
+ * @brief Initialize Dynamic Frequency Scaling (DFS) power management.
+ *
+ * @details Gates CPU cores to 80 MHz baseline during quiescent and interactive periods, while allowing transient 240 MHz turbo scaling during heavy UI/compute bursts.
+ *
+ * @param[in]    enable_dfs      Enable DFS scaling (true = 80MHz base / 240MHz max; false = locked 80MHz).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_power_init_dfs(bool enable_dfs)
 {
 #if CONFIG_PM_ENABLE
@@ -398,7 +501,8 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
     }
 
     ESP_LOGI(TAG, "Dynamic Frequency Scaling initialized: %s (Base: 80 MHz, Max: %d MHz)",
-             enable_dfs ? "ENABLED" : "LOCKED", pm_config.max_freq_mhz);
+             enable_dfs ? "ENABLED" : "LOCKED", 
+			 pm_config.max_freq_mhz);
     return ESP_OK;
 #else
     (void)enable_dfs;
@@ -407,6 +511,13 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
 #endif
 }
 
+/**
+ * @brief Acquire 240 MHz CPU performance lock (e.g.
+ *
+ * @details during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_power_cpu_max_acquire(void)
 {
 #if CONFIG_PM_ENABLE
@@ -417,6 +528,13 @@ esp_err_t sub_power_cpu_max_acquire(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Release 240 MHz CPU performance lock.
+ *
+ * @details Allows CPU cores to gate back down to 80 MHz baseline.
+ *
+ * @return ESP_OK on success.
+ */
 esp_err_t sub_power_cpu_max_release(void)
 {
 #if CONFIG_PM_ENABLE

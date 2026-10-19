@@ -41,23 +41,37 @@ static int64_t s_session_expiry_us = 0;
 static TaskHandle_t s_session_task_handle = NULL;
 static bool s_session_running = false;
 
+/**
+ * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
+ */
 void h1os_reset_session_timer(void)
 {
     uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
     if (timeout_sec == 0) {
-        ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting "
-                      "session timer reset.");
+        ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting session timer reset.");
         return;
     }
     s_session_expiry_us = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
 
+/**
+ * @brief Check whether an interactive inactivity countdown session is active.
+ *
+ * @return true if running in an interactive user session, false during unattended wakes.
+ */
 bool h1os_is_session_active(void)
 {
     return s_session_running;
 }
 
+/**
+ * @brief H1os trigger chime.
+ *
+ * @param[in]    type            Parameter type.
+ *
+ * @return Return value of type static void.
+ */
 static void h1os_trigger_chime(h1os_chime_type_t type)
 {
     if (s_app_lifecycle.presentation.on_chime != NULL) {
@@ -68,6 +82,13 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
     }
 }
 
+/**
+ * @brief H1os trigger splash.
+ *
+ * @param[in]    type            Parameter type.
+ *
+ * @return Return value of type static void.
+ */
 static void h1os_trigger_splash(h1os_splash_type_t type)
 {
     if (s_app_lifecycle.presentation.on_splash != NULL) {
@@ -75,19 +96,25 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
     }
 }
 
+/**
+ * @brief H1os session monitor task.
+ *
+ * @param[in]    arg             Parameter arg.
+ *
+ * @return Return value of type static void.
+ */
 static void h1os_session_monitor_task(void *arg)
 {
     while (s_session_running) {
         vTaskDelay(pdMS_TO_TICKS(500));
 
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
-            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
-                     (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...", 
+				(unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
             uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
             if (sleep_sec == 0) {
-                ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to "
-                              "safe shutdown.");
+                ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
                 h1os_shutdown();
                 break;
             }
@@ -99,37 +126,54 @@ static void h1os_session_monitor_task(void *arg)
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Diagnostic dump of ULP wake telemetry and execution performance.
+ *
+ * @details Isolated helper function for development; comment out the call in [h1os_start()](#h1os_start-1) for release builds.
+ *
+ * @return Return value of type static void.
+ */
 static void debug_dump_ulp_telemetry(void)
 {
     uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
     uint32_t exec_us = exec_cycles / 17;
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
-    ESP_LOGI(TAG,
-             "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), "
-             "btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
-             (unsigned long)ulp_wake_counter, (unsigned long)ulp_last_wake_cause,
-             (ulp_last_wake_cause == 1)   ? "BOOT_BTN"
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
+             (unsigned long)ulp_wake_counter, 
+			 (unsigned long)ulp_last_wake_cause,
+               (ulp_last_wake_cause == 1) ? "BOOT_BTN"
              : (ulp_last_wake_cause == 2) ? "PWR_BTN"
              : (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW"
              : (ulp_last_wake_cause == 4) ? "SENSOR_TICK"
              : (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT"
              : (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY"
                                           : "UNKNOWN",
-             (unsigned long)ulp_slice_counter, (unsigned long)ulp_overflow_limit, (unsigned long)ulp_last_vbat_mv,
-             (unsigned long)ulp_vbat_raw_adc, (unsigned long)ulp_last_wake_btn, (unsigned long)ulp_rtc_int_stuck,
-             (unsigned long)exec_cycles, (unsigned long)exec_us);
+             (unsigned long)ulp_slice_counter, 
+			 (unsigned long)ulp_overflow_limit, 
+			 (unsigned long)ulp_last_vbat_mv,
+             (unsigned long)ulp_vbat_raw_adc, 
+			 (unsigned long)ulp_last_wake_btn, 
+			 (unsigned long)ulp_rtc_int_stuck,
+             (unsigned long)exec_cycles, 
+			 (unsigned long)exec_us);
+			 
     if (ulp_rtc_int_stuck) {
-        ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! "
-                      "Re-arm suppressed.");
+        ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
     }
     if (ulp_last_wake_cause == 6) {
-        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!",
-                 (unsigned long)ulp_last_vbat_mv);
+        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
 
+/**
+ * @brief Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
+ *
+ * @param[in]    flow            Parameter flow.
+ *
+ * @return Return value of type static void.
+ */
 static void h1os_log_flow_banner(orch_flow_type_t flow)
 {
     orch_persisted_state_t *st = orch_state_get();
@@ -169,11 +213,19 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
     ESP_LOGI(TAG, ">>> H1OS ACTIVE FLOW: %s <<<", flow_title);
     ESP_LOGI(TAG, ">>> Trigger Source  : %s", trigger_desc);
     ESP_LOGI(TAG, ">>> Boot Count      : %lu | Wake Count: %lu | Session Inactivity: %lu s",
-             (unsigned long)st->boot_count, (unsigned long)st->wake_count,
+             (unsigned long)st->boot_count, 
+			 (unsigned long)st->wake_count,
              (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
     ESP_LOGI(TAG, "================================================================================");
 }
 
+/**
+ * @brief H1os early system bringup.
+ *
+ * @param[in]    config          Parameter config.
+ *
+ * @return Return value of type static orch_flow_type_t.
+ */
 static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config)
 {
     if (config != NULL) {
@@ -188,8 +240,12 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
     }
 
-    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", H1OS_NAME, H1OS_SUBTITLE,
-             h1os_version_get_string(), (unsigned long)st->sample_interval_sec, (unsigned long)st->flow_b_period_sec);
+    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", 
+				H1OS_NAME, 
+				H1OS_SUBTITLE,
+				h1os_version_get_string(), 
+				(unsigned long)st->sample_interval_sec, 
+				(unsigned long)st->flow_b_period_sec);
 
     sub_power_init_dfs(s_app_lifecycle.session.enable_dfs_80mhz);
 
@@ -213,6 +269,13 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     return flow;
 }
 
+/**
+ * @brief H1os handle non ui flows.
+ *
+ * @param[in]    flow            Parameter flow.
+ *
+ * @return True on success, false otherwise.
+ */
 static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 {
     if (flow == ORCH_FLOW_CRITICAL_OFF) {
@@ -233,6 +296,13 @@ static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
     return false;
 }
 
+/**
+ * @brief H1os launch interactive session.
+ *
+ * @param[in]    flow            Parameter flow.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 {
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
@@ -306,8 +376,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
         if (sleep_sec == 0) {
-            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. "
-                          "Aborting to safe shutdown.");
+            ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
             h1os_shutdown();
             return ESP_ERR_INVALID_STATE;
         }
@@ -315,8 +384,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     } else {
         uint32_t timeout_sec = s_app_lifecycle.session.inactivity_timeout_sec;
         if (timeout_sec == 0) {
-            ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0 for "
-                          "interactive session. Aborting to safe shutdown.");
+            ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0 for interactive session. Aborting to safe shutdown.");
             h1os_shutdown();
             return ESP_ERR_INVALID_ARG;
         }
@@ -328,6 +396,13 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     return ESP_OK;
 }
 
+/**
+ * @brief Initialize H1OS and dispatch application lifecycle.
+ *
+ * @param[in]    config          Parameter config.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
 {
     orch_flow_type_t flow = h1os_early_system_bringup(config);
@@ -339,6 +414,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     return h1os_launch_interactive_session(flow);
 }
 
+/**
+ * @brief Retrieve current Tri-Node environmental telemetry.
+ *
+ * @param[out]   out_telemetry   Parameter out_telemetry.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 {
     if (!out_telemetry)
@@ -393,6 +475,13 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     return ret;
 }
 
+/**
+ * @brief Put the platform into ultra-low-power deep sleep.
+ *
+ * @param[in]    sleep_sec       Parameter sleep_sec.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 {
     if (sleep_sec == 0) {
@@ -408,10 +497,16 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
     return orch_flow_transition_to_sleep(sleep_sec);
 }
 
+/**
+ * @brief Execute system shutdown.
+ *
+ * @param[in]    force_clean_white Parameter force_clean_white.
+ *
+ * @return Return value of type static void.
+ */
 static void execute_system_shutdown(bool force_clean_white)
 {
-    ESP_LOGI(TAG, "Executing system shutdown (%s)...",
-             force_clean_white ? "storage mode: clean white" : "standard mode");
+    ESP_LOGI(TAG, "Executing system shutdown (%s)...", force_clean_white ? "storage mode: clean white" : "standard mode");
     s_session_running = false;
 
     sub_rtc_cancel_countdown();
@@ -451,6 +546,9 @@ static void execute_system_shutdown(bool force_clean_white)
     esp_deep_sleep_start();
 }
 
+/**
+ * @brief Orderly system shutdown and physical battery power cut.
+ */
 void h1os_shutdown(void)
 {
 #if CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN
@@ -460,11 +558,23 @@ void h1os_shutdown(void)
 #endif
 }
 
+/**
+ * @brief Shutdown for long-term storage: clears display to pure white before cutting power.
+ *
+ * @details Protects e-Paper electrophoretic microcapsules against permanent dye migration and burn-in.
+ */
 void h1os_shutdown_for_storage(void)
 {
     execute_system_shutdown(true);
 }
 
+/**
+ * @brief Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
+ *
+ * @param[in]    volume_pct      Parameter volume_pct.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 {
     return sub_audio_set_volume(volume_pct);

@@ -53,6 +53,13 @@ volatile uint32_t usb_connected   = 0;
 #define ULP_DISPATCH_POWER_OFF         5
 // clang-format on
 
+/**
+ * @brief Converts raw ADC tick value to battery voltage in millivolts.
+ *
+ * @param[in]    raw             Raw ADC reading.
+ *
+ * @return Calibrated voltage in millivolts.
+ */
 static inline uint32_t ulp_raw_to_mv(int32_t raw)
 {
     if (raw <= 0)
@@ -65,6 +72,19 @@ static inline uint32_t ulp_raw_to_mv(int32_t raw)
     return (uint32_t)vbat;
 }
 
+/**
+ * @brief Evaluates wakeup triggers and arbitrates wake/shutdown dispatch.
+ *
+ * @details Handles button debounce, long-press detection, RTC countdown slicing, and critical battery cut.
+ *
+ * @param[in]    rtcio_int_st    Raw RTC IO interrupt status bitmask.
+ * @param[in]    boot_btn        BOOT0 button state (0 = pressed).
+ * @param[in]    pwr_btn         POWER button state (0 = pressed).
+ * @param[in]    rtc_int         RTC INT line state (0 = active).
+ * @param[in]    vbat_mv         Current battery voltage in millivolts.
+ *
+ * @return Return value of type static void.
+ */
 static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_btn, int rtc_int, uint32_t vbat_mv)
 {
     bool wake_main = false;
@@ -145,8 +165,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
         REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 
         uint32_t rdy_timeout = 50000;
-        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0)
-            ;
+        while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0);
 
         ulp_riscv_wakeup_main_processor();
 
@@ -169,20 +188,25 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
         if (rtc_int_stuck) {
             uint32_t rdy_timeout = 50000;
-            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0)
-                ;
+            while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0);
             last_wake_cause = 5;
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
             ulp_riscv_wakeup_main_processor();
         } else {
-            if (ulp_riscv_gpio_get_level(GPIO_NUM_0) == 1 && ulp_riscv_gpio_get_level(GPIO_NUM_18) == 1 &&
-                ulp_riscv_gpio_get_level(RTC_INT_PIN) == 1) {
-                SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+            if (ulp_riscv_gpio_get_level(GPIO_NUM_0) == 1 && 
+					ulp_riscv_gpio_get_level(GPIO_NUM_18) == 1 &&
+					ulp_riscv_gpio_get_level(RTC_INT_PIN) == 1) {
+				SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
             }
         }
     }
 }
 
+/**
+ * @brief Main.
+ *
+ * @return Return value of type int.
+ */
 int main(void)
 {
     if (!REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {

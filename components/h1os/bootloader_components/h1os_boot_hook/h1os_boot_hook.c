@@ -22,10 +22,21 @@
 
 static const char *TAG __unused = "H1OS_BOOT_HOOK";
 
+/**
+ * @brief Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
+ */
 void bootloader_hooks_include(void)
 {
+	// Empty
 }
 
+/**
+ * @brief FIRST HOOK: Executes before any bootloader hardware initialization.
+ *
+ * @details * Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here).
+ * Immediately latches BAT_CTRL (GPIO 17) HIGH in < 25ms.
+ * Explicitly connects SIG_GPIO_OUT_IDX to prevent reliance on reset defaults.
+ */
 void bootloader_before_init(void)
 {
     REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
@@ -50,6 +61,11 @@ void bootloader_before_init(void)
     gpio_ll_hold_en(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
 }
 
+/**
+ * @brief SECOND HOOK: Executes after standard bootloader initialization.
+ *
+ * @details * Console, SPI Flash cache, and clocks are now valid; ESP_LOG is operational.
+ */
 void bootloader_after_init(void)
 {
     uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;

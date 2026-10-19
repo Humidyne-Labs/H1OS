@@ -26,6 +26,13 @@ static sdmmc_card_t *s_sd_card = NULL;
 static TaskHandle_t s_mount_task = NULL;
 static bool s_card_absent_latched = false;
 
+/**
+ * @brief Sdcard mount worker task.
+ *
+ * @param[in]    pvParameters    Parameter pvParameters.
+ *
+ * @return Return value of type static void.
+ */
 static void sdcard_mount_worker_task(void *pvParameters)
 {
     (void)pvParameters;
@@ -46,6 +53,13 @@ static void sdcard_mount_worker_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Asynchronously mount MicroSD card in a background FreeRTOS task.
+ *
+ * @details Does not block caller or freeze UI refresh if card is missing.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sdcard_mount_async(void)
 {
     if (s_sd_card != NULL) {
@@ -62,6 +76,11 @@ esp_err_t sub_sdcard_mount_async(void)
     return (res == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
+/**
+ * @brief Mount MicroSD card using 1-bit SDMMC driver (synchronous).
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sdcard_mount(void)
 {
     if (s_sd_card != NULL) {
@@ -123,6 +142,11 @@ esp_err_t sub_sdcard_mount(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Unmount MicroSD card and release hardware bus resources.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sdcard_unmount(void)
 {
     if (s_sd_card == NULL) {
@@ -140,11 +164,23 @@ esp_err_t sub_sdcard_unmount(void)
     return ret;
 }
 
+/**
+ * @brief Check if MicroSD card is mounted and ready for I/O.
+ *
+ * @return True on success, false otherwise.
+ */
 bool sub_sdcard_is_mounted(void)
 {
     return (s_sd_card != NULL);
 }
 
+/**
+ * @brief Get total capacity of mounted card in megabytes.
+ *
+ * @param[out]   out_capacity_mb Parameter out_capacity_mb.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
 {
     if (!out_capacity_mb)
@@ -157,6 +193,11 @@ esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
     return ESP_OK;
 }
 
+/**
+ * @brief Format mounted card as FAT32 filesystem.
+ *
+ * @return ESP_OK on success, or an error code.
+ */
 esp_err_t sub_sdcard_format(void)
 {
     if (s_sd_card == NULL)
