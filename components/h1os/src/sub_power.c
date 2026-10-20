@@ -300,13 +300,8 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
         rtc_gpio_hold_dis(pin);
 
-        if (pin == HAL_PIN_RTC_INT) {
-            rtc_gpio_pullup_en(pin);
-            rtc_gpio_pulldown_dis(pin);
-        } else {
-            rtc_gpio_pullup_dis(pin);
-            rtc_gpio_pulldown_dis(pin);
-        }
+        rtc_gpio_pullup_en(pin);
+        rtc_gpio_pulldown_dis(pin);
 
         rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
