@@ -4,6 +4,26 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1-dev] - 2026-10-20
+
+### 🛠️ Fixed & Refactored
+- **EPD Quiesce Timeout & Core 0/1 Flush Collision Resolution** (`h1os_lvgl.cpp`, `orch_flow.c`, `sub_display.cpp`):
+  - Increased peripheral drain timeout in `orch_flow_quiesce_peripherals()` from 2500 ms to 6000 ms to fully accommodate periodic full OTP waveform refreshes (~2.2–2.8s) on Flow B Cycle 7.
+  - Added explicit invocation of `h1os_lvgl_stop()` prior to `sub_display_wait_busy()` and display sleep transitions, preventing Core 0 from isolating pads (`gpio_hold_en` on `EPD_CS`/`EPD_RST`) and issuing sleep commands (`0x10`) while Core 1 is actively executing SPI DMA transfers.
+- **Thread-Safe LVGL Multi-Core Synchronization** (`h1os_lvgl.cpp`, `h1os_lifecycle.c`):
+  - Wrapped `lv_timer_handler()` in `h1os_lvgl_port_task()` on Core 1 with `lv_lock()` and `lv_unlock()`.
+  - Guarded lifecycle callbacks (`on_boot`, `on_wake`, `on_splash`, `on_pre_sleep`) called from Core 0 with `h1os_lvgl_lock()` / `h1os_lvgl_unlock()` to eliminate concurrent invalidation area (`inv_p`) corruption and state deadlocks.
+- **PCF85063A RTC Driver & Wake Stub Clock Stability** (`sub_rtc.c`, `sub_power.c`, `orch_wake_stub.c`):
+  - Corrected `RTC_REG_CONTROL_2` clock output configuration in `orch_wake_stub.c` (lines 282, 406) from `0x00` to `0x07` (`CTRL2_COF_OFF`), stopping unwanted continuous 32.768 kHz `CLKOUT` oscillation on Flow A wakes.
+  - Added retry handling to `sub_rtc_arm_countdown()` inside `sub_power_enter_deep_sleep_mode()` to prevent entering deep sleep with the countdown timer halted (`TE=0`) after transient I2C write failures.
+  - Added 3-attempt I2C retry when clearing `RTC_REG_CONTROL_2` prior to awaiting `HAL_PIN_RTC_INT` line release.
+- **ULP Coprocessor Stabilization & ADC Isolation** (`ulp/main.c`, `hal_io.c`, `sub_power.c`):
+  - Recomposed `ulp/main.c` to immediately disarm `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` when waking the main Xtensa core, eliminating thousands of redundant re-wakes during active INT low pulses.
+  - Replaced the hard abort at `main.c:206` (`!RDY_FOR_WAKEUP`) with a bounded wait loop to prevent dropping valid wake events during deep-sleep entry sequences.
+  - Decoupled button level validation from `RTC_INT` evaluation and added timeouts to `ulp_riscv_adc_read_channel()` conversion loops.
+  - Configured `HAL_PIN_BATTERY_ADC` to `RTC_GPIO_MODE_DISABLED` in `sub_power_enter_deep_sleep_mode()` and released RTC IO pin configurations to avoid digital input buffer interference on ADC1.
+  - Gated `sub_audio_is_busy()` and `sub_audio_standby()` behind wake-cycle audio initialization checks to avoid unnecessary peripheral querying during non-audio sprints.
+
 ## [2.3.0-dev] - 2026-10-18
 
 ### 🚀 Added
