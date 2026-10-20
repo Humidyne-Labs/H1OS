@@ -26,14 +26,16 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     if (telem->is_usb_powered) {
         lv_label_set_text(lbl_bat, "Power:       USB CABLE");
     } else {
-        lv_label_set_text_fmt(lbl_bat, "Battery:     %.2fV (%u%%)", (float)telem->battery_mv / 1000.0f, telem->battery_percent);
+        lv_label_set_text_fmt(lbl_bat, "Battery:     %.2fV (%u%%)", 
+                                            (float)telem->battery_mv / 1000.0f, 
+                                            telem->battery_percent);
     }
     lv_obj_set_style_text_font(lbl_bat, H1OS_FONT_14, 0);
     lv_obj_align(lbl_bat, LV_ALIGN_TOP_LEFT, 6, 30);
 
     lv_obj_t *lbl_autonomy = lv_label_create(scr);
     if (telem->is_usb_powered) {
-        lv_label_set_text(lbl_autonomy, "Autonomy:    CONTINUOUS");
+        lv_label_set_text(lbl_autonomy, "Autonomy:    CHARGING");
     } else {
         float days = battery_estimate_remaining_days(400, telem->battery_mv, 0.35f);
         lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days", days);
@@ -62,11 +64,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_align(lbl_mcu, LV_ALIGN_TOP_LEFT, 6, 130);
 
     lv_obj_t *lbl_delta = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)", telem->trinode_delta_c, telem->trinode_confidence_pct);
+    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)", 
+                                        telem->trinode_delta_c, 
+                                        telem->trinode_confidence_pct);
     lv_obj_set_style_text_font(lbl_delta, H1OS_FONT_14, 0);
     lv_obj_align(lbl_delta, LV_ALIGN_TOP_LEFT, 6, 150);
 
-    char date_str[16] = "2026-10-11";
+    char date_str[16] = "2026-10-20";
     char time_str[16] = "--:--";
     h1os_time_get_date_formatted(H1OS_DATE_FMT_MM_DD_YY, date_str, sizeof(date_str));
     h1os_time_get_formatted(H1OS_TIME_FMT_12H_MIN, time_str, sizeof(time_str));

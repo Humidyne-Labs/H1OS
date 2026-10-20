@@ -54,9 +54,9 @@ float battery_estimate_avg_current_ma(uint32_t nominal_mah, uint32_t v1_mv, uint
         return -2.0f;
     }
 
-    float delta_soc = (float)(soc1_bp - soc2_bp) / 10000.0f;
+    float delta_soc    = (float)(soc1_bp - soc2_bp) / 10000.0f;
     float consumed_mah = (float)nominal_mah * delta_soc;
-    float delta_hours = (float)delta_t_sec / 3600.0f;
+    float delta_hours  = (float)delta_t_sec / 3600.0f;
 
     return consumed_mah / delta_hours;
 }

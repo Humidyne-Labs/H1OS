@@ -60,9 +60,9 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
     lv_obj_center(lbl_pg);
 
-    s_active_badge = badge;
+    s_active_badge     = badge;
     s_active_badge_lbl = lbl_pg;
-    s_badge_is_awake = is_awake;
+    s_badge_is_awake   = is_awake;
 
     static lv_point_precise_t line_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line = lv_line_create(scr);

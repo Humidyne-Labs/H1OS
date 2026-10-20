@@ -8,6 +8,7 @@
 
 #include "esp_sleep.h"
 #include "esp_system.h"
+#include "esp_private/esp_clk.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "h1os/h1os_lvgl.h"
@@ -104,10 +105,10 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_set_style_text_font(lbl_ulp, H1OS_FONT_14, 0);
     lv_obj_align(lbl_ulp, LV_ALIGN_TOP_LEFT, 6, 68);
 
-    uint32_t free_heap = esp_get_free_heap_size() / 1024;
-    uint32_t min_heap = esp_get_minimum_free_heap_size() / 1024;
     lv_obj_t *lbl_heap = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min", (unsigned long)free_heap, (unsigned long)min_heap);
+    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min", 
+                                        (unsigned long)(esp_get_free_heap_size() / 1024), 
+                                        (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
     lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
 
@@ -123,17 +124,19 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
 
     lv_obj_t *lbl_dfs = lv_label_create(scr);
-    lv_label_set_text(lbl_dfs, "CPU:    80MHz (DFS ON)");
+    lv_label_set_text_fmt(lbl_dfs, "CPU:  %3luMHz", (unsigned long)(esp_clk_cpu_freq() / 1000000));
     lv_obj_set_style_text_font(lbl_dfs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
 
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32, h1os_version_get_major(), h1os_version_get_minor());
+    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32, 
+                                        h1os_version_get_major(), 
+                                        h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
     lv_obj_t *lbl_foot_r = lv_label_create(scr);
-    lv_label_set_text(lbl_foot_r, "IDF v6.1");
+    lv_label_set_text_fmt(lbl_foot_r, "IDF %s", esp_get_idf_version());
     lv_obj_set_style_text_font(lbl_foot_r, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_r, LV_ALIGN_BOTTOM_RIGHT, -6, -6);
 

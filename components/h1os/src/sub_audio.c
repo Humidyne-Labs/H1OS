@@ -206,7 +206,7 @@ static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 }
 
 static void audio_worker_task(void *pvParameters);
-static void sub_audio_park_warm(bool enable);
+static esp_err_t sub_audio_park_warm(bool enable);
 
 /**
  * @brief Es8311 write reg.
@@ -270,14 +270,15 @@ static esp_err_t sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (s_audio_inited && s_i2s_chan_enabled) {
-        int16_t postroll[FRAME_SIZE];
-        memset(postroll, 0x0000, sizeof(postroll));
+        int16_t buffer[FRAME_SIZE];
+        memset(buffer, 0x0000, sizeof(buffer));
 
-        size_t postroll_written = 0;
-        ret = i2s_channel_write(s_tx_chan, postroll, sizeof(postroll), &postroll_written, pdMS_TO_TICKS(100));
-        ret = ((ret == ESP_OK) && (postroll_written == sizeof(postroll))) ? ESP_OK : ESP_ERR_INVALID_STATE;
+        size_t buffer_written = 0;
+        ret = i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &buffer_written, pdMS_TO_TICKS(100));
+        ret = ((ret == ESP_OK) && (buffer_written == sizeof(buffer))) ? ESP_OK : ESP_ERR_INVALID_STATE;
         
-        vTaskDelay(pdMS_TO_TICKS(20));
+        /* ~16ms to stream one frame at 16Khz */
+        vTaskDelay(pdMS_TO_TICKS(20)); 
     }
     return ret;
 }
@@ -350,11 +351,16 @@ static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
-    ret |= es8311_write_table(s_es8311_init_pre_charge, sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_pre_charge, 
+                                sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
 
+    /* Delay Needed for Internal Analog Frontend Charge Pump */
     vTaskDelay(pdMS_TO_TICKS(35));
 
-    ret |= es8311_write_table(s_es8311_init_post_charge, sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_post_charge, 
+                                sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
+    
+    /* Low Power Mode DOES Affect Audio Quality Marginally */
     ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00);
 
     return ret;
@@ -374,6 +380,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
 
     sub_power_cpu_max_acquire();
 
+    /* Disable Class D Audio Amp */
     sub_audio_park_warm(true);
 
     uint16_t chip_id = 0x0000;
@@ -479,7 +486,9 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     sub_power_cpu_max_release();
     s_audio_inited = true;
 
+    /* Enable Class D Audio Amp */
     sub_audio_park_warm(false);
+
     sub_audio_flush_frame();
     sub_audio_set_volume(volume_pct);
 
@@ -489,16 +498,20 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
 /**
  * @brief Sub audio park warm.
  *
- * @return Return value of type static void.
+ * @return Return value of type esp_err_t, ESP_OK on success.
  */
-static void sub_audio_park_warm(bool enable)
+static esp_err_t sub_audio_park_warm(bool enable)
 {
     uint32_t target_level = enable ? 0 : 1;
 
     if (gpio_get_level(HAL_PIN_PA_CTRL) != target_level) {
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
-        vTaskDelay(pdMS_TO_TICKS(25));
+
+        /* Startup / Shutdown Times Confirmed, [80ms down, 120ms up] */
+        vTaskDelay(pdMS_TO_TICKS(enable ? 120 : 80));
     }
+
+    return ESP_OK;
 }
 
 /**
@@ -510,10 +523,11 @@ static void sub_audio_park_warm(bool enable)
  */
 esp_err_t sub_audio_standby(void)
 {
-    gpio_set_level(HAL_PIN_PA_CTRL, 0);
-    vTaskDelay(pdMS_TO_TICKS(25));
+    /* Disable Class D Audio Amp */
+    sub_audio_park_warm(true);
 
-	esp_err_t ret = es8311_write_table(s_es8311_deinit, sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
+	esp_err_t ret = es8311_write_table(s_es8311_deinit, 
+                                        sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
 
     s_codec_in_standby = true;
 
@@ -542,7 +556,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
     int16_t buffer[FRAME_SIZE];
     uint32_t samples_generated = 0;
 
-    float phase = 0.0f;
+    float phase      = 0.0f;
     float phase_step = (2.0f * (float)M_PI * (float)frequency_hz) / (float)sample_rate;
 
     while (samples_generated < total_samples) {
@@ -598,6 +612,7 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
 
         memcpy(buffer, &samples[samples_sent], chunk * sizeof(int16_t));
         if (chunk < FRAME_SIZE) {
+            /* Pad the Buffer if Chunk < Full Frame, (avoid data under-runs?) */
             memset(&buffer[chunk], 0, (FRAME_SIZE - chunk) * sizeof(int16_t));
         }
 
@@ -629,10 +644,8 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         }
     }
 
-    if (gpio_get_level(HAL_PIN_PA_CTRL) == 0) {
-        gpio_set_level(HAL_PIN_PA_CTRL, 1);
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
+    /* Enable Class D Audio Amp */
+    sub_audio_park_warm(false);
 
     return ESP_OK;
 }
@@ -890,10 +903,12 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
  */
 bool sub_audio_is_busy(void)
 {
-    if (s_audio_is_busy)
+    if (s_audio_is_busy) 
         return true;
-    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0)
+
+    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0) 
         return true;
+
     return false;
 }
 
@@ -963,7 +978,7 @@ esp_err_t sub_audio_set_volume(uint8_t volume_pct)
     if (s_audio_inited && s_i2s_chan_enabled) {
         uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
         es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
-        es8311_write_reg(0x31, 0x00);
+        //es8311_write_reg(0x31, 0x00); // Handled in Postcharge Table entry #9 (unmute DSM/DEM)
         ESP_LOGI(TAG, "Volume set to %d [0x%2X]", volume_pct, vol_reg);
     }
     return ESP_OK;
