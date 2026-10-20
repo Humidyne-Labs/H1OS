@@ -339,9 +339,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
-        uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
-        sub_audio_init();
-        sub_audio_set_volume(init_vol);
+        sub_audio_init(s_app_lifecycle.presentation.volume_pct);
     } else {
         ESP_LOGI(TAG, "Unattended wake event: Codec initialization skipped (audio sleep preserved)");
     }
