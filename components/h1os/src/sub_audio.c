@@ -950,8 +950,7 @@ esp_err_t sub_audio_deinit(void)
  */
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 {
-    if (volume_pct > 100)
-        volume_pct = 100;
+    if (volume_pct > 100) volume_pct = 100;
     s_volume_pct = volume_pct;
 
     if (s_audio_inited && s_i2s_chan_enabled) {

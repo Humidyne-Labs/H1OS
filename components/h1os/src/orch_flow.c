@@ -39,8 +39,8 @@ static const char *TAG = "orch_flow";
 #include <math.h>
 
 #define ORCH_HISTORICAL_EWMA_ALPHA 0.25f
-#define ORCH_LEAKAGE_MARGIN_C 0.30f
-#define ORCH_TRINODE_SPAN_C 15.0f
+#define ORCH_LEAKAGE_MARGIN_C      6.00f //0.30f
+#define ORCH_TRINODE_SPAN_C        15.0f
 
 #include "ulp_h1os.h"
 
@@ -136,13 +136,12 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
 
     ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
     for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
-        shtc3T_ring[i] = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
+        shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
-        mcuT_ring[i] = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
-        epdT_ring[i] = (float)st->ring[i].epd_glass_centi_c / 100.0f;
-        ESP_LOGI(TAG, "  [%02d] %.2f, %.2f, %.2f, %.2f", 
-						i, 
-						(double)shtc3T_ring[i], 
+        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
+        epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c / 100.0f;
+        ESP_LOGI(TAG, " [%02d] %.2f, %.2f, %.2f, %.2f", i,
+            			(double)shtc3T_ring[i], 
 						(double)shtc3RH_ring[i],
 						(double)mcuT_ring[i], 
 						(double)epdT_ring[i]);
@@ -158,12 +157,12 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
  */
 static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
 {
-    uint32_t count = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
-    int16_t current_low = INT16_MAX;
-    int16_t current_high = INT16_MIN;
-    int32_t sum_shtc3 = 0;
-    int32_t sum_die = 0;
-    uint32_t valid_cnt = 0;
+    uint32_t count        = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
+    int16_t  current_low  = INT16_MAX;
+    int16_t  current_high = INT16_MIN;
+    int32_t  sum_shtc3    = 0;
+    int32_t  sum_die      = 0;
+    uint32_t valid_cnt    = 0;
 
     for (uint32_t i = 0; i < count; i++) {
         if (st->ring[i].quality_flags & SAMPLE_FLAG_VALID_COLD) {
@@ -191,11 +190,11 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
         }
     }
 
-    st->window_low_temp_centi_c = current_low;
+    st->window_low_temp_centi_c  = current_low;
     st->window_high_temp_centi_c = current_high;
-    st->amb_floor_temp_centi_c = current_low;
-    st->window_avg_shtc3_c = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
-    st->window_avg_die_c = ((float)sum_die / (float)valid_cnt) / 100.0f;
+    st->amb_floor_temp_centi_c   = current_low;
+    st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
+    st->window_avg_die_c         = ((float)sum_die / (float)valid_cnt) / 100.0f;
 }
 
 /**
@@ -291,27 +290,29 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     if (conf > 100.0f)
         conf = 100.0f;
 
-    st->trinode_temp_c = t_trinode;
-    st->trinode_delta_c = delta_trinode;
+    st->trinode_temp_c         = t_trinode;
+    st->trinode_delta_c        = delta_trinode;
     st->trinode_confidence_pct = (uint8_t)(conf + 0.5f);
 
     const char *amb_mode = NULL;
     float t_amb = orch_flow_evaluate_ambient_selection(st, t_valid, t_die, t_glass, &amb_mode);
 
-    float vp = 0.0f;
-    float dew = 0.0f;
+    float vp     = 0.0f;
+    float dew    = 0.0f;
     float rh_amb = 0.0f;
     orch_math_calc_psychrometrics(t_valid, rh_valid, t_amb, &vp, &dew, &rh_amb);
 
-    st->reconstructed_amb_temp_c = t_amb;
-    st->reconstructed_amb_rh_pct = rh_amb;
+    st->reconstructed_amb_temp_c  = t_amb;
+    st->reconstructed_amb_rh_pct  = rh_amb;
     st->reconstructed_dew_point_c = dew;
-    st->vapor_pressure_hpa = vp;
+    st->vapor_pressure_hpa        = vp;
 
     ESP_LOGI(TAG,
-             "Flow A Ring: samples=%lu head=%u trend=%u | Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
+             "Flow A Ring: samples=%lu head=%u trend=%u | "
+             "Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
 				(unsigned long)st->total_samples, 
-				st->ring_head, st->valid_trend,
+				st->ring_head, 
+                st->valid_trend,
 				(double)latest_raw.shtc3_temp_centi_c / 100.0, 
 				(double)latest_raw.shtc3_rh_centi_pct / 100.0,
 				(double)t_die, 

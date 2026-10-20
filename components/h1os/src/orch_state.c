@@ -35,14 +35,14 @@ void RTC_IRAM_ATTR orch_state_reset(void)
         p[i] = 0;
     }
 	
-    s_persisted_state.magic = ORCH_RTC_MAGIC;
-    s_persisted_state.sample_interval_sec = 60;
-    s_persisted_state.flow_b_period_sec = 300;
-    s_persisted_state.amb_floor_temp_centi_c = 0;
-    s_persisted_state.window_low_temp_centi_c = 0;
+    s_persisted_state.magic                    = ORCH_RTC_MAGIC;
+    s_persisted_state.sample_interval_sec      = 0;
+    s_persisted_state.flow_b_period_sec        = 0;
+    s_persisted_state.amb_floor_temp_centi_c   = 0;
+    s_persisted_state.window_low_temp_centi_c  = 0;
     s_persisted_state.window_high_temp_centi_c = 0;
-    s_persisted_state.last_glass_temp_centi_c = 0;
-    s_persisted_state.trinode_confidence_pct = 0;
+    s_persisted_state.last_glass_temp_centi_c  = 0;
+    s_persisted_state.trinode_confidence_pct   = 0;
 }
 
 /**

@@ -340,8 +340,8 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
         uint8_t init_vol = s_app_lifecycle.presentation.volume_pct;
-        sub_audio_set_volume(init_vol);
         sub_audio_init();
+        sub_audio_set_volume(init_vol);
     } else {
         ESP_LOGI(TAG, "Unattended wake event: Codec initialization skipped (audio sleep preserved)");
     }
@@ -358,14 +358,14 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
     } else if (s_app_lifecycle.on_wake) {
-        h1os_wake_context_t ctx = {.reset_reason = esp_reset_reason(),
-                                   .wakeup_causes = causes,
-                                   .boot_count = orch_state_get()->boot_count,
-                                   .deep_sleep_count = orch_state_get()->wake_count,
-                                   .woke_from_button = button_woke,
-                                   .wake_button = button_woke ? (uint8_t)ulp_last_wake_btn : 0,
+        h1os_wake_context_t ctx = {.reset_reason       = esp_reset_reason(),
+                                   .wakeup_causes      = causes,
+                                   .boot_count         = orch_state_get()->boot_count,
+                                   .deep_sleep_count   = orch_state_get()->wake_count,
+                                   .woke_from_button   = button_woke,
+                                   .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : 0,
                                    .sleep_duration_sec = orch_state_get()->sample_interval_sec,
-                                   .user_data = s_app_lifecycle.user_data};
+                                   .user_data          = s_app_lifecycle.user_data};
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
     }
 
@@ -433,44 +433,43 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     orch_persisted_state_t *st = orch_state_get();
 
     if (ret == ESP_OK) {
-        out_telemetry->ambient_temp_c = t;
-        out_telemetry->ambient_temp_f = (t * 9.0f / 5.0f) + 32.0f;
-        out_telemetry->ambient_rh_pct = rh;
-        out_telemetry->dew_point_c = dew;
-        out_telemetry->dew_point_f = (dew * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->ambient_temp_c       = t;
+        out_telemetry->ambient_temp_f       = (t * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->ambient_rh_pct       = rh;
+        out_telemetry->dew_point_c          = dew;
+        out_telemetry->dew_point_f          = (dew * 9.0f / 5.0f) + 32.0f;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
-
-        out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
+        out_telemetry->absolute_humidity_g  = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
-    out_telemetry->window_low_c = (float)st->window_low_temp_centi_c / 100.0f;
-    out_telemetry->window_high_c = (float)st->window_high_temp_centi_c / 100.0f;
-    out_telemetry->window_avg_shtc3_c = st->window_avg_shtc3_c;
-    out_telemetry->window_avg_die_c = st->window_avg_die_c;
-    out_telemetry->temp_historical_c = st->temp_historical_c;
-    out_telemetry->rh_historical_pct = st->rh_historical_pct;
-    out_telemetry->trinode_temp_c = st->trinode_temp_c;
-    out_telemetry->trinode_delta_c = st->trinode_delta_c;
+    out_telemetry->window_low_c           = (float)st->window_low_temp_centi_c / 100.0f;
+    out_telemetry->window_high_c          = (float)st->window_high_temp_centi_c / 100.0f;
+    out_telemetry->window_avg_shtc3_c     = st->window_avg_shtc3_c;
+    out_telemetry->window_avg_die_c       = st->window_avg_die_c;
+    out_telemetry->temp_historical_c      = st->temp_historical_c;
+    out_telemetry->rh_historical_pct      = st->rh_historical_pct;
+    out_telemetry->trinode_temp_c         = st->trinode_temp_c;
+    out_telemetry->trinode_delta_c        = st->trinode_delta_c;
     out_telemetry->trinode_confidence_pct = st->trinode_confidence_pct;
-    out_telemetry->valid_trend = st->valid_trend;
-    out_telemetry->epd_glass_temp_c = (float)st->last_glass_temp_centi_c / 100.0f;
+    out_telemetry->valid_trend            = st->valid_trend;
+    out_telemetry->epd_glass_temp_c       = (float)st->last_glass_temp_centi_c / 100.0f;
 
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
-        out_telemetry->mcu_die_temp_c = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
+        out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
-        out_telemetry->mcu_die_temp_c = st->window_avg_die_c;
+        out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
     out_telemetry->sample_count = st->total_samples;
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
     if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
-        out_telemetry->battery_mv = vbat_mv;
+        out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        out_telemetry->is_usb_powered = sub_power_connected_usb();
+        out_telemetry->is_usb_powered  = sub_power_connected_usb();
     }
 
     return ret;

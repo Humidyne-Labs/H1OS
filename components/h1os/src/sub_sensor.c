@@ -19,7 +19,7 @@
 static const char *TAG = "sub_sensor";
 
 #define SHTC3_CMD_WAKEUP 0x3517
-#define SHTC3_CMD_SLEEP 0xB098
+#define SHTC3_CMD_SLEEP  0xB098
 #define SHTC3_CMD_MEAS_NORMAL_T_FIRST 0x7866
 #define SHTC3_CMD_MEAS_LOWPWR_T_FIRST 0x609C
 
