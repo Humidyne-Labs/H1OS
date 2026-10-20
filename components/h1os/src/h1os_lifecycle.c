@@ -232,23 +232,6 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         s_app_lifecycle = *config;
     }
 
-	/*
-    orch_persisted_state_t *st = orch_state_get();
-    if (s_app_lifecycle.session.flow_a_period_sec > 0) {
-        st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
-    }
-    if (s_app_lifecycle.session.flow_b_period_sec > 0) {
-        st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
-    }
-	*/
-
-    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", 
-				H1OS_NAME, 
-				H1OS_SUBTITLE,
-				h1os_version_get_string(), 
-				(unsigned long)st->sample_interval_sec, 
-				(unsigned long)st->flow_b_period_sec);
-
     sub_power_init_dfs(s_app_lifecycle.session.enable_dfs_80mhz);
 
     hal_io_early_init();
@@ -262,17 +245,17 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     orch_persisted_state_t *st = orch_state_get();
     if (s_app_lifecycle.session.flow_a_period_sec > 0) {
         st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
-    } else if (st->sample_interval_sec == 0) {
-        st->sample_interval_sec = 60;
     }
     if (s_app_lifecycle.session.flow_b_period_sec > 0) {
         st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
-    } else if (st->flow_b_period_sec == 0) {
-        st->flow_b_period_sec = 300;
     }
-
-    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", H1OS_NAME, H1OS_SUBTITLE,
-             h1os_version_get_string(), (unsigned long)st->sample_interval_sec, (unsigned long)st->flow_b_period_sec);
+    
+    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", 
+                    H1OS_NAME, 
+                    H1OS_SUBTITLE,
+                    h1os_version_get_string(), 
+                    (unsigned long)st->sample_interval_sec, 
+                    (unsigned long)st->flow_b_period_sec);
 
     h1os_log_flow_banner(flow);
 
