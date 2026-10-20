@@ -305,12 +305,6 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         return;
     }
 
-    if (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
-    }
-
     orch_persisted_state_t *st = orch_state_get();
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
@@ -410,44 +404,41 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_state_push_sample(&sample);
     }
 
-    uint32_t sleep_sec = st->sample_interval_sec;
-    if (sleep_sec == 0)
-        sleep_sec = 60;
-
-    bool rtc_timer_active = false;
-    uint32_t rem_sec = 0;
-
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_VAL);
-        i2c_start();
-        if (i2c_write_byte((I2C_ADDR_PCF85063 << 1) | 1)) {
-            uint8_t timer_val = i2c_read_byte(true);
-            uint8_t timer_mode = i2c_read_byte(false);
-            if (timer_mode & RTC_TIMER_TE_BIT) {
-                rtc_timer_active = true;
-                rem_sec = ((timer_mode & RTC_TIMER_TCF_MASK) == RTC_TIMER_TCF_MIN) ? ((uint32_t)timer_val * 60U) : (uint32_t)timer_val;
-            }
-        }
-    }
-    i2c_stop();
-
-    if (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0 ||
-        (rtc_timer_active && rem_sec == 0)) {
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-        esp_default_wake_deep_sleep();
-        return;
-    }
+	/* Wait for the PCF85063A open-drain pulse to release back HIGH */
+	uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
+	while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
+		esp_rom_delay_us(500);
+		if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
+		timeout_us -= 500;
+	}
 
     st->wake_count++;
     st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
 
-    if (!rtc_timer_active || sleep_sec < rem_sec) {
-        esp_wake_stub_set_wakeup_time((uint64_t)sleep_sec * 1000000ULL);
-    } else {
-        uint32_t wake_ena = REG_GET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA);
-        REG_SET_FIELD(RTC_CNTL_WAKEUP_STATE_REG, RTC_CNTL_WAKEUP_ENA, wake_ena & ~((uint32_t)TIMER_EXPIRE));
+    /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) */
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(0x01); /* RTC_REG_CONTROL_2      */
+        i2c_write_byte(0x00); /* Clear TF & AF, COF off */
     }
+    i2c_stop();
+
+    /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
+    SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
+                      RTC_CNTL_SLP_REJECT_INT_CLR |
+					  RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                      RTC_CNTL_COCPU_INT_CLR |
+					  RTC_CNTL_COCPU_TRAP_INT_CLR | 
+					  RTC_CNTL_ULP_CP_INT_CLR);
+    REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+
+    /* Re-arm ULP GPIO wakeup */
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    esp_rom_delay_us(120);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
     REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
 

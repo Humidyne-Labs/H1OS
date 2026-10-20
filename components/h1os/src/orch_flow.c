@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -53,8 +54,10 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
     uint32_t causes = esp_sleep_get_wakeup_causes();
     orch_persisted_state_t *st = orch_state_get();
 
-    if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) {
-        st->boot_count++;
+    if ((causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) || esp_reset_reason() != ESP_RST_DEEPSLEEP) {
+        orch_state_reset();
+        st = orch_state_get();
+        st->boot_count = 1;
         if (EFUSE.rd_sys_part1_data4.blk_version_major != 0) {
             uint32_t cal_temp = EFUSE.rd_sys_part1_data4.temp_calib;
 
