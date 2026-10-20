@@ -49,6 +49,7 @@
 #define RTC_TIMER_TE_BIT   (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
 #define RTC_TIMER_TCF_MIN  (3 << 3)
+#define RTC_CTRL2_COF_OFF  0x07
 // clang-format on
 
 /**
@@ -281,6 +282,25 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
  *
  * @param[in]    seconds         Remaining countdown interval in seconds.
  */
+static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
+{
+    for (int attempt = 0; attempt < 3; attempt++) {
+        bool ok = false;
+        i2c_start();
+        if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+            if (i2c_write_byte(reg) && i2c_write_byte(val)) {
+                ok = true;
+            }
+        }
+        i2c_stop();
+        if (ok) {
+            return true;
+        }
+        esp_rom_delay_us(20);
+    }
+    return false;
+}
+
 static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 {
     if (seconds == 0) return;
@@ -300,36 +320,16 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
     uint8_t start_mode = stop_mode | RTC_TIMER_TE_BIT;
 
     /* 1. Stop timer */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_MODE);
-        i2c_write_byte(stop_mode);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_MODE, stop_mode);
 
     /* 2. Write countdown value */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_VAL);
-        i2c_write_byte(timer_val);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_VAL, timer_val);
 
-    /* 3. Acknowledge and clear TF & AF in Control_2, COF off */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_CONTROL_2);
-        i2c_write_byte(0x00);
-    }
-    i2c_stop();
+    /* 3. Acknowledge and clear TF & AF in Control_2, COF off (0x07 = high-Z) */
+    rtc_write_reg_retry(RTC_REG_CONTROL_2, RTC_CTRL2_COF_OFF);
 
     /* 4. Start timer */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_MODE);
-        i2c_write_byte(start_mode);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_MODE, start_mode);
 }
 
 /**
@@ -356,6 +356,9 @@ static void RTC_IRAM_ATTR shtc3_send_sleep(void)
  */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
+    /* Suppress ULP GPIO wakeups while wake stub executes */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
     /* LED timing vector */
     PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
     REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
@@ -468,28 +471,24 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_state_push_sample(&sample);
     }
 
-	/* Wait for the PCF85063A open-drain pulse to release back HIGH */
-	uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
-	while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-		esp_rom_delay_us(500);
-		if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
-		timeout_us -= 500;
-	}
-
     st->wake_count++;
     st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
 
-    /* If penultimate slice and remainder > 0, rearm PCF85063A for the remaining duration */
+    /* 1. Clear TF & AF in PCF85063A Control_2 (or rearm remainder) FIRST so /INT can release */
+    esp_rom_delay_us(20);
     if (ulp_slice_counter == (ulp_overflow_limit - 1) && ulp_remainder_sec > 0) {
         rtc_rearm_countdown_stub(ulp_remainder_sec);
     } else {
-        /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) so auto-reload continues */
-        i2c_start();
-        if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-            i2c_write_byte(RTC_REG_CONTROL_2);
-            i2c_write_byte(0x00); /* Clear TF & AF, COF off */
-        }
-        i2c_stop();
+        /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) with COF=111 (0x07) */
+        rtc_write_reg_retry(RTC_REG_CONTROL_2, RTC_CTRL2_COF_OFF);
+    }
+
+    /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
+    uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
+    while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
+        esp_rom_delay_us(500);
+        if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
+        timeout_us -= 500;
     }
 
 

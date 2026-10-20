@@ -354,11 +354,14 @@ static void orch_flow_quiesce_peripherals(void)
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < 2500) {
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000) {
             vTaskDelay(pdMS_TO_TICKS(20));
             wait_ms += 20;
         }
     }
+
+    /* Stop LVGL worker task on Core 1 before touching display sleep or pad holds */
+    h1os_lvgl_stop();
 
     if (sub_audio_is_busy()) {
         ESP_LOGI(TAG, "Waiting for audio playback to finish...");

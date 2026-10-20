@@ -40,6 +40,7 @@ static h1os_lifecycle_t s_app_lifecycle = {0};
 static int64_t s_session_expiry_us = 0;
 static TaskHandle_t s_session_task_handle = NULL;
 static bool s_session_running = false;
+static bool s_audio_initialized = false;
 
 /**
  * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
@@ -74,6 +75,9 @@ bool h1os_is_session_active(void)
  */
 static void h1os_trigger_chime(h1os_chime_type_t type)
 {
+    if (!s_audio_initialized) {
+        return;
+    }
     if (s_app_lifecycle.presentation.on_chime != NULL) {
         s_app_lifecycle.presentation.on_chime(type, s_app_lifecycle.user_data);
     } else if (s_app_lifecycle.presentation.chime_mask & (1 << type)) {
@@ -240,6 +244,9 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
 
     sub_nvs_init();
 
+    /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
     orch_flow_type_t flow = orch_flow_determine_wakeup();
 
     orch_persisted_state_t *st = orch_state_get();
@@ -339,10 +346,15 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     bool is_user_wake = (!is_wake) || button_woke;
     if (is_user_wake) {
-        sub_audio_init(s_app_lifecycle.presentation.volume_pct);
+        s_audio_initialized = (sub_audio_init(s_app_lifecycle.presentation.volume_pct) == ESP_OK);
     } else {
+        s_audio_initialized = false;
         ESP_LOGI(TAG, "Unattended wake event: Codec initialization skipped (audio sleep preserved)");
     }
+
+    /* Always clear any latched PCF85063A interrupt flags on Flow B entry */
+    bool alarm_f = false, timer_f = false;
+    sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
 
     s_session_running = !is_rtc_wake;
     if (s_session_running) {
@@ -351,10 +363,12 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
+        h1os_lvgl_lock(1000);
         h1os_trigger_splash(H1OS_SPLASH_BOOT);
         if (s_app_lifecycle.on_boot) {
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
+        h1os_lvgl_unlock();
     } else if (s_app_lifecycle.on_wake) {
         h1os_wake_context_t ctx = {.reset_reason       = esp_reset_reason(),
                                    .wakeup_causes      = causes,
@@ -364,15 +378,17 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
                                    .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : 0,
                                    .sleep_duration_sec = orch_state_get()->sample_interval_sec,
                                    .user_data          = s_app_lifecycle.user_data};
+        h1os_lvgl_lock(1000);
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
+        h1os_lvgl_unlock();
     }
 
     h1os_lvgl_start(5, 1);
 
     if (is_rtc_wake) {
+        /* Allow Core 1 LVGL task to pick up and begin flushing the updated frame */
+        vTaskDelay(pdMS_TO_TICKS(50));
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
-        bool alarm_f = false, timer_f = false;
-        sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
         uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
         if (sleep_sec == 0) {
             ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
@@ -488,10 +504,12 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
     }
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
+    h1os_lvgl_lock(1000);
     h1os_trigger_splash(H1OS_SPLASH_SLEEP);
     if (s_app_lifecycle.on_pre_sleep) {
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
+    h1os_lvgl_unlock();
     return orch_flow_transition_to_sleep(sleep_sec);
 }
 

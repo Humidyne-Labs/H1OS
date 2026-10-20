@@ -336,7 +336,22 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         uint32_t initial_arm_sec = (full_slices > 0) ? flow_a_sec : remainder;
-        sub_rtc_arm_countdown(initial_arm_sec);
+        esp_err_t rtc_err = ESP_FAIL;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            rtc_err = sub_rtc_arm_countdown(initial_arm_sec);
+            if (rtc_err == ESP_OK) {
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        if (rtc_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after 3 attempts: %s", esp_err_to_name(rtc_err));
+        }
+    }
+
+    /* Ensure ADC1 is initialized in ULP RISC-V mode before sleep handoff */
+    if (s_adc_handle == NULL) {
+        sub_power_init();
     }
 
     ulp_overflow_limit = overflow;
@@ -345,8 +360,9 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         ulp_slice_counter = 0;
     }
     ulp_dispatch_reason = 0;
-    ulp_rtc_int_stuck = 0;
-    ulp_usb_connected = sub_power_connected_usb() ? 1 : 0;
+    ulp_last_wake_btn   = 0;
+    ulp_rtc_int_stuck   = 0;
+    ulp_usb_connected   = sub_power_connected_usb() ? 1 : 0;
     asm volatile("memw" ::: "memory");
 
     ESP_LOGI(TAG,
@@ -360,6 +376,9 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 			 (unsigned long)overflow,
              (unsigned long)ulp_slice_counter, 
 			 (unsigned long)ulp_usb_connected);
+
+    /* Keep ULP GPIO wakeup disarmed while configuring RTC IO pads and printing logs */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
     const gpio_num_t wake_pins[] = {HAL_PIN_BUTTON_BOOT, HAL_PIN_BUTTON_POWER, HAL_PIN_RTC_INT};
     for (size_t i = 0; i < sizeof(wake_pins) / sizeof(wake_pins[0]); i++) {
@@ -377,7 +396,7 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     }
 
     rtc_gpio_init(HAL_PIN_BATTERY_ADC);
-    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_DISABLED);
     rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
@@ -387,20 +406,10 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     orch_wake_stub_install();
 
     uint32_t drain_wait_us = 0;
-    while (gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
+    while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
         esp_rom_delay_us(500);
         drain_wait_us += 500;
     }
-
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-    REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    esp_rom_delay_us(120);
-    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
-    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
-
-    esp_rom_delay_us(120);
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
@@ -414,6 +423,16 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
 					(unsigned long)flow_a_sec, 
 					(unsigned long)overflow);
+
+    /* Clear latched status and arm ULP GPIO wakeup immediately prior to sleep entry */
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    esp_rom_delay_us(120);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    esp_rom_delay_us(120);
+
     esp_deep_sleep_start();
     return ESP_OK;
 }

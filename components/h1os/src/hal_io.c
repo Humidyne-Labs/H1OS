@@ -437,6 +437,7 @@ esp_err_t hal_io_release_pad_holds(void)
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_deinit(HAL_PIN_BATTERY_ADC);
 
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);

@@ -33,8 +33,9 @@ static lv_display_t *s_lv_display       = NULL;
 static lv_indev_t   *s_lv_keypad_indev  = NULL;
 static TaskHandle_t  s_lvgl_task_handle = NULL;
 
-static bool s_lvgl_task_running = false;
-static bool s_first_boot_flush  = true;
+static volatile bool s_lvgl_task_running = false;
+static volatile bool s_flush_in_progress = false;
+static bool s_first_boot_flush           = true;
 
 #define LVGL_I1_PALETTE_SIZE 8
 
@@ -131,15 +132,18 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     CpuMaxTurboScope turbo;
+    s_flush_in_progress = true;
     lv_color_format_t cf = lv_display_get_color_format(disp);
     if (cf != LV_COLOR_FORMAT_I1) {
         lv_display_flush_ready(disp);
+        s_flush_in_progress = false;
         return;
     }
 
     lv_obj_t *act_scr = lv_display_get_screen_active(disp);
     if (act_scr != NULL && lv_obj_get_child_count(act_scr) == 0) {
         lv_display_flush_ready(disp);
+        s_flush_in_progress = false;
         return;
     }
 
@@ -152,12 +156,14 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
     if (dest_buf == NULL || src_buf == NULL || area_w == 0 || area_h == 0) {
         lv_display_flush_ready(disp);
+        s_flush_in_progress = false;
         return;
     }
 
     uint16_t y_start = area->y1;
     if (y_start >= EPD_HEIGHT) {
         lv_display_flush_ready(disp);
+        s_flush_in_progress = false;
         return;
     }
     if (y_start + area_h > EPD_HEIGHT) {
@@ -235,6 +241,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     }
 
     lv_display_flush_ready(disp);
+    s_flush_in_progress = false;
 }
 
 /**
@@ -366,7 +373,11 @@ esp_err_t h1os_lvgl_stop(void)
 {
     if (s_lvgl_task_handle != NULL) {
         s_lvgl_task_running = false;
-        vTaskDelay(pdMS_TO_TICKS(50));
+        uint32_t wait_ms = 0;
+        while (s_lvgl_task_handle != NULL && wait_ms < 6000) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            wait_ms += 20;
+        }
         if (s_lvgl_task_handle != NULL) {
             vTaskDelete(s_lvgl_task_handle);
             s_lvgl_task_handle = NULL;
@@ -384,6 +395,9 @@ bool h1os_lvgl_has_pending_tasks(void)
 {
     if (s_lv_display == NULL)
         return false;
+
+    if (s_flush_in_progress)
+        return true;
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
@@ -414,7 +428,9 @@ static void h1os_lvgl_port_task(void *pvParameters)
         if (need_blitz) {
             sub_power_cpu_max_acquire();
         }
+        lv_lock();
         uint32_t delay_ms = lv_timer_handler();
+        lv_unlock();
         if (need_blitz) {
             sub_power_cpu_max_release();
         }
