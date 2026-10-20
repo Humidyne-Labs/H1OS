@@ -23,6 +23,7 @@ volatile uint32_t last_wake_cause = 0;
 volatile uint32_t last_wake_btn   = 0;
 volatile uint32_t slice_counter   = 0;
 volatile uint32_t overflow_limit  = 5;
+volatile uint32_t remainder_sec   = 0;
 volatile uint32_t rtc_int_stuck   = 0;
 volatile uint32_t dispatch_reason = 0;
 volatile uint32_t gpio_status_raw = 0;
@@ -150,6 +151,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
             wake_main       = true;
         } else {
             slice_counter   = 0;
+            remainder_sec   = 0;
             last_wake_cause = 3;
             last_wake_btn   = 0;
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;

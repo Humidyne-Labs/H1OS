@@ -335,10 +335,12 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         overflow = 1;
 
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
-        sub_rtc_arm_countdown(flow_a_sec);
+        uint32_t initial_arm_sec = (full_slices > 0) ? flow_a_sec : remainder;
+        sub_rtc_arm_countdown(initial_arm_sec);
     }
 
     ulp_overflow_limit = overflow;
+    ulp_remainder_sec  = remainder;
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         ulp_slice_counter = 0;
     }
