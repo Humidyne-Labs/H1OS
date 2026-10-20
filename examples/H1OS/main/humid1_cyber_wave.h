@@ -14,8 +14,8 @@
 extern "C" {
 #endif
 
-#define HUMID1_CYBER_WAVE_WIDTH  200  /**< Asset width in physical pixels. */
-#define HUMID1_CYBER_WAVE_HEIGHT 200  /**< Asset height in physical pixels. */
+#define HUMID1_CYBER_WAVE_WIDTH  200  /**< Asset width in physical pixels.          */
+#define HUMID1_CYBER_WAVE_HEIGHT 200  /**< Asset height in physical pixels.         */
 #define HUMID1_CYBER_WAVE_BYTES  5000 /**< Packed 1-bit binary asset size in bytes. */
 
 /**

@@ -32,10 +32,10 @@ typedef struct {
     uint32_t wakeup_causes;                /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes). */
     uint32_t boot_count;                   /**< Monotonic system boot cycle count.                      */
     uint32_t deep_sleep_count;             /**< Monotonic deep sleep wake cycle count.                  */
-    bool woke_from_button;                 /**< True if system woke due to physical button actuation.   */
-    uint8_t wake_button;                   /**< GPIO pin number of waking button (if button wake).      */
+    bool     woke_from_button;             /**< True if system woke due to physical button actuation.   */
+    uint8_t  wake_button;                  /**< GPIO pin number of waking button (if button wake).      */
     uint32_t sleep_duration_sec;           /**< Elapsed deep sleep duration in seconds.                 */
-    void *user_data;                       /**< User context pointer passed to lifecycle.               */
+    void     *user_data;                   /**< User context pointer passed to lifecycle.               */
 } h1os_wake_context_t;
 
 /**

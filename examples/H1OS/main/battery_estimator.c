@@ -75,6 +75,7 @@ float battery_estimate_remaining_days(uint32_t nominal_mah, uint32_t current_vba
     if (avg_current_ma <= 0.001f) {
         avg_current_ma = 0.35f;
     }
+	
     uint32_t soc_bp = battery_get_soc_basis_pts(current_vbat_mv);
     float remaining_mah = (float)nominal_mah * ((float)soc_bp / 10000.0f);
     float hours = remaining_mah / avg_current_ma;

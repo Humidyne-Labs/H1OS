@@ -29,11 +29,12 @@
 
 static const char *TAG = "h1os_lvgl";
 
-static lv_display_t *s_lv_display = NULL;
-static lv_indev_t *s_lv_keypad_indev = NULL;
-static TaskHandle_t s_lvgl_task_handle = NULL;
+static lv_display_t *s_lv_display       = NULL;
+static lv_indev_t   *s_lv_keypad_indev  = NULL;
+static TaskHandle_t  s_lvgl_task_handle = NULL;
+
 static bool s_lvgl_task_running = false;
-static bool s_first_boot_flush = true;
+static bool s_first_boot_flush  = true;
 
 #define LVGL_I1_PALETTE_SIZE 8
 

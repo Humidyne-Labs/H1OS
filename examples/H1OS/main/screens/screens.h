@@ -24,9 +24,9 @@ extern "C" {
  * @brief Showcase application screen page identifiers.
  */
 typedef enum {
-    H1OS_SCREEN_ENV_HERO = 0,     /**< Screen 1: Primary environmental hero telemetry. */
-    H1OS_SCREEN_PSYCHROMETRICS,   /**< Screen 2: Psychrometric invariants and dew point metrics. */
-    H1OS_SCREEN_SYSTEM_HEALTH,    /**< Screen 3: Battery autonomy, voltage, and system health. */
+    H1OS_SCREEN_ENV_HERO = 0,     /**< Screen 1: Primary environmental hero telemetry.             */
+    H1OS_SCREEN_PSYCHROMETRICS,   /**< Screen 2: Psychrometric invariants and dew point metrics.   */
+    H1OS_SCREEN_SYSTEM_HEALTH,    /**< Screen 3: Battery autonomy, voltage, and system health.     */
     H1OS_SCREEN_DIAGNOSTICS       /**< Screen 4: Verbose hardware register and memory diagnostics. */
 } h1os_screen_id_t;
 

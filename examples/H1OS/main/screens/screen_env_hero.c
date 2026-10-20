@@ -44,8 +44,7 @@ void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
     lv_obj_set_style_line_color(mid_line, lv_color_black(), 0);
 
     lv_obj_t *lbl_stat = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_stat, "Status:   %s (%u%%)", telem->is_thermally_settled ? "SETTLED" : "SETTLING",
-                          telem->trinode_confidence_pct);
+    lv_label_set_text_fmt(lbl_stat, "Status:   %s (%u%%)", telem->is_thermally_settled ? "SETTLED" : "SETTLING", telem->trinode_confidence_pct);
     lv_obj_set_style_text_font(lbl_stat, H1OS_FONT_14, 0);
     lv_obj_align(lbl_stat, LV_ALIGN_TOP_LEFT, 6, 100);
 

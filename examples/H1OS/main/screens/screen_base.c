@@ -9,8 +9,9 @@
 #include "h1os/h1os_lvgl.h"
 #include "screens.h"
 
-static lv_obj_t *s_active_badge = NULL;
+static lv_obj_t *s_active_badge     = NULL;
 static lv_obj_t *s_active_badge_lbl = NULL;
+
 static bool s_badge_is_awake = false;
 
 lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_cb_t event_cb)
@@ -81,6 +82,7 @@ void screen_base_set_awake_badge(bool is_awake)
 {
     if (s_active_badge == NULL || s_active_badge_lbl == NULL)
         return;
+	
     if (s_badge_is_awake == is_awake)
         return;
 

@@ -6,6 +6,17 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "h1os/hal_i2c.h"
+
+#include "driver/i2c_master.h"
+#include "esp_log.h"
+
+static const char *TAG = "HAL_I2C";
+
+static i2c_master_bus_handle_t s_bus_handle = NULL;
+static SemaphoreHandle_t s_i2c_mutex = NULL;
+static bool s_is_inited = false;
+
 /**
  * @brief Initializes the shared I2C master bus hardware.
  *

@@ -20,7 +20,7 @@
 #define H1OS_PIN_EPD_3V3_EN 6
 #define H1OS_PIN_PA_EN 42
 
-static const char *TAG __unused = "H1OS_BOOT_HOOK";
+static const char *TAG = "H1OS_BOOT_HOOK";
 
 /**
  * @brief Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
@@ -69,18 +69,21 @@ void bootloader_before_init(void)
 void bootloader_after_init(void)
 {
     uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g17_out = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
-    uint32_t g6_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
+    uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> H1OS_PIN_POWER_HOLD) & 1U;
+    uint32_t g6_hold  = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
 
     if (g17_hold == 0 || g17_out == 0) {
-        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]", (unsigned long)g17_out,
-                 (unsigned long)g17_hold);
+        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]", 
+						(unsigned long)g17_out, 
+						(unsigned long)g17_hold);
 
         gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD, 1);
         gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
         REG_SET_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
     } else {
         ESP_LOGD(TAG, "Hardware master rails verified [BAT_CTRL=%lu (hold=%lu), EPD_EN_HOLD=%lu]",
-                 (unsigned long)g17_out, (unsigned long)g17_hold, (unsigned long)g6_hold);
+                 (unsigned long)g17_out, 
+				 (unsigned long)g17_hold, 
+				 (unsigned long)g6_hold);
     }
 }

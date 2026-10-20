@@ -25,14 +25,14 @@
 
 static const char *TAG = "sub_audio";
 
-#define ES8311_REG_RESET 0x00
+#define ES8311_REG_RESET       0x00
 #define ES8311_REG_SYS_PWR_ANA 0x0D
-#define ES8311_REG_SYS_LP_MOD 0x0F
-#define ES8311_REG_DAC_PWR 0x12
-#define ES8311_REG_DAC_VOL 0x32
-#define ES8311_REG_FLAG 0xFC
-#define ES8311_REG_CHIP_ID1 0xFD
-#define ES8311_REG_CHIP_ID2 0xFE
+#define ES8311_REG_SYS_LP_MOD  0x0F
+#define ES8311_REG_DAC_PWR     0x12
+#define ES8311_REG_DAC_VOL     0x32
+#define ES8311_REG_FLAG        0xFC
+#define ES8311_REG_CHIP_ID1    0xFD
+#define ES8311_REG_CHIP_ID2    0xFE
 
 #define FRAME_SIZE 0x100
 
@@ -58,31 +58,139 @@ typedef struct {
             uint32_t sample_rate_hz;
         } pcm;
     } params;
+	
     SemaphoreHandle_t done_sem;
     esp_err_t *result;
 } audio_cmd_t;
 
+typedef struct {
+    uint8_t reg;
+    uint8_t val;
+} es8311_reg_entry_t;
+
 static i2s_chan_handle_t s_tx_chan = NULL;
 
-static bool s_audio_inited = false;
+static bool s_audio_inited     = false;
 static bool s_i2s_chan_enabled = false;
 static bool s_codec_in_standby = false;
+static bool s_low_power_mode   = true;
 
-static bool s_low_power_mode = true;
-
-static QueueHandle_t s_audio_queue = NULL;
-static TaskHandle_t s_audio_task_handle = NULL;
-static volatile bool s_audio_is_busy = false;
+static QueueHandle_t s_audio_queue       = NULL;
+static TaskHandle_t  s_audio_task_handle = NULL;
+static volatile bool s_audio_is_busy    = false;
 
 static uint8_t s_volume_pct = 0;
 
 static const uint8_t es8311_perceptual_vol_table[101] = {
-    0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 0x61, 0x65, 0x68, 0x6B, 0x6E, 0x71, 0x73, 0x75, 0x77, 0x79, 0x7B,
-    0x7D, 0x7E, 0x80, 0x81, 0x83, 0x84, 0x85, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F, 0x90,
-    0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9E, 0x9F,
-    0xA0, 0xA1, 0xA2, 0xA2, 0xA3, 0xA4, 0xA5, 0xA5, 0xA6, 0xA7, 0xA8, 0xA8, 0xA9, 0xAA, 0xAA, 0xAB, 0xAC,
-    0xAC, 0xAD, 0xAE, 0xAE, 0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 0xB3, 0xB3, 0xB4, 0xB5, 0xB5, 0xB6, 0xB6,
-    0xB7, 0xB7, 0xB8, 0xB9, 0xB9, 0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 0xBD, 0xBE, 0xBE, 0xBF, 0xBF};
+    0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 
+	0x61, 0x65, 0x68, 0x6B, 0x6E, 0x71, 
+	0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D, 
+	0x7E, 0x80, 0x81, 0x83, 0x84, 0x85, 
+	0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 
+	0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92, 
+	0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 
+	0x99, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 
+	0x9E, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2, 
+	0xA2, 0xA3, 0xA4, 0xA5, 0xA5, 0xA6, 
+	0xA7, 0xA8, 0xA8, 0xA9, 0xAA, 0xAA, 
+	0xAB, 0xAC, 0xAC, 0xAD, 0xAE, 0xAE, 
+	0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 
+	0xB3, 0xB3, 0xB4, 0xB5, 0xB5, 0xB6, 
+	0xB6, 0xB7, 0xB7, 0xB8, 0xB9, 0xB9, 
+	0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 
+	0xBD, 0xBE, 0xBE, 0xBF, 0xBF
+};
+
+/* 
+ * Stage 1: Pre-charge sequence
+ * Resets digital logic, configures system clocks, power management,
+ * analog references, microphone bias, and digital audio serial interface (SDP).
+ */
+static const es8311_reg_entry_t s_es8311_init_pre_charge[] = 
+{
+    /* Analog / System startup */
+    {0x44, 0x08}, /**< REG44: Set internal analog bias / reference current                                     */
+    {0x44, 0x08}, /**< REG44: Write repeated to ensure stable latching during startup                          */
+
+    {0x0D, 0xFA}, /**< REG0D: System power down control - power down digital/modulators prior to configuration */
+
+    /* Clock & Power Setup */
+    {0x01, 0x30}, /**< REG01: Clock management - enable dig_mclk, BCLK/MCLK source selection                   */
+    {0x02, 0x00}, /**< REG02: Clock divider - pre-divider/MCLK division ratio                                  */
+    {0x03, 0x10}, /**< REG03: ADC clock divider (DIV_CLKADC) & DAC clock divider (DIV_CLKDAC)                  */
+    {0x16, 0x24}, /**< REG16: Internal analog LDO & bandgap voltage reference control                          */
+    {0x04, 0x20}, /**< REG04: Master BCLK divider / master mode clock timing                                   */
+    {0x05, 0x00}, /**< REG05: Master LRCK divider high byte (DIV_LRCK[11:8])                                   */
+    {0x0B, 0x00}, /**< REG0B: Clock gating / internal clock route enables                                      */
+    {0x0C, 0x00}, /**< REG0C: Digital system reset / clock synchronization                                     */
+
+    /* Digital Audio Serial Interface (SDP) Setup */
+    {0x10, 0x1F}, /**< REG10: SDP in/out format (e.g., standard I2S format, 16/24/32-bit data length)          */
+    {0x11, 0x7F}, /**< REG11: SDP control - slave/master mode, tri-state, clock polarity                       */
+
+    /* System Reset & Power Configuration */
+    {0x00, 0x80}, /**< REG00: Chip control - CSM (Clock State Machine) reset / digital reset                   */
+    {0x01, 0x3F}, /**< REG01: Clock management - un-gate digital clocks for ADC, DAC, and SDP                  */
+    {0x06, 0x03}, /**< REG06: Master LRCK divider low byte (DIV_LRCK[7:0])                                     */
+    {0x07, 0x00}, /**< REG07: Master LRCK divider fine adjustment / BCLK-to-LRCK ratio                         */
+    {0x08, 0xFF}, /**< REG08: Master mode BCLK divider settings                                                */
+
+    /* Analog Front-End (PGA / MIC / Reference) */
+    {0x13, 0x10}, /**< REG13: Analog bias circuit power up / current trimming                                  */
+    {0x1B, 0x0A}, /**< REG1B: ADC Analog PGA / input amplifier gain stage                                      */
+    {0x1C, 0x6A}, /**< REG1C: MIC bias generator enable, level tuning (e.g., 2.0V/2.4V), and reference voltage */
+    {0x44, 0x58}, /**< REG44: Analog charge pump / fast charge control for DC blocking caps                    */
+
+    /* Serial Data Port (SDP) Routing */
+    {0x09, 0x0C}, /**< REG09: SDP input configuration (DAC data channel select, unmute, polarity)              */
+    {0x0A, 0x0C}, /**< REG0A: SDP output configuration (ADC data channel select, tri-state control)            */
+};
+
+/* 
+ * Stage 2: Post-charge sequence
+ * Powers up ADC/DAC analog stages, unmutes signal paths, enables speaker/HP driver.
+ */
+static const es8311_reg_entry_t s_es8311_init_post_charge[] = 
+{
+    /* Analog Power Up */
+    {0x17, 0xBF}, /**< REG17: ADC & DAC analog circuitry power-up, reference buffer enable        */
+    {0x0E, 0x02}, /**< REG0E: Modulator & interpolator/decimator filter power-up                  */
+    {0x12, 0x00}, /**< REG12: System power-up - activate CSM (Clock State Machine)                */
+    {0x14, 0x1A}, /**< REG14: Analog output power control - enable DAC buffer & class-D/AB driver */
+    {0x0D, 0x01}, /**< REG0D: Clear power-down bits to wake DAC/ADC digital modulators            */
+    {0x15, 0x40}, /**< REG15: Output amplifier power & low-noise bias settings                    */
+
+    /* Digital Processing & Dynamic Range Control (DRC) */
+    {0x37, 0x08}, /**< REG37: DAC digital filter configuration & mute/demute slope rate           */
+    {0x45, 0x00}, /**< REG45: DAC DRC / limiter control disable or baseline setup                 */
+
+    /* Volume / Path Enable */
+    {0x31, 0x00}, /**< REG31: DAC digital mute control (0x00 = unmute DAC channel)                */
+};
+
+/* 
+ * Stage 3: De-initialization / Shutdown sequence
+ * Soft mutes output, turns off driver amps, powers down ADC/DAC analog blocks and clocks.
+ */
+static const es8311_reg_entry_t s_es8311_deinit[] =
+{
+    /* Soft Mute Outputs */
+    {0x31, 0x60}, /**< REG31: DAC digital mute enable (mute DAC, enable soft-ramp to prevent pops) */
+    {0x32, 0x00}, /**< REG32: DAC digital volume set to minimum (-95.5 dB)                         */
+
+    /* Power Down Driver & Analog Blocks */
+    {0x12, 0x02}, /**< REG12: Stop CSM / place internal state machines into standby                */
+    {0x0E, 0xFF}, /**< REG0E: Power down digital modulators, decimation, and interpolation filters */
+    {0x14, 0x00}, /**< REG14: Power down output amplifier / headphone driver                       */
+    {0x17, 0x00}, /**< REG17: Power down DAC and ADC analog circuits                               */
+    {0x15, 0x00}, /**< REG15: Power down class-D / analog output stages                            */
+    {0x45, 0x00}, /**< REG45: Reset DRC control registers                                          */
+
+    /* Power Down Digital System & References */
+    {0x0D, 0xFC}, /**< REG0D: Assert power down across system blocks                               */
+    {0x00, 0x1F}, /**< REG00: Digital block reset                                                  */
+    {0x01, 0x00}, /**< REG01: Disable all internal digital clocks (enter ultra-low-power standby)  */
+};
 
 /**
  * @brief Volume pct to es8311 reg.
@@ -93,8 +201,7 @@ static const uint8_t es8311_perceptual_vol_table[101] = {
  */
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 {
-    if (pct > 100)
-        pct = 100;
+    if (pct > 100) pct = 100;	
     return es8311_perceptual_vol_table[pct];
 }
 
@@ -211,60 +318,6 @@ bool sub_audio_is_ready(void)
 {
     return (sub_audio_wait_until_ready(10) == ESP_OK);
 }
-
-typedef struct {
-    uint8_t reg;
-    uint8_t val;
-} es8311_reg_entry_t;
-
-static const es8311_reg_entry_t s_es8311_init_pre_charge[] = 
-{
-    {0x44, 0x08},
-    {0x44, 0x08},
-
-    {0x0D, 0xFA},
-
-    {0x01, 0x30},
-    {0x02, 0x00},
-    {0x03, 0x10},
-    {0x16, 0x24},
-    {0x04, 0x20},
-    {0x05, 0x00},
-    {0x0B, 0x00},
-    {0x0C, 0x00},
-
-    {0x10, 0x1F},
-    {0x11, 0x7F},
-
-    {0x00, 0x80},
-    {0x01, 0x3F},
-    {0x06, 0x03},
-    {0x07, 0x00},
-    {0x08, 0xFF},
-
-    {0x13, 0x10},
-    {0x1B, 0x0A},
-    {0x1C, 0x6A},
-    {0x44, 0x58},
-
-    {0x09, 0x0C},
-    {0x0A, 0x0C},
-};
-
-static const es8311_reg_entry_t s_es8311_init_post_charge[] = 
-{
-    {0x17, 0xBF},
-    {0x0E, 0x02},
-    {0x12, 0x00},
-    {0x14, 0x1A},
-    {0x0D, 0x01},
-    {0x15, 0x40},
-
-    {0x37, 0x08},
-    {0x45, 0x00},
-
-    {0x31, 0x00},
-};
 
 /**
  * @brief Es8311 write table.
@@ -445,7 +498,7 @@ static void sub_audio_park_warm(void)
  *
  * @details Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
  *
- * @return ESP_OK on success.
+ * @return ESP_OK on success, or an error code.
  */
 esp_err_t sub_audio_standby(void)
 {
@@ -453,20 +506,7 @@ esp_err_t sub_audio_standby(void)
 
     vTaskDelay(pdMS_TO_TICKS(25));
 
-    es8311_write_reg(0x31, 0x60);
-    es8311_write_reg(0x32, 0x00);
-
-    es8311_write_reg(0x12, 0x02);
-    es8311_write_reg(0x0E, 0xFF);
-    es8311_write_reg(0x14, 0x00);
-    es8311_write_reg(0x17, 0x00);
-    es8311_write_reg(0x15, 0x00);
-    es8311_write_reg(0x45, 0x00);
-
-    es8311_write_reg(0x0D, 0xFC);
-
-    es8311_write_reg(0x00, 0x1F);
-    es8311_write_reg(0x01, 0x00);
+	esp_err_t ret = es8311_write_table(s_es8311_deinit, sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
 
     s_codec_in_standby = true;
 
@@ -475,7 +515,7 @@ esp_err_t sub_audio_standby(void)
         s_i2s_chan_enabled = false;
     }
 
-    return ESP_OK;
+    return ret;
 }
 
 /**

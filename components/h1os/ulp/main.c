@@ -62,13 +62,11 @@ volatile uint32_t usb_connected   = 0;
  */
 static inline uint32_t ulp_raw_to_mv(int32_t raw)
 {
-    if (raw <= 0)
-        return 0;
+    if (raw <= 0) return 0;
 
     uint32_t v_adc = ((uint32_t)raw * cal_scale) >> 12;
     int32_t vbat = (int32_t)(v_adc * 2) + cal_offset;
-    if (vbat < 0)
-        return 0;
+    if (vbat < 0) return 0;
     return (uint32_t)vbat;
 }
 
