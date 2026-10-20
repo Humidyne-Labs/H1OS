@@ -134,7 +134,7 @@ static void app_on_boot(void *user_data)
 					h1os_version_get_build_time(), 
 					h1os_version_get_code());
 					
-    s_app_state.cycle_counter = 1;
+    s_app_state.cycle_counter  = 1;
     s_app_state.boot_epoch_sec = (uint32_t)time(NULL);
 
     screen_base_set_awake_badge(true);

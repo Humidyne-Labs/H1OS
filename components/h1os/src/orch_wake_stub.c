@@ -37,7 +37,14 @@
 
 #define I2C_ADDR_SHTC3     0x70
 #define I2C_ADDR_PCF85063  0x51
+#define RTC_REG_CONTROL_2  0x01
 #define RTC_REG_TIMER_VAL  0x10
+#define RTC_REG_TIMER_MODE 0x11
+
+#define RTC_TIMER_CLK_1_HZ    (2 << 3)
+#define RTC_TIMER_CLK_1_60_HZ (3 << 3)
+#define RTC_TIMER_INT_EN_BIT  (1 << 1)
+#define RTC_TIMER_PULSE_BIT   (1 << 0)
 
 #define RTC_TIMER_TE_BIT   (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
@@ -270,6 +277,62 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
 }
 
 /**
+ * @brief Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
+ *
+ * @param[in]    seconds         Remaining countdown interval in seconds.
+ */
+static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
+{
+    if (seconds == 0) return;
+
+    uint8_t timer_val = 0;
+    uint8_t clk_src = 0;
+
+    if (seconds <= 255) {
+        clk_src = RTC_TIMER_CLK_1_HZ;
+        timer_val = (uint8_t)seconds;
+    } else {
+        clk_src = RTC_TIMER_CLK_1_60_HZ;
+        timer_val = (uint8_t)((seconds + 59) / 60);
+    }
+
+    uint8_t stop_mode  = clk_src | RTC_TIMER_INT_EN_BIT | RTC_TIMER_PULSE_BIT;
+    uint8_t start_mode = stop_mode | RTC_TIMER_TE_BIT;
+
+    /* 1. Stop timer */
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(RTC_REG_TIMER_MODE);
+        i2c_write_byte(stop_mode);
+    }
+    i2c_stop();
+
+    /* 2. Write countdown value */
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(RTC_REG_TIMER_VAL);
+        i2c_write_byte(timer_val);
+    }
+    i2c_stop();
+
+    /* 3. Acknowledge and clear TF & AF in Control_2, COF off */
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(RTC_REG_CONTROL_2);
+        i2c_write_byte(0x00);
+    }
+    i2c_stop();
+
+    /* 4. Start timer */
+    i2c_start();
+    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+        i2c_write_byte(RTC_REG_TIMER_MODE);
+        i2c_write_byte(start_mode);
+    }
+    i2c_stop();
+}
+
+/**
  * @brief Shtc3 send sleep.
  *
  * @return Return value of type static void RTC_IRAM_ATTR.
@@ -293,6 +356,7 @@ static void RTC_IRAM_ATTR shtc3_send_sleep(void)
  */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
+    /* LED timing vector */
     PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
     REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
     REG_WRITE(GPIO_ENABLE_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
@@ -361,12 +425,12 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {
-        uint16_t raw_t = ((uint16_t)rx[0] << 8) | rx[1];
+        uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
         uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
 
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {
@@ -396,10 +460,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_tri_node_sample_t sample = {
             .shtc3_temp_centi_c = temp_centi_c,
             .shtc3_rh_centi_pct = rh_centi_pct,
-            .mcu_tsens_centi_c = die_centi_c,
-            .epd_glass_centi_c = st->last_glass_temp_centi_c,
-            .timestamp_sec = 0,
-            .quality_flags = q_flags,
+            .mcu_tsens_centi_c  = die_centi_c,
+            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
+            .timestamp_sec      = 0,
+            .quality_flags      = q_flags,
         };
         orch_state_push_sample(&sample);
     }
@@ -415,13 +479,19 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     st->wake_count++;
     st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
 
-    /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(0x01); /* RTC_REG_CONTROL_2      */
-        i2c_write_byte(0x00); /* Clear TF & AF, COF off */
+    /* If penultimate slice and remainder > 0, rearm PCF85063A for the remaining duration */
+    if (ulp_slice_counter == (ulp_overflow_limit - 1) && ulp_remainder_sec > 0) {
+        rtc_rearm_countdown_stub(ulp_remainder_sec);
+    } else {
+        /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) so auto-reload continues */
+        i2c_start();
+        if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+            i2c_write_byte(RTC_REG_CONTROL_2);
+            i2c_write_byte(0x00); /* Clear TF & AF, COF off */
+        }
+        i2c_stop();
     }
-    i2c_stop();
+
 
     /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */
     CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
@@ -437,11 +507,12 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* Re-arm ULP GPIO wakeup */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     esp_rom_delay_us(120);
+
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
+    /* LED timing vector END */
     REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-
     esp_wake_stub_sleep(&bsp_wake_stub);
 }
 

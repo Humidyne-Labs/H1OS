@@ -29,12 +29,14 @@ typedef enum {
 /**
  * @brief Initialize ES8311 audio codec and NS4168 amplifier hardware.
  *
+ * @param[in] volume_pct Output volume (0 = Mute, 100 = 0 dB Max).
+ * 
  * Configures I2S master bus (16-bit 16kHz mono), performs codec register initialization
  * over shared I2C, and sets up the asynchronous FreeRTOS audio worker task.
  *
  * @return ESP_OK on success, or driver error code.
  */
-esp_err_t sub_audio_init(void);
+esp_err_t sub_audio_init(uint8_t volume_pct);
 
 /**
  * @brief Put audio subsystem into low-power hardware standby.
