@@ -326,10 +326,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
     uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
-    if (flow_a_sec == 0)
-        flow_a_sec = 60;
-    if (flow_b_sec == 0)
-        flow_b_sec = 300;
 
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder = flow_b_sec % flow_a_sec;
@@ -413,7 +409,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)), 
 					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
 					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
-
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
 					(unsigned long)flow_a_sec, 
 					(unsigned long)overflow);

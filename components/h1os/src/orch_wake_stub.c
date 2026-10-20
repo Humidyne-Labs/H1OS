@@ -361,12 +361,12 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {
-        uint16_t raw_t = ((uint16_t)rx[0] << 8) | rx[1];
+        uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
+        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
         uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
 
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {
@@ -396,10 +396,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_tri_node_sample_t sample = {
             .shtc3_temp_centi_c = temp_centi_c,
             .shtc3_rh_centi_pct = rh_centi_pct,
-            .mcu_tsens_centi_c = die_centi_c,
-            .epd_glass_centi_c = st->last_glass_temp_centi_c,
-            .timestamp_sec = 0,
-            .quality_flags = q_flags,
+            .mcu_tsens_centi_c  = die_centi_c,
+            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
+            .timestamp_sec      = 0,
+            .quality_flags      = q_flags,
         };
         orch_state_push_sample(&sample);
     }

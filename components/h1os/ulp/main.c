@@ -96,7 +96,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
         ulp_riscv_delay_us(BUTTON_DEBOUNCE_US);
 
         int boot_now = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-        int pwr_now = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+        int pwr_now  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
 
         if (boot_now == 0 || pwr_now == 0) {
             bool is_boot = (boot_now == 0);
@@ -145,15 +145,15 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
         if (slice_counter < overflow_limit) {
             last_wake_cause = 4;
-            last_wake_btn = 0;
+            last_wake_btn   = 0;
             dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
-            wake_main = true;
+            wake_main       = true;
         } else {
-            slice_counter = 0;
+            slice_counter   = 0;
             last_wake_cause = 3;
-            last_wake_btn = 0;
+            last_wake_btn   = 0;
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
-            wake_main = true;
+            wake_main       = true;
         }
     } else {
         wake_main = false;
@@ -225,8 +225,8 @@ int main(void)
     gpio_status_raw = rtcio_int_st;
 
     int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-    int pwr_btn = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-    int rtc_int = ulp_riscv_gpio_get_level(GPIO_NUM_5);
+    int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    int rtc_int  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
 
     uint32_t vbat_mv = last_vbat_mv;
     if (usb_connected) {
