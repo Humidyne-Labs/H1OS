@@ -16,7 +16,6 @@ static bool s_badge_is_awake = false;
 
 lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_cb_t event_cb)
 {
-    h1os_lvgl_lock(100);
     lv_obj_t *scr = lv_screen_active();
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
@@ -60,9 +59,9 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
     lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
     lv_obj_center(lbl_pg);
 
-    s_active_badge = badge;
+    s_active_badge     = badge;
     s_active_badge_lbl = lbl_pg;
-    s_badge_is_awake = is_awake;
+    s_badge_is_awake   = is_awake;
 
     static lv_point_precise_t line_pts[] = {{4, 22}, {196, 22}};
     lv_obj_t *line = lv_line_create(scr);
@@ -82,7 +81,7 @@ void screen_base_set_awake_badge(bool is_awake)
 {
     if (s_active_badge == NULL || s_active_badge_lbl == NULL)
         return;
-	
+
     if (s_badge_is_awake == is_awake)
         return;
 

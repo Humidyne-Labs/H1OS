@@ -28,14 +28,14 @@ extern "C" {
  * Populated during boot and passed to the application lifecycle on_wake hook.
  */
 typedef struct {
-    esp_reset_reason_t reset_reason;       /**< Hardware reset reason code.                             */
-    uint32_t wakeup_causes;                /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes). */
-    uint32_t boot_count;                   /**< Monotonic system boot cycle count.                      */
-    uint32_t deep_sleep_count;             /**< Monotonic deep sleep wake cycle count.                  */
-    bool     woke_from_button;             /**< True if system woke due to physical button actuation.   */
-    uint8_t  wake_button;                  /**< GPIO pin number of waking button (if button wake).      */
-    uint32_t sleep_duration_sec;           /**< Elapsed deep sleep duration in seconds.                 */
-    void     *user_data;                   /**< User context pointer passed to lifecycle.               */
+    esp_reset_reason_t reset_reason;       /**< Hardware reset reason code.                                         */
+    uint32_t wakeup_causes;                /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
+    uint32_t boot_count;                   /**< Monotonic system boot cycle count.                                  */
+    uint32_t deep_sleep_count;             /**< Monotonic deep sleep wake cycle count.                              */
+    bool     woke_from_button;             /**< True if system woke due to physical button actuation.               */
+    uint8_t  wake_button;                  /**< Waking button ID (h1os_wake_btn_t: 0=None, 1=BOOT, 2=POWER).        */
+    uint32_t sleep_duration_sec;           /**< Configured sleep interval prior to wake in seconds.                 */
+    void     *user_data;                   /**< User context pointer passed to lifecycle.                           */
 } h1os_wake_context_t;
 
 /**
@@ -47,17 +47,6 @@ typedef enum {
     H1OS_SPLASH_SHUTDOWN, /**< Orderly physical power-down splash screen.         */
     H1OS_SPLASH_MAX       /**< Sentinel maximum splash enum value.                */
 } h1os_splash_type_t;
-
-/**
- * @brief Acoustic chime sound pattern types.
- */
-typedef enum {
-    H1OS_CHIME_BOOT = 0, /**< Ascending multi-tone power-on chime.   */
-    H1OS_CHIME_SLEEP,    /**< Descending sleep preparation chime.    */
-    H1OS_CHIME_SHUTDOWN, /**< Dual-tone shutdown confirmation chime. */
-    H1OS_CHIME_ALARM,    /**< Repetitive alert chime pattern.        */
-    H1OS_CHIME_MAX       /**< Sentinel maximum chime enum value.     */
-} h1os_chime_type_t;
 
 /**
  * @brief System boot and power-on reset callback signature.
@@ -167,7 +156,7 @@ typedef struct {
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.1.0-alpha").
+ * @return Null-terminated semantic version string (e.g. "2.3.2-dev").
  */
 static inline const char *h1os_get_version(void)
 {

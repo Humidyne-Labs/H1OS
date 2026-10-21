@@ -105,6 +105,13 @@ esp_err_t sub_display_refresh_partial(void);
 esp_err_t sub_display_read_glass_temp(float *out_temp_c);
 
 /**
+ * @brief Retrieve the latest cached SSD1681 on-glass temperature in centi-degrees Celsius.
+ *
+ * @return Cached glass temperature in centi-°C (0 if not yet sampled).
+ */
+int16_t sub_display_get_glass_temp_centi_c(void);
+
+/**
  * @brief Put SSD1681 into Deep Sleep Mode 1 (<1uA quiescent drain).
  *
  * @return ESP_OK on success.

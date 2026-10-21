@@ -49,6 +49,7 @@
 #define RTC_TIMER_TE_BIT   (1 << 2)
 #define RTC_TIMER_TCF_MASK (3 << 3)
 #define RTC_TIMER_TCF_MIN  (3 << 3)
+#define RTC_CTRL2_COF_OFF  0x07
 // clang-format on
 
 /**
@@ -238,20 +239,23 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 }
 
 /**
- * @brief Wake stub read die temp centi c.
+ * @brief Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
  *
- * @param[in]    cal_centi_c     Parameter cal_centi_c.
- * @param[in]    fallback_centi_c Parameter fallback_centi_c.
+ * @param[in]    offset_centi_c   Pre-computed intercept (2052 + tsens_cal_centi_c).
+ * @param[in]    fallback_centi_c Fallback temperature if conversion fails.
  *
- * @return Return value of type static int16_t RTC_IRAM_ATTR.
+ * @return Sampled die temperature in centi-°C.
  */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c, int16_t fallback_centi_c)
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t fallback_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+    REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
-    esp_rom_delay_us(300);
+    esp_rom_delay_us(400);
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
@@ -269,11 +273,34 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
         return fallback_centi_c;
     }
 
-    int32_t t_centi = (((4386 * (int32_t)raw) - 205200) / 100) - (int32_t)cal_centi_c;
+    /* Division-free Q12 fixed-point transfer: 43.86 * 4096 = 179651 */
+    int32_t t_centi = (((int32_t)raw * 179651) >> 12) - (int32_t)offset_centi_c;
     if (t_centi < -4000 || t_centi > 12500) {
         return fallback_centi_c;
     }
     return (int16_t)t_centi;
+}
+
+/**
+ * @brief Write a register to PCF85063A over bit-banged I2C with up to 3 attempts.
+ */
+static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
+{
+    for (int attempt = 0; attempt < 3; attempt++) {
+        bool ok = false;
+        i2c_start();
+        if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
+            if (i2c_write_byte(reg) && i2c_write_byte(val)) {
+                ok = true;
+            }
+        }
+        i2c_stop();
+        if (ok) {
+            return true;
+        }
+        esp_rom_delay_us(20);
+    }
+    return false;
 }
 
 /**
@@ -300,36 +327,16 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
     uint8_t start_mode = stop_mode | RTC_TIMER_TE_BIT;
 
     /* 1. Stop timer */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_MODE);
-        i2c_write_byte(stop_mode);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_MODE, stop_mode);
 
     /* 2. Write countdown value */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_VAL);
-        i2c_write_byte(timer_val);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_VAL, timer_val);
 
-    /* 3. Acknowledge and clear TF & AF in Control_2, COF off */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_CONTROL_2);
-        i2c_write_byte(0x00);
-    }
-    i2c_stop();
+    /* 3. Acknowledge and clear TF & AF in Control_2, COF off (0x07 = high-Z) */
+    rtc_write_reg_retry(RTC_REG_CONTROL_2, RTC_CTRL2_COF_OFF);
 
     /* 4. Start timer */
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-        i2c_write_byte(RTC_REG_TIMER_MODE);
-        i2c_write_byte(start_mode);
-    }
-    i2c_stop();
+    rtc_write_reg_retry(RTC_REG_TIMER_MODE, start_mode);
 }
 
 /**
@@ -356,6 +363,9 @@ static void RTC_IRAM_ATTR shtc3_send_sleep(void)
  */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
+    /* Suppress ULP GPIO wakeups while wake stub executes */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+
     /* LED timing vector */
     PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
     REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
@@ -428,9 +438,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
-        uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        /* 32-bit unsigned hardware division (1-cycle Xtensa quou instruction) */
+        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
+        uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
+        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, temp_centi_c);
 
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {
@@ -439,17 +450,17 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         } else {
             uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
             int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
-            int16_t diff = temp_centi_c - prev_t;
-            if (diff < 0)
-                diff = -diff;
 
-            if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
+            if (orch_math_is_plateau_settled(prev_t, temp_centi_c, SAMPLE_DELTA_GATE_CENTI_C)) {
                 st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
                 q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
                 if (st->valid_trend < 2) {
                     st->valid_trend = 2;
                 } else {
                     st->valid_trend++;
+                }
+                if (st->valid_trend >= 3) {
+                    st->die_tare_centi_c = temp_centi_c - die_centi_c;
                 }
             } else {
                 q_flags = 0;
@@ -468,39 +479,34 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_state_push_sample(&sample);
     }
 
-	/* Wait for the PCF85063A open-drain pulse to release back HIGH */
-	uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
-	while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-		esp_rom_delay_us(500);
-		if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
-		timeout_us -= 500;
-	}
-
     st->wake_count++;
     st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
 
-    /* If penultimate slice and remainder > 0, rearm PCF85063A for the remaining duration */
+    /* 1. Clear TF & AF in PCF85063A Control_2 (or rearm remainder) FIRST so /INT can release */
+    esp_rom_delay_us(20);
     if (ulp_slice_counter == (ulp_overflow_limit - 1) && ulp_remainder_sec > 0) {
         rtc_rearm_countdown_stub(ulp_remainder_sec);
     } else {
-        /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) so auto-reload continues */
-        i2c_start();
-        if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
-            i2c_write_byte(RTC_REG_CONTROL_2);
-            i2c_write_byte(0x00); /* Clear TF & AF, COF off */
-        }
-        i2c_stop();
+        /* Acknowledge PCF85063A timer interrupt flag (TF in Control_2) with COF=111 (0x07) */
+        rtc_write_reg_retry(RTC_REG_CONTROL_2, RTC_CTRL2_COF_OFF);
     }
 
+    /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
+    uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
+    while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
+        esp_rom_delay_us(500);
+        if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
+        timeout_us -= 500;
+    }
 
     /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */
     CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
     SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
                       RTC_CNTL_SLP_REJECT_INT_CLR |
-					  RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                      RTC_CNTL_SLP_WAKEUP_INT_CLR |
                       RTC_CNTL_COCPU_INT_CLR |
-					  RTC_CNTL_COCPU_TRAP_INT_CLR | 
-					  RTC_CNTL_ULP_CP_INT_CLR);
+                      RTC_CNTL_COCPU_TRAP_INT_CLR |
+                      RTC_CNTL_ULP_CP_INT_CLR);
     REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 

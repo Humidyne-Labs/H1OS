@@ -11,6 +11,8 @@
 #include "esp_log.h"
 #include "esp_partition.h"
 
+#include <inttypes.h>
+
 static const char *TAG = "HAL_FLASH";
 
 static const esp_partition_t *s_part = NULL;

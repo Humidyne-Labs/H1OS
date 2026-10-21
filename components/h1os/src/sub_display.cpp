@@ -14,10 +14,10 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "h1os/hal_io.h"
 #include "h1os/hal_spi.h"
 #include "h1os/hal_types.h"
-#include "h1os/orch_state.h"
 
 #include <string.h>
 
@@ -27,6 +27,7 @@ static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
 static bool s_inited = false;
+static int16_t s_last_glass_temp_centi_c = 0;
 
 static const uint8_t WF_PARTIAL_1IN54[159] = {
     0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00,
@@ -117,6 +118,7 @@ static void epd_configure_base_registers(void)
  */
 esp_err_t sub_display_init(bool is_wake_cycle)
 {
+    (void)is_wake_cycle;
     if (s_inited)
         return ESP_OK;
 
@@ -157,8 +159,9 @@ esp_err_t sub_display_init(bool is_wake_cycle)
             int16_t frac_c = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
-                orch_state_get()->last_glass_temp_centi_c = glass_cc;
-                ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)", (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
+                s_last_glass_temp_centi_c = glass_cc;
+                ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)",
+                         (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
             }
         }
     }
@@ -262,7 +265,7 @@ esp_err_t sub_display_refresh_full(void)
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
     int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
-    ESP_LOGI(TAG, "Full OTP Refresh completed in %lld ms", t_elapsed_ms);
+    ESP_LOGI(TAG, "Full OTP Refresh completed in %lld ms", (long long)t_elapsed_ms);
 
     return ESP_OK;
 }
@@ -341,9 +344,19 @@ esp_err_t sub_display_refresh_partial(void)
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
     int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
-    ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", t_elapsed_ms);
+    ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", (long long)t_elapsed_ms);
 
     return ESP_OK;
+}
+
+/**
+ * @brief Retrieve the latest cached SSD1681 on-glass temperature in centi-degrees Celsius.
+ *
+ * @return Cached glass temperature in centi-°C (0 if not yet sampled).
+ */
+int16_t sub_display_get_glass_temp_centi_c(void)
+{
+    return s_last_glass_temp_centi_c;
 }
 
 /**
@@ -359,7 +372,7 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
         return ESP_ERR_INVALID_ARG;
 
     if (s_inited) {
-        *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
+        *out_temp_c = (float)s_last_glass_temp_centi_c / 100.0f;
         return ESP_OK;
     }
 
@@ -383,13 +396,13 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
         float glass_temp = (float)temp_int + ((temp_int >= 0) ? temp_frac : -temp_frac);
 
         if (glass_temp < -40.0f || glass_temp > 85.0f || temp_raw[0] == 0xFF || temp_raw[0] == 0x00) {
-            *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
+            *out_temp_c = (float)s_last_glass_temp_centi_c / 100.0f;
             return ESP_ERR_INVALID_RESPONSE;
         }
-        orch_state_get()->last_glass_temp_centi_c = (int16_t)(glass_temp * 100.0f);
+        s_last_glass_temp_centi_c = (int16_t)(glass_temp * 100.0f);
         *out_temp_c = glass_temp;
     } else {
-        *out_temp_c = (float)orch_state_get()->last_glass_temp_centi_c / 100.0f;
+        *out_temp_c = (float)s_last_glass_temp_centi_c / 100.0f;
     }
     return err;
 }

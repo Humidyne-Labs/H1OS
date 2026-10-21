@@ -9,6 +9,7 @@
 #include "h1os/hal_spi.h"
 
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 
 #include <string.h>
 

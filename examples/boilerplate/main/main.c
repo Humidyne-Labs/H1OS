@@ -57,22 +57,22 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_line_color(div, lv_color_black(), 0);
 
     lv_obj_t *lbl_temp = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_temp, "%.1f°F", telem->ambient_temp_f);
+    lv_label_set_text_fmt(lbl_temp, "%.1f°F", (double)telem->ambient_temp_f);
     lv_obj_set_style_text_font(lbl_temp, H1OS_FONT_20, 0);
     lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 6, 32);
 
     lv_obj_t *lbl_rh = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_rh, "%.1f%%", telem->ambient_rh_pct);
+    lv_label_set_text_fmt(lbl_rh, "%.1f%%", (double)telem->ambient_rh_pct);
     lv_obj_set_style_text_font(lbl_rh, H1OS_FONT_20, 0);
     lv_obj_align(lbl_rh, LV_ALIGN_TOP_RIGHT, -6, 32);
 
     lv_obj_t *lbl_metric = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_metric, "(%.1f°C ambient)", telem->ambient_temp_c);
+    lv_label_set_text_fmt(lbl_metric, "(%.1f°C ambient)", (double)telem->ambient_temp_c);
     lv_obj_set_style_text_font(lbl_metric, H1OS_FONT_14, 0);
     lv_obj_align(lbl_metric, LV_ALIGN_TOP_LEFT, 6, 58);
 
     lv_obj_t *lbl_dew = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", telem->dew_point_f);
+    lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", (double)telem->dew_point_f);
     lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 84);
 
@@ -80,7 +80,7 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     if (telem->is_usb_powered) {
         lv_label_set_text(lbl_pwr, "Power:      USB CABLE");
     } else {
-        lv_label_set_text_fmt(lbl_pwr, "Battery:    %.2fV (%u%%)", (float)telem->battery_mv / 1000.0f,
+        lv_label_set_text_fmt(lbl_pwr, "Battery:    %.2fV (%u%%)", (double)((float)telem->battery_mv / 1000.0f),
                               telem->battery_percent);
     }
     lv_obj_set_style_text_font(lbl_pwr, H1OS_FONT_14, 0);
@@ -97,7 +97,6 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
-    lv_refr_now(NULL);
     h1os_lvgl_unlock();
 }
 
@@ -122,6 +121,7 @@ static void update_display(void)
  */
 static void app_on_boot(void *user_data)
 {
+    (void)user_data;
     ESP_LOGI(TAG, "Application booted cleanly (H1OS %s, built %s %s, code 0x%08" PRIx32 ")", h1os_version_get_string(),
              h1os_version_get_build_date(), h1os_version_get_build_time(), h1os_version_get_code());
     s_app_state.cycle_counter = 1;
@@ -139,6 +139,8 @@ static void app_on_boot(void *user_data)
  */
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 {
+    (void)ctx;
+    (void)user_data;
     s_app_state.cycle_counter++;
     ESP_LOGI(TAG, "Application resumed from sleep (Cycle #%lu)", (unsigned long)s_app_state.cycle_counter);
     update_display();
@@ -154,6 +156,7 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
  */
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
+    (void)user_data;
     ESP_LOGI(TAG, "System entering deep sleep for %lu seconds", (unsigned long)sleep_sec);
 }
 
@@ -166,6 +169,7 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
  */
 static void app_on_shutdown(void *user_data)
 {
+    (void)user_data;
     ESP_LOGI(TAG, "System shutting down");
 }
 

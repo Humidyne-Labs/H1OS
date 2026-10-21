@@ -25,7 +25,7 @@ static const char *TAG = "HAL_IO";
 /**
  * @brief Early boot initialization of non-latched application pins.
  *
- * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader ([h1os_boot_hook.c](#h1os_boot_hookc)).
+ * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader (h1os_boot_hook.c).
  *
  * @return ESP_OK on success, or driver error code.
  */
@@ -224,6 +224,7 @@ static uint32_t s_breath_period_ms = 2000;
  */
 static void led_breath_task(void *arg)
 {
+    (void)arg;
     while (s_breathing_running) {
         uint32_t half = s_breath_period_ms / 2;
         if (half < 100)
@@ -437,6 +438,7 @@ esp_err_t hal_io_release_pad_holds(void)
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_deinit(HAL_PIN_BATTERY_ADC);
 
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);
