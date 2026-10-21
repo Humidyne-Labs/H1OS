@@ -28,7 +28,6 @@
 #include "sub_nvs.h"
 #include "sub_power.h"
 #include "sub_rtc.h"
-#include "sub_sensor.h"
 #include "ulp_h1os.h"
 
 #include <stdio.h>
@@ -101,6 +100,22 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
 }
 
 /**
+ * @brief Drain pending LVGL render/flush tasks and stop the Core 1 LVGL worker task.
+ */
+static void h1os_quiesce_lvgl_pipeline(void)
+{
+    if (h1os_lvgl_has_pending_tasks()) {
+        ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
+        uint32_t wait_ms = 0;
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            wait_ms += 20;
+        }
+    }
+    h1os_lvgl_stop();
+}
+
+/**
  * @brief H1os session monitor task.
  *
  * @param[in]    arg             Parameter arg.
@@ -109,12 +124,13 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
  */
 static void h1os_session_monitor_task(void *arg)
 {
+    (void)arg;
     while (s_session_running) {
         vTaskDelay(pdMS_TO_TICKS(500));
 
         if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
-            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...", 
-				(unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
+                (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
             uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
             if (sleep_sec == 0) {
@@ -133,7 +149,7 @@ static void h1os_session_monitor_task(void *arg)
 /**
  * @brief Diagnostic dump of ULP wake telemetry and execution performance.
  *
- * @details Isolated helper function for development; comment out the call in [h1os_start()](#h1os_start-1) for release builds.
+ * @details Isolated helper function for development; comment out the call in h1os_start() for release builds.
  *
  * @return Return value of type static void.
  */
@@ -144,8 +160,8 @@ static void debug_dump_ulp_telemetry(void)
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
     ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
-             (unsigned long)ulp_wake_counter, 
-			 (unsigned long)ulp_last_wake_cause,
+             (unsigned long)ulp_wake_counter,
+             (unsigned long)ulp_last_wake_cause,
                (ulp_last_wake_cause == 1) ? "BOOT_BTN"
              : (ulp_last_wake_cause == 2) ? "PWR_BTN"
              : (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW"
@@ -153,15 +169,15 @@ static void debug_dump_ulp_telemetry(void)
              : (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT"
              : (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY"
                                           : "UNKNOWN",
-             (unsigned long)ulp_slice_counter, 
-			 (unsigned long)ulp_overflow_limit, 
-			 (unsigned long)ulp_last_vbat_mv,
-             (unsigned long)ulp_vbat_raw_adc, 
-			 (unsigned long)ulp_last_wake_btn, 
-			 (unsigned long)ulp_rtc_int_stuck,
-             (unsigned long)exec_cycles, 
-			 (unsigned long)exec_us);
-			 
+             (unsigned long)ulp_slice_counter,
+             (unsigned long)ulp_overflow_limit,
+             (unsigned long)ulp_last_vbat_mv,
+             (unsigned long)ulp_vbat_raw_adc,
+             (unsigned long)ulp_last_wake_btn,
+             (unsigned long)ulp_rtc_int_stuck,
+             (unsigned long)exec_cycles,
+             (unsigned long)exec_us);
+
     if (ulp_rtc_int_stuck) {
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
     }
@@ -217,8 +233,8 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
     ESP_LOGI(TAG, ">>> H1OS ACTIVE FLOW: %s <<<", flow_title);
     ESP_LOGI(TAG, ">>> Trigger Source  : %s", trigger_desc);
     ESP_LOGI(TAG, ">>> Boot Count      : %lu | Wake Count: %lu | Session Inactivity: %lu s",
-             (unsigned long)st->boot_count, 
-			 (unsigned long)st->wake_count,
+             (unsigned long)st->boot_count,
+             (unsigned long)st->wake_count,
              (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
     ESP_LOGI(TAG, "================================================================================");
 }
@@ -256,12 +272,12 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     if (s_app_lifecycle.session.flow_b_period_sec > 0) {
         st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
     }
-    
-    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]", 
-                    H1OS_NAME, 
+
+    ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]",
+                    H1OS_NAME,
                     H1OS_SUBTITLE,
-                    h1os_version_get_string(), 
-                    (unsigned long)st->sample_interval_sec, 
+                    h1os_version_get_string(),
+                    (unsigned long)st->sample_interval_sec,
                     (unsigned long)st->flow_b_period_sec);
 
     h1os_log_flow_banner(flow);
@@ -361,6 +377,8 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         h1os_reset_session_timer();
     }
 
+    orch_persisted_state_t *st = orch_state_get();
+
     if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
         h1os_lvgl_lock(1000);
@@ -372,11 +390,11 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     } else if (s_app_lifecycle.on_wake) {
         h1os_wake_context_t ctx = {.reset_reason       = esp_reset_reason(),
                                    .wakeup_causes      = causes,
-                                   .boot_count         = orch_state_get()->boot_count,
-                                   .deep_sleep_count   = orch_state_get()->wake_count,
+                                   .boot_count         = st->boot_count,
+                                   .deep_sleep_count   = st->wake_count,
                                    .woke_from_button   = button_woke,
-                                   .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : 0,
-                                   .sleep_duration_sec = orch_state_get()->sample_interval_sec,
+                                   .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
+                                   .sleep_duration_sec = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
                                    .user_data          = s_app_lifecycle.user_data};
         h1os_lvgl_lock(1000);
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
@@ -389,7 +407,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         /* Allow Core 1 LVGL task to pick up and begin flushing the updated frame */
         vTaskDelay(pdMS_TO_TICKS(50));
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
-        uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+        uint32_t sleep_sec = st->flow_b_period_sec;
         if (sleep_sec == 0) {
             ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
             h1os_shutdown();
@@ -420,6 +438,10 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
  */
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
 {
+    if (config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     orch_flow_type_t flow = h1os_early_system_bringup(config);
 
     if (h1os_handle_non_ui_flows(flow)) {
@@ -471,7 +493,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
-        out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
+        out_telemetry->mcu_die_temp_c   = (float)(latest_samp.mcu_tsens_centi_c + st->die_tare_centi_c) / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
         out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
@@ -510,6 +532,8 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
     h1os_lvgl_unlock();
+
+    h1os_quiesce_lvgl_pipeline();
     return orch_flow_transition_to_sleep(sleep_sec);
 }
 
@@ -528,10 +552,14 @@ static void execute_system_shutdown(bool force_clean_white)
     sub_rtc_cancel_countdown();
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
+    h1os_lvgl_lock(1000);
     h1os_trigger_splash(H1OS_SPLASH_SHUTDOWN);
     if (s_app_lifecycle.on_shutdown) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
+    h1os_lvgl_unlock();
+
+    h1os_quiesce_lvgl_pipeline();
 
     sub_audio_wait_idle(1500);
     sub_audio_standby();
@@ -558,7 +586,7 @@ static void execute_system_shutdown(bool force_clean_white)
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
     rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
-    esp_sleep_enable_ext1_wakeup(1ULL << HAL_PIN_BUTTON_POWER, ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_sleep_enable_ext0_wakeup(HAL_PIN_BUTTON_POWER, 0);
     esp_deep_sleep_start();
 }
 

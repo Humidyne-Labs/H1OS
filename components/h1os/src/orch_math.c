@@ -8,6 +8,8 @@
 
 #include "h1os/orch_math.h"
 
+#include "esp_attr.h"
+
 #include <math.h>
 
 #define MAGNUS_A 17.625f
@@ -98,7 +100,7 @@ float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor
 /**
  * @brief Unified Psychrometric Vector Transform.
  *
- * @details Evaluates water vapor pressure invariant (e), true dew point (T_dew), and reconstructed ambient relative humidity (RH_amb) in a single consolidated pass.
+ * @details Evaluates water vapor pressure invariant (e), true dew point (T_dew), and reconstructed ambient relative humidity (RH_amb) by composing single-responsibility helpers.
  *
  * @param[in]    temp_c          Measured package temperature in Celsius.
  * @param[in]    rh_pct          Measured package relative humidity in percent.
@@ -110,37 +112,18 @@ float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor
 void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa, float *out_dew_c,
                                    float *out_rh_amb)
 {
-    float rh_norm = rh_pct / 100.0f;
-    if (rh_norm <= 0.0001f)
-        rh_norm = 0.0001f;
-    if (rh_norm > 1.0f)
-        rh_norm = 1.0f;
-
-    float term_t = (MAGNUS_A * temp_c) / (MAGNUS_B + temp_c);
-    float es = 6.112f * expf(term_t);
-    float vp = rh_norm * es;
+    float vp = orch_math_calc_vapor_pressure(temp_c, rh_pct);
 
     if (out_vp_hpa) {
         *out_vp_hpa = vp;
     }
 
     if (out_dew_c) {
-        float gamma = logf(rh_norm) + term_t;
-        *out_dew_c = (MAGNUS_B * gamma) / (MAGNUS_A - gamma);
+        *out_dew_c = orch_math_calc_dew_point(temp_c, rh_pct);
     }
 
     if (out_rh_amb) {
-        float es_amb = 6.112f * expf((MAGNUS_A * amb_floor_c) / (MAGNUS_B + amb_floor_c));
-        if (es_amb > 0.0001f) {
-            float rh = (vp / es_amb) * 100.0f;
-            if (rh < 0.0f)
-                rh = 0.0f;
-            if (rh > 100.0f)
-                rh = 100.0f;
-            *out_rh_amb = rh;
-        } else {
-            *out_rh_amb = 0.0f;
-        }
+        *out_rh_amb = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);
     }
 }
 
@@ -183,18 +166,22 @@ float orch_math_update_ewma(float current_sample, float previous_ewma, float alp
 }
 
 /**
- * @brief Evaluates whether sensor package has settled to thermal plateau.
+ * @brief Evaluates whether sensor package has settled to thermal plateau (|initial - current| <= gate_threshold).
  *
- * @details Formula: Delta T = initial_temp - current_temp >= gate_threshold
+ * @details Marked RTC_IRAM_ATTR so it can be safely called from the RTC Fast Memory deep sleep wake stub.
  *
- * @param[in]    initial_temp_centi_c Initial sleep entry baseline temp (centi-°C).
- * @param[in]    current_temp_centi_c Current sample temp (centi-°C).
- * @param[in]    gate_threshold_centi_c Threshold drop (typically 5 to 20 centi-°C, i.e. 0.05 - 0.20 °C).
+ * @param[in]    initial_temp_centi_c   Previous/reference sample temp (centi-°C).
+ * @param[in]    current_temp_centi_c   Current sample temp (centi-°C).
+ * @param[in]    gate_threshold_centi_c Maximum allowable absolute drift (typically 20 centi-°C = 0.20 °C).
  *
- * @return True if thermally settled.
+ * @return True if |initial - current| <= gate_threshold.
  */
-bool orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c, int16_t gate_threshold_centi_c)
+bool RTC_IRAM_ATTR orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c,
+                                                int16_t gate_threshold_centi_c)
 {
-    int16_t delta_drop = initial_temp_centi_c - current_temp_centi_c;
-    return (delta_drop >= gate_threshold_centi_c);
+    int32_t diff = (int32_t)current_temp_centi_c - (int32_t)initial_temp_centi_c;
+    if (diff < 0) {
+        diff = -diff;
+    }
+    return (diff <= (int32_t)gate_threshold_centi_c);
 }

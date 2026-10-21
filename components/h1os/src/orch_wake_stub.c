@@ -239,20 +239,24 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 }
 
 /**
- * @brief Wake stub read die temp centi c.
+ * @brief Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
  *
- * @param[in]    cal_centi_c     Parameter cal_centi_c.
- * @param[in]    fallback_centi_c Parameter fallback_centi_c.
+ * @param[in]    offset_centi_c   Pre-computed intercept (2052 + tsens_cal_centi_c).
+ * @param[in]    fallback_centi_c Fallback temperature if conversion fails.
  *
- * @return Return value of type static int16_t RTC_IRAM_ATTR.
+ * @return Sampled die temperature in centi-°C.
  */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c, int16_t fallback_centi_c)
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t fallback_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+    REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_DAC, 15);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
-    esp_rom_delay_us(300);
+    esp_rom_delay_us(400);
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
@@ -270,7 +274,8 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
         return fallback_centi_c;
     }
 
-    int32_t t_centi = (((4386 * (int32_t)raw) - 205200) / 100) - (int32_t)cal_centi_c;
+    /* Division-free Q12 fixed-point transfer: 43.86 * 4096 = 179651 */
+    int32_t t_centi = (((int32_t)raw * 179651) >> 12) - (int32_t)offset_centi_c;
     if (t_centi < -4000 || t_centi > 12500) {
         return fallback_centi_c;
     }
@@ -278,9 +283,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t cal_centi_c
 }
 
 /**
- * @brief Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
- *
- * @param[in]    seconds         Remaining countdown interval in seconds.
+ * @brief Write a register to PCF85063A over bit-banged I2C with up to 3 attempts.
  */
 static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
 {
@@ -301,6 +304,11 @@ static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
     return false;
 }
 
+/**
+ * @brief Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
+ *
+ * @param[in]    seconds         Remaining countdown interval in seconds.
+ */
 static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 {
     if (seconds == 0) return;
@@ -431,9 +439,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500LL * raw_t) / 65535LL));
-        uint16_t rh_centi_pct = (uint16_t)((10000LL * raw_rh) / 65535LL);
-        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_cal_centi_c, temp_centi_c);
+        /* 32-bit unsigned hardware division (1-cycle Xtensa quou instruction) */
+        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
+        uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
+        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, temp_centi_c);
 
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {
@@ -442,17 +451,17 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         } else {
             uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
             int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
-            int16_t diff = temp_centi_c - prev_t;
-            if (diff < 0)
-                diff = -diff;
 
-            if (diff <= SAMPLE_DELTA_GATE_CENTI_C) {
+            if (orch_math_is_plateau_settled(prev_t, temp_centi_c, SAMPLE_DELTA_GATE_CENTI_C)) {
                 st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
                 q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
                 if (st->valid_trend < 2) {
                     st->valid_trend = 2;
                 } else {
                     st->valid_trend++;
+                }
+                if (st->valid_trend >= 3) {
+                    st->die_tare_centi_c = temp_centi_c - die_centi_c;
                 }
             } else {
                 q_flags = 0;
@@ -491,15 +500,14 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         timeout_us -= 500;
     }
 
-
     /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */
     CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
     SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
                       RTC_CNTL_SLP_REJECT_INT_CLR |
-					  RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                      RTC_CNTL_SLP_WAKEUP_INT_CLR |
                       RTC_CNTL_COCPU_INT_CLR |
-					  RTC_CNTL_COCPU_TRAP_INT_CLR | 
-					  RTC_CNTL_ULP_CP_INT_CLR);
+                      RTC_CNTL_COCPU_TRAP_INT_CLR |
+                      RTC_CNTL_ULP_CP_INT_CLR);
     REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 

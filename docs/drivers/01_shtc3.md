@@ -97,7 +97,7 @@ $$
 
 ## 5. Audit & Translation Verification
 
-| Parameter / Feature | Legacy Reference (`bsp_sensors.c`) | Clean-Slate (`sub_sensor.c` & `orch_wake_stub.c`) | Status |
+| Parameter / Feature | Legacy Reference (`bsp_sensors.c`) | Clean-Slate (`orch_wake_stub.c` RTC IRAM) | Status |
 |---|---|---|---|
 | I2C Address | `0x70` | `HAL_I2C_ADDR_SHTC3` (`0x70`) | **PASS** |
 | Wake Command | `0x3517` + 250 µs delay | `0x3517` + 250 µs delay | **PASS** |

@@ -7,7 +7,7 @@ The table below defines the exact hardware assignment, physical pins, electrical
 
 | Subsystem / IC | Bus / Interface | Physical Pins (ESP32-S3) | Operating Parameters | Standby / Sleep State | Verified Hardware Reference |
 |---|---|---|---|---|---|
-| **Sensirion SHTC3** | Shared I2C (0x70) | SDA: `GPIO 47`<br>SCL: `GPIO 48` | 400 kHz Fast-Mode<br>External 4.7 kΩ Pull-ups to 3.3V<br>Normal Mode (`0x7866`): Full ADC Precision | Sleep cmd: `0xB098` | `components/h1os/src/sub_sensor.c` |
+| **Sensirion SHTC3** | Shared I2C (0x70) | SDA: `GPIO 47`<br>SCL: `GPIO 48` | 400 kHz Fast-Mode<br>External 4.7 kΩ Pull-ups to 3.3V<br>Normal Mode (`0x7866`): Full ADC Precision | Sleep cmd: `0xB098` | `components/h1os/src/orch_wake_stub.c` |
 | **NXP PCF85063A** | Shared I2C (0x51)<br>INT: Open-Drain | SDA: `GPIO 47`<br>SCL: `GPIO 48`<br>INT: `GPIO 5` | 400 kHz Fast-Mode<br>External 4.7 kΩ Pull-ups to 3.3V<br>32.768 kHz Quartz (12.5pF)<br>CLKOUT Disabled (`COF=0x07`) | Countdown Timer active | `components/h1os/src/sub_rtc.c` |
 | **Everest Semi ES8311** | Shared I2C (0x18)<br>I2S Master | SDA: `GPIO 47`, SCL: `GPIO 48`<br>MCLK: `GPIO 14`, BCLK: `GPIO 15`<br>WS: `GPIO 38`, DOUT: `GPIO 45`<br>DIN: `GPIO 16` | 16 kHz 16-bit Standard Philips Mono<br>Root Clock: `PLL_160M` with DFS Lock<br>22-Register clock tree<br>PA Rail: `GPIO 42` (Active LOW) | Standby cmd: `0x0D=0xFC`<br>Rail kept ON (0) to avoid I2C clamping | `components/h1os/src/sub_audio.c` |
 | **NS4168 Class-D Amp** | Audio Power Amp | Enable/Mute: `GPIO 46`<br>Power Rail: `GPIO 42` | Analog differential drive from ES8311<br>CTRL: 1 = Active, 0 = Muted | Muted: `GPIO 46 = 0` | `components/h1os/src/sub_audio.c` |
@@ -51,7 +51,7 @@ graph TD;
     HAL --> HW["Layer 0: Physical Silicon and GPIOs"];
 
     subgraph Layer2_Subsystems ["Layer 2 Subsystem Drivers"]
-        sub_sensor["sub_sensor.c: SHTC3 and TSENS"];
+        wake_stub["orch_wake_stub.c: SHTC3 and TSENS (RTC IRAM)"];
         sub_rtc["sub_rtc.c: PCF85063A RTC"];
         sub_audio["sub_audio.c: ES8311 and NS4168"];
         sub_display["sub_display.cpp: SSD1681 E-Paper"];

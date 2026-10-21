@@ -25,10 +25,22 @@ static const char *TAG = "orch_display_sync";
 static bool s_frame_dirty = false;
 
 /**
+ * @brief Synchronize latest SSD1681 on-glass temperature into persisted RTC state.
+ */
+static inline void orch_display_sync_latch_glass_temp(void)
+{
+    int16_t glass_cc = sub_display_get_glass_temp_centi_c();
+    if (glass_cc != 0) {
+        orch_state_get()->last_glass_temp_centi_c = glass_cc;
+    }
+}
+
+/**
  * @brief Mark the current display framebuffer as dirty (needs flash persistence on sleep).
  */
 void orch_display_sync_mark_dirty(void)
 {
+    orch_display_sync_latch_glass_temp();
     s_frame_dirty = true;
 }
 
@@ -39,6 +51,7 @@ void orch_display_sync_mark_dirty(void)
  */
 esp_err_t orch_display_sync_save_if_dirty(void)
 {
+    orch_display_sync_latch_glass_temp();
     if (!s_frame_dirty) {
         return ESP_OK;
     }
@@ -65,6 +78,7 @@ esp_err_t orch_display_sync_save_if_dirty(void)
  */
 esp_err_t orch_display_sync_restore_to_framebuffer(void)
 {
+    orch_display_sync_latch_glass_temp();
     orch_persisted_state_t *st = orch_state_get();
     if (!(st->flags & ORCH_FLAG_EPD_FRAME_VALID)) {
         return ESP_ERR_NOT_FOUND;
@@ -98,8 +112,8 @@ bool orch_display_sync_should_full_refresh(void)
 
     if (st->epd_partial_refresh_count >= CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT) {
         ESP_LOGI(TAG, "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh required",
-						(unsigned)st->epd_partial_refresh_count, 
-						CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
+                        (unsigned)st->epd_partial_refresh_count,
+                        CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
         return true;
     }
 
@@ -115,9 +129,9 @@ void orch_display_sync_record_partial_refresh(void)
 {
     orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count++;
-    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d", 
-					(unsigned)st->epd_partial_refresh_count,
-					CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
+    ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d",
+                    (unsigned)st->epd_partial_refresh_count,
+                    CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT);
 }
 
 /**
@@ -134,8 +148,6 @@ void orch_display_sync_record_full_refresh(void)
 
 /**
  * @brief Get the accumulated count of partial refreshes since the last full refresh.
- *
- * @details ## Variables
  *
  * @return Return value of type uint16_t.
  */

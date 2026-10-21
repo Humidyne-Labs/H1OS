@@ -71,6 +71,16 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec);
 
 /**
+ * @brief Configure ULP slice parameters prior to entering deep sleep.
+ *
+ * @param[in] flow_a_sec    Flow A sample interval in seconds.
+ * @param[in] flow_b_sec    Flow B display refresh interval in seconds.
+ * @param[in] overflow      Total slice overflow threshold.
+ * @param[in] remainder_sec Final remainder slice duration in seconds.
+ */
+void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec);
+
+/**
  * @brief Enter target deep sleep mode with wake pin configuration.
  *
  * @param[in] sleep_seconds  Sleep duration in seconds.

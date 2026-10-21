@@ -63,6 +63,8 @@ static const char *get_wake_causes_str(uint32_t causes)
  */
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
+    (void)telem;
+    h1os_lvgl_lock(100);
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "4/4", event_cb);
 
     orch_persisted_state_t *st = orch_state_get();
@@ -106,8 +108,8 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_ulp, LV_ALIGN_TOP_LEFT, 6, 68);
 
     lv_obj_t *lbl_heap = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min", 
-                                        (unsigned long)(esp_get_free_heap_size() / 1024), 
+    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min",
+                                        (unsigned long)(esp_get_free_heap_size() / 1024),
                                         (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
     lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
@@ -129,8 +131,8 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
 
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32, 
-                                        h1os_version_get_major(), 
+    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32,
+                                        h1os_version_get_major(),
                                         h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
@@ -140,6 +142,5 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_set_style_text_font(lbl_foot_r, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_r, LV_ALIGN_BOTTOM_RIGHT, -6, -6);
 
-    lv_refr_now(NULL);
     h1os_lvgl_unlock();
 }

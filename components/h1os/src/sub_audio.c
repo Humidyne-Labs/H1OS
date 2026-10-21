@@ -11,16 +11,19 @@
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "h1os/h1os.h"
 #include "h1os/hal_i2c.h"
 #include "h1os/hal_types.h"
-#include "h1os/sub_power.h"
+#include "sdkconfig.h"
 
 #include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
 #include <string.h>
 
 static const char *TAG = "sub_audio";
@@ -58,7 +61,7 @@ typedef struct {
             uint32_t sample_rate_hz;
         } pcm;
     } params;
-	
+
     SemaphoreHandle_t done_sem;
     esp_err_t *result;
 } audio_cmd_t;
@@ -81,32 +84,63 @@ static volatile bool s_audio_is_busy     = false;
 
 static uint8_t s_volume_pct = 0;
 
+#if CONFIG_PM_ENABLE
+static esp_pm_lock_handle_t s_audio_pm_lock = NULL;
+#endif
+
+/**
+ * @brief Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
+ */
+static inline void audio_cpu_max_acquire(void)
+{
+#if CONFIG_PM_ENABLE
+    if (s_audio_pm_lock == NULL) {
+        esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "sub_audio", &s_audio_pm_lock);
+    }
+    if (s_audio_pm_lock != NULL) {
+        esp_pm_lock_acquire(s_audio_pm_lock);
+    }
+#endif
+}
+
+/**
+ * @brief Release 240 MHz CPU frequency lock.
+ */
+static inline void audio_cpu_max_release(void)
+{
+#if CONFIG_PM_ENABLE
+    if (s_audio_pm_lock != NULL) {
+        esp_pm_lock_release(s_audio_pm_lock);
+    }
+#endif
+}
+
 static const uint8_t es8311_perceptual_vol_table[101] = {
-    0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D, 
-	0x61, 0x65, 0x68, 0x6B, 0x6E, 0x71, 
-	0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D, 
-	0x7E, 0x80, 0x81, 0x83, 0x84, 0x85, 
-	0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 
-	0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92, 
-	0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 
-	0x99, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 
-	0x9E, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2, 
-	0xA2, 0xA3, 0xA4, 0xA5, 0xA5, 0xA6, 
-	0xA7, 0xA8, 0xA8, 0xA9, 0xAA, 0xAA, 
-	0xAB, 0xAC, 0xAC, 0xAD, 0xAE, 0xAE, 
-	0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2, 
-	0xB3, 0xB3, 0xB4, 0xB5, 0xB5, 0xB6, 
-	0xB6, 0xB7, 0xB7, 0xB8, 0xB9, 0xB9, 
-	0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD, 
-	0xBD, 0xBE, 0xBE, 0xBF, 0xBF
+    0x00, 0x3A, 0x48, 0x51, 0x57, 0x5D,
+    0x61, 0x65, 0x68, 0x6B, 0x6E, 0x71,
+    0x73, 0x75, 0x77, 0x79, 0x7B, 0x7D,
+    0x7E, 0x80, 0x81, 0x83, 0x84, 0x85,
+    0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C,
+    0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92,
+    0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
+    0x99, 0x99, 0x9A, 0x9B, 0x9C, 0x9D,
+    0x9E, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2,
+    0xA2, 0xA3, 0xA4, 0xA5, 0xA5, 0xA6,
+    0xA7, 0xA8, 0xA8, 0xA9, 0xAA, 0xAA,
+    0xAB, 0xAC, 0xAC, 0xAD, 0xAE, 0xAE,
+    0xAF, 0xB0, 0xB0, 0xB1, 0xB2, 0xB2,
+    0xB3, 0xB3, 0xB4, 0xB5, 0xB5, 0xB6,
+    0xB6, 0xB7, 0xB7, 0xB8, 0xB9, 0xB9,
+    0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 0xBD,
+    0xBD, 0xBE, 0xBE, 0xBF, 0xBF
 };
 
-/* 
+/*
  * Stage 1: Pre-charge sequence
  * Resets digital logic, configures system clocks, power management,
  * analog references, microphone bias, and digital audio serial interface (SDP).
  */
-static const es8311_reg_entry_t s_es8311_init_pre_charge[] = 
+static const es8311_reg_entry_t s_es8311_init_pre_charge[] =
 {
     /* Analog / System startup */
     {0x44, 0x08}, /**< REG44: Set internal analog bias / reference current                                     */
@@ -146,11 +180,11 @@ static const es8311_reg_entry_t s_es8311_init_pre_charge[] =
     {0x0A, 0x0C}, /**< REG0A: SDP output configuration (ADC data channel select, tri-state control)            */
 };
 
-/* 
+/*
  * Stage 2: Post-charge sequence
  * Powers up ADC/DAC analog stages, unmutes signal paths, enables speaker/HP driver.
  */
-static const es8311_reg_entry_t s_es8311_init_post_charge[] = 
+static const es8311_reg_entry_t s_es8311_init_post_charge[] =
 {
     /* Analog Power Up */
     {0x17, 0xBF}, /**< REG17: ADC & DAC analog circuitry power-up, reference buffer enable        */
@@ -168,7 +202,7 @@ static const es8311_reg_entry_t s_es8311_init_post_charge[] =
     {0x31, 0x00}, /**< REG31: DAC digital mute control (0x00 = unmute DAC channel)                */
 };
 
-/* 
+/*
  * Stage 3: De-initialization / Shutdown sequence
  * Soft mutes output, turns off driver amps, powers down ADC/DAC analog blocks and clocks.
  */
@@ -201,7 +235,7 @@ static const es8311_reg_entry_t s_es8311_deinit[] =
  */
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 {
-    if (pct > 100) pct = 100;	
+    if (pct > 100) pct = 100;
     return es8311_perceptual_vol_table[pct];
 }
 
@@ -238,21 +272,21 @@ static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *val)
 /**
  * @brief Sub audio read chip id.
  *
- * @param[in]    chip_id         Parameter chip_id.
+ * @param[out]   chip_id         Pointer to store 16-bit chip ID.
  *
  * @return ESP_OK on success, or an error code.
  */
 static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 {
-    if (s_tx_chan != NULL && !s_i2s_chan_enabled)
-        return ESP_ERR_INVALID_STATE;
+    if (chip_id == NULL)
+        return ESP_ERR_INVALID_ARG;
 
     uint8_t id1 = 0, id2 = 0;
 
     esp_err_t err1 = es8311_read_reg(ES8311_REG_CHIP_ID1, &id1);
     esp_err_t err2 = es8311_read_reg(ES8311_REG_CHIP_ID2, &id2);
 
-    *chip_id = (id1 << 8) | id2;
+    *chip_id = (uint16_t)((id1 << 8) | id2);
 
     if (err1 != ESP_OK || err2 != ESP_OK || *chip_id != 0x8311) {
         return ESP_ERR_NOT_FOUND;
@@ -262,7 +296,7 @@ static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 }
 
 /**
- * @brief Sub audio flush frame.
+ * @brief Sub audio flush frame (single zero-frame write serving as valid I2S transfer pipeline indicator).
  *
  * @return ESP_OK on success, or an error code.
  */
@@ -276,9 +310,9 @@ static esp_err_t sub_audio_flush_frame(void)
         size_t buffer_written = 0;
         ret = i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &buffer_written, pdMS_TO_TICKS(100));
         ret = ((ret == ESP_OK) && (buffer_written == sizeof(buffer))) ? ESP_OK : ESP_ERR_INVALID_STATE;
-        
+
         /* ~16ms to stream one frame at 16Khz */
-        vTaskDelay(pdMS_TO_TICKS(20)); 
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
     return ret;
 }
@@ -351,17 +385,17 @@ static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
-    ret |= es8311_write_table(s_es8311_init_pre_charge, 
+    ret |= es8311_write_table(s_es8311_init_pre_charge,
                                 sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
 
     /* Delay Needed for Internal Analog Frontend Charge Pump */
     vTaskDelay(pdMS_TO_TICKS(35));
 
-    ret |= es8311_write_table(s_es8311_init_post_charge, 
+    ret |= es8311_write_table(s_es8311_init_post_charge,
                                 sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
-    
+
     /* Low Power Mode DOES Affect Audio Quality Marginally */
-    ret |= es8311_write_reg(0x0F, s_low_power_mode ? 0x80 : 0x00);
+    ret |= es8311_write_reg(ES8311_REG_SYS_LP_MOD, s_low_power_mode ? 0x80 : 0x00);
 
     return ret;
 }
@@ -378,9 +412,9 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     if (s_audio_inited)
         return ESP_OK;
 
-    sub_power_cpu_max_acquire();
+    audio_cpu_max_acquire();
 
-    /* Disable Class D Audio Amp */
+    /* Disable Class D Audio Amp during codec pre-charge */
     sub_audio_park_warm(true);
 
     uint16_t chip_id = 0x0000;
@@ -388,7 +422,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     if (chip_id != 0x8311) {
         ESP_LOGE(TAG, "Chip ID NOT Valid (0x%04X)", chip_id);
         s_audio_inited = false;
-        sub_power_cpu_max_release();
+        audio_cpu_max_release();
         return ESP_ERR_INVALID_VERSION;
     } else {
         ESP_LOGI(TAG, "Chip ID Valid (0x%04X)", chip_id);
@@ -402,7 +436,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2S TX channel: %s", esp_err_to_name(err));
-        sub_power_cpu_max_release();
+        audio_cpu_max_release();
         return err;
     }
 
@@ -432,7 +466,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
         ESP_LOGE(TAG, "Failed to init I2S std mode: %s", esp_err_to_name(err));
         i2s_del_channel(s_tx_chan);
         s_tx_chan = NULL;
-        sub_power_cpu_max_release();
+        audio_cpu_max_release();
         return err;
     }
 
@@ -441,8 +475,9 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
         s_i2s_chan_enabled = true;
     }
     vTaskDelay(pdMS_TO_TICKS(5));
-    
+
     err = es8311_init_dac_registers();
+    s_codec_in_standby = false;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     } else {
@@ -453,13 +488,13 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
         s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
         if (s_audio_queue != NULL) {
             TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
-            BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task, 
-														"h1os_audio_worker", 
-														4096, 
-														(void *)current_task, 
-														6, 
-														&s_audio_task_handle, 
-														tskNO_AFFINITY);
+            BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task,
+                                                        "h1os_audio_worker",
+                                                        4096,
+                                                        (void *)current_task,
+                                                        6,
+                                                        &s_audio_task_handle,
+                                                        tskNO_AFFINITY);
             if (res == pdPASS) {
                 if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
                     ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
@@ -467,26 +502,26 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
                     s_audio_task_handle = NULL;
                     vQueueDelete(s_audio_queue);
                     s_audio_queue = NULL;
-                    sub_power_cpu_max_release();
+                    audio_cpu_max_release();
                     return ESP_ERR_TIMEOUT;
                 }
             } else {
                 ESP_LOGE(TAG, "Failed to create audio worker task: %d", res);
                 vQueueDelete(s_audio_queue);
                 s_audio_queue = NULL;
-                sub_power_cpu_max_release();
+                audio_cpu_max_release();
                 return ESP_ERR_NO_MEM;
             }
         } else {
-            sub_power_cpu_max_release();
+            audio_cpu_max_release();
             return ESP_ERR_NO_MEM;
         }
     }
 
-    sub_power_cpu_max_release();
+    audio_cpu_max_release();
     s_audio_inited = true;
 
-    /* Enable Class D Audio Amp */
+    /* Enable Class D Audio Amp for zero-latency interactive session tones */
     sub_audio_park_warm(false);
 
     sub_audio_flush_frame();
@@ -504,7 +539,7 @@ static esp_err_t sub_audio_park_warm(bool enable)
 {
     uint32_t target_level = enable ? 0 : 1;
 
-    if (gpio_get_level(HAL_PIN_PA_CTRL) != target_level) {
+    if ((uint32_t)gpio_get_level(HAL_PIN_PA_CTRL) != target_level) {
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
 
         /* Startup / Shutdown Times Confirmed, [80ms down, 120ms up] */
@@ -515,7 +550,7 @@ static esp_err_t sub_audio_park_warm(bool enable)
 }
 
 /**
- * @brief Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0x00 @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
+ * @brief Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
  *
  * @details Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
  *
@@ -526,7 +561,7 @@ esp_err_t sub_audio_standby(void)
     /* Disable Class D Audio Amp */
     sub_audio_park_warm(true);
 
-	esp_err_t ret = es8311_write_table(s_es8311_deinit, 
+    esp_err_t ret = es8311_write_table(s_es8311_deinit,
                                         sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
 
     s_codec_in_standby = true;
@@ -612,7 +647,6 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
 
         memcpy(buffer, &samples[samples_sent], chunk * sizeof(int16_t));
         if (chunk < FRAME_SIZE) {
-            /* Pad the Buffer if Chunk < Full Frame, (avoid data under-runs?) */
             memset(&buffer[chunk], 0, (FRAME_SIZE - chunk) * sizeof(int16_t));
         }
 
@@ -642,6 +676,12 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         } else {
             ESP_LOGW(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(chan_err));
         }
+    }
+
+    if (s_codec_in_standby) {
+        es8311_init_dac_registers();
+        s_codec_in_standby = false;
+        sub_audio_set_volume(s_volume_pct);
     }
 
     /* Enable Class D Audio Amp */
@@ -768,7 +808,7 @@ static void audio_worker_task(void *pvParameters)
     while (1) {
         if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
             s_audio_is_busy = true;
-            sub_power_cpu_max_acquire();
+            audio_cpu_max_acquire();
 
             esp_err_t res = ESP_OK;
 
@@ -782,6 +822,13 @@ static void audio_worker_task(void *pvParameters)
             case AUDIO_CMD_PCM:
                 res = sub_audio_exec_pcm(cmd.params.pcm.samples, cmd.params.pcm.sample_count, cmd.params.pcm.sample_rate_hz);
                 break;
+            default:
+                res = ESP_ERR_INVALID_ARG;
+                break;
+            }
+
+            if (uxQueueMessagesWaiting(s_audio_queue) == 0) {
+                sub_audio_flush_frame();
             }
 
             if (cmd.result) {
@@ -792,7 +839,7 @@ static void audio_worker_task(void *pvParameters)
                 xSemaphoreGive(cmd.done_sem);
             }
 
-            sub_power_cpu_max_release();
+            audio_cpu_max_release();
             s_audio_is_busy = false;
         }
     }
@@ -852,7 +899,7 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
  *
  * @param[in]    type            Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM.
  * @param[in]    data            Parameter data.
- * @param[in]    len             Parameter len.
+ * @param[in]    len             Length of data payload in bytes.
  *
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
  */
@@ -866,7 +913,7 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
     switch (type) {
     case SUB_AUDIO_TONE: {
         const uint32_t *params = (const uint32_t *)data;
-        if (len < 2 && len < (2 * sizeof(uint32_t)))
+        if (len < (2 * sizeof(uint32_t)))
             return ESP_ERR_INVALID_ARG;
         cmd.type = AUDIO_CMD_TONE;
         cmd.params.tone.frequency_hz = params[0];
@@ -881,11 +928,11 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
         break;
     }
     case SUB_AUDIO_PCM: {
-        if (len == 0)
+        if (len < sizeof(int16_t))
             return ESP_ERR_INVALID_ARG;
         cmd.type = AUDIO_CMD_PCM;
         cmd.params.pcm.samples = (const int16_t *)data;
-        cmd.params.pcm.sample_count = len;
+        cmd.params.pcm.sample_count = len / sizeof(int16_t);
         cmd.params.pcm.sample_rate_hz = 16000;
         break;
     }
@@ -903,10 +950,10 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
  */
 bool sub_audio_is_busy(void)
 {
-    if (s_audio_is_busy) 
+    if (s_audio_is_busy)
         return true;
 
-    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0) 
+    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0)
         return true;
 
     return false;
@@ -957,6 +1004,13 @@ esp_err_t sub_audio_deinit(void)
         s_audio_queue = NULL;
     }
 
+#if CONFIG_PM_ENABLE
+    if (s_audio_pm_lock != NULL) {
+        esp_pm_lock_delete(s_audio_pm_lock);
+        s_audio_pm_lock = NULL;
+    }
+#endif
+
     s_audio_inited = false;
     return ESP_OK;
 }
@@ -978,7 +1032,6 @@ esp_err_t sub_audio_set_volume(uint8_t volume_pct)
     if (s_audio_inited && s_i2s_chan_enabled) {
         uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
         es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
-        //es8311_write_reg(0x31, 0x00); // Handled in Postcharge Table entry #9 (unmute DSM/DEM)
         ESP_LOGI(TAG, "Volume set to %d [0x%2X]", volume_pct, vol_reg);
     }
     return ESP_OK;

@@ -4,6 +4,46 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2-dev] - 2026-10-20
+
+### 🚀 Added
+- **Division-Free Q12 Fixed-Point Die Temperature Math & Equilibrium Self-Tare** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.h/.c`):
+  - Pre-computed `tsens_offset_centi_c` (`2052 + tsens_cal_centi_c`) on cold boot and replaced 32-bit integer division in `wake_stub_read_die_temp_centi_c()` with a single-cycle `Q12` fixed-point multiply-shift (`((int32_t)raw * 179651) >> 12`).
+  - Explicitly configured `SENS_TSENS_CLK_DIV = 6` and `SENS_TSENS_DAC = 15` (`0x0F`, `-20.52°C` offset range) with a hardware `SENS_TSENS_RESET` pulse and 400 µs settling window in `orch_wake_stub.c`.
+  - Added `die_tare_centi_c` in `orch_persisted_state_t` to self-zero the ESP32-S3 internal SAR TSENS against the factory-calibrated SHTC3 once `valid_trend >= 3` in deep sleep, restoring `ORCH_LEAKAGE_MARGIN_C` from `6.00f` to `0.50f`.
+- **Layer 2-to-Layer 3 Decoupling Primitives** (`sub_display.h/.cpp`, `sub_power.h/.c`, `hal_types.h`):
+  - Added `sub_display_get_glass_temp_centi_c()` in `sub_display.h/.cpp` and `orch_display_sync_latch_glass_temp()` in `orch_display_sync.c`.
+  - Added `sub_power_set_sleep_slices()` in `sub_power.h/.c` so Layer 3 (`orch_flow_execute_sleep()`) computes Flow A/B slices, arms the external RTC, and installs the wake stub before invoking Layer 2 deep sleep entry.
+  - Promoted `h1os_chime_type_t` and `h1os_wake_btn_t` to `hal_types.h` (Layer 1 shared types).
+
+### 🔄 Changed
+- **Strict 4-Layer Architectural Separation** (`sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `orch_flow.c`, `h1os_lifecycle.c`):
+  - Eliminated all upward and horizontal `#include` dependencies across Layer 2 (`sub_audio.c`, `sub_display.cpp`, `sub_power.c`) and Layer 3 (`orch_flow.c`), enforcing strictly downward `Layer 4 -> Layer 3 -> Layer 2 -> Layer 1` header inclusion.
+  - Replaced cross-subsystem `sub_power_cpu_max_acquire()` calls in `sub_audio.c` with a dedicated `sub_audio` `esp_pm_lock_handle_t` (`ESP_PM_CPU_FREQ_MAX`).
+- **Single-Responsibility Psychrometric Math & 32-Bit SHTC3 Division** (`orch_math.h/.c`, `orch_wake_stub.c`):
+  - Refactored `orch_math_calc_psychrometrics()` to compose `orch_math_calc_vapor_pressure()`, `orch_math_calc_dew_point()`, and `orch_math_reconstruct_ambient_rh()` without formula duplication.
+  - Corrected `orch_math_is_plateau_settled()` to evaluate `|initial - current| <= gate_threshold`, marked it `RTC_IRAM_ATTR`, and wired it into `bsp_wake_stub()`.
+  - Replaced 64-bit software division (`65535LL`) in `bsp_wake_stub()` with 32-bit unsigned hardware division (`65535U`, single-cycle `quou`).
+- **I2S Pipeline Verification & Interactive Class-D Readiness** (`sub_audio.c`):
+  - Kept the NS4168 Class-D amplifier unmuted (`sub_audio_park_warm(false)`) during active interactive sessions to avoid the 120 ms hardware unmute delay on short button tones, while executing a single post-playback zero-frame write (`sub_audio_flush_frame()`) as an I2S transfer pipeline indicator.
+
+### 🗑️ Removed
+- **Redundant Host-Mode Sensor Driver & Legacy Symbols** (`sub_sensor.c/.h`, `CMakeLists.txt`, `hal_types.h`, `orch_state.h`, `Kconfig`):
+  - Removed unused `sub_sensor.c` and `sub_sensor.h` (along with `esp_driver_tsens` in `CMakeLists.txt`), as all environmental sampling executes exclusively in Flow A (`orch_wake_stub.c`) and Cold Boot intentionally reports `0.0` until settled Flow A samples arrive.
+  - Removed unpopulated `HAL_PIN_SD_DET` (`GPIO 16`) and pre-mount GPIO polling in `sub_sdcard.c` (MicroSD `CD` pin is not wired to the ESP32-S3; all SDMMC lines use external pull-ups).
+  - Pruned 48 bytes of unused fields (`wake_timestamp_epoch`, `ulp_vbat_scale`, `ulp_vbat_offset_mv`, `app_stage`, `scratchpad_len`, `scratchpad[32]`) from `orch_persisted_state_t` (shrinking RTC Slow SRAM footprint from 632 to 592 bytes) and removed 7 orphaned `BSP_*` options from `Kconfig`.
+
+### 🛠️ Fixed
+- **EWMA Historical Baseline Protection on UI Redraws (BUG-01)** (`orch_flow.c`, `orch_state.h`):
+  - Gated `temp_historical_c` / `rh_historical_pct` EWMA updates and UART ring-buffer debug dumps behind `st->total_samples != st->last_ewma_sample_seq`, preventing interactive carousel navigation from corrupting historical trends.
+- **LVGL Lock Symmetry & Non-Recursive Screen Refresh (BUG-02, BUG-03)** (`screen_base.c`, `screen_env_hero.c`, `screen_psychrometrics.c`, `screen_system_health.c`, `screen_diagnostics.c`):
+  - Moved `h1os_lvgl_lock(100)` out of `screen_base_create()` to the top of each `screen_*_render()` function (matching `h1os_lvgl_unlock()`) and removed recursive `lv_refr_now(NULL)` calls inside keypad event callbacks.
+- **Audio PCM Buffer Over-Read & Standby Chip-ID Check (BUG-04, BUG-05)** (`sub_audio.c`):
+  - Fixed `SUB_AUDIO_PCM` in `sub_audio_play()` to divide byte length `len` by `sizeof(int16_t)`, preventing a 2x buffer over-read in `sub_audio_render_pcm_samples()`.
+  - Removed the `!s_i2s_chan_enabled` rejection in `sub_audio_read_chip_id()` and added automatic DAC register re-initialization when waking the ES8311 from software standby.
+- **Wake Context & Standby Wakeup Alignment (BUG-07, BUG-08)** (`h1os_lifecycle.c`, `h1os_lvgl.cpp`):
+  - Fixed `ctx.sleep_duration_sec` in `on_wake` to report `flow_b_period_sec` on full-cycle RTC wakes and replaced deprecated `esp_sleep_enable_ext1_wakeup(..., ESP_EXT1_WAKEUP_ANY_LOW)` in `execute_system_shutdown()` with `esp_sleep_enable_ext0_wakeup(HAL_PIN_BUTTON_POWER, 0)`.
+
 ## [2.3.1-dev] - 2026-10-20
 
 ### 🛠️ Fixed & Refactored

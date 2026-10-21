@@ -3,7 +3,6 @@ set(h1os_srcs
     "src/hal_i2c.c"
     "src/hal_spi.c"
     "src/hal_flash.c"
-    "src/sub_sensor.c"
     "src/sub_rtc.c"
     "src/sub_power.c"
     "src/sub_audio.c"
@@ -35,7 +34,6 @@ set(bsp_requires
     log
     freertos
     lvgl__lvgl
-    esp_driver_tsens
     esp_pm
     esp_partition
     spi_flash
@@ -148,4 +146,3 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
     -Wno-missing-field-initializers
 )
-

@@ -15,14 +15,12 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
 #include "esp_pm.h"
+#include "esp_rom_sys.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "h1os/hal_io.h"
 #include "h1os/hal_types.h"
-#include "h1os/orch_state.h"
-#include "h1os/orch_wake_stub.h"
-#include "h1os/sub_rtc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
 #include "ulp_h1os.h"
@@ -39,24 +37,29 @@ static adc_oneshot_unit_handle_t s_adc_handle = NULL;
 static adc_cali_handle_t s_cali_handle = NULL;
 static bool s_cali_valid = false;
 
+static uint32_t s_flow_a_sec     = 60;
+static uint32_t s_flow_b_sec     = 300;
+static uint32_t s_overflow_limit = 5;
+static uint32_t s_remainder_sec  = 0;
+
 static const struct {
     uint16_t mv;
     uint8_t pct;
-} s_lipo_table[] = 
+} s_lipo_table[] =
 {
-	{4200, 100}, 
-	{4060, 92}, 
-	{3980, 85}, 
-	{3920, 75}, 
-	{3870, 65}, 
-	{3820, 55}, 
-	{3780, 45}, 
-	{3750, 35}, 
-	{3720, 25}, 
-	{3680, 15}, 
-	{3600, 8}, 
-	{3450, 3}, 
-	{3300, 0}
+    {4200, 100},
+    {4060, 92},
+    {3980, 85},
+    {3920, 75},
+    {3870, 65},
+    {3820, 55},
+    {3780, 45},
+    {3750, 35},
+    {3720, 25},
+    {3680, 15},
+    {3600, 8},
+    {3450, 3},
+    {3300, 0}
 };
 
 #define LIPO_TABLE_SIZE (sizeof(s_lipo_table) / sizeof(s_lipo_table[0]))
@@ -277,7 +280,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         sub_power_init();
 
         sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
-        ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV", (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
+        ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV",
+                 (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
         ulp_dispatch_reason = 0;
         ulp_last_wake_btn = 0;
         ulp_last_vbat_mv = 4000;
@@ -307,6 +311,22 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 }
 
 /**
+ * @brief Configure ULP slice parameters prior to entering deep sleep.
+ *
+ * @param[in]    flow_a_sec      Flow A sample interval in seconds.
+ * @param[in]    flow_b_sec      Flow B display refresh interval in seconds.
+ * @param[in]    overflow        Total slice overflow threshold.
+ * @param[in]    remainder_sec   Final remainder slice duration in seconds.
+ */
+void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
+{
+    s_flow_a_sec     = (flow_a_sec > 0) ? flow_a_sec : 60;
+    s_flow_b_sec     = (flow_b_sec > 0) ? flow_b_sec : 300;
+    s_overflow_limit = (overflow > 0) ? overflow : 1;
+    s_remainder_sec  = remainder_sec;
+}
+
+/**
  * @brief Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
  *
  * @details Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
@@ -324,38 +344,15 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     hal_io_isolate_sleep_pads();
 
-    uint32_t flow_a_sec = orch_state_get()->sample_interval_sec;
-    uint32_t flow_b_sec = orch_state_get()->flow_b_period_sec;
-
-    uint32_t full_slices = flow_b_sec / flow_a_sec;
-    uint32_t remainder = flow_b_sec % flow_a_sec;
-
-    uint32_t overflow = full_slices + (remainder > 0 ? 1 : 0);
-    if (overflow == 0)
-        overflow = 1;
-
-    if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
-        uint32_t initial_arm_sec = (full_slices > 0) ? flow_a_sec : remainder;
-        esp_err_t rtc_err = ESP_FAIL;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            rtc_err = sub_rtc_arm_countdown(initial_arm_sec);
-            if (rtc_err == ESP_OK) {
-                break;
-            }
-            vTaskDelay(pdMS_TO_TICKS(5));
-        }
-        if (rtc_err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after 3 attempts: %s", esp_err_to_name(rtc_err));
-        }
-    }
-
     /* Ensure ADC1 is initialized in ULP RISC-V mode before sleep handoff */
     if (s_adc_handle == NULL) {
         sub_power_init();
     }
 
-    ulp_overflow_limit = overflow;
-    ulp_remainder_sec  = remainder;
+    uint32_t full_slices = s_flow_b_sec / s_flow_a_sec;
+
+    ulp_overflow_limit = s_overflow_limit;
+    ulp_remainder_sec  = s_remainder_sec;
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         ulp_slice_counter = 0;
     }
@@ -368,14 +365,14 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     ESP_LOGI(TAG,
              "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> FullSlices=%lu, Remainder=%lus -> "
              "TotalOverflowLimit=%lu (SliceAcc=%lu, USB=%lu)",
-             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST", 
-			 (unsigned long)flow_a_sec,
-             (unsigned long)flow_b_sec, 
-			 (unsigned long)full_slices, 
-			 (unsigned long)remainder, 
-			 (unsigned long)overflow,
-             (unsigned long)ulp_slice_counter, 
-			 (unsigned long)ulp_usb_connected);
+             (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST",
+             (unsigned long)s_flow_a_sec,
+             (unsigned long)s_flow_b_sec,
+             (unsigned long)full_slices,
+             (unsigned long)s_remainder_sec,
+             (unsigned long)s_overflow_limit,
+             (unsigned long)ulp_slice_counter,
+             (unsigned long)ulp_usb_connected);
 
     /* Keep ULP GPIO wakeup disarmed while configuring RTC IO pads and printing logs */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
@@ -403,8 +400,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     esp_sleep_enable_ulp_wakeup();
 
-    orch_wake_stub_install();
-
     uint32_t drain_wait_us = 0;
     while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
         esp_rom_delay_us(500);
@@ -414,15 +409,15 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     ESP_LOGI(TAG, "Pre-Sleep Audit: ULP_CP_TIMER=0x%08lx, GPIO_STATUS=0x%08lx",
-					(unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG), 
-					(unsigned long)REG_READ(RTC_GPIO_STATUS_REG));
+                    (unsigned long)REG_READ(RTC_CNTL_ULP_CP_TIMER_REG),
+                    (unsigned long)REG_READ(RTC_GPIO_STATUS_REG));
     ESP_LOGI(TAG, "RTC Wake Audit: PIN0(BOOT)=0x%08lx, PIN5(RTC)=0x%08lx, PIN18(PWR)=0x%08lx",
-					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)), 
-					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
-					(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
+                    (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),
+                    (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
+                    (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
-					(unsigned long)flow_a_sec, 
-					(unsigned long)overflow);
+                    (unsigned long)s_flow_a_sec,
+                    (unsigned long)s_overflow_limit);
 
     /* Clear latched status and arm ULP GPIO wakeup immediately prior to sleep entry */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
@@ -513,8 +508,8 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
     }
 
     ESP_LOGI(TAG, "Dynamic Frequency Scaling initialized: %s (Base: 80 MHz, Max: %d MHz)",
-             enable_dfs ? "ENABLED" : "LOCKED", 
-			 pm_config.max_freq_mhz);
+             enable_dfs ? "ENABLED" : "LOCKED",
+             pm_config.max_freq_mhz);
     return ESP_OK;
 #else
     (void)enable_dfs;
@@ -524,9 +519,9 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
 }
 
 /**
- * @brief Acquire 240 MHz CPU performance lock (e.g.
+ * @brief Acquire 240 MHz CPU performance lock (e.g. during LVGL rendering blitz).
  *
- * @details during LVGL rendering blitz). Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
+ * @details Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
  *
  * @return ESP_OK on success.
  */

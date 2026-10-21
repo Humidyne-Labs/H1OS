@@ -16,9 +16,9 @@ extern "C" {
 
 #define H1OS_VERSION_MAJOR   2             /**< Major version number (breaking API changes).          */
 #define H1OS_VERSION_MINOR   3             /**< Minor version number (backward-compatible features).  */
-#define H1OS_VERSION_PATCH   1             /**< Patch version number (backward-compatible bug fixes). */
+#define H1OS_VERSION_PATCH   2             /**< Patch version number (backward-compatible bug fixes). */
 #define H1OS_VERSION_TAG     "dev"         /**< Pre-release release track tag.                        */
-#define H1OS_VERSION_STRING  "2.3.1-dev"   /**< Full human-readable semantic version string.          */
+#define H1OS_VERSION_STRING  "2.3.2-dev"   /**< Full human-readable semantic version string.          */
 
 #define H1OS_NAME            "H1OS"                                   /**< Primary operating system designation. */
 #define H1OS_SUBTITLE        "E-Class Environmental Operating System" /**< System commercial subtitle.           */
@@ -80,7 +80,7 @@ static inline const char *h1os_version_get_tag(void)
 
 /**
  * @brief Get complete version string.
- * @return Full version string (e.g. "2.1.0-alpha").
+ * @return Full version string (e.g. "2.3.2-dev").
  */
 static inline const char *h1os_version_get_string(void)
 {

@@ -52,7 +52,7 @@ extern "C" {
 #define HAL_PIN_I2S_LRCK       GPIO_NUM_38 /**< Word Select / Frame Sync (WS).                                */
 #define HAL_PIN_I2S_DSDIN      GPIO_NUM_45 /**< ESP32 Audio Out to Codec (DOUT).                              */
 
-/* MicroSD Card (SDMMC 1-Bit Mode) */
+/* MicroSD Card (SDMMC 1-Bit Mode, external pullups, no CD pin wired) */
 #define HAL_PIN_SD_CLK         GPIO_NUM_39 /**< MicroSD Clock.                                                */
 #define HAL_PIN_SD_MISO        GPIO_NUM_40 /**< MicroSD MISO / D0.                                            */
 #define HAL_PIN_SD_MOSI        GPIO_NUM_41 /**< MicroSD MOSI / CMD.                                           */
@@ -87,21 +87,24 @@ typedef enum {
 } hal_btn_mask_t;
 
 /**
- * @brief Platform initialization execution modes for dynamic hardware configuration.
+ * @brief Waking button identifier reported by ULP coprocessor.
  */
 typedef enum {
-    H1OS_INIT_MODE_BOOT = 0,   /**< Cold boot: all hardware subsystems & LVGL initialized.                     */
-    H1OS_INIT_MODE_WAKE,       /**< Wake initialization: fast display refresh retaining existing framebuffers. */
-    H1OS_INIT_MODE_SUB_EXEC    /**< Sub-execution initialization: scaled-back runtime (I2C + sensor only).     */
-} h1os_init_mode_t;
+    H1OS_WAKE_BTN_NONE  = 0, /**< Wake was not triggered by a physical button. */
+    H1OS_WAKE_BTN_BOOT  = 1, /**< Woken by BOOT0 button (GPIO 0).              */
+    H1OS_WAKE_BTN_POWER = 2  /**< Woken by POWER button (GPIO 18).             */
+} h1os_wake_btn_t;
 
 /**
- * @brief Hardware sleep power states.
+ * @brief Acoustic chime sound pattern types.
  */
 typedef enum {
-    H1OS_SLEEP_MODE_LIGHT = 0, /**< Light sleep (RAM preserved, peripheral clocks gated). */
-    H1OS_SLEEP_MODE_DEEP       /**< Deep sleep (power down, RTC slow memory preserved).   */
-} h1os_sleep_mode_t;
+    H1OS_CHIME_BOOT = 0, /**< Ascending multi-tone power-on chime.   */
+    H1OS_CHIME_SLEEP,    /**< Descending sleep preparation chime.    */
+    H1OS_CHIME_SHUTDOWN, /**< Dual-tone shutdown confirmation chime. */
+    H1OS_CHIME_ALARM,    /**< Repetitive alert chime pattern.        */
+    H1OS_CHIME_MAX       /**< Sentinel maximum chime enum value.     */
+} h1os_chime_type_t;
 
 #ifdef __cplusplus
 }

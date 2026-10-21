@@ -64,10 +64,7 @@ typedef struct {
 
     uint32_t sample_interval_sec;       /**< Interval between Flow A sensor samples in seconds.                    */
     uint32_t flow_b_period_sec;         /**< Interval between Flow B display refreshes in seconds.                 */
-    uint32_t wake_timestamp_epoch;      /**< POSIX timestamp of most recent system wake.                           */
-
-    uint32_t ulp_vbat_scale;            /**< Two-point ADC slope calibration coefficient for ULP.                  */
-    int32_t ulp_vbat_offset_mv;         /**< Two-point ADC offset calibration in millivolts for ULP.               */
+    uint32_t last_ewma_sample_seq;      /**< Sample sequence number of last processed EWMA & ring debug update.    */
 
     uint16_t epd_partial_refresh_count; /**< Consecutive differential partial refreshes on EPD.                    */
     uint16_t valid_trend;               /**< Monotonic count of consecutive settled cold samples.                  */
@@ -91,11 +88,9 @@ typedef struct {
     float trinode_delta_c;              /**< Thermal gradient delta: T_valid - T_trinode.                          */
     uint8_t trinode_confidence_pct;     /**< 0-100% linear psychrometric confidence score.                         */
     bool ewma_inited;                   /**< True if EWMA filters have been seeded with initial samples.           */
-    int16_t tsens_cal_centi_c;          /**< Factory calibrated TSENS offset in centi-degrees Celsius.             */
-
-    uint8_t app_stage;                  /**< Application state machine stage index.                                */
-    uint8_t scratchpad_len;             /**< Length of active data in user scratchpad.                             */
-    uint8_t scratchpad[32];             /**< 32-byte generic persistent scratchpad for user data.                  */
+    int16_t tsens_cal_centi_c;          /**< Factory calibrated TSENS eFuse offset in centi-degrees Celsius.       */
+    int16_t tsens_offset_centi_c;       /**< Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c).  */
+    int16_t die_tare_centi_c;           /**< Settled deep-sleep tare offset (T_shtc3_cold - T_die_cold).           */
 
     orch_tri_node_sample_t ring[ORCH_RING_CAPACITY]; /**< Circular ring buffer of historical telemetry samples.    */
 
