@@ -230,7 +230,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         if (out_rh_pct)
             *out_rh_pct = 0.0f;
         if (out_dew_c)
-            *out_dew_c  = 0.0f;
+            *out_dew_c = 0.0f;
         return ESP_OK;
     }
 
@@ -325,7 +325,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     if (out_rh_pct)
         *out_rh_pct = rh_valid;
     if (out_dew_c)
-        *out_dew_c  = dew;
+        *out_dew_c = dew;
     return ESP_OK;
 }
 

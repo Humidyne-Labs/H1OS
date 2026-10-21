@@ -454,14 +454,14 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
             {
                 .mclk = HAL_PIN_I2S_MCLK,
                 .bclk = HAL_PIN_I2S_SCLK,
-                .ws   = HAL_PIN_I2S_LRCK,
+                .ws = HAL_PIN_I2S_LRCK,
                 .dout = HAL_PIN_I2S_DSDIN,
-                .din  = I2S_GPIO_UNUSED,
+                .din = I2S_GPIO_UNUSED,
                 .invert_flags =
                     {
                         .mclk_inv = false,
                         .bclk_inv = false,
-                        .ws_inv   = false,
+                        .ws_inv = false,
                     },
             },
     };
@@ -527,11 +527,11 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     }
 
     s_audio_inited = true;
-    sub_audio_set_volume(volume_pct);
-    sub_audio_flush_frame();
 
-    /* Keep Class-D amp muted (PA_CTRL=0) at idle; worker unmutes on demand during playback */
-    sub_audio_park_warm(true);
+    /* Enable Class D Audio Amp (120 ms hardware startup) for zero-latency interactive session tones */
+    sub_audio_park_warm(false);
+    sub_audio_flush_frame();
+    sub_audio_set_volume(volume_pct);
 
     audio_cpu_max_release();
     return ESP_OK;
@@ -540,7 +540,10 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
 /**
  * @brief Control NS4168 Class-D amplifier hardware mute state (HAL_PIN_PA_CTRL / GPIO 46).
  *
- * @param[in]    park_mute       true to mute/shutdown amplifier (PA_CTRL=0), false to enable (PA_CTRL=1).
+ * @details NS4168 hardware requires minimum 120 ms startup when unmuting (PA_CTRL -> 1)
+ *          and minimum 80 ms shutdown when muting (PA_CTRL -> 0).
+ *
+ * @param[in]    park_mute       true to mute/shutdown amplifier (PA_CTRL=0, 80ms), false to enable (PA_CTRL=1, 120ms).
  *
  * @return ESP_OK on success.
  */
@@ -553,10 +556,8 @@ static esp_err_t sub_audio_park_warm(bool park_mute)
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
         s_pa_enabled = target_enabled;
 
-        /* Wait 120 ms for NS4168 Class-D bridge startup when unmuting; immediate shutoff when muting */
-        if (target_enabled) {
-            vTaskDelay(pdMS_TO_TICKS(125)); // 80ms shutdown time no observed
-        }
+        /* Startup / Shutdown Times Confirmed: 120ms up (target_enabled=true), 80ms down (park_mute=true) */
+        vTaskDelay(pdMS_TO_TICKS(target_enabled ? 120 : 80));
     }
 
     return ESP_OK;
@@ -573,7 +574,7 @@ static esp_err_t sub_audio_park_warm(bool park_mute)
  */
 esp_err_t sub_audio_standby(void)
 {
-    /* Always ensure NS4168 Class-D amplifier is muted (GPIO 46 = 0) */
+    /* Always ensure NS4168 Class-D amplifier is muted (GPIO 46 = 0, waits 80ms on active->mute transition) */
     sub_audio_park_warm(true);
 
     if (!s_audio_inited && s_rtc_codec_in_standby && esp_reset_reason() == ESP_RST_DEEPSLEEP) {
@@ -706,7 +707,7 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
         sub_audio_set_volume(s_volume_pct);
     }
 
-    /* Enable Class D Audio Amp */
+    /* Enable Class D Audio Amp (waits 120ms if transitioning from muted) */
     sub_audio_park_warm(false);
 
     return ESP_OK;
@@ -851,11 +852,6 @@ static void audio_worker_task(void *pvParameters)
 
             if (uxQueueMessagesWaiting(s_audio_queue) == 0) {
                 sub_audio_flush_frame();
-                sub_audio_park_warm(true);
-                if (s_tx_chan != NULL && s_i2s_chan_enabled) {
-                    i2s_channel_disable(s_tx_chan);
-                    s_i2s_chan_enabled = false;
-                }
             }
 
             if (cmd.result) {

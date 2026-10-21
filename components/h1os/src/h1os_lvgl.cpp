@@ -64,7 +64,9 @@ bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
     (void)timeout_ms;
     sub_power_cpu_max_acquire();
-    lv_lock();
+    if (s_lv_display != NULL) {
+        lv_lock();
+    }
     return true;
 }
 
@@ -73,7 +75,9 @@ bool h1os_lvgl_lock(uint32_t timeout_ms)
  */
 void h1os_lvgl_unlock(void)
 {
-    lv_unlock();
+    if (s_lv_display != NULL) {
+        lv_unlock();
+    }
     sub_power_cpu_max_release();
 }
 
@@ -152,8 +156,8 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     const uint8_t *src_buf = px_map + LVGL_I1_PALETTE_SIZE;
     uint8_t *dest_buf = sub_display_get_framebuffer();
 
-    uint16_t area_w = (uint16_t)(area->x2 - area->x1 + 1);
-    uint16_t area_h = (uint16_t)(area->y2 - area->y1 + 1);
+    uint16_t area_w = (area->x2 - area->x1 + 1);
+    uint16_t area_h = (area->y2 - area->y1 + 1);
     uint32_t src_stride = lv_draw_buf_width_to_stride(area_w, LV_COLOR_FORMAT_I1);
 
     if (dest_buf == NULL || src_buf == NULL || area_w == 0 || area_h == 0) {
@@ -162,75 +166,75 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
         return;
     }
 
-    uint16_t y_start = (uint16_t)area->y1;
+    uint16_t y_start = area->y1;
     if (y_start >= EPD_HEIGHT) {
         lv_display_flush_ready(disp);
         s_flush_in_progress = false;
         return;
     }
     if (y_start + area_h > EPD_HEIGHT) {
-        area_h = (uint16_t)(EPD_HEIGHT - y_start);
+        area_h = EPD_HEIGHT - y_start;
     }
-
-    const uint32_t epd_stride = EPD_WIDTH / 8;
 
     {
         CpuMaxTurboScope turbo;
+        const uint32_t epd_stride = EPD_WIDTH / 8;
+
         if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
-        uint16_t bytes_per_line = area_w >> 3;
-        uint16_t start_byte_x = (uint16_t)(area->x1 >> 3);
+            uint16_t bytes_per_line = area_w >> 3;
+            uint16_t start_byte_x = area->x1 >> 3;
 
-        const uint8_t *src = src_buf;
-        uint8_t *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
-
-        for (uint16_t y = 0; y < area_h; y++) {
-            memcpy(dst, src, bytes_per_line);
-            src += src_stride;
-            dst += epd_stride;
-        }
-    } else {
-        uint16_t x1 = (uint16_t)area->x1;
-        uint16_t x2 = (uint16_t)(x1 + area_w - 1);
-        if (x1 < EPD_WIDTH) {
-            if (x2 >= EPD_WIDTH)
-                x2 = EPD_WIDTH - 1;
-
-            uint32_t first_byte = x1 >> 3;
-            uint32_t last_byte = x2 >> 3;
-            uint8_t shift = x1 & 7;
-
-            uint8_t left_mask = (uint8_t)(0xFFU >> shift);
-            uint8_t right_mask = (uint8_t)(0xFFU << (7 - (x2 & 7)));
+            const uint8_t *src = src_buf;
+            uint8_t *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
 
             for (uint16_t y = 0; y < area_h; y++) {
-                const uint8_t *s = src_buf + (y * src_stride);
-                uint8_t *d = dest_buf + ((y_start + y) * epd_stride) + first_byte;
+                memcpy(dst, src, bytes_per_line);
+                src += src_stride;
+                dst += epd_stride;
+            }
+        } else {
+            uint16_t x1 = area->x1;
+            uint16_t x2 = x1 + area_w - 1;
+            if (x1 < EPD_WIDTH) {
+                if (x2 >= EPD_WIDTH)
+                    x2 = EPD_WIDTH - 1;
 
-                if (first_byte == last_byte) {
-                    uint8_t mask = left_mask & right_mask;
-                    uint8_t val = (uint8_t)((*s >> shift) & mask);
-                    *d = (uint8_t)((*d & ~mask) | val);
-                    continue;
-                }
+                uint32_t first_byte = x1 >> 3;
+                uint32_t last_byte = x2 >> 3;
+                uint8_t shift = x1 & 7;
 
-                uint8_t carry = *s;
-                *d = (uint8_t)((*d & ~left_mask) | ((carry >> shift) & left_mask));
-                d++;
+                uint8_t left_mask = 0xFF >> shift;
+                uint8_t right_mask = 0xFF << (7 - (x2 & 7));
 
-                for (uint32_t bx = first_byte + 1; bx < last_byte; bx++) {
+                for (uint16_t y = 0; y < area_h; y++) {
+                    const uint8_t *s = src_buf + (y * src_stride);
+                    uint8_t *d = dest_buf + ((y_start + y) * epd_stride) + first_byte;
+
+                    if (first_byte == last_byte) {
+                        uint8_t mask = left_mask & right_mask;
+                        uint8_t val = (*s >> shift) & mask;
+                        *d = (*d & ~mask) | val;
+                        continue;
+                    }
+
+                    uint8_t carry = *s;
+                    *d = (*d & ~left_mask) | ((carry >> shift) & left_mask);
+                    d++;
+
+                    for (uint32_t bx = first_byte + 1; bx < last_byte; bx++) {
+                        s++;
+                        uint8_t next = *s;
+                        *d++ = (carry << (8 - shift)) | (next >> shift);
+                        carry = next;
+                    }
+
                     s++;
-                    uint8_t next = *s;
-                    *d++ = (uint8_t)((carry << (8 - shift)) | (next >> shift));
-                    carry = next;
+                    uint8_t val = (carry << (8 - shift)) | (*s >> shift);
+                    *d = (*d & ~right_mask) | (val & right_mask);
                 }
-
-                s++;
-                uint8_t val = (uint8_t)((carry << (8 - shift)) | (*s >> shift));
-                *d = (uint8_t)((*d & ~right_mask) | (val & right_mask));
             }
         }
     }
-    } /* Release 240 MHz CpuMaxTurboScope before waiting on mechanical EPD refresh */
 
     if (lv_display_flush_is_last(disp)) {
         orch_display_sync_mark_dirty();
@@ -372,12 +376,18 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 /**
  * @brief Stop the LVGL background task.
  *
+ * @details Safely handles being called from within an LVGL input callback on the
+ *          LVGL task thread itself (e.g. long-press shutdown) without self-deletion.
+ *
  * @return ESP_OK on success, or an error code.
  */
 esp_err_t h1os_lvgl_stop(void)
 {
     if (s_lvgl_task_handle != NULL) {
         s_lvgl_task_running = false;
+        if (xTaskGetCurrentTaskHandle() == s_lvgl_task_handle) {
+            return ESP_OK;
+        }
         uint32_t wait_ms = 0;
         while (s_lvgl_task_handle != NULL && wait_ms < 6000) {
             vTaskDelay(pdMS_TO_TICKS(20));
@@ -403,6 +413,9 @@ bool h1os_lvgl_has_pending_tasks(void)
 
     if (s_flush_in_progress)
         return true;
+
+    if (s_lvgl_task_handle != NULL && xTaskGetCurrentTaskHandle() == s_lvgl_task_handle)
+        return false;
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
