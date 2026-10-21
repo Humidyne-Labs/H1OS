@@ -7,9 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.3.2-dev] - 2026-10-20
 
 ### 🚀 Added
+
 - **Explicit CPU Clock & Power Profile Scaling (sys_clk_mode_t)** (hal_types.h, sub_power.h/.c, h1os.h, h1os_lifecycle.c):
   - Defined sys_clk_mode_t in hal_types.h (SYS_CLK_MODE_DYNAMIC = 0, SYS_CLK_MODE_FIXED_MAX = 1, SYS_CLK_MODE_FIXED_MIN = 2) to make clock scaling explicit and prevent C struct zero-initialization from clamping CPU clock to 80 MHz.
-  - Replaced ambiguous ool enable_dfs_80mhz in h1os_lifecycle_t.session with sys_clk_mode_t clk_mode.
+  - Replaced ambiguous bool enable_dfs_80mhz in h1os_lifecycle_t.session with sys_clk_mode_t clk_mode.
 - **Division-Free Q12 Fixed-Point Die Temperature Math & Equilibrium Self-Tare** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.h/.c`):
   - Pre-computed `tsens_offset_centi_c` (`2052 + tsens_cal_centi_c`) on cold boot and replaced 32-bit integer division in `wake_stub_read_die_temp_centi_c()` with a single-cycle `Q12` fixed-point multiply-shift (`((int32_t)raw * 179651) >> 12`).
   - Explicitly configured `SENS_TSENS_CLK_DIV = 6` with a hardware `SENS_TSENS_RESET` pulse and 400 µs settling window in `orch_wake_stub.c` (removed legacy ESP32-S2 `SENS_TSENS_DAC` bitfield not present in ESP32-S3 `SENS_SAR_TSENS_CTRL2_REG`).
@@ -20,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Promoted `h1os_chime_type_t` and `h1os_wake_btn_t` to `hal_types.h` (Layer 1 shared types).
 
 ### 🔄 Changed
+
 - **Dynamic Frequency Scaling Driver Refactor & Config Alignment** (sub_power.h/.c):
   - Refactored sub_power_init_dfs() to accept sys_clk_mode_t, dynamically setting max_freq_mhz to CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ (240 MHz) and min_freq_mhz based on the selected mode instead of hardcoded 240/80 MHz.
 - **Strict 4-Layer Architectural Separation** (`sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `orch_flow.c`, `h1os_lifecycle.c`):
@@ -33,12 +35,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Kept the NS4168 Class-D amplifier unmuted (`sub_audio_park_warm(false)`) during active interactive sessions to avoid the 120 ms hardware unmute delay on short button tones, while executing a single post-playback zero-frame write (`sub_audio_flush_frame()`) as an I2S transfer pipeline indicator.
 
 ### 🗑️ Removed
+
 - **Redundant Host-Mode Sensor Driver & Legacy Symbols** (`sub_sensor.c/.h`, `CMakeLists.txt`, `hal_types.h`, `orch_state.h`, `Kconfig`):
   - Removed unused `sub_sensor.c` and `sub_sensor.h` (along with `esp_driver_tsens` in `CMakeLists.txt`), as all environmental sampling executes exclusively in Flow A (`orch_wake_stub.c`) and Cold Boot intentionally reports `0.0` until settled Flow A samples arrive.
   - Removed unpopulated `HAL_PIN_SD_DET` (`GPIO 16`) and pre-mount GPIO polling in `sub_sdcard.c` (MicroSD `CD` pin is not wired to the ESP32-S3; all SDMMC lines use external pull-ups).
   - Pruned 48 bytes of unused fields (`wake_timestamp_epoch`, `ulp_vbat_scale`, `ulp_vbat_offset_mv`, `app_stage`, `scratchpad_len`, `scratchpad[32]`) from `orch_persisted_state_t` (shrinking RTC Slow SRAM footprint from 632 to 592 bytes) and removed 7 orphaned `BSP_*` options from `Kconfig`.
 
 ### 🛠️ Fixed
+
 - **DFS Baseline Underclocking Trap on Default Lifecycle Config** (sub_power.c, h1os_lifecycle.c, examples/H1OS/main/main.c):
   - Fixed issue where omitting .enable_dfs_80mhz in application lifecycle config zero-initialized the parameter to alse, causing sub_power_init_dfs() to force max_freq_mhz = 80 and lock CPU cores permanently to 80 MHz despite CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240.
 - **EWMA Historical Baseline Protection on UI Redraws (BUG-01)** (`orch_flow.c`, `orch_state.h`):
@@ -54,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.3.1-dev] - 2026-10-20
 
 ### 🛠️ Fixed & Refactored
+
 - **EPD Quiesce Timeout & Core 0/1 Flush Collision Resolution** (`h1os_lvgl.cpp`, `orch_flow.c`, `sub_display.cpp`):
   - Increased peripheral drain timeout in `orch_flow_quiesce_peripherals()` from 2500 ms to 6000 ms to fully accommodate periodic full OTP waveform refreshes (~2.2–2.8s) on Flow B Cycle 7.
   - Added explicit invocation of `h1os_lvgl_stop()` prior to `sub_display_wait_busy()` and display sleep transitions, preventing Core 0 from isolating pads (`gpio_hold_en` on `EPD_CS`/`EPD_RST`) and issuing sleep commands (`0x10`) while Core 1 is actively executing SPI DMA transfers.
@@ -74,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.3.0-dev] - 2026-10-18
 
 ### 🚀 Added
+
 - **Standardized Hybrid Component Configuration Baseline** (`components/h1os/sdkconfig.defaults`, `CMakeLists.txt`, `CMakePresets.json`):
   - Created component-level `sdkconfig.defaults` establishing the single source of truth for all hardware and silicon invariants (ESP32-S3-PICO-1-N8R8, 8MB QIO Flash @ 80MHz, 8MB Octal PSRAM @ 80MHz, ULP RISC-V coprocessor, FreeRTOS 1000Hz, and 1-bit monochrome LVGL v9 display engine).
   - Wired chained `SDKCONFIG_DEFAULTS` in `examples/H1OS/CMakeLists.txt`, `examples/boilerplate/CMakeLists.txt`, and `CMakePresets.json` (`components/h1os/sdkconfig.defaults;sdkconfig.defaults`).
@@ -99,6 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Resolved filename collisions and cross-linked references across `README.md` and architecture manifests.
 
 ### 🛠️ Fixed & Refactored
+
 - **Codebase Consolidation & Pruning (Phases 1–5)**:
   - **Phase 1 (Cold-Boot & ULP Hardening):** Enforced 30 ms ULP glitch filter, Wake-on-Release rule, CDC power latch ordering, eFuse linear battery scaling ($M \cdot X + B$), and bootloader GPIO 17 latch validation.
   - **Phase 2 (Fast Wake Stub & Drain Centralization):** Installed Flow A wake stub in `sub_power.c` and centralized the PCF85063A 50 ms drain barrier. Deleted legacy `orch_flow_execute_sensor_sample()` and FreeRTOS Flow A branch.
@@ -115,6 +122,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.2.0-prod] - 2026-10-16
 
 ### 🚀 Added
+
 - **ULP-RISC-V Autonomous Reactive Coprocessor & Dual-Wake Engine** (`components/h1os/ulp/main.c`, `sub_power.c/.h`, `hal_io.c`):
   - Established dual-wake architecture in `RTC_CNTL_ULP_CP_TIMER_REG` with simultaneous `RTC_CNTL_ULP_CP_SLP_TIMER_EN` (60s Flow A soft-timer) and `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` (instantaneous RTC GPIO wake).
   - Explicitly enabled low-power IO sampling clock (`io_mux_enable_lp_io_clock()`) on ESP32-S3 for `HAL_PIN_RTC_INT` (GPIO 5), `HAL_PIN_BUTTON_BOOT` (GPIO 0), and `HAL_PIN_BUTTON_POWER` (GPIO 18) during sleep pad isolation, resolving silicon clock-gating of RTC level sampling.
@@ -128,6 +136,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Upgraded MCP server with dynamic workspace detection, `build_dir` (`build_prod`/`build_dev`) support, and automatic Espressif v6.1 profile execution.
 
 ### 🛠️ Fixed & Refactored
+
 - **ULP Spurious 0ms Wake Elimination & Mandatory Glitch Filter** (`components/h1os/ulp/main.c`, `components/h1os/src/hal_io.c`):
   - Added a 100 µs settling delay in `hal_io_isolate_sleep_pads()` following LP IO clock enabling (`io_mux_enable_lp_io_clock()`) before clearing `RTC_GPIO_STATUS_W1TC_REG`, ensuring input buffers synchronize the external 3.3V high level from hardware pull-up resistors and preventing `0x040001` from immediately re-latching.
   - Made the ULP glitch filter strictly mandatory (`hold_ms < 20`): spurious wakes with 0ms hold or unheld pins are immediately recorded as `GLITCH_FILTERED`, clearing RTC interrupt flags and halting without waking the main processor.
@@ -153,6 +162,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.1.0-alpha] - 2026-10-12
 
 ### 🚀 Added
+
 - **SSD1681 E-Paper Maintenance & Scheduled Refresh Policy** (`sub_display.cpp/.h`, `orch_state.c/.h`, `orch_display_sync.c/.h`, `h1os_lvgl.cpp`, `h1os_lifecycle.c`, `Kconfig`):
   - Added anti-ghosting quota tracking (`epd_partial_refresh_count`) in persistent RTC Slow memory, automatically triggering a full OTP refresh after every 6 partial updates (`CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT`, default 6; guarantees full refresh $\le 24\text{h}$ at 4h max sleep) to reset residual DC bias.
   - Added long-term storage panel neutralization: implemented `sub_display_clear_to_white_full()` in Layer 2 and `h1os_shutdown_for_storage()` in Layer 4, driving the display to clean white (`0xFF`) before cutting power (`CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN`) to protect microcapsule chemistry against permanent dye migration.
@@ -170,6 +180,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Replaced hardcoded sleep timeouts with dynamic runtime intervals for Flow A telemetry sample bursts and Flow B UI presentation sessions.
 
 ### 🛠️ Fixed & Refactored
+
 - **Deep Sleep Premature Wakeup & Dual-Period Sleep Policy** (`hal_io.c`, `orch_flow.c`):
   - Configured persistent RTC IO pull-ups (`rtc_gpio_init`, `rtc_gpio_set_direction(INPUT_ONLY)`, `rtc_gpio_pullup_en`, `rtc_gpio_pulldown_dis`) on `HAL_PIN_RTC_INT` (GPIO 5), `HAL_PIN_BUTTON_BOOT` (GPIO 0), and `HAL_PIN_BUTTON_POWER` (GPIO 18) during deep sleep pad isolation (`hal_io_isolate_sleep_pads()`). Because standard digital GPIO pull-ups lose power when `VDD3P3_CPU` drops, the open-drain PCF85063A INT pin previously floated LOW within seconds, triggering false `ESP_SLEEP_WAKEUP_EXT1` wakeups (<10s).
   - De-initialized RTC GPIO domain on wake in `hal_io_release_pad_holds()` (`rtc_gpio_deinit()`) to seamlessly restore pins to standard digital GPIO peripherals.
@@ -208,6 +219,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.0.0-alpha] - 2026-10-10
 
 ### 🚀 Added
+
 - **Clean-Slate 4-Layer Unidirectional Architecture**:
   - **Layer 1: HAL** (`hal_types.h`, `hal_io.c/.h`, `hal_i2c.c/.h`, `hal_spi.c/.h`, `hal_flash.c/.h`): Fixed-width types, RTC pad holds, thread-safe mutexed I2C Driver V2 on GPIO 47/48, 20 MHz DMA SPI Master, sector-aligned raw partition read/write for `epd_frame` (16 KB).
   - **Layer 2: Hardware Subsystem Managers** (`sub_display.cpp/.h`, `sub_sensor.c/.h`, `sub_rtc.c/.h`, `sub_power.c/.h`, `sub_audio.c/.h`): SSD1681 dual-RAM Ping-Pong buffer (0x24/0x26), partial waveform LUT (0x32), GPIO 8 BUSY semaphore ISR synchronization, glass thermistor read (0x1B), SHTC3 NIST physical read with CRC-8, MCU TSENS silicon temperature, PCF85063A POSIX timekeeping & countdown timer, 12 dB attenuated battery ADC with 16-sample trimmed outlier filtering, ES8311 software standby (<1.0 µA @ Reg 0x0D).
@@ -219,6 +231,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Re-rasterized using `npx lv_font_conv` from `Montserrat-Bold.ttf` with fast-kern tables and FontAwesome icons, resolving thin 1-pixel stroke illegibility on 200x200 monochrome e-paper.
 
 ### 🛠️ Fixed & Refactored
+
 - **Keep All Gates Open Policy Enforced**:
   - Permanently asserted `BAT_CTRL` (`GPIO 17` = 1) and `EPD_3V3_EN` (`GPIO 6` = 0) with RTC pad holds during sleep.
   - Audio Domain `PA_EN` (`GPIO 42` = 0) kept held LOW across sleep to prevent ES8311 ESD protection diodes from forward-biasing and clamping shared I2C bus (`GPIO 47/48`) to ~0.7V. ES8311 enters software standby (<1.0 µA) without hard power cut.
@@ -248,6 +261,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.3.1] - 2026-10-09
 
 ### 🛠️ Fixed & Refactored
+
 - **Deterministic Two-Flow Cadence & Sleep Freeze Remediation** ([`bsp_power.c`](components/esp32-s3_bsp/src/bsp_power.c), [`bsp_common.c`](components/esp32-s3_bsp/src/bsp_common.c)):
   - **Eliminated Unbounded Button Release Loop**: Fixed the 5-minute device hang where `bsp_enter_sleep()` executed an unbounded `while (gpio_get_level(BOOT) == 0 || gpio_get_level(POWER) == 0)` loop on headless sprints without configured digital input buffers. Bypassed button checking completely for Flow A (`BSP_INIT_MODE_MINIMAL`) and bounded Flow B checking to a hard 200 ms timeout (max 4 iterations $\times$ 50 ms).
   - **Zero-Hour Collision & Handoff Resolution**: When both Flow A (internal timer: 60s) and Flow B (external PCF85063A countdown timer: 120s / IRL) arrive at zero hour, the $<10\,\text{ms}$ cold sensor sprint always executes first out of deep sleep, queries the PCF85063A over I2C, and promotes cleanly to Flow B.
@@ -260,6 +274,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.3.0] - 2026-10-09
 
 ### 🚀 Added
+
 - **Class-E Environmental Hygrometer Architecture** ([`bsp_sensors.h`](components/esp32-s3_bsp/include/bsp/bsp_sensors.h), [`bsp_sensors.c`](components/esp32-s3_bsp/src/bsp_sensors.c)):
   - Redesigned the environmental sensing subsystem into an ultra-low-power **Class-E Hygrometer** with strict zero runtime I2C polling during active UI and Turbo execution.
   - Implemented 1-cycle integer raw ADC differential gating (`SHTC3_RAW_IS_SETTLED`: 562 LSB counts / $1.50^\circ\text{C}$ margin) executing in $<10\,\text{ms}$ on 60s hot-wakes.
@@ -279,6 +294,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - POWER (`GPIO 18`) held $\ge 1.2\,\text{s}$ initiates graceful shutdown (`bsp_power_off()`).
 
 ### 🛠️ Fixed & Refactored
+
 - **Automated LVGL Display Refresh Gating** ([`bsp_lvgl.cpp`](components/esp32-s3_bsp/src/bsp_lvgl.cpp)):
   - Automatic full OTP vs. differential partial refresh arbitration in `lvgl_display_flush_cb()` based on `s_first_boot_flush` and `bsp_display_get_partial_count() >= PARTIAL_REFRESH_LIMIT` (30).
 - **Nomenclature & API Modernization**:
@@ -290,6 +306,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.2.2] - 2026-10-08
 
 ### 🚀 Added
+
 - **Multi-Rail Bootloader Latch System** ([`bsp_boot_hook.c`](components/esp32-s3_bsp/bootloader_components/bsp_boot_hook/bsp_boot_hook.c)):
   - Extended 2nd-stage bootloader hook (`bootloader_before_init()`) to assert and latch all primary board power gates in $< 25\,\text{ms}$ of initial power-up:
     - `BSP_PIN_POWER_HOLD` (`GPIO 17`): Driven HIGH (`1`) with RTC pad latch.
@@ -312,6 +329,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added user-level functions `bsp_power_set_latch(bool)`, `bsp_power_set_epd_rail(bool)`, and `bsp_power_set_pa_rail(bool)` for programmatic assertion/deassertion of power rails with automatic digital and RTC pad hold management.
 
 ### 🛠️ Fixed & Refactored
+
 - **Active-LOW Display Power Gate Inversion** ([`bsp_display.cpp`](components/esp32-s3_bsp/src/bsp_display.cpp)):
   - Fixed logic inverted bug in `display_power_enable(bool enable)` where `enable == true` was driving `1` (shutting OFF power to the SSD1681 and SHTC3) and returning `true` only when the rail was disabled. Corrected to drive `0` (ON) and verify level is `0`.
 - **Synchronous LVGL Render Enforcement** ([`main.c`](examples/Unified_Environmental_Demo/main/main.c)):
@@ -324,6 +342,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.2.1] - 2026-10-08
 
 ### 🚀 Added
+
 - **Zero-Management Bootloader Power Latch Hook** ([`bsp_boot_hook.c`](components/esp32-s3_bsp/bootloader_components/bsp_boot_hook/bsp_boot_hook.c), [`CMakeLists.txt`](components/esp32-s3_bsp/CMakeLists.txt)):
   - Built-in 2nd-stage bootloader hook (`bootloader_before_init()`) asserting `GPIO 17` (`BSP_PIN_POWER_HOLD`) HIGH and engaging the hardware RTC pad hold latch (`gpio_ll_hold_en`) within $\approx 25\,\text{ms}$ of power-on.
   - Automatically registered into the ESP-IDF bootloader build system via `BOOTLOADER_EXTRA_COMPONENT_DIRS`, eliminating application-level bootloader configuration and preventing battery LDO brownouts.
@@ -333,6 +352,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added `.on_pxe(btn_mask, user_data)` callback and `bsp_button_mask_t` (`BSP_BUTTON_MASK_NONE`, `BSP_BUTTON_MASK_BOOT`, `BSP_BUTTON_MASK_POWER`, `BSP_BUTTON_MASK_BOTH`) for instant boot-time tactile button state detection before subsystem initialization.
 
 ### 🛠️ Fixed & Refactored
+
 - **Automatic Shutdown Callback Registration** ([`bsp_common.c`](components/esp32-s3_bsp/src/bsp_common.c), [`bsp_power.c`](components/esp32-s3_bsp/src/bsp_power.c)):
   - Fixed bug where `lifecycle.on_shutdown` was never wired to `bsp_power_register_shutdown_cb()`. `bsp_power_off()` now executes the application's shutdown hook, rendering the persistent shutdown splash screen on the EPD glass before releasing the power latch.
 - **Two-Phase IO Bring-Up Decoupling** ([`bsp_common.c`](components/esp32-s3_bsp/src/bsp_common.c)):
@@ -343,6 +363,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.2.0] - 2026-10-07
 
 ### 🚀 Added
+
 - **Tri-Node Thermal Sensing Architecture** ([`bsp_sensors.c`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/src/bsp_sensors.c), [`bsp_sensors.h`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/include/bsp/bsp_sensors.h)):
   - Integrated three physical sensing nodes: Node 1 (PCB-mounted SHTC3), Node 2 (SSD1681 on-glass thermal sensor), and Node 3 (ESP32-S3 internal TSENS silicon die).
   - Multi-node thermal sanity cross-checking and dynamic thermal confidence scoring ($0\dots 100\%$).
@@ -376,6 +397,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Automatic critical battery shutdown guard ($\le 10\%$ SoC / $< 3400\text{ mV}$).
 
 ### 🛠️ Changed & Refactored
+
 - **Persistent Environmental Telemetry Modernization** ([`bsp_env_telemetry.h`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/include/bsp/bsp_env_telemetry.h), [`bsp_sensors.c`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/src/bsp_sensors.c), [`bsp_sensors.h`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/include/bsp/bsp_sensors.h)):
   - Replaced obsolete `bsp_ulp_shared.h` with `bsp_env_telemetry.h`, modernizing the persistent 64-entry RTC Slow Memory sample ring buffer (`bsp_env_telemetry_history_t`, `bsp_env_raw_sample_t`).
   - Standardized public telemetry APIs to `bsp_sensors_get_telemetry_history()` and `bsp_sensors_get_sample_count()`.
@@ -394,6 +416,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Relocated 5,000-byte E-Paper frame buffer to RTC Fast Memory (`RTC_FAST_ATTR`), freeing 61% (5 KB) of RTC Slow SRAM for clean sensor ring buffers.
 
 ### 🗑️ Removed & Deprecated
+
 - **Purged Obsolete ULP MUX Arbitration Routines** ([`bsp_sensors.h`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/include/bsp/bsp_sensors.h), [`bsp_sensors.c`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/src/bsp_sensors.c)):
   - Deleted `bsp_ulp_mux_set_app_active()`, `bsp_ulp_mux_set_bus_locked()`, `bsp_ulp_mux_is_app_active()`, and `bsp_ulp_mux_set_substrate_hot()`.
 - **Decommissioned ULP RISC-V Coprocessor Subsystem**:
@@ -406,6 +429,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.1.0] - 2026-10-02
 
 ### 🚀 Added
+
 - **Structured Application Lifecycle Engine** ([`bsp_common.c`](file:///c:/Users/Matt/Documents/GitHub/esp32-s3_bsp/components/esp32-s3_bsp/src/bsp_common.c)):
   - Added `bsp_app_start()` with structured callbacks (`on_cold_boot`, `on_wake`, `on_before_sleep`, `on_shutdown`).
 - **Hardware Profile Init Engine**:
@@ -423,5 +447,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.0.0] - 2026-09-25
 
 ### 🚀 Added
+
 - Initial baseline BSP release for Waveshare ESP32-S3-Touch-ePaper-1.54 V2 (`ESP32-S3-PICO-1-N8R8`).
 - Basic drivers for SSD1681 e-Paper, SHTC3 sensor, PCF85063A RTC, ES8311 Audio Codec, FT6336 Capacitive Touch, SD Card SPI, and NVS Storage.
