@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### 🚀 Added
 - **Division-Free Q12 Fixed-Point Die Temperature Math & Equilibrium Self-Tare** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.h/.c`):
   - Pre-computed `tsens_offset_centi_c` (`2052 + tsens_cal_centi_c`) on cold boot and replaced 32-bit integer division in `wake_stub_read_die_temp_centi_c()` with a single-cycle `Q12` fixed-point multiply-shift (`((int32_t)raw * 179651) >> 12`).
-  - Explicitly configured `SENS_TSENS_CLK_DIV = 6` and `SENS_TSENS_DAC = 15` (`0x0F`, `-20.52°C` offset range) with a hardware `SENS_TSENS_RESET` pulse and 400 µs settling window in `orch_wake_stub.c`.
+  - Explicitly configured `SENS_TSENS_CLK_DIV = 6` with a hardware `SENS_TSENS_RESET` pulse and 400 µs settling window in `orch_wake_stub.c` (removed legacy ESP32-S2 `SENS_TSENS_DAC` bitfield not present in ESP32-S3 `SENS_SAR_TSENS_CTRL2_REG`).
   - Added `die_tare_centi_c` in `orch_persisted_state_t` to self-zero the ESP32-S3 internal SAR TSENS against the factory-calibrated SHTC3 once `valid_trend >= 3` in deep sleep, restoring `ORCH_LEAKAGE_MARGIN_C` from `6.00f` to `0.50f`.
 - **Layer 2-to-Layer 3 Decoupling Primitives** (`sub_display.h/.cpp`, `sub_power.h/.c`, `hal_types.h`):
   - Added `sub_display_get_glass_temp_centi_c()` in `sub_display.h/.cpp` and `orch_display_sync_latch_glass_temp()` in `orch_display_sync.c`.
