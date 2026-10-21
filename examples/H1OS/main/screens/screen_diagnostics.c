@@ -64,6 +64,7 @@ static const char *get_wake_causes_str(uint32_t causes)
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
     (void)telem;
+    uint32_t base_cpu_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
     h1os_lvgl_lock(100);
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "4/4", event_cb);
 
@@ -126,7 +127,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
 
     lv_obj_t *lbl_dfs = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_dfs, "CPU:  %3luMHz", (unsigned long)(esp_clk_cpu_freq() / 1000000));
+    lv_label_set_text_fmt(lbl_dfs, "CPU:  %3luMHz", (unsigned long)base_cpu_mhz);
     lv_obj_set_style_text_font(lbl_dfs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
 

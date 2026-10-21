@@ -10,8 +10,10 @@
 
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_pm.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -76,7 +78,10 @@ static i2s_chan_handle_t s_tx_chan = NULL;
 static bool s_audio_inited     = false;
 static bool s_i2s_chan_enabled = false;
 static bool s_codec_in_standby = false;
+static bool s_pa_enabled       = false;
 static bool s_low_power_mode   = true;
+
+RTC_DATA_ATTR static bool s_rtc_codec_in_standby = false;
 
 static QueueHandle_t s_audio_queue       = NULL;
 static TaskHandle_t  s_audio_task_handle = NULL;
@@ -215,14 +220,16 @@ static const es8311_reg_entry_t s_es8311_deinit[] =
     /* Power Down Driver & Analog Blocks */
     {0x12, 0x02}, /**< REG12: Stop CSM / place internal state machines into standby                */
     {0x0E, 0xFF}, /**< REG0E: Power down digital modulators, decimation, and interpolation filters */
+    {0x13, 0x00}, /**< REG13: Power down internal analog bias current generator                    */
     {0x14, 0x00}, /**< REG14: Power down output amplifier / headphone driver                       */
     {0x17, 0x00}, /**< REG17: Power down DAC and ADC analog circuits                               */
     {0x15, 0x00}, /**< REG15: Power down class-D / analog output stages                            */
+    {0x1C, 0x00}, /**< REG1C: Power down microphone bias generator and reference                   */
     {0x45, 0x00}, /**< REG45: Reset DRC control registers                                          */
 
-    /* Power Down Digital System & References */
-    {0x0D, 0xFC}, /**< REG0D: Assert power down across system blocks                               */
-    {0x00, 0x1F}, /**< REG00: Digital block reset                                                  */
+    /* Power Down Digital System & References (Preserve RST_REG=0 in REG00 so 0x0D=0xFC is retained) */
+    {0x0D, 0xFC}, /**< REG0D: Assert power down across all analog & VMID system blocks (<1.0 uA)   */
+    {0x00, 0x1E}, /**< REG00: Reset digital/DAC/ADC/CSM blocks, CSM_ON=0, RST_REG=0 (retain regs)  */
     {0x01, 0x00}, /**< REG01: Disable all internal digital clocks (enter ultra-low-power standby)  */
 };
 
@@ -447,14 +454,14 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
             {
                 .mclk = HAL_PIN_I2S_MCLK,
                 .bclk = HAL_PIN_I2S_SCLK,
-                .ws = HAL_PIN_I2S_LRCK,
+                .ws   = HAL_PIN_I2S_LRCK,
                 .dout = HAL_PIN_I2S_DSDIN,
-                .din = I2S_GPIO_UNUSED,
+                .din  = I2S_GPIO_UNUSED,
                 .invert_flags =
                     {
                         .mclk_inv = false,
                         .bclk_inv = false,
-                        .ws_inv = false,
+                        .ws_inv   = false,
                     },
             },
     };
@@ -477,7 +484,8 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     vTaskDelay(pdMS_TO_TICKS(5));
 
     err = es8311_init_dac_registers();
-    s_codec_in_standby = false;
+    s_codec_in_standby     = false;
+    s_rtc_codec_in_standby = false;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     } else {
@@ -518,32 +526,37 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
         }
     }
 
-    audio_cpu_max_release();
     s_audio_inited = true;
-
-    /* Enable Class D Audio Amp for zero-latency interactive session tones */
-    sub_audio_park_warm(false);
-
-    sub_audio_flush_frame();
     sub_audio_set_volume(volume_pct);
+    sub_audio_flush_frame();
 
+    /* Keep Class-D amp muted (PA_CTRL=0) at idle; worker unmutes on demand during playback */
+    sub_audio_park_warm(true);
+
+    audio_cpu_max_release();
     return ESP_OK;
 }
 
 /**
- * @brief Sub audio park warm.
+ * @brief Control NS4168 Class-D amplifier hardware mute state (HAL_PIN_PA_CTRL / GPIO 46).
  *
- * @return Return value of type esp_err_t, ESP_OK on success.
+ * @param[in]    park_mute       true to mute/shutdown amplifier (PA_CTRL=0), false to enable (PA_CTRL=1).
+ *
+ * @return ESP_OK on success.
  */
-static esp_err_t sub_audio_park_warm(bool enable)
+static esp_err_t sub_audio_park_warm(bool park_mute)
 {
-    uint32_t target_level = enable ? 0 : 1;
+    uint32_t target_level = park_mute ? 0U : 1U;
+    bool target_enabled   = !park_mute;
 
-    if ((uint32_t)gpio_get_level(HAL_PIN_PA_CTRL) != target_level) {
+    if (s_pa_enabled != target_enabled || (uint32_t)gpio_get_level(HAL_PIN_PA_CTRL) != target_level) {
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
+        s_pa_enabled = target_enabled;
 
-        /* Startup / Shutdown Times Confirmed, [80ms down, 120ms up] */
-        vTaskDelay(pdMS_TO_TICKS(enable ? 120 : 80));
+        /* Wait 120 ms for NS4168 Class-D bridge startup when unmuting; immediate shutoff when muting */
+        if (target_enabled) {
+            vTaskDelay(pdMS_TO_TICKS(125)); // 80ms shutdown time no observed
+        }
     }
 
     return ESP_OK;
@@ -553,18 +566,26 @@ static esp_err_t sub_audio_park_warm(bool enable)
  * @brief Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
  *
  * @details Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
+ *          On unattended deep-sleep wakes where the codec is already in verified standby,
+ *          bypasses redundant I2C register writes to keep the codec completely undisturbed.
  *
  * @return ESP_OK on success, or an error code.
  */
 esp_err_t sub_audio_standby(void)
 {
-    /* Disable Class D Audio Amp */
+    /* Always ensure NS4168 Class-D amplifier is muted (GPIO 46 = 0) */
     sub_audio_park_warm(true);
+
+    if (!s_audio_inited && s_rtc_codec_in_standby && esp_reset_reason() == ESP_RST_DEEPSLEEP) {
+        s_codec_in_standby = true;
+        return ESP_OK;
+    }
 
     esp_err_t ret = es8311_write_table(s_es8311_deinit,
                                         sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
 
-    s_codec_in_standby = true;
+    s_codec_in_standby     = true;
+    s_rtc_codec_in_standby = (ret == ESP_OK);
 
     if (s_tx_chan != NULL && s_i2s_chan_enabled) {
         i2s_channel_disable(s_tx_chan);
@@ -680,7 +701,8 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 
     if (s_codec_in_standby) {
         es8311_init_dac_registers();
-        s_codec_in_standby = false;
+        s_codec_in_standby     = false;
+        s_rtc_codec_in_standby = false;
         sub_audio_set_volume(s_volume_pct);
     }
 
@@ -829,6 +851,11 @@ static void audio_worker_task(void *pvParameters)
 
             if (uxQueueMessagesWaiting(s_audio_queue) == 0) {
                 sub_audio_flush_frame();
+                sub_audio_park_warm(true);
+                if (s_tx_chan != NULL && s_i2s_chan_enabled) {
+                    i2s_channel_disable(s_tx_chan);
+                    s_i2s_chan_enabled = false;
+                }
             }
 
             if (cmd.result) {

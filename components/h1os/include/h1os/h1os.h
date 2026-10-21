@@ -124,11 +124,12 @@ typedef struct {
  * @brief Comprehensive environmental telemetry and system metrics snapshot.
  */
 typedef struct {
-    float ambient_temp_c;            /**< Filtered ambient temperature in degrees Celsius.                   */
-    float ambient_temp_f;            /**< Filtered ambient temperature in degrees Fahrenheit.                */
-    float ambient_rh_pct;            /**< Filtered ambient relative humidity percentage (0..100%).           */
+    float ambient_temp_c;            /**< Trusted steady-state SHTC3 ambient temperature in degrees Celsius. */
+    float ambient_temp_f;            /**< Trusted steady-state SHTC3 ambient temperature in degrees Fahr.    */
+    float ambient_rh_pct;            /**< Trusted steady-state SHTC3 relative humidity percentage (0..100%). */
     float dew_point_c;               /**< Psychrometrically calculated dew point in degrees Celsius.         */
     float dew_point_f;               /**< Psychrometrically calculated dew point in degrees Fahrenheit.      */
+    float vapor_pressure_hpa;        /**< Calculated water vapor partial pressure in hectopascals (hPa).     */
     float absolute_humidity_g;       /**< Calculated absolute humidity in grams per cubic meter (g/m³).      */
 
     float window_low_c;              /**< Valid Window Floor (minimum over valid 32-sample window).          */
@@ -141,14 +142,17 @@ typedef struct {
     float raw_shtc3_temp_c;          /**< Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.  */
     float mcu_die_temp_c;            /**< Instantaneous ESP32-S3 internal TSENS die temperature.             */
     float epd_glass_temp_c;          /**< Instantaneous SSD1681 display on-glass temperature sensor reading. */
-    float trinode_temp_c;            /**< Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0. */
-    float trinode_delta_c;           /**< Thermal gradient delta: T_valid - T_trinode.                       */
-    uint8_t trinode_confidence_pct;  /**< 0-100% linear psychrometric confidence score.                      */
+    float trinode_temp_c;            /**< Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.*/
+    float trinode_delta_c;           /**< Cross-node verification delta: T_valid - T_trinode.                */
+    uint8_t trinode_confidence_pct;  /**< 0-100% cross-node range verification confidence score.             */
 
-    bool is_thermally_settled;       /**< True if thermal equilibrium criteria are satisfied.                */
+    bool is_thermally_settled;       /**< True if steady-state thermal criteria (|T2-T1| <= gate) are met.   */
     uint16_t valid_trend;            /**< Monotonic count of consecutive thermally settled Flow A samples.   */
     uint32_t sample_count;           /**< Total monotonic environmental telemetry sample count.              */
+    uint32_t flow_a_period_sec;      /**< Active Flow A sensor sample interval in seconds.                   */
+    uint32_t flow_b_period_sec;      /**< Active Flow B display refresh interval in seconds.                 */
     uint16_t battery_mv;             /**< Sampled battery terminal voltage in millivolts.                    */
+    uint16_t boot_vbat_mv;           /**< Initial non-USB battery voltage captured on boot in millivolts.    */
     uint8_t battery_percent;         /**< Estimated battery state-of-charge percentage (0..100%).            */
     bool is_usb_powered;             /**< True if USB VBUS power connection is actively detected.            */
 } h1os_telemetry_t;

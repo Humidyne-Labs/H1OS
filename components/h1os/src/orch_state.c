@@ -38,13 +38,11 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     s_persisted_state.magic                    = ORCH_RTC_MAGIC;
     s_persisted_state.sample_interval_sec      = 0;
     s_persisted_state.flow_b_period_sec        = 0;
-    s_persisted_state.amb_floor_temp_centi_c   = 0;
     s_persisted_state.window_low_temp_centi_c  = 0;
     s_persisted_state.window_high_temp_centi_c = 0;
     s_persisted_state.last_glass_temp_centi_c  = 0;
     s_persisted_state.trinode_confidence_pct   = 0;
     s_persisted_state.tsens_offset_centi_c     = 2052;
-    s_persisted_state.die_tare_centi_c         = 0;
 }
 
 /**

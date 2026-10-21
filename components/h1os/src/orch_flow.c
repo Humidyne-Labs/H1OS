@@ -1,6 +1,6 @@
 /**
  * @file orch_flow.c
- * @brief Layer 3: Execution flow arbiter and thermal lockout MUX implementation
+ * @brief Layer 3: Execution flow arbiter and steady-state SHTC3 telemetry selector
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -39,8 +39,7 @@ static const char *TAG = "orch_flow";
 #include <string.h>
 
 #define ORCH_HISTORICAL_EWMA_ALPHA 0.25f
-#define ORCH_LEAKAGE_MARGIN_C      0.50f
-#define ORCH_TRINODE_SPAN_C        15.0f
+#define ORCH_TRINODE_SPAN_C        5.0f
 
 #include "ulp_h1os.h"
 
@@ -106,9 +105,10 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 /**
  * @brief Check whether system is in Thermal Lockout state.
  *
- * @details If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibrium.
+ * @details Returns true until at least two consecutive Flow A samples have settled
+ *          within SAMPLE_DELTA_GATE_CENTI_C (|temp2 - temp1| <= 0.20 C).
  *
- * @return True if in lockout, False if in thermal equilibrium.
+ * @return True if settling (lockout), False if board is in thermal steady state.
  */
 bool orch_flow_is_thermal_lockout(void)
 {
@@ -141,7 +141,7 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
     for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
         shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
-        mcuT_ring[i]    = (float)(st->ring[i].mcu_tsens_centi_c + st->die_tare_centi_c) / 100.0f;
+        mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
         epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c / 100.0f;
         ESP_LOGI(TAG, " [%02d] %.2f, %.2f, %.2f, %.2f", i,
                         (double)shtc3T_ring[i],
@@ -175,7 +175,7 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
             if (s_t > current_high)
                 current_high = s_t;
             sum_shtc3 += s_t;
-            sum_die += (int32_t)st->ring[i].mcu_tsens_centi_c + (int32_t)st->die_tare_centi_c;
+            sum_die += st->ring[i].mcu_tsens_centi_c;
             valid_cnt++;
         }
     }
@@ -188,62 +188,28 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
             if (s_t > current_high)
                 current_high = s_t;
             sum_shtc3 += s_t;
-            sum_die += (int32_t)st->ring[i].mcu_tsens_centi_c + (int32_t)st->die_tare_centi_c;
+            sum_die += st->ring[i].mcu_tsens_centi_c;
             valid_cnt++;
         }
     }
 
     st->window_low_temp_centi_c  = current_low;
     st->window_high_temp_centi_c = current_high;
-    st->amb_floor_temp_centi_c   = current_low;
     st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;
     st->window_avg_die_c         = ((float)sum_die / (float)valid_cnt) / 100.0f;
 }
 
 /**
- * @brief Orch flow evaluate ambient selection.
+ * @brief Query current environmental telemetry directly from factory-calibrated SHTC3 steady-state samples.
  *
- * @param[in]    st              Parameter st.
- * @param[in]    t_valid         Parameter t_valid.
- * @param[in]    t_die           Parameter t_die.
- * @param[in]    t_glass         Parameter t_glass.
- * @param[in]    out_mode        Parameter out_mode.
+ * @details The SHTC3 is factory-calibrated and requires no synthetic offsets, reconstitutions, or taring.
+ *          When consecutive Flow A samples satisfy |temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C, the board
+ *          is at thermal steady state and the SHTC3 reading is trusted directly. The EPD glass and MCU die
+ *          sensors serve strictly to verify that the SHTC3 is operating within a normal range.
  *
- * @return Return value of type static float.
- */
-static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t *st, float t_valid, float t_die, float t_glass, const char **out_mode)
-{
-    float t_amb = t_valid;
-    const char *mode = "SETTLED(T_valid)";
-
-    if (st->valid_trend < 2) {
-        float min_ref = (t_glass < t_die) ? t_glass : t_die;
-        t_amb = (min_ref < t_valid) ? min_ref : t_valid;
-        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
-        mode = "CASE_A_UNSETTLED";
-    } else if (st->window_avg_shtc3_c > (st->window_avg_die_c + ORCH_LEAKAGE_MARGIN_C)) {
-        t_amb = (t_die < t_glass) ? t_die : t_glass;
-        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
-        mode = "CASE_B_LEAKAGE";
-    } else {
-        t_amb = t_valid;
-        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
-    }
-
-    if (out_mode) {
-        *out_mode = mode;
-    }
-    return t_amb;
-}
-
-/**
- * @brief Query current environmental telemetry through the Thermal Lockout MUX.
- *
- * @details Returns 0.0f on initial cold boot (when total_samples == 0) to prevent reporting thermally contaminated Flow B readings.
- *
- * @param[out]   out_temp_c      Reconstructed ambient temperature in Celsius.
- * @param[out]   out_rh_pct      Reconstructed ambient relative humidity in percent.
- * @param[out]   out_dew_c       True dew point in Celsius.
+ * @param[out]   out_temp_c      Trusted SHTC3 ambient temperature in Celsius.
+ * @param[out]   out_rh_pct      Trusted SHTC3 ambient relative humidity in percent.
+ * @param[out]   out_dew_c       Calculated dew point in Celsius.
  *
  * @return ESP_OK on success.
  */
@@ -264,21 +230,22 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         if (out_rh_pct)
             *out_rh_pct = 0.0f;
         if (out_dew_c)
-            *out_dew_c = 0.0f;
+            *out_dew_c  = 0.0f;
         return ESP_OK;
     }
 
     float t_glass = (float)st->last_glass_temp_centi_c / 100.0f;
     orch_tri_node_sample_t latest_raw = {0};
     orch_state_get_latest_sample(&latest_raw);
-    float t_die = (float)(latest_raw.mcu_tsens_centi_c + st->die_tare_centi_c) / 100.0f;
+    float t_die = (float)latest_raw.mcu_tsens_centi_c / 100.0f;
 
     orch_flow_scan_ring_metrics(st);
 
     orch_tri_node_sample_t valid_samp = {0};
     orch_state_get_latest_valid_sample(&valid_samp);
 
-    float t_valid = (float)valid_samp.shtc3_temp_centi_c / 100.0f;
+    /* Trust the factory-calibrated SHTC3 steady-state sample directly (zero offsets, zero reconstitution) */
+    float t_valid  = (float)valid_samp.shtc3_temp_centi_c / 100.0f;
     float rh_valid = (float)valid_samp.shtc3_rh_centi_pct / 100.0f;
 
     bool is_new_sample = (st->total_samples != st->last_ewma_sample_seq);
@@ -294,6 +261,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         st->last_ewma_sample_seq = st->total_samples;
     }
 
+    /* Glass and MCU die sensors are used strictly to verify the SHTC3 is operating within a normal range */
     float t_trinode = (t_valid + t_die + t_glass) / 3.0f;
     float delta_trinode = t_valid - t_trinode;
     float conf = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
@@ -306,43 +274,45 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     st->trinode_delta_c        = delta_trinode;
     st->trinode_confidence_pct = (uint8_t)(conf + 0.5f);
 
-    const char *amb_mode = NULL;
-    float t_amb = orch_flow_evaluate_ambient_selection(st, t_valid, t_die, t_glass, &amb_mode);
+    if (orch_flow_is_thermal_lockout()) {
+        st->flags |= ORCH_FLAG_THERMAL_LOCKOUT;
+    } else {
+        st->flags &= ~ORCH_FLAG_THERMAL_LOCKOUT;
+    }
 
-    float vp     = 0.0f;
-    float dew    = 0.0f;
-    float rh_amb = 0.0f;
-    orch_math_calc_psychrometrics(t_valid, rh_valid, t_amb, &vp, &dew, &rh_amb);
+    float vp  = 0.0f;
+    float dew = 0.0f;
+    orch_math_calc_psychrometrics(t_valid, rh_valid, &vp, &dew);
 
-    st->reconstructed_amb_temp_c  = t_amb;
-    st->reconstructed_amb_rh_pct  = rh_amb;
-    st->reconstructed_dew_point_c = dew;
-    st->vapor_pressure_hpa        = vp;
+    st->ambient_temp_c     = t_valid;
+    st->ambient_rh_pct     = rh_valid;
+    st->dew_point_c        = dew;
+    st->vapor_pressure_hpa = vp;
 
     if (is_new_sample) {
+        const char *state_str = (st->flags & ORCH_FLAG_THERMAL_LOCKOUT) ? "SETTLING" : "SETTLED(SHTC3_DIRECT)";
         ESP_LOGI(TAG,
                  "Flow A Ring: samples=%lu head=%u trend=%u | "
-                 "Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC(tare=%+d cC) flags=0x%02X]",
+                 "Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
                     (unsigned long)st->total_samples,
                     st->ring_head,
                     st->valid_trend,
                     (double)latest_raw.shtc3_temp_centi_c / 100.0,
                     (double)latest_raw.shtc3_rh_centi_pct / 100.0,
                     (double)t_die,
-                    (int)st->die_tare_centi_c,
                     latest_raw.quality_flags);
 
-        ESP_LOGI(TAG, "Tri-Node & Tiers: mode=%s T_amb=%.2fC RH_amb=%.1f%% | "
-                      "T_valid=%.2fC WinAvg[SHTC3=%.2fC Die=%.2fC] Hist=%.2fC | "
-                      "Glass=%.2fC Tri=%.2fC(d=%+.2fC, conf=%u%%)",
-                        amb_mode,
-                        (double)t_amb,
-                        (double)rh_amb,
+        ESP_LOGI(TAG, "SHTC3 & Verification Nodes: state=%s T_shtc3=%.2fC RH_shtc3=%.1f%% | "
+                      "WinAvg[SHTC3=%.2fC Die=%.2fC] Hist=%.2fC | "
+                      "Verify[Glass=%.2fC Die=%.2fC Tri=%.2fC d=%+.2fC conf=%u%%]",
+                        state_str,
                         (double)t_valid,
+                        (double)rh_valid,
                         (double)st->window_avg_shtc3_c,
                         (double)st->window_avg_die_c,
                         (double)st->temp_historical_c,
                         (double)t_glass,
+                        (double)t_die,
                         (double)t_trinode,
                         (double)delta_trinode,
                         st->trinode_confidence_pct);
@@ -351,11 +321,11 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     }
 
     if (out_temp_c)
-        *out_temp_c = t_amb;
+        *out_temp_c = t_valid;
     if (out_rh_pct)
-        *out_rh_pct = rh_amb;
+        *out_rh_pct = rh_valid;
     if (out_dew_c)
-        *out_dew_c = dew;
+        *out_dew_c  = dew;
     return ESP_OK;
 }
 
@@ -374,8 +344,6 @@ static void orch_flow_quiesce_peripherals(void)
 
     ESP_LOGI(TAG, "Waiting for EPD panel BUSY line...");
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
-
-    vTaskDelay(pdMS_TO_TICKS(250));
 
     orch_display_sync_save_if_dirty();
 

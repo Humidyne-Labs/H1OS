@@ -66,6 +66,8 @@ static inline int32_t battery_estimate_avg_current_ua(uint32_t nominal_mah, uint
  *
  * @return Remaining autonomy in days (e.g. 180.5 days).
  */
+float battery_estimate_schedule_current_ma(uint32_t flow_a_sec, uint32_t flow_b_sec);
+
 float battery_estimate_remaining_days(uint32_t nominal_mah, uint32_t current_vbat_mv, float avg_current_ma);
 
 #ifdef __cplusplus

@@ -51,12 +51,10 @@ float orch_math_calc_vapor_pressure(float temp_c, float rh_pct)
 }
 
 /**
- * @brief Calculate true dew point (T_dew) in Celsius from physical vapor pressure.
+ * @brief Calculate true dew point (T_dew) in Celsius from temperature and relative humidity.
  *
- * @details Invariant against package heating because vapor mass in air does not change with temperature.
- *
- * @param[in]    temp_c          Measured package temperature in Celsius.
- * @param[in]    rh_pct          Measured package relative humidity in percent.
+ * @param[in]    temp_c          Measured temperature in Celsius.
+ * @param[in]    rh_pct          Measured relative humidity in percent.
  *
  * @return Dew point in Celsius.
  */
@@ -74,56 +72,21 @@ float orch_math_calc_dew_point(float temp_c, float rh_pct)
 }
 
 /**
- * @brief Reconstruct true ambient relative humidity using the ambient baseline floor temperature.
+ * @brief Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibrated SHTC3 readings.
  *
- * @details Formula: RH_amb = (e / e_s(temp_ambient_floor)) * 100.0%
- *
- * @param[in]    vapor_pressure_hpa Invariant vapor pressure in hPa.
- * @param[in]    amb_floor_temp_c Ambient floor temperature in Celsius.
- *
- * @return Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
- */
-float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor_temp_c)
-{
-    float es_amb = orch_math_calc_sat_vapor_pressure(amb_floor_temp_c);
-    if (es_amb <= 0.0001f)
-        return 0.0f;
-
-    float rh = (vapor_pressure_hpa / es_amb) * 100.0f;
-    if (rh < 0.0f)
-        rh = 0.0f;
-    if (rh > 100.0f)
-        rh = 100.0f;
-    return rh;
-}
-
-/**
- * @brief Unified Psychrometric Vector Transform.
- *
- * @details Evaluates water vapor pressure invariant (e), true dew point (T_dew), and reconstructed ambient relative humidity (RH_amb) by composing single-responsibility helpers.
- *
- * @param[in]    temp_c          Measured package temperature in Celsius.
- * @param[in]    rh_pct          Measured package relative humidity in percent.
- * @param[in]    amb_floor_c     Ambient floor baseline temperature in Celsius.
+ * @param[in]    temp_c          Settled SHTC3 temperature in Celsius.
+ * @param[in]    rh_pct          Settled SHTC3 relative humidity in percent.
  * @param[out]   out_vp_hpa      Output vapor pressure in hPa (optional, can be NULL).
  * @param[out]   out_dew_c       Output dew point in Celsius (optional, can be NULL).
- * @param[out]   out_rh_amb      Output reconstructed ambient RH in percent (optional, can be NULL).
  */
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa, float *out_dew_c,
-                                   float *out_rh_amb)
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float *out_vp_hpa, float *out_dew_c)
 {
-    float vp = orch_math_calc_vapor_pressure(temp_c, rh_pct);
-
     if (out_vp_hpa) {
-        *out_vp_hpa = vp;
+        *out_vp_hpa = orch_math_calc_vapor_pressure(temp_c, rh_pct);
     }
 
     if (out_dew_c) {
         *out_dew_c = orch_math_calc_dew_point(temp_c, rh_pct);
-    }
-
-    if (out_rh_amb) {
-        *out_rh_amb = orch_math_reconstruct_ambient_rh(vp, amb_floor_c);
     }
 }
 

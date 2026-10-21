@@ -134,7 +134,6 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
  */
 static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    CpuMaxTurboScope turbo;
     s_flush_in_progress = true;
     lv_color_format_t cf = lv_display_get_color_format(disp);
     if (cf != LV_COLOR_FORMAT_I1) {
@@ -175,7 +174,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
     const uint32_t epd_stride = EPD_WIDTH / 8;
 
-    if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
+    {
+        CpuMaxTurboScope turbo;
+        if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
         uint16_t bytes_per_line = area_w >> 3;
         uint16_t start_byte_x = (uint16_t)(area->x1 >> 3);
 
@@ -229,6 +230,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
             }
         }
     }
+    } /* Release 240 MHz CpuMaxTurboScope before waiting on mechanical EPD refresh */
 
     if (lv_display_flush_is_last(disp)) {
         orch_display_sync_mark_dirty();
@@ -428,16 +430,9 @@ static void h1os_lvgl_port_task(void *pvParameters)
     (void)pvParameters;
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());
     while (s_lvgl_task_running) {
-        bool need_blitz = h1os_lvgl_has_pending_tasks();
-        if (need_blitz) {
-            sub_power_cpu_max_acquire();
-        }
         lv_lock();
         uint32_t delay_ms = lv_timer_handler();
         lv_unlock();
-        if (need_blitz) {
-            sub_power_cpu_max_release();
-        }
         delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD) ? LV_DEF_REFR_PERIOD : delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }

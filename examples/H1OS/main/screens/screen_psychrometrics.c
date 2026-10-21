@@ -8,7 +8,6 @@
 
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
-#include "h1os/orch_state.h"
 #include "screens.h"
 
 /**

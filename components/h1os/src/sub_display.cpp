@@ -43,14 +43,17 @@ static const uint8_t WF_PARTIAL_1IN54[159] = {
 /**
  * @brief Epd reset pulse.
  *
+ * @details SSD1681 hardware reset pulse requires >= 1 ms low and >= 1 ms recovery.
+ *          Using 2 ms instead of 10 ms shaves 16 ms of active CPU spin-wait off every wake.
+ *
  * @return Return value of type static void.
  */
 static void epd_reset_pulse(void)
 {
     gpio_set_level(HAL_PIN_EPD_RST, 0);
-    esp_rom_delay_us(10000);
+    esp_rom_delay_us(2000);
     gpio_set_level(HAL_PIN_EPD_RST, 1);
-    esp_rom_delay_us(10000);
+    esp_rom_delay_us(2000);
 }
 
 /**
@@ -127,7 +130,7 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     gpio_config_t busy_conf = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };

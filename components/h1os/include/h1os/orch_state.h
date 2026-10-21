@@ -31,9 +31,9 @@ typedef enum {
     ULP_DISPATCH_POWER_OFF             /**< BAT_KEY long-press held down during sleep: power off. */
 } orch_ulp_dispatch_t;
 
-#define SAMPLE_FLAG_VALID_COLD      0x01 /**< Cold baseline sample captured before MCU self-heating. */
+#define SAMPLE_FLAG_VALID_COLD      0x01 /**< Steady-state sample captured during quiescent sleep.   */
 #define SAMPLE_FLAG_THERMAL_SETTLED 0x02 /**< Thermal plateau settled indicator.                     */
-#define SAMPLE_DELTA_GATE_CENTI_C   20   /**< Maximum allowable drift for thermal plateau (0.20°C).  */
+#define SAMPLE_DELTA_GATE_CENTI_C   20   /**< Maximum allowable drift for steady state (0.20°C).     */
 // clang-format on
 
 /**
@@ -61,15 +61,15 @@ typedef struct {
     uint8_t flags;                      /**< Operating state flags (ORCH_FLAG_*).                                  */
     uint8_t ulp_dispatch_reason;        /**< Reason code from last ULP coprocessor dispatch.                       */
     uint16_t last_vbat_mv;              /**< Last sampled battery terminal voltage in millivolts.                  */
+    uint16_t boot_vbat_mv;              /**< Initial non-USB battery voltage captured on boot in millivolts.       */
 
     uint32_t sample_interval_sec;       /**< Interval between Flow A sensor samples in seconds.                    */
     uint32_t flow_b_period_sec;         /**< Interval between Flow B display refreshes in seconds.                 */
     uint32_t last_ewma_sample_seq;      /**< Sample sequence number of last processed EWMA & ring debug update.    */
 
     uint16_t epd_partial_refresh_count; /**< Consecutive differential partial refreshes on EPD.                    */
-    uint16_t valid_trend;               /**< Monotonic count of consecutive settled cold samples.                  */
+    uint16_t valid_trend;               /**< Monotonic count of consecutive settled steady-state samples.          */
 
-    int16_t amb_floor_temp_centi_c;     /**< Lowest observed ambient baseline temperature in centi-°C.             */
     int16_t window_low_temp_centi_c;    /**< Valid Window Floor (minimum over active window) in centi-°C.          */
     int16_t window_high_temp_centi_c;   /**< Valid Window Ceiling (maximum over active window) in centi-°C.        */
     int16_t last_glass_temp_centi_c;    /**< Last sampled EPD glass temperature in centi-°C.                       */
@@ -79,18 +79,17 @@ typedef struct {
     float temp_historical_c;            /**< Long-term light EWMA baseline temperature.                            */
     float rh_historical_pct;            /**< Long-term light EWMA baseline relative humidity.                      */
 
-    float reconstructed_amb_temp_c;     /**< Psychrometrically reconstructed ambient temperature.                  */
-    float reconstructed_amb_rh_pct;     /**< Psychrometrically reconstructed ambient relative humidity.            */
-    float reconstructed_dew_point_c;    /**< Reconstructed dew point temperature.                                  */
-    float vapor_pressure_hpa;           /**< Conserved ambient water vapor partial pressure in hPa.                */
+    float ambient_temp_c;               /**< Trusted steady-state SHTC3 ambient temperature in °C.                 */
+    float ambient_rh_pct;               /**< Trusted steady-state SHTC3 ambient relative humidity in %.            */
+    float dew_point_c;                  /**< Calculated dew point temperature in °C.                               */
+    float vapor_pressure_hpa;           /**< Calculated water vapor partial pressure in hPa.                       */
 
-    float trinode_temp_c;               /**< Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0.    */
-    float trinode_delta_c;              /**< Thermal gradient delta: T_valid - T_trinode.                          */
-    uint8_t trinode_confidence_pct;     /**< 0-100% linear psychrometric confidence score.                         */
+    float trinode_temp_c;               /**< Tri-Node verification average: (T_valid + T_die + T_glass) / 3.0.     */
+    float trinode_delta_c;              /**< Cross-sensor verification delta: T_valid - T_trinode.                 */
+    uint8_t trinode_confidence_pct;     /**< 0-100% cross-sensor range verification score.                         */
     bool ewma_inited;                   /**< True if EWMA filters have been seeded with initial samples.           */
     int16_t tsens_cal_centi_c;          /**< Factory calibrated TSENS eFuse offset in centi-degrees Celsius.       */
     int16_t tsens_offset_centi_c;       /**< Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c).  */
-    int16_t die_tare_centi_c;           /**< Settled deep-sleep tare offset (T_shtc3_cold - T_die_cold).           */
 
     orch_tri_node_sample_t ring[ORCH_RING_CAPACITY]; /**< Circular ring buffer of historical telemetry samples.    */
 
