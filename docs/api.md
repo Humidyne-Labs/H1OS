@@ -2071,6 +2071,26 @@ Acoustic chime sound pattern types.
 
 ---
 
+{#sys_clk_mode_t}
+
+### sys_clk_mode_t
+
+```cpp
+enum sys_clk_mode_t
+```
+
+Defined in h1os/hal_types.h:112
+
+System CPU clock frequency scaling and power profile modes.
+
+| Value | Description |
+|-------|-------------|
+| `SYS_CLK_MODE_DYNAMIC` | Dynamic Frequency Scaling: 80 MHz baseline, 240 MHz turbo bursts (Default). |
+| `SYS_CLK_MODE_FIXED_MAX` | Fixed Maximum Clock: Locked to max frequency (240 MHz), DFS disabled. |
+| `SYS_CLK_MODE_FIXED_MIN` | Fixed Minimum Clock: Locked to base frequency (80 MHz), turbo disabled. |
+
+---
+
 {#orch_flow_type_t}
 
 ### orch_flow_type_t
@@ -2121,7 +2141,7 @@ Acoustic payload type for consolidated sub_audio_play dispatch.
 enum sub_power_sleep_mode_t
 ```
 
-Defined in h1os/sub_power.h:23
+Defined in h1os/sub_power.h:24
 
 Deep sleep cycle execution modes.
 
@@ -6202,7 +6222,7 @@ true if Low-Power Mode is active, false if Normal Power Mode.
 esp_err_t sub_power_init(void)
 ```
 
-Defined in h1os/sub_power.h:35
+Defined in h1os/sub_power.h:36
 
 Initialize battery ADC channel and calibration engine.
 
@@ -6228,7 +6248,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_power_deinit(void)
 ```
 
-Defined in h1os/sub_power.h:42
+Defined in h1os/sub_power.h:43
 
 Deinitialize battery ADC driver.
 
@@ -6252,7 +6272,7 @@ ESP_OK on success.
 esp_err_t sub_power_read_battery(uint16_t * out_mv, uint8_t * out_pct)
 ```
 
-Defined in h1os/sub_power.h:52
+Defined in h1os/sub_power.h:53
 
 Sample current battery terminal voltage and calculate state-of-charge.
 
@@ -6283,7 +6303,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_power_get_ulp_cal_params(uint32_t * out_scale, int32_t * out_offset_mv)
 ```
 
-Defined in h1os/sub_power.h:62
+Defined in h1os/sub_power.h:63
 
 Retrieve two-point calibration parameters for ULP coprocessor ADC readings.
 
@@ -6314,7 +6334,7 @@ ESP_OK on success.
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 ```
 
-Defined in h1os/sub_power.h:71
+Defined in h1os/sub_power.h:72
 
 Initialize ULP-RISC-V coprocessor firmware for background monitoring.
 
@@ -6346,7 +6366,7 @@ ESP_OK on success, or an error code.
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 ```
 
-Defined in h1os/sub_power.h:81
+Defined in h1os/sub_power.h:82
 
 Configure ULP slice parameters prior to entering deep sleep.
 
@@ -6369,7 +6389,7 @@ Configure ULP slice parameters prior to entering deep sleep.
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 ```
 
-Defined in h1os/sub_power.h:92
+Defined in h1os/sub_power.h:93
 
 Enter target deep sleep mode with wake pin configuration.
 
@@ -6403,7 +6423,7 @@ Does not return on success (enters deep sleep).
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in h1os/sub_power.h:102
+Defined in h1os/sub_power.h:103
 
 Enter full cycle deep sleep with wake pin configuration.
 
@@ -6436,7 +6456,7 @@ Does not return on success (enters deep sleep).
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in h1os/sub_power.h:107
+Defined in h1os/sub_power.h:108
 
 Cut master power latch (releases GPIO 17 BAT_CTRL).
 
@@ -6456,7 +6476,7 @@ Used for critical low-battery shutdown or explicit user power-off.
 bool sub_power_connected_usb(void)
 ```
 
-Defined in h1os/sub_power.h:114
+Defined in h1os/sub_power.h:115
 
 Check if USB VBUS connection is actively present.
 
@@ -6479,17 +6499,17 @@ true if usb is connected, or false if disconnected.
 ### sub_power_init_dfs
 
 ```cpp
-esp_err_t sub_power_init_dfs(bool enable_dfs)
+esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 ```
 
-Defined in h1os/sub_power.h:123
+Defined in h1os/sub_power.h:124
 
 Initialize Dynamic Frequency Scaling (DFS) power management.
 
 #### Returns
 ESP_OK on success.
 
-Gates CPU cores to 80 MHz baseline during quiescent and interactive periods, while allowing transient 240 MHz turbo scaling during heavy UI/compute bursts.
+Configures CPU frequency scaling based on the selected clock mode. SYS_CLK_MODE_DYNAMIC gates CPU cores to 80 MHz baseline during quiescent periods, allowing transient turbo scaling (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) during heavy UI/compute bursts. SYS_CLK_MODE_FIXED_MAX locks CPU cores permanently to maximum clock (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ). SYS_CLK_MODE_FIXED_MIN locks CPU cores permanently to 80 MHz baseline.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -6498,7 +6518,7 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `enable_dfs` | `bool` | Enable DFS scaling (true = 80MHz base / 240MHz max; false = locked 80MHz). |
+| `mode` | [`sys_clk_mode_t`](#sys_clk_mode_t) | Clock scaling mode (SYS_CLK_MODE_DYNAMIC, FIXED_MAX, FIXED_MIN). |
 
 ---
 
@@ -6510,7 +6530,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_power_cpu_max_acquire(void)
 ```
 
-Defined in h1os/sub_power.h:130
+Defined in h1os/sub_power.h:131
 
 Acquire CPU frequency lock at 240 MHz for compute/display intensive operations.
 
@@ -6538,7 +6558,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_release(void)
 ```
 
-Defined in h1os/sub_power.h:137
+Defined in h1os/sub_power.h:138
 
 Release CPU frequency lock, allowing DFS to downclock to 80 MHz.
 
@@ -8449,14 +8469,14 @@ True if connected to USB power.
 ### sub_power_init_dfs
 
 ```cpp
-esp_err_t sub_power_init_dfs(bool enable_dfs)
+esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 ```
 
-Defined in sub_power.c:488
+Defined in sub_power.c:492
 
 Initialize Dynamic Frequency Scaling (DFS) power management.
 
-Gates CPU cores to 80 MHz baseline during quiescent and interactive periods, while allowing transient 240 MHz turbo scaling during heavy UI/compute bursts.
+Configures CPU frequency scaling based on the selected clock mode. SYS_CLK_MODE_DYNAMIC gates CPU cores to 80 MHz baseline during quiescent periods, allowing transient turbo scaling (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) during heavy UI/compute bursts. SYS_CLK_MODE_FIXED_MAX locks CPU cores permanently to maximum clock (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ). SYS_CLK_MODE_FIXED_MIN locks CPU cores permanently to 80 MHz baseline.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -8468,7 +8488,7 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `enable_dfs` | `bool` | True to enable 80 MHz scaling during idle periods. |
+| `mode` | [`sys_clk_mode_t`](#sys_clk_mode_t) | Clock scaling mode (SYS_CLK_MODE_DYNAMIC, FIXED_MAX, FIXED_MIN). |
 
 ---
 
@@ -8480,7 +8500,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_acquire(void)
 ```
 
-Defined in sub_power.c:528
+Defined in sub_power.c:540
 
 Acquire 240 MHz CPU performance lock (e.g.
 
@@ -8508,7 +8528,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_release(void)
 ```
 
-Defined in sub_power.c:545
+Defined in sub_power.c:557
 
 Release 240 MHz CPU performance lock.
 
@@ -13131,7 +13151,7 @@ Defined in h1os/h1os.h:113
 | Return | Name | Description |
 |--------|------|-------------|
 | `uint32_t` | [`inactivity_timeout_sec`](#inactivity_timeout_sec)  | Interactive session idle sleep timeout in seconds. |
-| `bool` | [`enable_dfs_80mhz`](#enable_dfs_80mhz)  | Enable dynamic frequency scaling to 80MHz baseline during idle. |
+| [`sys_clk_mode_t`](#sys_clk_mode_t) | [`clk_mode`](#clk_mode)  | CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default). |
 | `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Period between headless sensor sample bursts in seconds. |
 | `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec)  | Period between unattended display flushes in seconds. |
 
@@ -13151,17 +13171,19 @@ Interactive session idle sleep timeout in seconds.
 
 ---
 
-{#enable_dfs_80mhz}
+{#clk_mode}
 
-#### enable_dfs_80mhz
+#### clk_mode
 
 ```cpp
-bool enable_dfs_80mhz
+sys_clk_mode_t clk_mode
 ```
+
+Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
 Defined in h1os/h1os.h:115
 
-Enable dynamic frequency scaling to 80MHz baseline during idle.
+CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
 ---
 
@@ -14596,7 +14618,7 @@ Defined in h1os/h1os.h:113
 | Return | Name | Description |
 |--------|------|-------------|
 | `uint32_t` | [`inactivity_timeout_sec`](#inactivity_timeout_sec)  | Interactive session idle sleep timeout in seconds. |
-| `bool` | [`enable_dfs_80mhz`](#enable_dfs_80mhz)  | Enable dynamic frequency scaling to 80MHz baseline during idle. |
+| [`sys_clk_mode_t`](#sys_clk_mode_t) | [`clk_mode`](#clk_mode)  | CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default). |
 | `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec)  | Period between headless sensor sample bursts in seconds. |
 | `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec)  | Period between unattended display flushes in seconds. |
 
@@ -14616,17 +14638,19 @@ Interactive session idle sleep timeout in seconds.
 
 ---
 
-{#enable_dfs_80mhz}
+{#clk_mode}
 
-#### enable_dfs_80mhz
+#### clk_mode
 
 ```cpp
-bool enable_dfs_80mhz
+sys_clk_mode_t clk_mode
 ```
+
+Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
 Defined in h1os/h1os.h:115
 
-Enable dynamic frequency scaling to 80MHz baseline during idle.
+CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
 ---
 

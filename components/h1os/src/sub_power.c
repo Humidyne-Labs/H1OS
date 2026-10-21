@@ -479,18 +479,25 @@ static esp_pm_lock_handle_t s_cpu_max_lock = NULL;
 /**
  * @brief Initialize Dynamic Frequency Scaling (DFS) power management.
  *
- * @details Gates CPU cores to 80 MHz baseline during quiescent and interactive periods, while allowing transient 240 MHz turbo scaling during heavy UI/compute bursts.
+ * @details Configures CPU frequency scaling based on the selected clock mode.
+ *          SYS_CLK_MODE_DYNAMIC gates CPU cores to 80 MHz baseline during quiescent periods,
+ *          allowing transient turbo scaling (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) during heavy UI/compute bursts.
+ *          SYS_CLK_MODE_FIXED_MAX locks CPU cores permanently to maximum clock (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ).
+ *          SYS_CLK_MODE_FIXED_MIN locks CPU cores permanently to 80 MHz baseline.
  *
- * @param[in]    enable_dfs      Enable DFS scaling (true = 80MHz base / 240MHz max; false = locked 80MHz).
+ * @param[in]    mode            Clock scaling mode (SYS_CLK_MODE_DYNAMIC, FIXED_MAX, FIXED_MIN).
  *
  * @return ESP_OK on success, or an error code.
  */
-esp_err_t sub_power_init_dfs(bool enable_dfs)
+esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 {
 #if CONFIG_PM_ENABLE
+    int max_freq = (mode == SYS_CLK_MODE_FIXED_MIN) ? 80 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+    int min_freq = (mode == SYS_CLK_MODE_FIXED_MAX) ? CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ : 80;
+
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = enable_dfs ? 240 : 80,
-        .min_freq_mhz = 80,
+        .max_freq_mhz = max_freq,
+        .min_freq_mhz = min_freq,
         .light_sleep_enable = false,
     };
     esp_err_t err = esp_pm_configure(&pm_config);
@@ -499,7 +506,7 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
         return err;
     }
 
-    if (enable_dfs && s_cpu_max_lock == NULL) {
+    if (mode == SYS_CLK_MODE_DYNAMIC && s_cpu_max_lock == NULL) {
         err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "h1os_turbo", &s_cpu_max_lock);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create CPU MAX PM lock: %s", esp_err_to_name(err));
@@ -507,12 +514,17 @@ esp_err_t sub_power_init_dfs(bool enable_dfs)
         }
     }
 
-    ESP_LOGI(TAG, "Dynamic Frequency Scaling initialized: %s (Base: 80 MHz, Max: %d MHz)",
-             enable_dfs ? "ENABLED" : "LOCKED",
+    const char *mode_str = (mode == SYS_CLK_MODE_DYNAMIC)   ? "DYNAMIC" :
+                           (mode == SYS_CLK_MODE_FIXED_MAX) ? "FIXED_MAX" :
+                                                              "FIXED_MIN";
+
+    ESP_LOGI(TAG, "Dynamic Frequency Scaling initialized: %s (Base: %d MHz, Max: %d MHz)",
+             mode_str,
+             pm_config.min_freq_mhz,
              pm_config.max_freq_mhz);
     return ESP_OK;
 #else
-    (void)enable_dfs;
+    (void)mode;
     ESP_LOGW(TAG, "CONFIG_PM_ENABLE disabled; DFS unavailable");
     return ESP_ERR_NOT_SUPPORTED;
 #endif

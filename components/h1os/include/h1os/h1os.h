@@ -112,7 +112,7 @@ typedef struct {
 
     struct {
         uint32_t inactivity_timeout_sec; /**< Interactive session idle sleep timeout in seconds.              */
-        bool enable_dfs_80mhz;           /**< Enable dynamic frequency scaling to 80MHz baseline during idle. */
+        sys_clk_mode_t clk_mode;         /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
         uint32_t flow_a_period_sec;      /**< Period between headless sensor sample bursts in seconds.        */
         uint32_t flow_b_period_sec;      /**< Period between unattended display flushes in seconds.           */
     } session;

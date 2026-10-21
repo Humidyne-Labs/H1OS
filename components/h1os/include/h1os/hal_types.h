@@ -106,6 +106,15 @@ typedef enum {
     H1OS_CHIME_MAX       /**< Sentinel maximum chime enum value.     */
 } h1os_chime_type_t;
 
+/**
+ * @brief System CPU clock frequency scaling and power profile modes.
+ */
+typedef enum {
+    SYS_CLK_MODE_DYNAMIC   = 0, /**< Dynamic Frequency Scaling: 80 MHz baseline, 240 MHz turbo bursts (Default). */
+    SYS_CLK_MODE_FIXED_MAX = 1, /**< Fixed Maximum Clock: Locked to max frequency (240 MHz), DFS disabled.       */
+    SYS_CLK_MODE_FIXED_MIN = 2  /**< Fixed Minimum Clock: Locked to base frequency (80 MHz), turbo disabled.     */
+} sys_clk_mode_t;
+
 #ifdef __cplusplus
 }
 #endif
