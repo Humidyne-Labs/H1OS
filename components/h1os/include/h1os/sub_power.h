@@ -9,6 +9,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "h1os/hal_types.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -116,11 +117,11 @@ bool sub_power_connected_usb(void);
 /**
  * @brief Initialize Dynamic Frequency Scaling (DFS) power management.
  *
- * @param[in] enable_dfs True to enable 80 MHz scaling during idle periods.
+ * @param[in] mode Clock scaling mode (SYS_CLK_MODE_DYNAMIC, FIXED_MAX, FIXED_MIN).
  *
  * @return ESP_OK on success.
  */
-esp_err_t sub_power_init_dfs(bool enable_dfs);
+esp_err_t sub_power_init_dfs(sys_clk_mode_t mode);
 
 /**
  * @brief Acquire CPU frequency lock at 240 MHz for compute/display intensive operations.

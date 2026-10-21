@@ -249,6 +249,7 @@ void app_main(void)
         .session =
             {
                 .inactivity_timeout_sec = 30,
+                .clk_mode               = SYS_CLK_MODE_DYNAMIC,
                 .flow_a_period_sec      = 60,
                 .flow_b_period_sec      = 300,
             },

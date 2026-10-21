@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.3.2-dev] - 2026-10-20
 
 ### 🚀 Added
+- **Explicit CPU Clock & Power Profile Scaling (sys_clk_mode_t)** (hal_types.h, sub_power.h/.c, h1os.h, h1os_lifecycle.c):
+  - Defined sys_clk_mode_t in hal_types.h (SYS_CLK_MODE_DYNAMIC = 0, SYS_CLK_MODE_FIXED_MAX = 1, SYS_CLK_MODE_FIXED_MIN = 2) to make clock scaling explicit and prevent C struct zero-initialization from clamping CPU clock to 80 MHz.
+  - Replaced ambiguous ool enable_dfs_80mhz in h1os_lifecycle_t.session with sys_clk_mode_t clk_mode.
 - **Division-Free Q12 Fixed-Point Die Temperature Math & Equilibrium Self-Tare** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.h/.c`):
   - Pre-computed `tsens_offset_centi_c` (`2052 + tsens_cal_centi_c`) on cold boot and replaced 32-bit integer division in `wake_stub_read_die_temp_centi_c()` with a single-cycle `Q12` fixed-point multiply-shift (`((int32_t)raw * 179651) >> 12`).
   - Explicitly configured `SENS_TSENS_CLK_DIV = 6` with a hardware `SENS_TSENS_RESET` pulse and 400 µs settling window in `orch_wake_stub.c` (removed legacy ESP32-S2 `SENS_TSENS_DAC` bitfield not present in ESP32-S3 `SENS_SAR_TSENS_CTRL2_REG`).
@@ -17,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Promoted `h1os_chime_type_t` and `h1os_wake_btn_t` to `hal_types.h` (Layer 1 shared types).
 
 ### 🔄 Changed
+- **Dynamic Frequency Scaling Driver Refactor & Config Alignment** (sub_power.h/.c):
+  - Refactored sub_power_init_dfs() to accept sys_clk_mode_t, dynamically setting max_freq_mhz to CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ (240 MHz) and min_freq_mhz based on the selected mode instead of hardcoded 240/80 MHz.
 - **Strict 4-Layer Architectural Separation** (`sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `orch_flow.c`, `h1os_lifecycle.c`):
   - Eliminated all upward and horizontal `#include` dependencies across Layer 2 (`sub_audio.c`, `sub_display.cpp`, `sub_power.c`) and Layer 3 (`orch_flow.c`), enforcing strictly downward `Layer 4 -> Layer 3 -> Layer 2 -> Layer 1` header inclusion.
   - Replaced cross-subsystem `sub_power_cpu_max_acquire()` calls in `sub_audio.c` with a dedicated `sub_audio` `esp_pm_lock_handle_t` (`ESP_PM_CPU_FREQ_MAX`).
@@ -34,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Pruned 48 bytes of unused fields (`wake_timestamp_epoch`, `ulp_vbat_scale`, `ulp_vbat_offset_mv`, `app_stage`, `scratchpad_len`, `scratchpad[32]`) from `orch_persisted_state_t` (shrinking RTC Slow SRAM footprint from 632 to 592 bytes) and removed 7 orphaned `BSP_*` options from `Kconfig`.
 
 ### 🛠️ Fixed
+- **DFS Baseline Underclocking Trap on Default Lifecycle Config** (sub_power.c, h1os_lifecycle.c, examples/H1OS/main/main.c):
+  - Fixed issue where omitting .enable_dfs_80mhz in application lifecycle config zero-initialized the parameter to alse, causing sub_power_init_dfs() to force max_freq_mhz = 80 and lock CPU cores permanently to 80 MHz despite CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240.
 - **EWMA Historical Baseline Protection on UI Redraws (BUG-01)** (`orch_flow.c`, `orch_state.h`):
   - Gated `temp_historical_c` / `rh_historical_pct` EWMA updates and UART ring-buffer debug dumps behind `st->total_samples != st->last_ewma_sample_seq`, preventing interactive carousel navigation from corrupting historical trends.
 - **LVGL Lock Symmetry & Non-Recursive Screen Refresh (BUG-02, BUG-03)** (`screen_base.c`, `screen_env_hero.c`, `screen_psychrometrics.c`, `screen_system_health.c`, `screen_diagnostics.c`):

@@ -252,7 +252,7 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         s_app_lifecycle = *config;
     }
 
-    sub_power_init_dfs(s_app_lifecycle.session.enable_dfs_80mhz);
+    sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
 
     hal_io_early_init();
 
