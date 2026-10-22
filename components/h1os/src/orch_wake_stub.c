@@ -46,10 +46,10 @@
 #define RTC_TIMER_INT_EN_BIT  (1 << 1)
 #define RTC_TIMER_PULSE_BIT   (1 << 0)
 
-#define RTC_TIMER_TE_BIT   (1 << 2)
-#define RTC_TIMER_TCF_MASK (3 << 3)
-#define RTC_TIMER_TCF_MIN  (3 << 3)
-#define RTC_CTRL2_COF_OFF  0x07
+#define RTC_TIMER_TE_BIT      (1 << 2)
+#define RTC_TIMER_TCF_MASK    (3 << 3)
+#define RTC_TIMER_TCF_MIN     (3 << 3)
+#define RTC_CTRL2_COF_OFF      0x07
 // clang-format on
 
 /**
@@ -373,15 +373,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* Suppress ULP GPIO wakeups while wake stub executes */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    /* LED timing vector */
-    PIN_FUNC_SELECT(IO_MUX_GPIO3_REG, PIN_FUNC_GPIO);
-    REG_WRITE(GPIO_OUT_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
-    REG_WRITE(GPIO_ENABLE_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
     if (ulp_dispatch_reason != ULP_DISPATCH_SENSOR_SAMPLE && cause != TIMER_EXPIRE) {
-        REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
+        esp_rom_delay_us(5);
         esp_default_wake_deep_sleep();
         return;
     }
@@ -389,12 +384,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     orch_persisted_state_t *st = orch_state_get();
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
-    PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG);
-    PIN_PULLUP_EN(IO_MUX_GPIO47_REG);
+    PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
 
     PIN_FUNC_SELECT(IO_MUX_GPIO48_REG, PIN_FUNC_GPIO);
-    PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG);
-    PIN_PULLUP_EN(IO_MUX_GPIO48_REG);
+    PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG); /* I2C SCL */
 
     bool sample_ok = true;
     i2c_start();
@@ -429,11 +422,11 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_stop();
             sample_ok = false;
         } else {
-            rx[0] = i2c_read_byte(true);
-            rx[1] = i2c_read_byte(true);
-            rx[2] = i2c_read_byte(true);
-            rx[3] = i2c_read_byte(true);
-            rx[4] = i2c_read_byte(true);
+            rx[0] = i2c_read_byte(true );
+            rx[1] = i2c_read_byte(true );
+            rx[2] = i2c_read_byte(true );
+            rx[3] = i2c_read_byte(true );
+            rx[4] = i2c_read_byte(true );
             rx[5] = i2c_read_byte(false);
             i2c_stop();
         }
@@ -509,7 +502,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
                       RTC_CNTL_SLP_REJECT_INT_CLR |
                       RTC_CNTL_SLP_WAKEUP_INT_CLR |
-                      RTC_CNTL_COCPU_INT_CLR |
+                      RTC_CNTL_COCPU_INT_CLR      |
                       RTC_CNTL_COCPU_TRAP_INT_CLR |
                       RTC_CNTL_ULP_CP_INT_CLR);
     REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
@@ -530,11 +523,6 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_INPUT_DISABLE(IO_MUX_GPIO48_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO48_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
-
-    /* LED timing vector END */
-    REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
-    /* 2. Tri-state Status LED so it does not actively source 3.3V in sleep */
-    REG_WRITE(GPIO_ENABLE_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
 
     esp_wake_stub_sleep(&bsp_wake_stub);
 }
