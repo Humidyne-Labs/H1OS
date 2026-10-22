@@ -91,6 +91,17 @@ static void keypad_event_cb(lv_event_t *e)
         return;
     }
 
+    if (code == LV_EVENT_SHORT_CLICKED) {
+        const uint32_t tone_rev[] = {880, 50};
+        sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
+        s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
+        ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
+                        s_app_state.active_page + 1,
+                        H1OS_NUM_SCREENS);
+        update_active_display();
+        return;
+    }
+
     if (code == LV_EVENT_KEY) {
         uint32_t key = lv_event_get_key(e);
         if (key == 0 && lv_event_get_param(e) != NULL) {
@@ -107,14 +118,6 @@ static void keypad_event_cb(lv_event_t *e)
                             H1OS_NUM_SCREENS);
             update_active_display();
             return;
-        } else if (key == LV_KEY_PREV || key == LV_KEY_LEFT || key == LV_KEY_ENTER) {
-            const uint32_t tone_rev[] = {880, 50};
-            sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
-            s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
-            ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
-                            s_app_state.active_page + 1,
-                            H1OS_NUM_SCREENS);
-            update_active_display();
         }
     }
 }

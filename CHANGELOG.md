@@ -86,7 +86,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   * Added `RTC_DATA_ATTR static bool s_rtc_codec_in_standby` in `sub_audio.c` so `sub_audio_standby()` skips redundant I2C register writes on unattended deep-sleep RTC wakes when the codec is already parked in `< 1.0 µA` standby.
 
-  * Fixed `HAL_PIN_PA_CTRL` (`GPIO 46`) readback bug where configuring `GPIO 46` as `GPIO_MODE_OUTPUT` (input buffer disabled) caused `gpio_get_level(HAL_PIN_PA_CTRL)` to return `0` even when driven HIGH, preventing `sub_audio_park_warm(true)` from pulling `PA_CTRL` LOW. Configured `HAL_PIN_PA_CTRL` as `GPIO_MODE_INPUT_OUTPUT` in `hal_io.c`, latched `GPIO 46 = 0` in `h1os_boot_hook.c`, and parked the NS4168 Class-D amplifier (`PA_CTRL = 0`) and I2S clocks immediately upon audio queue drain in `audio_worker_task()`.
+  * Fixed `HAL_PIN_PA_CTRL` (`GPIO 46`) readback bug where configuring `GPIO 46` as `GPIO_MODE_OUTPUT` (input buffer disabled) caused `gpio_get_level(HAL_PIN_PA_CTRL)` to return `0` even when driven HIGH, preventing `sub_audio_park_warm(true)` from pulling `PA_CTRL` LOW. Configured `HAL_PIN_PA_CTRL` as `GPIO_MODE_INPUT_OUTPUT` in `hal_io.c` and latched `GPIO 46 = 0` in `h1os_boot_hook.c`.
+
+  * Enforced hardware startup/shutdown timing for the NS4168 Class-D amplifier (`120 ms` unmute turn-on delay `NS4168_STARTUP_DELAY_MS`, `80 ms` mute turn-off delay `NS4168_SHUTDOWN_DELAY_MS` in `sub_audio.c`), keeping the amplifier unmuted across active 30-second user sessions (`sub_audio_park_warm(false)` in `sub_audio_init()`) with a single silent I2S DMA frame flush (`sub_audio_flush_frame()`) after queue drain so short `50 ms` navigation tones and initial chime notes are never clipped.
+
+* **Storage-Mode White Screen Shutdown (`CONFIG_H1OS_EPD_CLEAN_WHITE_ON_SHUTDOWN`) & EPD `BUSY` Synchronization** (`h1os_lvgl.cpp`, `h1os_lifecycle.c`, `sub_display.cpp`):
+
+  * Fixed task self-deletion bug in `h1os_lvgl_stop()` (`h1os_lvgl.cpp`) when `h1os_shutdown()` is called from inside an LVGL `LV_EVENT_LONG_PRESSED` callback on the `h1os_lvgl` thread (`xTaskGetCurrentTaskHandle() == s_lvgl_task_handle`), which previously terminated the executing thread before `sub_display_clear_to_white_full()` could run.
+
+  * Guarded `lv_lock()` and `lv_unlock()` in `h1os_lvgl_lock()` / `h1os_lvgl_unlock()` (`h1os_lvgl.cpp`) with `if (s_lv_display != NULL)` so ULP deep-sleep power-off (`ORCH_FLOW_CRITICAL_OFF`) does not dereference an uninitialized LVGL mutex prior to `lv_init()`.
+
+  * Updated `sub_display_clear_to_white_full()` (`sub_display.cpp`) to wake and initialize the SSD1681 (`sub_display_init(false)`) when invoked while the panel is asleep or uninitialized.
+
+  * Updated `sub_display_wait_busy()` (`sub_display.cpp`) to poll up to `15 ms` for the SSD1681 `BUSY` rising edge before returning early when `HAL_PIN_EPD_BUSY` reads LOW, ensuring `sub_display_wait_busy()` accurately reflects actual panel refresh duration (`~582 ms` partial, `~1404 ms` full OTP).
+
+  * Gated `h1os_reset_session_timer()` inside the button state-transition check (`if (btns != s_prev_logged_btns && btns != 0)`) in `lvgl_keypad_read_cb()` (`h1os_lvgl.cpp`), eliminating 33 ms log spam while holding `BOOT` or `POWER` for a 2-second long-press.
 
 * **ESP32-S3 Wake Thermal Soak & 240 MHz EPD Busy-Wait Elimination** (`h1os_lvgl.cpp`, `sub_display.cpp`, `orch_flow.c`, `h1os_lifecycle.c`, `hal_io.c`, `screen_diagnostics.c`, `sdkconfig*`):
 
@@ -653,7 +667,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   * Added strict `if (s_spi_handle == NULL) return;` guard to `bsp_display_deep_sleep()`, preventing kernel panics and crash-reboot loops when returning to deep sleep during minimal headless hot-wake sprints (`BSP_INIT_MODE_MINIMAL`).
 
-* **Internalized 60s Hot-Wake Sprint Engine & Hardware GPIO ISR Promotion** (bsp_common.c, bsp_sensors.h, https://www.google.com/search?q=examples/Unified\_Environmental\_Demo/main/main.c):
+* **Internalized 60s Hot-Wake Sprint Engine & Hardware GPIO ISR Promotion** (bsp_common.c, bsp_sensors.h, https://www.google.com/search?q=examples/Unified_Environmental_Demo/main/main.c):
 
   * Fully internalized the 60-second headless hot-wake sensor sprint inside `bsp_app_start()`, autonomously capturing NIST SHTC3/Tri-Node samples into RTC Slow Memory without invoking application-level wake hooks or activating the EPD display.
 
@@ -661,13 +675,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   * Documented SHTC3 PCB ground plane self-heating physics ($+1.5^\circ\text{C}\dots +3.0^\circ\text{C}$) directly in `bsp_sensors.h` developer guidance.
 
-* **Dual-Wake & Two-Branch Firmware Architecture** (bsp_power.c, bsp_common.c, bsp_rtc_mem.h, https://www.google.com/search?q=examples/Unified\_Environmental\_Demo/main/main.c):
+* **Dual-Wake & Two-Branch Firmware Architecture** (bsp_power.c, bsp_common.c, bsp_rtc_mem.h, https://www.google.com/search?q=examples/Unified_Environmental_Demo/main/main.c):
 
   * Implemented simultaneous dual deep-sleep wake triggers: Internal 60s RTC timer (`ESP_SLEEP_WAKEUP_TIMER`) reserved exclusively for hot-wake sprints + External PCF85063A RTC Alarm (`ESP_SLEEP_WAKEUP_EXT1`) reserved for user application scheduling.
 
   * Added `BSP_INIT_MODE_MINIMAL` to bypass SPI display and FreeRTOS LVGL tasks during headless 60s sensor sprints.
 
-* **Sub-15ms Firmware "Sleep-Sprint" Engine** (bsp_power.c, https://www.google.com/search?q=examples/Unified\_Environmental\_Demo/main/main.c):
+* **Sub-15ms Firmware "Sleep-Sprint" Engine** (bsp_power.c, https://www.google.com/search?q=examples/Unified_Environmental_Demo/main/main.c):
 
   * Enabled deep sleep fast wake stub (`esp_set_deep_sleep_wake_stub_default_entry()` / `esp_deep_sleep_disable_rom_logging()`) for ultra-rapid resume.
 
@@ -693,7 +707,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   * Standardized public telemetry APIs to `bsp_sensors_get_telemetry_history()` and `bsp_sensors_get_sample_count()`.
 
-* **EPD UI Gated Sample Counter** (https://www.google.com/search?q=examples/Unified\_Environmental\_Demo/main/main.c):
+* **EPD UI Gated Sample Counter** (https://www.google.com/search?q=examples/Unified_Environmental_Demo/main/main.c):
 
   * Replaced the transient `Sprint: %lums` badge on Row 1 ($y=140$) with a verified **Thermal-Gated Sample Counter** (`SMP: %lu`) reflecting verified environmental acquisitions logged in the RTC ring buffer.
 

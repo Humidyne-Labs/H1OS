@@ -114,16 +114,17 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
                       (btns & HAL_BTN_BOOT)  ? 1 : 0,
                       (btns & HAL_BTN_POWER) ? 1 : 0);
         s_prev_logged_btns = btns;
+        if (btns != 0) {
+            h1os_reset_session_timer();
+        }
     }
 
     if (btns & HAL_BTN_BOOT) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key = LV_KEY_RIGHT;
-        h1os_reset_session_timer();
     } else if (btns & HAL_BTN_POWER) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->key = LV_KEY_ENTER;
-        h1os_reset_session_timer();
     }
 }
 
