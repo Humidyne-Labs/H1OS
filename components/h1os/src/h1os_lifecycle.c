@@ -405,7 +405,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     if (is_rtc_wake) {
         /* Allow Core 1 LVGL task to pick up and begin flushing the updated frame */
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10));
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         uint32_t sleep_sec = st->flow_b_period_sec;
         if (sleep_sec == 0) {
@@ -474,6 +474,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->ambient_rh_pct       = rh;
         out_telemetry->dew_point_c          = dew;
         out_telemetry->dew_point_f          = (dew * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->vapor_pressure_hpa   = st->vapor_pressure_hpa;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
         out_telemetry->absolute_humidity_g  = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
@@ -493,12 +494,14 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
-        out_telemetry->mcu_die_temp_c   = (float)(latest_samp.mcu_tsens_centi_c + st->die_tare_centi_c) / 100.0f;
+        out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
         out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
-    out_telemetry->sample_count = st->total_samples;
+    out_telemetry->sample_count      = st->total_samples;
+    out_telemetry->flow_a_period_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60;
+    out_telemetry->flow_b_period_sec = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : 300;
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
@@ -506,6 +509,11 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
         out_telemetry->is_usb_powered  = sub_power_connected_usb();
+        st->last_vbat_mv               = vbat_mv;
+        if (!out_telemetry->is_usb_powered && (st->boot_vbat_mv == 0 || vbat_mv > st->boot_vbat_mv)) {
+            st->boot_vbat_mv = vbat_mv;
+        }
+        out_telemetry->boot_vbat_mv = st->boot_vbat_mv;
     }
 
     return ret;

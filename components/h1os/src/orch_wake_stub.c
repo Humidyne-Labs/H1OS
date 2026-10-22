@@ -438,7 +438,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
-        /* 32-bit unsigned hardware division (1-cycle Xtensa quou instruction) */
+        /* Factory-calibrated SHTC3 transfer equations using 32-bit unsigned hardware division (quou) */
         int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
         uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
         int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, temp_centi_c);
@@ -451,6 +451,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             uint8_t prev_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
             int16_t prev_t = st->ring[prev_idx].shtc3_temp_centi_c;
 
+            /* Steady-state gate: when |temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C, board is settled and SHTC3 is trusted */
             if (orch_math_is_plateau_settled(prev_t, temp_centi_c, SAMPLE_DELTA_GATE_CENTI_C)) {
                 st->ring[prev_idx].quality_flags |= (SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED);
                 q_flags = SAMPLE_FLAG_VALID_COLD | SAMPLE_FLAG_THERMAL_SETTLED;
@@ -458,9 +459,6 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
                     st->valid_trend = 2;
                 } else {
                     st->valid_trend++;
-                }
-                if (st->valid_trend >= 3) {
-                    st->die_tare_centi_c = temp_centi_c - die_centi_c;
                 }
             } else {
                 q_flags = 0;

@@ -1,6 +1,6 @@
 /**
  * @file orch_math.h
- * @brief Layer 3: Class-E psychrometric invariant engine and EWMA filters
+ * @brief Layer 3: Class-E psychrometric math and EWMA filters
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -45,29 +45,14 @@ float orch_math_calc_vapor_pressure(float temp_c, float rh_pct);
 float orch_math_calc_dew_point(float temp_c, float rh_pct);
 
 /**
- * @brief Psychrometrically reconstruct ambient relative humidity at the true ambient floor temperature.
+ * @brief Calculate vapor pressure and dew point directly from factory-calibrated SHTC3 readings.
  *
- * Leverages the thermodynamic principle that water vapor partial pressure remains constant
- * across PCB microclimates and self-heating boundaries.
- *
- * @param[in] vapor_pressure_hpa Conserved vapor pressure in hPa.
- * @param[in] amb_floor_temp_c   True ambient floor temperature in degrees Celsius.
- *
- * @return Reconstructed ambient relative humidity percentage (0..100%).
+ * @param[in]  temp_c     Settled SHTC3 temperature in Celsius.
+ * @param[in]  rh_pct     Settled SHTC3 relative humidity %.
+ * @param[out] out_vp_hpa Pointer to store vapor pressure in hPa.
+ * @param[out] out_dew_c  Pointer to store dew point in Celsius.
  */
-float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor_temp_c);
-
-/**
- * @brief Calculate full psychrometric suite from raw sensor readings and ambient floor temperature.
- *
- * @param[in]  temp_c       Raw sensor temperature in Celsius.
- * @param[in]  rh_pct       Raw sensor relative humidity %.
- * @param[in]  amb_floor_c  Estimated true ambient floor temperature in Celsius.
- * @param[out] out_vp_hpa   Pointer to store vapor pressure in hPa.
- * @param[out] out_dew_c    Pointer to store dew point in Celsius.
- * @param[out] out_rh_amb   Pointer to store reconstructed ambient relative humidity %.
- */
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float *out_vp_hpa, float *out_dew_c, float *out_rh_amb);
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float *out_vp_hpa, float *out_dew_c);
 
 /**
  * @brief Calculate absolute humidity in grams per cubic meter (g/m³).

@@ -8,7 +8,6 @@
 
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
-#include "h1os/orch_state.h"
 #include "screens.h"
 
 /**
@@ -51,9 +50,8 @@ void screen_env_hero_render(const h1os_telemetry_t *telem, uint32_t cycle_count,
     lv_obj_set_style_text_font(lbl_stat, H1OS_FONT_14, 0);
     lv_obj_align(lbl_stat, LV_ALIGN_TOP_LEFT, 6, 100);
 
-    orch_persisted_state_t *st = orch_state_get();
     lv_obj_t *lbl_vp = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_vp, "Vapor P:  %.1f hPa", (double)st->vapor_pressure_hpa);
+    lv_label_set_text_fmt(lbl_vp, "Vapor P:  %.1f hPa", (double)telem->vapor_pressure_hpa);
     lv_obj_set_style_text_font(lbl_vp, H1OS_FONT_14, 0);
     lv_obj_align(lbl_vp, LV_ALIGN_TOP_LEFT, 6, 126);
 

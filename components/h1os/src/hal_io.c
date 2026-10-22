@@ -44,11 +44,12 @@ esp_err_t hal_io_early_init(void)
     esp_log_level_set("sub_display", ESP_LOG_DEBUG);
     esp_log_level_set("h1os_demo", ESP_LOG_DEBUG);
 
+    gpio_set_level(HAL_PIN_PA_CTRL, 0);
     hal_io_release_pad_holds();
 
     gpio_config_t pa_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_PA_CTRL),
-        .mode = GPIO_MODE_OUTPUT,
+        .mode = GPIO_MODE_INPUT_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
@@ -451,18 +452,20 @@ esp_err_t hal_io_release_pad_holds(void)
 /**
  * @brief Check if USB Serial/JTAG is connected to an active host via SOF packets.
  *
+ * @details USB Full-Speed hosts transmit a Start-Of-Frame (SOF) packet every 1.000 ms.
+ *          Sampling both the SOF interrupt flag and frame counter delta across a single
+ *          1100 us window cuts active spin time from 3000 us to 1100 us per check.
+ *
  * @return true if USB host connection detected, false otherwise.
  */
 bool hal_check_usb_ll(void)
 {
+    uint32_t f1 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
     REG_WRITE(USB_SERIAL_JTAG_INT_CLR_REG, USB_SERIAL_JTAG_SOF_INT_CLR);
-    esp_rom_delay_us(1500);
+    esp_rom_delay_us(1100);
     if ((REG_READ(USB_SERIAL_JTAG_INT_RAW_REG) & USB_SERIAL_JTAG_SOF_INT_RAW) != 0) {
         return true;
     }
-
-    uint32_t f1 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
-    esp_rom_delay_us(1500);
     uint32_t f2 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
     return (f1 != f2);
 }

@@ -27,6 +27,7 @@ static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
 static bool s_inited = false;
+static bool s_in_deep_sleep = false;
 static int16_t s_last_glass_temp_centi_c = 0;
 
 static const uint8_t WF_PARTIAL_1IN54[159] = {
@@ -43,20 +44,25 @@ static const uint8_t WF_PARTIAL_1IN54[159] = {
 /**
  * @brief Epd reset pulse.
  *
+ * @details Wakes SSD1681 out of Deep Sleep Mode 1 (0x10 = 0x01) and resets state machine.
+ *
  * @return Return value of type static void.
  */
 static void epd_reset_pulse(void)
 {
     gpio_set_level(HAL_PIN_EPD_RST, 0);
-    esp_rom_delay_us(10000);
+    esp_rom_delay_us(2000);
     gpio_set_level(HAL_PIN_EPD_RST, 1);
-    esp_rom_delay_us(10000);
+    esp_rom_delay_us(2000);
+    s_in_deep_sleep = false;
 }
 
 /**
  * @brief Synchronously wait for EPD panel to finish driving electrophoretic particles.
  *
- * @details Blocks on binary semaphore driven by GPIO 8 (BUSY) falling edge.
+ * @details Waits up to 15 ms for the SSD1681 state machine to assert BUSY HIGH (1) after
+ *          a command (e.g. 0x20 Master Activation or 0x12 SW Reset), then polls until
+ *          BUSY drops back LOW (0).
  *
  * @param[in]    timeout_ticks   Max FreeRTOS ticks to wait.
  *
@@ -64,7 +70,13 @@ static void epd_reset_pulse(void)
  */
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
-    esp_rom_delay_us(200);
+    /* Wait up to 15 ms for BUSY (GPIO 8) to assert HIGH after command issue */
+    for (int i = 0; i < 60; i++) {
+        if (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
+            break;
+        }
+        esp_rom_delay_us(250);
+    }
 
     TickType_t start_ticks = xTaskGetTickCount();
     while (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
@@ -110,7 +122,7 @@ static void epd_configure_base_registers(void)
 /**
  * @brief Initialize SSD1681 display controller.
  *
- * @details Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization semaphore.
+ * @details Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization.
  *
  * @param[in]    is_wake_cycle   True if resuming from deep sleep with persistent framebuffer.
  *
@@ -119,15 +131,23 @@ static void epd_configure_base_registers(void)
 esp_err_t sub_display_init(bool is_wake_cycle)
 {
     (void)is_wake_cycle;
-    if (s_inited)
+    if (s_inited) {
+        if (s_in_deep_sleep) {
+            epd_reset_pulse();
+            sub_display_wait_busy(pdMS_TO_TICKS(1000));
+            hal_spi_write_cmd(0x12);
+            sub_display_wait_busy(pdMS_TO_TICKS(1000));
+            epd_configure_base_registers();
+        }
         return ESP_OK;
+    }
 
     hal_spi_init();
 
     gpio_config_t busy_conf = {
         .pin_bit_mask = (1ULL << HAL_PIN_EPD_BUSY),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
@@ -244,6 +264,10 @@ esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
  */
 esp_err_t sub_display_refresh_full(void)
 {
+    if (!s_inited || s_in_deep_sleep) {
+        sub_display_init(false);
+    }
+
     int64_t t_start = esp_timer_get_time();
 
     hal_spi_write_cmd(0x12);
@@ -274,11 +298,16 @@ esp_err_t sub_display_refresh_full(void)
  * @brief Clear display to pure white and trigger full OTP refresh.
  *
  * @details Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+ *          Ensures SPI2 and SSD1681 are initialized and awake even when invoked directly from
+ *          deep-sleep ULP power-off wakes (ORCH_FLOW_CRITICAL_OFF).
  *
  * @return ESP_OK on success.
  */
 esp_err_t sub_display_clear_to_white_full(void)
 {
+    if (!s_inited || s_in_deep_sleep) {
+        sub_display_init(false);
+    }
     memset(s_current_frame, 0xFF, EPD_BUFFER_SIZE);
     memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
     ESP_LOGI(TAG, "Clearing e-Paper display to pure white for storage / burn-in protection...");
@@ -320,6 +349,10 @@ static void epd_load_custom_lut(const uint8_t *lut_buffer)
  */
 esp_err_t sub_display_refresh_partial(void)
 {
+    if (!s_inited || s_in_deep_sleep) {
+        sub_display_init(false);
+    }
+
     int64_t t_start = esp_timer_get_time();
 
     epd_commit_ram_dma(0x24, s_current_frame);
@@ -416,10 +449,15 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
  */
 esp_err_t sub_display_enter_deep_sleep(void)
 {
+    if (!s_inited || s_in_deep_sleep) {
+        return ESP_OK;
+    }
+
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
     uint8_t d_sleep[] = {0x01};
     hal_spi_write_cmd(0x10);
     hal_spi_write_data(d_sleep, sizeof(d_sleep));
+    s_in_deep_sleep = true;
     return ESP_OK;
 }

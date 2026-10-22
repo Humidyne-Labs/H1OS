@@ -18,7 +18,8 @@
 
 #define H1OS_PIN_POWER_HOLD 17
 #define H1OS_PIN_EPD_3V3_EN 6
-#define H1OS_PIN_PA_EN 42
+#define H1OS_PIN_PA_EN      42
+#define H1OS_PIN_PA_CTRL    46
 
 static const char *TAG = "H1OS_BOOT_HOOK";
 
@@ -59,6 +60,13 @@ void bootloader_before_init(void)
     gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN, 0);
     gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
     gpio_ll_hold_en(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
+
+    gpio_ll_hold_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
+    esp_rom_gpio_pad_select_gpio(H1OS_PIN_PA_CTRL);
+    esp_rom_gpio_connect_out_signal(H1OS_PIN_PA_CTRL, SIG_GPIO_OUT_IDX, false, false);
+    gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL, 0);
+    gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
+    gpio_ll_hold_en(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
 }
 
 /**
