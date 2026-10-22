@@ -1,0 +1,1 @@
+- Thermal-Cam seems to match SHTC3 readings. Local Env 25-26C, further testing is still needed.
