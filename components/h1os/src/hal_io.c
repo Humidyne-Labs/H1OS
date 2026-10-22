@@ -413,6 +413,20 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
+    /* Deinit i2s pins and latch to known state */
+    const gpio_num_t i2s_pins[] = { 
+        HAL_PIN_I2S_MCLK, HAL_PIN_I2S_SCLK, 
+        HAL_PIN_I2S_LRCK, HAL_PIN_I2S_DSDIN, 
+        HAL_PIN_I2S_ASDOUT
+    };
+
+    for(int i = 0;  i < sizeof(i2s_pins)/sizeof(i2s_pins[0]); i++) {
+        gpio_reset_pin(i2s_pins[i]); /**< Reset State Before Sleep */
+        gpio_set_direction(i2s_pins[i], GPIO_MODE_OUTPUT);
+        gpio_set_level(i2s_pins[i], 0);
+        gpio_hold_en(i2s_pins[i]);
+    }
+
     if (s_led_pwm_active) {
         hal_led_pwm_deinit();
     }
@@ -445,6 +459,13 @@ esp_err_t hal_io_release_pad_holds(void)
     gpio_hold_dis(HAL_PIN_EPD_RST);
     gpio_hold_dis(HAL_PIN_PA_CTRL);
     gpio_hold_dis(HAL_PIN_STATUS_LED);
+
+    /* Remove IO Latch on Wake */
+    gpio_hold_dis(HAL_PIN_I2S_MCLK);
+    gpio_hold_dis(HAL_PIN_I2S_SCLK);
+    gpio_hold_dis(HAL_PIN_I2S_LRCK);
+    gpio_hold_dis(HAL_PIN_I2S_DSDIN);
+    gpio_hold_dis(HAL_PIN_I2S_ASDOUT);
 
     return ESP_OK;
 }

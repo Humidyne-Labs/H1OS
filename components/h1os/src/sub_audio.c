@@ -147,13 +147,13 @@ static const uint8_t es8311_perceptual_vol_table[101] = {
  */
 static const es8311_reg_entry_t s_es8311_init_pre_charge[] =
 {
-    /* Analog / System startup */
+    /* Analog / System startup                                                                                 */
     {0x44, 0x08}, /**< REG44: Set internal analog bias / reference current                                     */
     {0x44, 0x08}, /**< REG44: Write repeated to ensure stable latching during startup                          */
 
     {0x0D, 0xFA}, /**< REG0D: System power down control - power down digital/modulators prior to configuration */
 
-    /* Clock & Power Setup */
+    /* Clock & Power Setup                                                                                     */
     {0x01, 0x30}, /**< REG01: Clock management - enable dig_mclk, BCLK/MCLK source selection                   */
     {0x02, 0x00}, /**< REG02: Clock divider - pre-divider/MCLK division ratio                                  */
     {0x03, 0x10}, /**< REG03: ADC clock divider (DIV_CLKADC) & DAC clock divider (DIV_CLKDAC)                  */
@@ -163,24 +163,24 @@ static const es8311_reg_entry_t s_es8311_init_pre_charge[] =
     {0x0B, 0x00}, /**< REG0B: Clock gating / internal clock route enables                                      */
     {0x0C, 0x00}, /**< REG0C: Digital system reset / clock synchronization                                     */
 
-    /* Digital Audio Serial Interface (SDP) Setup */
+    /* Digital Audio Serial Interface (SDP) Setup                                                              */
     {0x10, 0x1F}, /**< REG10: SDP in/out format (e.g., standard I2S format, 16/24/32-bit data length)          */
     {0x11, 0x7F}, /**< REG11: SDP control - slave/master mode, tri-state, clock polarity                       */
 
-    /* System Reset & Power Configuration */
+    /* System Reset & Power Configuration                                                                      */
     {0x00, 0x80}, /**< REG00: Chip control - CSM (Clock State Machine) reset / digital reset                   */
     {0x01, 0x3F}, /**< REG01: Clock management - un-gate digital clocks for ADC, DAC, and SDP                  */
     {0x06, 0x03}, /**< REG06: Master LRCK divider low byte (DIV_LRCK[7:0])                                     */
     {0x07, 0x00}, /**< REG07: Master LRCK divider fine adjustment / BCLK-to-LRCK ratio                         */
     {0x08, 0xFF}, /**< REG08: Master mode BCLK divider settings                                                */
 
-    /* Analog Front-End (PGA / MIC / Reference) */
+    /* Analog Front-End (PGA / MIC / Reference)                                                                */
     {0x13, 0x10}, /**< REG13: Analog bias circuit power up / current trimming                                  */
     {0x1B, 0x0A}, /**< REG1B: ADC Analog PGA / input amplifier gain stage                                      */
     {0x1C, 0x6A}, /**< REG1C: MIC bias generator enable, level tuning (e.g., 2.0V/2.4V), and reference voltage */
     {0x44, 0x58}, /**< REG44: Analog charge pump / fast charge control for DC blocking caps                    */
 
-    /* Serial Data Port (SDP) Routing */
+    /* Serial Data Port (SDP) Routing                                                                          */
     {0x09, 0x0C}, /**< REG09: SDP input configuration (DAC data channel select, unmute, polarity)              */
     {0x0A, 0x0C}, /**< REG0A: SDP output configuration (ADC data channel select, tri-state control)            */
 };
@@ -191,7 +191,7 @@ static const es8311_reg_entry_t s_es8311_init_pre_charge[] =
  */
 static const es8311_reg_entry_t s_es8311_init_post_charge[] =
 {
-    /* Analog Power Up */
+    /* Analog Power Up                                                                            */
     {0x17, 0xBF}, /**< REG17: ADC & DAC analog circuitry power-up, reference buffer enable        */
     {0x0E, 0x02}, /**< REG0E: Modulator & interpolator/decimator filter power-up                  */
     {0x12, 0x00}, /**< REG12: System power-up - activate CSM (Clock State Machine)                */
@@ -199,11 +199,11 @@ static const es8311_reg_entry_t s_es8311_init_post_charge[] =
     {0x0D, 0x01}, /**< REG0D: Clear power-down bits to wake DAC/ADC digital modulators            */
     {0x15, 0x40}, /**< REG15: Output amplifier power & low-noise bias settings                    */
 
-    /* Digital Processing & Dynamic Range Control (DRC) */
+    /* Digital Processing & Dynamic Range Control (DRC)                                           */
     {0x37, 0x08}, /**< REG37: DAC digital filter configuration & mute/demute slope rate           */
     {0x45, 0x00}, /**< REG45: DAC DRC / limiter control disable or baseline setup                 */
 
-    /* Volume / Path Enable */
+    /* Volume / Path Enable                                                                       */
     {0x31, 0x00}, /**< REG31: DAC digital mute control (0x00 = unmute DAC channel)                */
 };
 
@@ -213,11 +213,11 @@ static const es8311_reg_entry_t s_es8311_init_post_charge[] =
  */
 static const es8311_reg_entry_t s_es8311_deinit[] =
 {
-    /* Soft Mute Outputs */
+    /* Soft Mute Outputs                                                                           */
     {0x31, 0x60}, /**< REG31: DAC digital mute enable (mute DAC, enable soft-ramp to prevent pops) */
     {0x32, 0x00}, /**< REG32: DAC digital volume set to minimum (-95.5 dB)                         */
 
-    /* Power Down Driver & Analog Blocks */
+    /* Power Down Driver & Analog Blocks                                                           */
     {0x12, 0x02}, /**< REG12: Stop CSM / place internal state machines into standby                */
     {0x0E, 0xFF}, /**< REG0E: Power down digital modulators, decimation, and interpolation filters */
     {0x13, 0x00}, /**< REG13: Power down internal analog bias current generator                    */
@@ -227,11 +227,16 @@ static const es8311_reg_entry_t s_es8311_deinit[] =
     {0x1C, 0x00}, /**< REG1C: Power down microphone bias generator and reference                   */
     {0x45, 0x00}, /**< REG45: Reset DRC control registers                                          */
 
-    /* Power Down Digital System & References (Preserve RST_REG=0 in REG00 so 0x0D=0xFC is retained) */
+    /* Power Down Digital System & References                                                      */
+    /* Preserve RST_REG=0 in REG00 so 0x0D=0xFC is retained                                        */
     {0x0D, 0xFC}, /**< REG0D: Assert power down across all analog & VMID system blocks (<1.0 uA)   */
     {0x00, 0x1E}, /**< REG00: Reset digital/DAC/ADC/CSM blocks, CSM_ON=0, RST_REG=0 (retain regs)  */
     {0x01, 0x00}, /**< REG01: Disable all internal digital clocks (enter ultra-low-power standby)  */
 };
+
+#define S_ES8311_INIT_PRE_CHARGE_SIZE    (sizeof(s_es8311_init_pre_charge)  / sizeof(s_es8311_init_pre_charge[0]) ) /**< Pre Charge Table Size Macro  */
+#define S_ES8311_INIT_POST_CHARGE_SIZE   (sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0])) /**< Post Charge Table Size Macro */
+#define S_ES8311_DEINIT_SIZE             (sizeof(s_es8311_deinit)           / sizeof(s_es8311_deinit[0])          ) /**< Deinit Table Size Macro      */
 
 /**
  * @brief Volume pct to es8311 reg.
@@ -285,8 +290,9 @@ static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *val)
  */
 static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 {
-    if (chip_id == NULL)
+    if (chip_id == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     uint8_t id1 = 0, id2 = 0;
 
@@ -307,7 +313,7 @@ static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
  *
  * @return ESP_OK on success, or an error code.
  */
-static esp_err_t sub_audio_flush_frame(void)
+static esp_err_t __unused sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (s_audio_inited && s_i2s_chan_enabled) {
@@ -392,14 +398,12 @@ static esp_err_t es8311_init_dac_registers(void)
 {
     esp_err_t ret = ESP_OK;
 
-    ret |= es8311_write_table(s_es8311_init_pre_charge,
-                                sizeof(s_es8311_init_pre_charge) / sizeof(s_es8311_init_pre_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_pre_charge, S_ES8311_INIT_PRE_CHARGE_SIZE);
 
     /* Delay Needed for Internal Analog Frontend Charge Pump */
     vTaskDelay(pdMS_TO_TICKS(35));
 
-    ret |= es8311_write_table(s_es8311_init_post_charge,
-                                sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]));
+    ret |= es8311_write_table(s_es8311_init_post_charge, S_ES8311_INIT_POST_CHARGE_SIZE);
 
     /* Low Power Mode DOES Affect Audio Quality Marginally */
     ret |= es8311_write_reg(ES8311_REG_SYS_LP_MOD, s_low_power_mode ? 0x80 : 0x00);
@@ -416,31 +420,49 @@ static esp_err_t es8311_init_dac_registers(void)
  */
 esp_err_t sub_audio_init(uint8_t volume_pct)
 {
-    if (s_audio_inited)
+    if (s_audio_inited) {
         return ESP_OK;
+    }
 
     audio_cpu_max_acquire();
 
     /* Disable Class D Audio Amp during codec pre-charge */
     sub_audio_park_warm(true);
 
+	/* Probe Bus for Device */
+	esp_err_t err = hal_i2c_probe(HAL_I2C_ADDR_ES8311);
+	if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Device Not Found: %s", esp_err_to_name(err));
+        s_audio_inited = false;
+        audio_cpu_max_release();        
+		return ESP_ERR_NOT_FOUND;
+    }
+
     uint16_t chip_id = 0x0000;
-    sub_audio_read_chip_id(&chip_id);
+    err = sub_audio_read_chip_id(&chip_id);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Chip read failed: %s", esp_err_to_name(err));
+        s_audio_inited = false;
+        audio_cpu_max_release();
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
     if (chip_id != 0x8311) {
-        ESP_LOGE(TAG, "Chip ID NOT Valid (0x%04X)", chip_id);
+        ESP_LOGE(TAG, "Chip ID invalid (0x%04X, expected 0x8311)", chip_id);
         s_audio_inited = false;
         audio_cpu_max_release();
         return ESP_ERR_INVALID_VERSION;
-    } else {
-        ESP_LOGI(TAG, "Chip ID Valid (0x%04X)", chip_id);
     }
+
+    ESP_LOGI(TAG, "Chip ID valid (0x%04X)", chip_id);
 
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     chan_cfg.auto_clear        = true;
     chan_cfg.dma_desc_num      = 4;
     chan_cfg.dma_frame_num     = FRAME_SIZE;
 
-    esp_err_t err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
+    err = i2s_new_channel(&chan_cfg, &s_tx_chan, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2S TX channel: %s", esp_err_to_name(err));
         audio_cpu_max_release();
@@ -530,7 +552,6 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
 
     /* Enable Class D Audio Amp (120 ms hardware startup) for zero-latency interactive session tones */
     sub_audio_park_warm(false);
-    sub_audio_flush_frame();
     sub_audio_set_volume(volume_pct);
 
     audio_cpu_max_release();
@@ -556,7 +577,9 @@ static esp_err_t sub_audio_park_warm(bool park_mute)
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
         s_pa_enabled = target_enabled;
 
-        /* Startup / Shutdown Times Confirmed: 120ms up (target_enabled=true), 80ms down (park_mute=true) */
+        /* Startup / Shutdown Times Confirmed:  */ 
+        /*   120ms up   (target_enabled=true)   */
+        /*   80ms  down (park_mute=true)        */
         vTaskDelay(pdMS_TO_TICKS(target_enabled ? 120 : 80));
     }
 
@@ -582,8 +605,7 @@ esp_err_t sub_audio_standby(void)
         return ESP_OK;
     }
 
-    esp_err_t ret = es8311_write_table(s_es8311_deinit,
-                                        sizeof(s_es8311_deinit) / sizeof(s_es8311_deinit[0]));
+    esp_err_t ret = es8311_write_table(s_es8311_deinit, S_ES8311_DEINIT_SIZE);
 
     s_codec_in_standby     = true;
     s_rtc_codec_in_standby = (ret == ESP_OK);
@@ -848,10 +870,6 @@ static void audio_worker_task(void *pvParameters)
             default:
                 res = ESP_ERR_INVALID_ARG;
                 break;
-            }
-
-            if (uxQueueMessagesWaiting(s_audio_queue) == 0) {
-                sub_audio_flush_frame();
             }
 
             if (cmd.result) {

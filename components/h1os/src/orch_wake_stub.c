@@ -323,7 +323,7 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
         timer_val = (uint8_t)((seconds + 59) / 60);
     }
 
-    uint8_t stop_mode  = clk_src | RTC_TIMER_INT_EN_BIT | RTC_TIMER_PULSE_BIT;
+    uint8_t stop_mode  = clk_src   | RTC_TIMER_INT_EN_BIT | RTC_TIMER_PULSE_BIT;
     uint8_t start_mode = stop_mode | RTC_TIMER_TE_BIT;
 
     /* 1. Stop timer */
@@ -340,18 +340,25 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 }
 
 /**
- * @brief Shtc3 send sleep.
- *
- * @return Return value of type static void RTC_IRAM_ATTR.
+ * @brief Reliable SHTC3 sleep dispatch with ACK verification.
+ * 
+ * @return Return value of sleep command wright status.
  */
-static void RTC_IRAM_ATTR shtc3_send_sleep(void)
+static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 {
-    i2c_start();
-    if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
-        i2c_write_byte(0xB0);
-        i2c_write_byte(0x98);
+    bool ok = false;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        i2c_start();
+        if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+            if (i2c_write_byte(0xB0) && i2c_write_byte(0x98)) {
+                ok = true;
+            }
+        }
+        i2c_stop();
+        if (ok) break;
+        esp_rom_delay_us(50);
     }
-    i2c_stop();
+    return ok; /**< Sensor Was Not Sleeping as Expected, Now Fixed */
 }
 
 /**
@@ -515,8 +522,20 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
+    /* 1. Tear down I2C pads to eliminate deep-sleep leakage */
+    PIN_INPUT_DISABLE(IO_MUX_GPIO47_REG);
+    PIN_PULLUP_DIS(IO_MUX_GPIO47_REG);
+    REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
+
+    PIN_INPUT_DISABLE(IO_MUX_GPIO48_REG);
+    PIN_PULLUP_DIS(IO_MUX_GPIO48_REG);
+    REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
+
     /* LED timing vector END */
     REG_WRITE(GPIO_OUT_W1TS_REG, (1UL << HAL_PIN_STATUS_LED));
+    /* 2. Tri-state Status LED so it does not actively source 3.3V in sleep */
+    REG_WRITE(GPIO_ENABLE_W1TC_REG, (1UL << HAL_PIN_STATUS_LED));
+
     esp_wake_stub_sleep(&bsp_wake_stub);
 }
 
