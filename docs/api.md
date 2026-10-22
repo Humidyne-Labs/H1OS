@@ -235,7 +235,7 @@ Defined in main.c:59
 #define HAL_LEDC_TIMER LEDC_TIMER_0
 ```
 
-Defined in hal_io.c:107
+Defined in hal_io.c:108
 
 ---
 
@@ -247,7 +247,7 @@ Defined in hal_io.c:107
 #define HAL_LEDC_MODE LEDC_LOW_SPEED_MODE
 ```
 
-Defined in hal_io.c:108
+Defined in hal_io.c:109
 
 ---
 
@@ -259,7 +259,7 @@ Defined in hal_io.c:108
 #define HAL_LEDC_CHANNEL LEDC_CHANNEL_0
 ```
 
-Defined in hal_io.c:109
+Defined in hal_io.c:110
 
 ---
 
@@ -271,7 +271,7 @@ Defined in hal_io.c:109
 #define HAL_LEDC_DUTY_RES LEDC_TIMER_10_BIT
 ```
 
-Defined in hal_io.c:110
+Defined in hal_io.c:111
 
 ---
 
@@ -283,7 +283,7 @@ Defined in hal_io.c:110
 #define HAL_LEDC_FREQUENCY 5000
 ```
 
-Defined in hal_io.c:111
+Defined in hal_io.c:112
 
 ---
 
@@ -1151,27 +1151,15 @@ Defined in orch_flow.c:41
 
 ---
 
-{#orch_leakage_margin_c}
-
-### ORCH_LEAKAGE_MARGIN_C
-
-```cpp
-#define ORCH_LEAKAGE_MARGIN_C 0.50f
-```
-
-Defined in orch_flow.c:42
-
----
-
 {#orch_trinode_span_c}
 
 ### ORCH_TRINODE_SPAN_C
 
 ```cpp
-#define ORCH_TRINODE_SPAN_C 15.0f
+#define ORCH_TRINODE_SPAN_C 5.0f
 ```
 
-Defined in orch_flow.c:43
+Defined in orch_flow.c:42
 
 ---
 
@@ -1207,7 +1195,7 @@ Defined in orch_math.c:16
 #define M_PI 3.14159265358979323846f
 ```
 
-Defined in sub_audio.c:25
+Defined in sub_audio.c:27
 
 ---
 
@@ -1219,7 +1207,7 @@ Defined in sub_audio.c:25
 #define ES8311_REG_RESET 0x00
 ```
 
-Defined in sub_audio.c:31
+Defined in sub_audio.c:33
 
 ---
 
@@ -1231,7 +1219,7 @@ Defined in sub_audio.c:31
 #define ES8311_REG_SYS_PWR_ANA 0x0D
 ```
 
-Defined in sub_audio.c:32
+Defined in sub_audio.c:34
 
 ---
 
@@ -1243,7 +1231,7 @@ Defined in sub_audio.c:32
 #define ES8311_REG_SYS_LP_MOD 0x0F
 ```
 
-Defined in sub_audio.c:33
+Defined in sub_audio.c:35
 
 ---
 
@@ -1255,7 +1243,7 @@ Defined in sub_audio.c:33
 #define ES8311_REG_DAC_PWR 0x12
 ```
 
-Defined in sub_audio.c:34
+Defined in sub_audio.c:36
 
 ---
 
@@ -1267,7 +1255,7 @@ Defined in sub_audio.c:34
 #define ES8311_REG_DAC_VOL 0x32
 ```
 
-Defined in sub_audio.c:35
+Defined in sub_audio.c:37
 
 ---
 
@@ -1279,7 +1267,7 @@ Defined in sub_audio.c:35
 #define ES8311_REG_FLAG 0xFC
 ```
 
-Defined in sub_audio.c:36
+Defined in sub_audio.c:38
 
 ---
 
@@ -1291,7 +1279,7 @@ Defined in sub_audio.c:36
 #define ES8311_REG_CHIP_ID1 0xFD
 ```
 
-Defined in sub_audio.c:37
+Defined in sub_audio.c:39
 
 ---
 
@@ -1303,7 +1291,7 @@ Defined in sub_audio.c:37
 #define ES8311_REG_CHIP_ID2 0xFE
 ```
 
-Defined in sub_audio.c:38
+Defined in sub_audio.c:40
 
 ---
 
@@ -1315,7 +1303,7 @@ Defined in sub_audio.c:38
 #define FRAME_SIZE 0x100
 ```
 
-Defined in sub_audio.c:40
+Defined in sub_audio.c:42
 
 ---
 
@@ -1369,7 +1357,7 @@ Fixed capacity of historical telemetry sample ring buffer.
 
 Defined in h1os/orch_state.h:34
 
-Cold baseline sample captured before MCU self-heating.
+Steady-state sample captured during quiescent sleep.
 
 ---
 
@@ -1397,7 +1385,7 @@ Thermal plateau settled indicator.
 
 Defined in h1os/orch_state.h:36
 
-Maximum allowable drift for thermal plateau (0.20°C).
+Maximum allowable drift for steady state (0.20°C).
 
 ---
 
@@ -1409,7 +1397,7 @@ Maximum allowable drift for thermal plateau (0.20°C).
 #define ORCH_FLAG_NONE 0
 ```
 
-Defined in h1os/orch_state.h:102
+Defined in h1os/orch_state.h:101
 
 No persistent flags active.
 
@@ -1423,7 +1411,7 @@ No persistent flags active.
 #define ORCH_FLAG_EPD_FRAME_VALID (1 << 0)
 ```
 
-Defined in h1os/orch_state.h:103
+Defined in h1os/orch_state.h:102
 
 Flash partition contains valid preserved display frame.
 
@@ -1437,7 +1425,7 @@ Flash partition contains valid preserved display frame.
 #define ORCH_FLAG_CRITICAL_BATTERY (1 << 1)
 ```
 
-Defined in h1os/orch_state.h:104
+Defined in h1os/orch_state.h:103
 
 Battery below brownout threshold.
 
@@ -1451,7 +1439,7 @@ Battery below brownout threshold.
 #define ORCH_FLAG_THERMAL_LOCKOUT (1 << 2)
 ```
 
-Defined in h1os/orch_state.h:105
+Defined in h1os/orch_state.h:104
 
 Self-heating lockout active.
 
@@ -1726,6 +1714,18 @@ Defined in h1os_boot_hook.c:20
 ```
 
 Defined in h1os_boot_hook.c:21
+
+---
+
+{#h1os_pin_pa_ctrl}
+
+### H1OS_PIN_PA_CTRL
+
+```cpp
+#define H1OS_PIN_PA_CTRL 46
+```
+
+Defined in h1os_boot_hook.c:22
 
 ---
 
@@ -2160,7 +2160,7 @@ Deep sleep cycle execution modes.
 enum audio_cmd_type_t
 ```
 
-Defined in sub_audio.c:42
+Defined in sub_audio.c:44
 
 | Value | Description |
 |-------|-------------|
@@ -2354,7 +2354,7 @@ ESP_OK if external time was synchronized, or error code.
 static inline const char * h1os_get_version(void)
 ```
 
-Defined in h1os/h1os.h:161
+Defined in h1os/h1os.h:165
 
 Get the H1OS semantic version string.
 
@@ -2371,7 +2371,7 @@ Null-terminated semantic version string (e.g. "2.3.2-dev").
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os/h1os.h:179
+Defined in h1os/h1os.h:183
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -2402,7 +2402,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os/h1os.h:193
+Defined in h1os/h1os.h:197
 
 Set audio subsystem output volume percentage.
 
@@ -2436,7 +2436,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os/h1os.h:207
+Defined in h1os/h1os.h:211
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -2466,7 +2466,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os/h1os.h:221
+Defined in h1os/h1os.h:225
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -2496,7 +2496,7 @@ ESP_OK on success, or an error code.
 void h1os_reset_session_timer(void)
 ```
 
-Defined in h1os/h1os.h:229
+Defined in h1os/h1os.h:233
 
 Reset the interactive session inactivity timer.
 
@@ -2516,7 +2516,7 @@ Reset the interactive session inactivity timer.
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os/h1os.h:236
+Defined in h1os/h1os.h:240
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -2536,7 +2536,7 @@ true if running in an interactive user session, false during unattended wakes.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os/h1os.h:244
+Defined in h1os/h1os.h:248
 
 Orderly system shutdown and physical battery power cut.
 
@@ -2552,7 +2552,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os/h1os.h:252
+Defined in h1os/h1os.h:256
 
 Shutdown for long-term storage.
 
@@ -2999,6 +2999,8 @@ Check if USB Serial/JTAG is connected to an active host via SOF packets.
 #### Returns
 True if USB host connection detected, false otherwise.
 
+USB Full-Speed hosts transmit a Start-Of-Frame (SOF) packet every 1.000 ms. Sampling both the SOF interrupt flag and frame counter delta across a single 1100 us window cuts active spin time from 3000 us to 1100 us per check.
+
 #### Returns
 true if USB host connection detected, false otherwise.
 
@@ -3031,7 +3033,7 @@ ESP_OK on success, or driver error code.
 esp_err_t hal_io_release_power_latch(void)
 ```
 
-Defined in hal_io.c:98
+Defined in hal_io.c:99
 
 Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
 
@@ -3050,7 +3052,7 @@ ESP_OK on success.
 esp_err_t hal_led_pwm_init(void)
 ```
 
-Defined in hal_io.c:122
+Defined in hal_io.c:123
 
 Initializes LEDC hardware PWM controller for user LED on GPIO 3.
 
@@ -3069,7 +3071,7 @@ ESP_OK on success.
 esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
 ```
 
-Defined in hal_io.c:174
+Defined in hal_io.c:175
 
 Sets user LED brightness percentage using hardware PWM (0..100%).
 
@@ -3092,7 +3094,7 @@ ESP_OK on success.
 esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
 ```
 
-Defined in hal_io.c:199
+Defined in hal_io.c:200
 
 Smoothly fades user LED to target brightness using hardware fade engine.
 
@@ -3120,7 +3122,7 @@ ESP_OK on success.
 static void led_breath_task(void * arg)
 ```
 
-Defined in hal_io.c:225
+Defined in hal_io.c:226
 
 Led breath task.
 
@@ -3143,7 +3145,7 @@ Return value of type static void.
 esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 ```
 
-Defined in hal_io.c:265
+Defined in hal_io.c:266
 
 Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
 
@@ -3168,7 +3170,7 @@ ESP_OK on success, or ESP_FAIL if task creation fails.
 esp_err_t hal_led_stop_breathing(void)
 ```
 
-Defined in hal_io.c:297
+Defined in hal_io.c:298
 
 Stops the asynchronous breathing task and turns the LED off.
 
@@ -3185,7 +3187,7 @@ ESP_OK on success.
 bool hal_led_is_breathing(void)
 ```
 
-Defined in hal_io.c:322
+Defined in hal_io.c:323
 
 Queries whether the asynchronous breathing task is actively running.
 
@@ -3202,7 +3204,7 @@ True if breathing task is active, false otherwise.
 esp_err_t hal_led_pwm_deinit(void)
 ```
 
-Defined in hal_io.c:332
+Defined in hal_io.c:333
 
 Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
 
@@ -3219,7 +3221,7 @@ ESP_OK on success.
 esp_err_t hal_io_set_led(bool on)
 ```
 
-Defined in hal_io.c:365
+Defined in hal_io.c:366
 
 Controls user status LED (GPIO 3, Active LOW).
 
@@ -3242,7 +3244,7 @@ ESP_OK on success.
 hal_btn_mask_t hal_io_read_buttons(void)
 ```
 
-Defined in hal_io.c:382
+Defined in hal_io.c:383
 
 Samples instantaneous state of hardware tactile buttons.
 
@@ -3259,7 +3261,7 @@ Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 esp_err_t hal_io_isolate_sleep_pads(void)
 ```
 
-Defined in hal_io.c:404
+Defined in hal_io.c:405
 
 Configures and locks dynamic peripheral lines prior to deep sleep.
 
@@ -3286,7 +3288,7 @@ ESP_OK on success.
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in hal_io.c:434
+Defined in hal_io.c:435
 
 Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
 
@@ -3303,9 +3305,11 @@ ESP_OK on success.
 bool hal_check_usb_ll(void)
 ```
 
-Defined in hal_io.c:456
+Defined in hal_io.c:461
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
+
+USB Full-Speed hosts transmit a Start-Of-Frame (SOF) packet every 1.000 ms. Sampling both the SOF interrupt flag and frame counter delta across a single 1100 us window cuts active spin time from 3000 us to 1100 us per check.
 
 #### Returns
 true if USB host connection detected, false otherwise.
@@ -5110,6 +5114,8 @@ Signals the event loop to terminate cleanly and waits for task exit.
 
 * ESP_OK: Task stopped successfully.
 
+Safely handles being called from within an LVGL input callback on the LVGL task thread itself (e.g. long-press shutdown) without self-deletion.
+
 #### Returns
 ESP_OK on success, or an error code.
 
@@ -5538,10 +5544,10 @@ True if radio/CPU self-heating is actively decaying.
 
 Check whether thermal self-heating lockout is currently active.
 
-If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibrium.
+Returns true until at least two consecutive Flow A samples have settled within SAMPLE_DELTA_GATE_CENTI_C (|temp2 - temp1| <= 0.20 C).
 
 #### Returns
-True if in lockout, False if in thermal equilibrium.
+True if settling (lockout), False if board is in thermal steady state.
 
 ---
 
@@ -5557,14 +5563,14 @@ Defined in h1os/orch_flow.h:55
 
 Query current filtered Tri-Node environmental telemetry.
 
-Query current environmental telemetry through the Thermal Lockout MUX.
+Query current environmental telemetry directly from factory-calibrated SHTC3 steady-state samples.
 
 #### Returns
 ESP_OK on success, or ESP_ERR_INVALID_ARG if any pointer is NULL.
 
 Query current filtered Tri-Node environmental telemetry.
 
-Returns 0.0f on initial cold boot (when total_samples == 0) to prevent reporting thermally contaminated Flow B readings.
+The SHTC3 is factory-calibrated and requires no synthetic offsets, reconstitutions, or taring. When consecutive Flow A samples satisfy |temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C, the board is at thermal steady state and the SHTC3 reading is trusted directly. The EPD glass and MCU die sensors serve strictly to verify that the SHTC3 is operating within a normal range.
 
 #### Returns
 ESP_OK on success.
@@ -5573,9 +5579,9 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `out_temp_c` | `float *` | Reconstructed ambient temperature in Celsius. |
-| `out_rh_pct` | `float *` | Reconstructed ambient relative humidity in percent. |
-| `out_dew_c` | `float *` | True dew point in Celsius. |
+| `out_temp_c` | `float *` | Trusted SHTC3 ambient temperature in Celsius. |
+| `out_rh_pct` | `float *` | Trusted SHTC3 ambient relative humidity in percent. |
+| `out_dew_c` | `float *` | Calculated dew point in Celsius. |
 
 ---
 
@@ -5686,14 +5692,12 @@ Defined in h1os/orch_math.h:45
 
 Calculate dew point temperature from temperature and relative humidity.
 
-Calculate true dew point (T_dew) in Celsius from physical vapor pressure.
+Calculate true dew point (T_dew) in Celsius from temperature and relative humidity.
 
 #### Returns
 Dew point in degrees Celsius.
 
 Calculate dew point temperature from temperature and relative humidity.
-
-Invariant against package heating because vapor mass in air does not change with temperature.
 
 #### Returns
 Dew point in Celsius.
@@ -5702,43 +5706,8 @@ Dew point in Celsius.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `temp_c` | `float` | Measured package temperature in Celsius. |
-| `rh_pct` | `float` | Measured package relative humidity in percent. |
-
----
-
-{#orch_math_reconstruct_ambient_rh}
-
-### orch_math_reconstruct_ambient_rh
-
-```cpp
-float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor_temp_c)
-```
-
-Defined in h1os/orch_math.h:58
-
-Psychrometrically reconstruct ambient relative humidity at the true ambient floor temperature.
-
-Reconstruct true ambient relative humidity using the ambient baseline floor temperature.
-
-Leverages the thermodynamic principle that water vapor partial pressure remains constant across PCB microclimates and self-heating boundaries.
-
-#### Returns
-Reconstructed ambient relative humidity percentage (0..100%).
-
-Psychrometrically reconstruct ambient relative humidity at the true ambient floor temperature.
-
-Formula: RH_amb = (e / e_s(temp_ambient_floor)) * 100.0%
-
-#### Returns
-Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vapor_pressure_hpa` | `float` | Invariant vapor pressure in hPa. |
-| `amb_floor_temp_c` | `float` | Ambient floor temperature in Celsius. |
+| `temp_c` | `float` | Measured temperature in Celsius. |
+| `rh_pct` | `float` | Measured relative humidity in percent. |
 
 ---
 
@@ -5747,29 +5716,25 @@ Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
 ### orch_math_calc_psychrometrics
 
 ```cpp
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float * out_vp_hpa, float * out_dew_c, float * out_rh_amb)
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float * out_vp_hpa, float * out_dew_c)
 ```
 
-Defined in h1os/orch_math.h:70
+Defined in h1os/orch_math.h:55
 
-Calculate full psychrometric suite from raw sensor readings and ambient floor temperature.
+Calculate vapor pressure and dew point directly from factory-calibrated SHTC3 readings.
 
-Unified Psychrometric Vector Transform.
+Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibrated SHTC3 readings.
 
-Calculate full psychrometric suite from raw sensor readings and ambient floor temperature.
-
-Evaluates water vapor pressure invariant (e), true dew point (T_dew), and reconstructed ambient relative humidity (RH_amb) by composing single-responsibility helpers.
+Calculate vapor pressure and dew point directly from factory-calibrated SHTC3 readings.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `temp_c` | `float` | Measured package temperature in Celsius. |
-| `rh_pct` | `float` | Measured package relative humidity in percent. |
-| `amb_floor_c` | `float` | Ambient floor baseline temperature in Celsius. |
+| `temp_c` | `float` | Settled SHTC3 temperature in Celsius. |
+| `rh_pct` | `float` | Settled SHTC3 relative humidity in percent. |
 | `out_vp_hpa` | `float *` | Output vapor pressure in hPa (optional, can be NULL). |
 | `out_dew_c` | `float *` | Output dew point in Celsius (optional, can be NULL). |
-| `out_rh_amb` | `float *` | Output reconstructed ambient RH in percent (optional, can be NULL). |
 
 ---
 
@@ -5781,7 +5746,7 @@ Evaluates water vapor pressure invariant (e), true dew point (T_dew), and recons
 float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_c)
 ```
 
-Defined in h1os/orch_math.h:80
+Defined in h1os/orch_math.h:65
 
 Calculate absolute humidity in grams per cubic meter (g/m³).
 
@@ -5814,7 +5779,7 @@ Vapor density in g/m³.
 float orch_math_update_ewma(float current_sample, float previous_ewma, float alpha)
 ```
 
-Defined in h1os/orch_math.h:91
+Defined in h1os/orch_math.h:76
 
 Update an Exponentially Weighted Moving Average (EWMA) filter.
 
@@ -5848,7 +5813,7 @@ Filtered result.
 bool orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c, int16_t gate_threshold_centi_c)
 ```
 
-Defined in h1os/orch_math.h:102
+Defined in h1os/orch_math.h:87
 
 Check if temperature trend has settled onto a stable thermal plateau.
 
@@ -5929,7 +5894,7 @@ ESP_OK on success.
 
 Put audio subsystem into low-power hardware standby.
 
-Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
+Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes. On unattended deep-sleep wakes where the codec is already in verified standby, bypasses redundant I2C register writes to keep the codec completely undisturbed.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -6883,7 +6848,7 @@ Performs sector erase prior to flashing to guarantee bit integrity.
 orch_flow_type_t orch_flow_determine_wakeup(void)
 ```
 
-Defined in orch_flow.c:52
+Defined in orch_flow.c:51
 
 Inspect system wake source and arbitrate target flow.
 
@@ -6913,10 +6878,10 @@ Check whether system is in Thermal Lockout state.
 
 Check whether thermal self-heating lockout is currently active.
 
-If true, active dissipation from CPU/Display/Wi-Fi has perturbed board equilibrium.
+Returns true until at least two consecutive Flow A samples have settled within SAMPLE_DELTA_GATE_CENTI_C (|temp2 - temp1| <= 0.20 C).
 
 #### Returns
-True if in lockout, False if in thermal equilibrium.
+True if settling (lockout), False if board is in thermal steady state.
 
 Check whether system is in Thermal Lockout state.
 
@@ -6975,35 +6940,6 @@ Return value of type static void.
 
 ---
 
-{#orch_flow_evaluate_ambient_selection}
-
-### orch_flow_evaluate_ambient_selection
-
-`static`
-
-```cpp
-static float orch_flow_evaluate_ambient_selection(orch_persisted_state_t * st, float t_valid, float t_die, float t_glass, const char ** out_mode)
-```
-
-Defined in orch_flow.c:214
-
-Orch flow evaluate ambient selection.
-
-#### Returns
-Return value of type static float.
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `st` | [`orch_persisted_state_t`](#orch_persisted_state_t) * | Parameter st. |
-| `t_valid` | `float` | Parameter t_valid. |
-| `t_die` | `float` | Parameter t_die. |
-| `t_glass` | `float` | Parameter t_glass. |
-| `out_mode` | `const char **` | Parameter out_mode. |
-
----
-
 {#orch_flow_query_telemetry-1}
 
 ### orch_flow_query_telemetry
@@ -7012,18 +6948,18 @@ Return value of type static float.
 esp_err_t orch_flow_query_telemetry(float * out_temp_c, float * out_rh_pct, float * out_dew_c)
 ```
 
-Defined in orch_flow.c:250
+Defined in orch_flow.c:216
 
-Query current environmental telemetry through the Thermal Lockout MUX.
+Query current environmental telemetry directly from factory-calibrated SHTC3 steady-state samples.
 
 Query current filtered Tri-Node environmental telemetry.
 
-Returns 0.0f on initial cold boot (when total_samples == 0) to prevent reporting thermally contaminated Flow B readings.
+The SHTC3 is factory-calibrated and requires no synthetic offsets, reconstitutions, or taring. When consecutive Flow A samples satisfy |temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C, the board is at thermal steady state and the SHTC3 reading is trusted directly. The EPD glass and MCU die sensors serve strictly to verify that the SHTC3 is operating within a normal range.
 
 #### Returns
 ESP_OK on success.
 
-Query current environmental telemetry through the Thermal Lockout MUX.
+Query current environmental telemetry directly from factory-calibrated SHTC3 steady-state samples.
 
 #### Returns
 ESP_OK on success, or ESP_ERR_INVALID_ARG if any pointer is NULL.
@@ -7048,7 +6984,7 @@ ESP_OK on success, or ESP_ERR_INVALID_ARG if any pointer is NULL.
 static void orch_flow_quiesce_peripherals(void)
 ```
 
-Defined in orch_flow.c:367
+Defined in orch_flow.c:337
 
 Orch flow quiesce peripherals.
 
@@ -7067,7 +7003,7 @@ Return value of type static void.
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 ```
 
-Defined in orch_flow.c:392
+Defined in orch_flow.c:360
 
 Orch flow execute sleep.
 
@@ -7090,7 +7026,7 @@ ESP_OK on success, or an error code.
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 ```
 
-Defined in orch_flow.c:441
+Defined in orch_flow.c:409
 
 Execute coordinated sleep transition sequence to deep sleep.
 
@@ -7185,18 +7121,16 @@ Actual vapor pressure in hectopascals (hPa).
 float orch_math_calc_dew_point(float temp_c, float rh_pct)
 ```
 
-Defined in orch_math.c:63
+Defined in orch_math.c:61
 
-Calculate true dew point (T_dew) in Celsius from physical vapor pressure.
+Calculate true dew point (T_dew) in Celsius from temperature and relative humidity.
 
 Calculate dew point temperature from temperature and relative humidity.
-
-Invariant against package heating because vapor mass in air does not change with temperature.
 
 #### Returns
 Dew point in Celsius.
 
-Calculate true dew point (T_dew) in Celsius from physical vapor pressure.
+Calculate true dew point (T_dew) in Celsius from temperature and relative humidity.
 
 #### Returns
 Dew point in degrees Celsius.
@@ -7210,69 +7144,30 @@ Dew point in degrees Celsius.
 
 ---
 
-{#orch_math_reconstruct_ambient_rh-1}
-
-### orch_math_reconstruct_ambient_rh
-
-```cpp
-float orch_math_reconstruct_ambient_rh(float vapor_pressure_hpa, float amb_floor_temp_c)
-```
-
-Defined in orch_math.c:86
-
-Reconstruct true ambient relative humidity using the ambient baseline floor temperature.
-
-Psychrometrically reconstruct ambient relative humidity at the true ambient floor temperature.
-
-Formula: RH_amb = (e / e_s(temp_ambient_floor)) * 100.0%
-
-#### Returns
-Reconstructed ambient relative humidity in percent (clamped to [0, 100]).
-
-Reconstruct true ambient relative humidity using the ambient baseline floor temperature.
-
-Leverages the thermodynamic principle that water vapor partial pressure remains constant across PCB microclimates and self-heating boundaries.
-
-#### Returns
-Reconstructed ambient relative humidity percentage (0..100%).
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vapor_pressure_hpa` | `float` | Conserved vapor pressure in hPa. |
-| `amb_floor_temp_c` | `float` | True ambient floor temperature in degrees Celsius. |
-
----
-
 {#orch_math_calc_psychrometrics-1}
 
 ### orch_math_calc_psychrometrics
 
 ```cpp
-void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float amb_floor_c, float * out_vp_hpa, float * out_dew_c, float * out_rh_amb)
+void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float * out_vp_hpa, float * out_dew_c)
 ```
 
-Defined in orch_math.c:112
+Defined in orch_math.c:82
 
-Unified Psychrometric Vector Transform.
+Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibrated SHTC3 readings.
 
-Calculate full psychrometric suite from raw sensor readings and ambient floor temperature.
+Calculate vapor pressure and dew point directly from factory-calibrated SHTC3 readings.
 
-Evaluates water vapor pressure invariant (e), true dew point (T_dew), and reconstructed ambient relative humidity (RH_amb) by composing single-responsibility helpers.
-
-Unified Psychrometric Vector Transform.
+Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibrated SHTC3 readings.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `temp_c` | `float` | Raw sensor temperature in Celsius. |
-| `rh_pct` | `float` | Raw sensor relative humidity %. |
-| `amb_floor_c` | `float` | Estimated true ambient floor temperature in Celsius. |
+| `temp_c` | `float` | Settled SHTC3 temperature in Celsius. |
+| `rh_pct` | `float` | Settled SHTC3 relative humidity %. |
 | `out_vp_hpa` | `float *` | Pointer to store vapor pressure in hPa. |
 | `out_dew_c` | `float *` | Pointer to store dew point in Celsius. |
-| `out_rh_amb` | `float *` | Pointer to store reconstructed ambient relative humidity %. |
 
 ---
 
@@ -7284,7 +7179,7 @@ Unified Psychrometric Vector Transform.
 float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_c)
 ```
 
-Defined in orch_math.c:140
+Defined in orch_math.c:103
 
 Calculate absolute humidity (vapor density) in grams per cubic meter (g/m³).
 
@@ -7317,7 +7212,7 @@ Absolute humidity in g/m³.
 float orch_math_update_ewma(float current_sample, float previous_ewma, float alpha)
 ```
 
-Defined in orch_math.c:159
+Defined in orch_math.c:122
 
 Update continuous recursive EWMA filter.
 
@@ -7351,7 +7246,7 @@ Updated EWMA value.
 bool RTC_IRAM_ATTR orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c, int16_t gate_threshold_centi_c)
 ```
 
-Defined in orch_math.c:179
+Defined in orch_math.c:142
 
 Evaluates whether sensor package has settled to thermal plateau (|initial - current| <= gate_threshold).
 
@@ -7387,7 +7282,7 @@ True if |initial - current| <= gate_threshold.
 static inline void audio_cpu_max_acquire(void)
 ```
 
-Defined in sub_audio.c:94
+Defined in sub_audio.c:99
 
 Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 
@@ -7403,7 +7298,7 @@ Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 static inline void audio_cpu_max_release(void)
 ```
 
-Defined in sub_audio.c:109
+Defined in sub_audio.c:114
 
 Release 240 MHz CPU frequency lock.
 
@@ -7419,7 +7314,7 @@ Release 240 MHz CPU frequency lock.
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 ```
 
-Defined in sub_audio.c:236
+Defined in sub_audio.c:243
 
 Volume pct to es8311 reg.
 
@@ -7444,7 +7339,7 @@ Return value of type static inline uint8_t.
 static void audio_worker_task(void * pvParameters)
 ```
 
-Defined in sub_audio.c:798
+Defined in sub_audio.c:821
 
 Audio worker task.
 
@@ -7469,12 +7364,14 @@ Return value of type static void.
 static esp_err_t sub_audio_park_warm(bool enable)
 ```
 
-Defined in sub_audio.c:538
+Defined in sub_audio.c:550
 
-Sub audio park warm.
+Control NS4168 Class-D amplifier hardware mute state (HAL_PIN_PA_CTRL / GPIO 46).
+
+NS4168 hardware requires minimum 120 ms startup when unmuting (PA_CTRL -> 1) and minimum 80 ms shutdown when muting (PA_CTRL -> 0).
 
 #### Returns
-Return value of type esp_err_t, ESP_OK on success.
+ESP_OK on success.
 
 ---
 
@@ -7488,7 +7385,7 @@ Return value of type esp_err_t, ESP_OK on success.
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_audio.c:253
+Defined in sub_audio.c:260
 
 Es8311 write reg.
 
@@ -7514,7 +7411,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t * val)
 ```
 
-Defined in sub_audio.c:267
+Defined in sub_audio.c:274
 
 Es8311 read reg.
 
@@ -7540,7 +7437,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_read_chip_id(uint16_t * chip_id)
 ```
 
-Defined in sub_audio.c:279
+Defined in sub_audio.c:286
 
 Sub audio read chip id.
 
@@ -7565,7 +7462,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_flush_frame(void)
 ```
 
-Defined in sub_audio.c:303
+Defined in sub_audio.c:310
 
 Sub audio flush frame (single zero-frame write serving as valid I2S transfer pipeline indicator).
 
@@ -7582,7 +7479,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:327
+Defined in sub_audio.c:334
 
 Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
 
@@ -7612,7 +7509,7 @@ ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
 bool sub_audio_is_ready(void)
 ```
 
-Defined in sub_audio.c:357
+Defined in sub_audio.c:364
 
 Quick status check of whether ES8311 codec is ready.
 
@@ -7638,7 +7535,7 @@ True if audio worker is operational, false otherwise.
 static esp_err_t es8311_write_table(const es8311_reg_entry_t * table, size_t count)
 ```
 
-Defined in sub_audio.c:370
+Defined in sub_audio.c:377
 
 Es8311 write table.
 
@@ -7664,7 +7561,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_init_dac_registers(void)
 ```
 
-Defined in sub_audio.c:384
+Defined in sub_audio.c:391
 
 Initialize es8311_init_dac_registers module resources.
 
@@ -7681,7 +7578,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_init(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:410
+Defined in sub_audio.c:417
 
 Initialize ES8311 codec and NS4168 amplifier.
 
@@ -7715,13 +7612,13 @@ ESP_OK on success, or driver error code.
 esp_err_t sub_audio_standby(void)
 ```
 
-Defined in sub_audio.c:559
+Defined in sub_audio.c:575
 
 Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
 
 Put audio subsystem into low-power hardware standby.
 
-Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes.
+Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes. On unattended deep-sleep wakes where the codec is already in verified standby, bypasses redundant I2C register writes to keep the codec completely undisturbed.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -7745,7 +7642,7 @@ ESP_OK on success.
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:585
+Defined in sub_audio.c:607
 
 Sub audio render tone samples.
 
@@ -7771,7 +7668,7 @@ Return value of type static void.
 static void sub_audio_render_pcm_samples(const int16_t * samples, size_t sample_count)
 ```
 
-Defined in sub_audio.c:636
+Defined in sub_audio.c:658
 
 Sub audio render pcm samples.
 
@@ -7797,7 +7694,7 @@ Return value of type static void.
 static esp_err_t sub_audio_prepare_and_unmute(void)
 ```
 
-Defined in sub_audio.c:664
+Defined in sub_audio.c:686
 
 Sub audio prepare and unmute.
 
@@ -7816,7 +7713,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:701
+Defined in sub_audio.c:724
 
 Sub audio exec tone.
 
@@ -7842,7 +7739,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:722
+Defined in sub_audio.c:745
 
 Sub audio exec pcm.
 
@@ -7869,7 +7766,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:740
+Defined in sub_audio.c:763
 
 Sub audio exec chime.
 
@@ -7894,7 +7791,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_send_command(const audio_cmd_t * cmd, bool is_sync, uint32_t wait_ms)
 ```
 
-Defined in sub_audio.c:857
+Defined in sub_audio.c:880
 
 Sub audio send command.
 
@@ -7919,7 +7816,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_play(sub_audio_type_t type, const void * data, size_t len)
 ```
 
-Defined in sub_audio.c:906
+Defined in sub_audio.c:929
 
 Unified asynchronous audio playback dispatcher.
 
@@ -7953,7 +7850,7 @@ ESP_OK if command was queued to worker, or error code.
 bool sub_audio_is_busy(void)
 ```
 
-Defined in sub_audio.c:951
+Defined in sub_audio.c:974
 
 Check if audio playback is currently active or queue has pending items.
 
@@ -7977,7 +7874,7 @@ True if amplifier is active and audio samples are playing.
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:969
+Defined in sub_audio.c:992
 
 Wait until background audio worker completes all playback and enters standby.
 
@@ -8007,7 +7904,7 @@ ESP_OK when playback is idle, ESP_ERR_TIMEOUT on expiration.
 esp_err_t sub_audio_deinit(void)
 ```
 
-Defined in sub_audio.c:984
+Defined in sub_audio.c:1007
 
 Teardown audio subsystem, stop background worker task, and delete I2S channel.
 
@@ -8031,7 +7928,7 @@ ESP_OK on success.
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:1027
+Defined in sub_audio.c:1050
 
 Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
 
@@ -8063,7 +7960,7 @@ ESP_OK on success.
 uint8_t sub_audio_get_volume(void)
 ```
 
-Defined in sub_audio.c:1045
+Defined in sub_audio.c:1068
 
 Get currently configured output volume percentage (0 - 100).
 
@@ -8087,7 +7984,7 @@ Current volume level (0..100%).
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 ```
 
-Defined in sub_audio.c:1059
+Defined in sub_audio.c:1082
 
 Configure ES8311 DAC power mode (Low-Power vs Normal).
 
@@ -8119,7 +8016,7 @@ ESP_OK on success.
 bool sub_audio_get_low_power_mode(void)
 ```
 
-Defined in sub_audio.c:1073
+Defined in sub_audio.c:1096
 
 Query whether audio subsystem is in Low-Power Mode.
 
@@ -8554,7 +8451,7 @@ ESP_OK on success.
 orch_persisted_state_t * orch_state_get(void)
 ```
 
-Defined in h1os/orch_state.h:115
+Defined in h1os/orch_state.h:114
 
 Retrieve pointer to persistent state structure in RTC Slow SRAM.
 
@@ -8573,7 +8470,7 @@ Pointer to persistent state block in RTC Slow Memory.
 void orch_state_reset(void)
 ```
 
-Defined in h1os/orch_state.h:120
+Defined in h1os/orch_state.h:119
 
 Reset persisted state in RTC Slow Memory to clean factory defaults.
 
@@ -8594,7 +8491,7 @@ Return value of type void RTC_IRAM_ATTR.
 void orch_state_push_sample(const orch_tri_node_sample_t * sample)
 ```
 
-Defined in h1os/orch_state.h:127
+Defined in h1os/orch_state.h:126
 
 Push a new sample into the RTC circular ring buffer.
 
@@ -8621,7 +8518,7 @@ Return value of type void RTC_IRAM_ATTR.
 bool orch_state_get_latest_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:136
+Defined in h1os/orch_state.h:135
 
 Retrieve the most recent sample from the ring buffer.
 
@@ -8651,7 +8548,7 @@ true if reading present, false if buffer empty.
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:145
+Defined in h1os/orch_state.h:144
 
 Retrieve the most recent thermally settled, valid sample from the ring buffer.
 
@@ -8875,7 +8772,7 @@ Reset persisted RTC state to default values.
 void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t * sample)
 ```
 
-Defined in orch_state.c:57
+Defined in orch_state.c:55
 
 Push a new Tri-Node telemetry sample into the RTC ring buffer.
 
@@ -8902,7 +8799,7 @@ Push a new Tri-Node telemetry sample into the RTC ring buffer.
 bool orch_state_get_latest_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in orch_state.c:75
+Defined in orch_state.c:73
 
 Get the latest committed sample from the ring buffer.
 
@@ -8932,7 +8829,7 @@ True if a sample was retrieved, false if ring buffer is empty.
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in orch_state.c:98
+Defined in orch_state.c:96
 
 Get the newest sample in the ring buffer marked SAMPLE_FLAG_VALID_COLD.
 
@@ -9154,7 +9051,7 @@ ESP_OK on success, or SPI communication error.
 
 Initialize SSD1681 electrophoretic display controller.
 
-Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization semaphore.
+Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization.
 
 #### Returns
 ESP_OK on success.
@@ -9259,7 +9156,7 @@ ESP_OK when panel idle, ESP_ERR_TIMEOUT on timeout.
 
 Block until SSD1681 BUSY line deasserts (panel update complete).
 
-Blocks on binary semaphore driven by GPIO 8 (BUSY) falling edge.
+Waits up to 15 ms for the SSD1681 state machine to assert BUSY HIGH (1) after a command (e.g. 0x20 Master Activation or 0x12 SW Reset), then polls until BUSY drops back LOW (0).
 
 #### Returns
 ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
@@ -9321,7 +9218,7 @@ ESP_OK on success.
 
 Clear panel to solid white and trigger full OTP refresh.
 
-Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in. Ensures SPI2 and SSD1681 are initialized and awake even when invoked directly from deep-sleep ULP power-off wakes (ORCH_FLOW_CRITICAL_OFF).
 
 #### Returns
 ESP_OK on success.
@@ -9437,7 +9334,7 @@ ESP_OK on success.
 static void h1os_lvgl_port_task(void * pvParameters)
 ```
 
-Defined in h1os_lvgl.cpp:426
+Defined in h1os_lvgl.cpp:442
 
 H1os lvgl port task.
 
@@ -9488,7 +9385,7 @@ True if mutex was successfully acquired within timeout, false otherwise.
 void h1os_lvgl_unlock(void)
 ```
 
-Defined in h1os_lvgl.cpp:74
+Defined in h1os_lvgl.cpp:76
 
 Release LVGL reentrant mutex lock.
 
@@ -9506,7 +9403,7 @@ Releases the mutex acquired via [h1os_lvgl_lock()](#h1os_lvgl_lock).
 static uint32_t lvgl_tick_get_cb(void)
 ```
 
-Defined in h1os_lvgl.cpp:85
+Defined in h1os_lvgl.cpp:89
 
 Lvgl tick get cb.
 
@@ -9525,7 +9422,7 @@ Return value of type static uint32_t.
 static void lvgl_keypad_read_cb(lv_indev_t * indev, lv_indev_data_t * data)
 ```
 
-Defined in h1os_lvgl.cpp:98
+Defined in h1os_lvgl.cpp:102
 
 Lvgl keypad read cb.
 
@@ -9551,7 +9448,7 @@ Return value of type static void.
 static void lvgl_display_flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * px_map)
 ```
 
-Defined in h1os_lvgl.cpp:135
+Defined in h1os_lvgl.cpp:140
 
 Lvgl display flush cb.
 
@@ -9576,7 +9473,7 @@ Return value of type static void.
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 ```
 
-Defined in h1os_lvgl.cpp:257
+Defined in h1os_lvgl.cpp:264
 
 Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
 
@@ -9606,7 +9503,7 @@ Configures the bilevel draw buffer, registers the display flush callback, and se
 void h1os_lvgl_set_first_flush_mode(bool full_refresh)
 ```
 
-Defined in h1os_lvgl.cpp:327
+Defined in h1os_lvgl.cpp:334
 
 Explicitly override whether the first flush executes a full or partial refresh.
 
@@ -9626,7 +9523,7 @@ Explicitly override whether the first flush executes a full or partial refresh.
 esp_err_t h1os_lvgl_start(int priority, int core_id)
 ```
 
-Defined in h1os_lvgl.cpp:340
+Defined in h1os_lvgl.cpp:347
 
 Start the LVGL background FreeRTOS task.
 
@@ -9657,9 +9554,11 @@ Spawns the dedicated presentation task pinned to Core 1 for decoupled UI renderi
 esp_err_t h1os_lvgl_stop(void)
 ```
 
-Defined in h1os_lvgl.cpp:375
+Defined in h1os_lvgl.cpp:385
 
 Stop the LVGL background task.
+
+Safely handles being called from within an LVGL input callback on the LVGL task thread itself (e.g. long-press shutdown) without self-deletion.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9680,7 +9579,7 @@ Signals the event loop to terminate cleanly and waits for task exit.
 bool h1os_lvgl_has_pending_tasks(void)
 ```
 
-Defined in h1os_lvgl.cpp:397
+Defined in h1os_lvgl.cpp:410
 
 Check if the LVGL display pipeline has pending render/flush tasks.
 
@@ -9700,7 +9599,7 @@ True if display driver is currently flushing or widgets are invalidated.
 lv_indev_t * h1os_lvgl_get_indev(void)
 ```
 
-Defined in h1os_lvgl.cpp:414
+Defined in h1os_lvgl.cpp:430
 
 Retrieve the LVGL keypad input device handle.
 
@@ -9871,9 +9770,11 @@ Build time string.
 static void epd_reset_pulse(void)
 ```
 
-Defined in sub_display.cpp:48
+Defined in sub_display.cpp:51
 
 Epd reset pulse.
+
+Wakes SSD1681 out of Deep Sleep Mode 1 (0x10 = 0x01) and resets state machine.
 
 #### Returns
 Return value of type static void.
@@ -9888,13 +9789,13 @@ Return value of type static void.
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 ```
 
-Defined in sub_display.cpp:65
+Defined in sub_display.cpp:71
 
 Synchronously wait for EPD panel to finish driving electrophoretic particles.
 
 Block until SSD1681 BUSY line deasserts (panel update complete).
 
-Blocks on binary semaphore driven by GPIO 8 (BUSY) falling edge.
+Waits up to 15 ms for the SSD1681 state machine to assert BUSY HIGH (1) after a command (e.g. 0x20 Master Activation or 0x12 SW Reset), then polls until BUSY drops back LOW (0).
 
 #### Returns
 ESP_OK on panel ready, ESP_ERR_TIMEOUT on expiration.
@@ -9922,7 +9823,7 @@ ESP_OK when panel idle, ESP_ERR_TIMEOUT on timeout.
 static void epd_configure_base_registers(void)
 ```
 
-Defined in sub_display.cpp:87
+Defined in sub_display.cpp:99
 
 Epd configure base registers.
 
@@ -9939,13 +9840,13 @@ Return value of type static void.
 esp_err_t sub_display_init(bool is_wake_cycle)
 ```
 
-Defined in sub_display.cpp:119
+Defined in sub_display.cpp:131
 
 Initialize SSD1681 display controller.
 
 Initialize SSD1681 electrophoretic display controller.
 
-Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization semaphore.
+Wakes panel, initializes SPI interface, configures scanning geometry, and sets up BUSY synchronization.
 
 #### Returns
 ESP_OK on success.
@@ -9973,7 +9874,7 @@ ESP_OK on success, or SPI communication error.
 uint8_t * sub_display_get_framebuffer(void)
 ```
 
-Defined in sub_display.cpp:178
+Defined in sub_display.cpp:198
 
 Retrieve direct pointer to the active 5000-byte internal RAM framebuffer.
 
@@ -9990,7 +9891,7 @@ Pointer to packed 1-bit monochrome pixel array.
 void sub_display_clear(uint8_t color)
 ```
 
-Defined in sub_display.cpp:188
+Defined in sub_display.cpp:208
 
 Clear active working framebuffer.
 
@@ -10016,7 +9917,7 @@ Clear active working framebuffer.
 static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t * frame_data)
 ```
 
-Defined in sub_display.cpp:201
+Defined in sub_display.cpp:221
 
 Epd commit ram dma.
 
@@ -10040,7 +9941,7 @@ Return value of type static void.
 esp_err_t sub_display_sync_previous_frame(const uint8_t * prev_frame)
 ```
 
-Defined in sub_display.cpp:224
+Defined in sub_display.cpp:244
 
 Synchronize previous frame into shadow buffer and hardware RAM 0x26.
 
@@ -10072,7 +9973,7 @@ ESP_OK on success.
 esp_err_t sub_display_refresh_full(void)
 ```
 
-Defined in sub_display.cpp:245
+Defined in sub_display.cpp:265
 
 Execute full display refresh (OTP factory waveform LUT).
 
@@ -10100,13 +10001,13 @@ ESP_OK on success.
 esp_err_t sub_display_clear_to_white_full(void)
 ```
 
-Defined in sub_display.cpp:280
+Defined in sub_display.cpp:306
 
 Clear display to pure white and trigger full OTP refresh.
 
 Clear panel to solid white and trigger full OTP refresh.
 
-Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in. Ensures SPI2 and SSD1681 are initialized and awake even when invoked directly from deep-sleep ULP power-off wakes (ORCH_FLOW_CRITICAL_OFF).
 
 #### Returns
 ESP_OK on success.
@@ -10130,7 +10031,7 @@ ESP_OK on success.
 static void epd_load_custom_lut(const uint8_t * lut_buffer)
 ```
 
-Defined in sub_display.cpp:295
+Defined in sub_display.cpp:324
 
 Epd load custom lut.
 
@@ -10153,7 +10054,7 @@ Return value of type static void.
 esp_err_t sub_display_refresh_partial(void)
 ```
 
-Defined in sub_display.cpp:321
+Defined in sub_display.cpp:350
 
 Execute fast partial refresh (~300ms) with software LUT.
 
@@ -10179,7 +10080,7 @@ ESP_OK on success.
 int16_t sub_display_get_glass_temp_centi_c(void)
 ```
 
-Defined in sub_display.cpp:357
+Defined in sub_display.cpp:390
 
 Retrieve the latest cached SSD1681 on-glass temperature in centi-degrees Celsius.
 
@@ -10196,7 +10097,7 @@ Cached glass temperature in centi-°C (0 if not yet sampled).
 esp_err_t sub_display_read_glass_temp(float * out_temp_c)
 ```
 
-Defined in sub_display.cpp:369
+Defined in sub_display.cpp:402
 
 Read SSD1681 on-glass integrated temperature sensor (SPI Cmd 0x1B).
 
@@ -10226,7 +10127,7 @@ ESP_OK on success, or SPI read error.
 esp_err_t sub_display_enter_deep_sleep(void)
 ```
 
-Defined in sub_display.cpp:417
+Defined in sub_display.cpp:450
 
 Put SSD1681 into Deep Sleep Mode 1 (Command 0x10, Data 0x01 @ 1.0 µA).
 
@@ -10565,7 +10466,7 @@ Copies the latest validated psychrometric invariants, sensor readings, and batte
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:521
+Defined in h1os_lifecycle.c:529
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -10597,7 +10498,7 @@ Arms the PCF85063A countdown timer, isolates GPIO sleep pads, holds power latch,
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:547
+Defined in h1os_lifecycle.c:555
 
 Execute system shutdown.
 
@@ -10620,7 +10521,7 @@ Return value of type static void.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:596
+Defined in h1os_lifecycle.c:604
 
 Orderly system shutdown and physical battery power cut.
 
@@ -10636,7 +10537,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:610
+Defined in h1os_lifecycle.c:618
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -10658,7 +10559,7 @@ Performs pure white full OTP refresh on electrophoretic display before cutting p
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:622
+Defined in h1os_lifecycle.c:630
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -10692,7 +10593,7 @@ Controls ES8311 DAC gain and NS4168 power state. 0% volume automatically mutes t
 void bootloader_hooks_include(void)
 ```
 
-Defined in h1os_boot_hook.c:28
+Defined in h1os_boot_hook.c:29
 
 Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
 
@@ -10706,7 +10607,7 @@ Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
 void bootloader_before_init(void)
 ```
 
-Defined in h1os_boot_hook.c:40
+Defined in h1os_boot_hook.c:41
 
 FIRST HOOK: Executes before any bootloader hardware initialization.
 
@@ -10722,7 +10623,7 @@ FIRST HOOK: Executes before any bootloader hardware initialization.
 void bootloader_after_init(void)
 ```
 
-Defined in h1os_boot_hook.c:69
+Defined in h1os_boot_hook.c:77
 
 SECOND HOOK: Executes after standard bootloader initialization.
 
@@ -11121,7 +11022,7 @@ Executes fast sub-3ms Flow A sensor bursts using bitbanged I2C without booting t
 void orch_wake_stub_install(void)
 ```
 
-Defined in orch_wake_stub.c:530
+Defined in orch_wake_stub.c:528
 
 Install the RTC deep sleep wake stub.
 
@@ -11693,7 +11594,7 @@ Defined in hal_io.c:23
 bool s_led_pwm_active = false
 ```
 
-Defined in hal_io.c:113
+Defined in hal_io.c:114
 
 ---
 
@@ -11707,7 +11608,7 @@ Defined in hal_io.c:113
 TaskHandle_t s_breath_task = NULL
 ```
 
-Defined in hal_io.c:214
+Defined in hal_io.c:215
 
 ---
 
@@ -11721,7 +11622,7 @@ Defined in hal_io.c:214
 volatile bool s_breathing_running = false
 ```
 
-Defined in hal_io.c:215
+Defined in hal_io.c:216
 
 ---
 
@@ -11735,7 +11636,7 @@ Defined in hal_io.c:215
 uint32_t s_breath_period_ms = 2000
 ```
 
-Defined in hal_io.c:216
+Defined in hal_io.c:217
 
 ---
 
@@ -11989,7 +11890,7 @@ Defined in orch_flow.c:31
 const char * TAG = "sub_audio"
 ```
 
-Defined in sub_audio.c:29
+Defined in sub_audio.c:31
 
 ---
 
@@ -12003,7 +11904,7 @@ Defined in sub_audio.c:29
 i2s_chan_handle_t s_tx_chan = NULL
 ```
 
-Defined in sub_audio.c:74
+Defined in sub_audio.c:76
 
 ---
 
@@ -12017,7 +11918,7 @@ Defined in sub_audio.c:74
 bool s_audio_inited = false
 ```
 
-Defined in sub_audio.c:76
+Defined in sub_audio.c:78
 
 ---
 
@@ -12031,7 +11932,7 @@ Defined in sub_audio.c:76
 bool s_i2s_chan_enabled = false
 ```
 
-Defined in sub_audio.c:77
+Defined in sub_audio.c:79
 
 ---
 
@@ -12045,7 +11946,21 @@ Defined in sub_audio.c:77
 bool s_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:78
+Defined in sub_audio.c:80
+
+---
+
+{#s_pa_enabled}
+
+### s_pa_enabled
+
+`static`
+
+```cpp
+bool s_pa_enabled = false
+```
+
+Defined in sub_audio.c:81
 
 ---
 
@@ -12059,7 +11974,21 @@ Defined in sub_audio.c:78
 bool s_low_power_mode = true
 ```
 
-Defined in sub_audio.c:79
+Defined in sub_audio.c:82
+
+---
+
+{#s_rtc_codec_in_standby}
+
+### s_rtc_codec_in_standby
+
+`static`
+
+```cpp
+RTC_DATA_ATTR bool s_rtc_codec_in_standby = false
+```
+
+Defined in sub_audio.c:84
 
 ---
 
@@ -12073,7 +12002,7 @@ Defined in sub_audio.c:79
 QueueHandle_t s_audio_queue = NULL
 ```
 
-Defined in sub_audio.c:81
+Defined in sub_audio.c:86
 
 ---
 
@@ -12087,7 +12016,7 @@ Defined in sub_audio.c:81
 TaskHandle_t s_audio_task_handle = NULL
 ```
 
-Defined in sub_audio.c:82
+Defined in sub_audio.c:87
 
 ---
 
@@ -12101,7 +12030,7 @@ Defined in sub_audio.c:82
 volatile bool s_audio_is_busy = false
 ```
 
-Defined in sub_audio.c:83
+Defined in sub_audio.c:88
 
 ---
 
@@ -12115,7 +12044,7 @@ Defined in sub_audio.c:83
 uint8_t s_volume_pct = 0
 ```
 
-Defined in sub_audio.c:85
+Defined in sub_audio.c:90
 
 ---
 
@@ -12129,7 +12058,7 @@ Defined in sub_audio.c:85
 const uint8_t es8311_perceptual_vol_table[101]
 ```
 
-Defined in sub_audio.c:118
+Defined in sub_audio.c:123
 
 ---
 
@@ -12143,7 +12072,7 @@ Defined in sub_audio.c:118
 const es8311_reg_entry_t s_es8311_init_pre_charge[]
 ```
 
-Defined in sub_audio.c:143
+Defined in sub_audio.c:148
 
 ---
 
@@ -12157,7 +12086,7 @@ Defined in sub_audio.c:143
 const es8311_reg_entry_t s_es8311_init_post_charge[]
 ```
 
-Defined in sub_audio.c:187
+Defined in sub_audio.c:192
 
 ---
 
@@ -12171,7 +12100,7 @@ Defined in sub_audio.c:187
 const es8311_reg_entry_t s_es8311_deinit[]
 ```
 
-Defined in sub_audio.c:209
+Defined in sub_audio.c:214
 
 ---
 
@@ -12527,6 +12456,20 @@ Defined in sub_display.cpp:29
 
 ---
 
+{#s_in_deep_sleep}
+
+### s_in_deep_sleep
+
+`static`
+
+```cpp
+bool s_in_deep_sleep = false
+```
+
+Defined in sub_display.cpp:30
+
+---
+
 {#s_last_glass_temp_centi_c}
 
 ### s_last_glass_temp_centi_c
@@ -12537,7 +12480,7 @@ Defined in sub_display.cpp:29
 int16_t s_last_glass_temp_centi_c = 0
 ```
 
-Defined in sub_display.cpp:30
+Defined in sub_display.cpp:31
 
 ---
 
@@ -12551,7 +12494,7 @@ Defined in sub_display.cpp:30
 const uint8_t WF_PARTIAL_1IN54[159]
 ```
 
-Defined in sub_display.cpp:32
+Defined in sub_display.cpp:33
 
 ---
 
@@ -12651,7 +12594,7 @@ Defined in h1os_lifecycle.c:42
 const char * TAG = "H1OS_BOOT_HOOK"
 ```
 
-Defined in h1os_boot_hook.c:23
+Defined in h1os_boot_hook.c:24
 
 ---
 
@@ -12689,7 +12632,7 @@ Defined in orch_display_sync.c:25
 struct audio_cmd_t
 ```
 
-Defined in sub_audio.c:48
+Defined in sub_audio.c:50
 
 ### Public Attributes
 
@@ -12712,7 +12655,7 @@ audio_cmd_type_t type
 
 Type: [`audio_cmd_type_t`](#audio_cmd_type_t)
 
-Defined in sub_audio.c:49
+Defined in sub_audio.c:51
 
 ---
 
@@ -12724,7 +12667,7 @@ Defined in sub_audio.c:49
 union audio_cmd_t::@075142260334247171354103021266123360172342241057 params
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:65
 
 ---
 
@@ -12736,7 +12679,7 @@ Defined in sub_audio.c:63
 SemaphoreHandle_t done_sem
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:67
 
 ---
 
@@ -12748,7 +12691,7 @@ Defined in sub_audio.c:65
 esp_err_t * result
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:68
 
 {#unionparams}
 
@@ -12758,7 +12701,7 @@ Defined in sub_audio.c:66
 union [union].params
 ```
 
-Defined in sub_audio.c:50
+Defined in sub_audio.c:52
 
 ### Public Attributes
 
@@ -12778,7 +12721,7 @@ Defined in sub_audio.c:50
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:54
+Defined in sub_audio.c:56
 
 ---
 
@@ -12790,7 +12733,7 @@ Defined in sub_audio.c:54
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:59
 
 ---
 
@@ -12802,7 +12745,7 @@ Defined in sub_audio.c:57
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:64
 
 {#structparamstone}
 
@@ -12812,7 +12755,7 @@ Defined in sub_audio.c:62
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:51
+Defined in sub_audio.c:53
 
 ### Public Attributes
 
@@ -12831,7 +12774,7 @@ Defined in sub_audio.c:51
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:52
+Defined in sub_audio.c:54
 
 ---
 
@@ -12843,7 +12786,7 @@ Defined in sub_audio.c:52
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:53
+Defined in sub_audio.c:55
 
 {#structparamschime}
 
@@ -12853,7 +12796,7 @@ Defined in sub_audio.c:53
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:57
 
 ### Public Attributes
 
@@ -12871,7 +12814,7 @@ Defined in sub_audio.c:55
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:58
 
 {#structparamspcm}
 
@@ -12881,7 +12824,7 @@ Defined in sub_audio.c:56
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -12901,7 +12844,7 @@ Defined in sub_audio.c:58
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:61
 
 ---
 
@@ -12913,7 +12856,7 @@ Defined in sub_audio.c:59
 size_t sample_count
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:62
 
 ---
 
@@ -12925,7 +12868,7 @@ Defined in sub_audio.c:60
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:63
 
 {#h1os_lifecycle_t}
 
@@ -13233,11 +13176,12 @@ Comprehensive environmental telemetry and system metrics snapshot.
 
 | Return | Name | Description |
 |--------|------|-------------|
-| `float` | [`ambient_temp_c`](#ambient_temp_c)  | Filtered ambient temperature in degrees Celsius. |
-| `float` | [`ambient_temp_f`](#ambient_temp_f)  | Filtered ambient temperature in degrees Fahrenheit. |
-| `float` | [`ambient_rh_pct`](#ambient_rh_pct)  | Filtered ambient relative humidity percentage (0..100%). |
+| `float` | [`ambient_temp_c`](#ambient_temp_c)  | Trusted steady-state SHTC3 ambient temperature in degrees Celsius. |
+| `float` | [`ambient_temp_f`](#ambient_temp_f)  | Trusted steady-state SHTC3 ambient temperature in degrees Fahr. |
+| `float` | [`ambient_rh_pct`](#ambient_rh_pct)  | Trusted steady-state SHTC3 relative humidity percentage (0..100%). |
 | `float` | [`dew_point_c`](#dew_point_c)  | Psychrometrically calculated dew point in degrees Celsius. |
 | `float` | [`dew_point_f`](#dew_point_f)  | Psychrometrically calculated dew point in degrees Fahrenheit. |
+| `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa)  | Calculated water vapor partial pressure in hectopascals (hPa). |
 | `float` | [`absolute_humidity_g`](#absolute_humidity_g)  | Calculated absolute humidity in grams per cubic meter (g/m³). |
 | `float` | [`window_low_c`](#window_low_c)  | Valid Window Floor (minimum over valid 32-sample window). |
 | `float` | [`window_high_c`](#window_high_c)  | Valid Window Ceiling (maximum over valid 32-sample window). |
@@ -13248,13 +13192,16 @@ Comprehensive environmental telemetry and system metrics snapshot.
 | `float` | [`raw_shtc3_temp_c`](#raw_shtc3_temp_c)  | Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius. |
 | `float` | [`mcu_die_temp_c`](#mcu_die_temp_c)  | Instantaneous ESP32-S3 internal TSENS die temperature. |
 | `float` | [`epd_glass_temp_c`](#epd_glass_temp_c)  | Instantaneous SSD1681 display on-glass temperature sensor reading. |
-| `float` | [`trinode_temp_c`](#trinode_temp_c)  | Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0. |
-| `float` | [`trinode_delta_c`](#trinode_delta_c)  | Thermal gradient delta: T_valid - T_trinode. |
-| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct)  | 0-100% linear psychrometric confidence score. |
-| `bool` | [`is_thermally_settled`](#is_thermally_settled)  | True if thermal equilibrium criteria are satisfied. |
+| `float` | [`trinode_temp_c`](#trinode_temp_c)  | Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0. |
+| `float` | [`trinode_delta_c`](#trinode_delta_c)  | Cross-node verification delta: T_valid - T_trinode. |
+| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct)  | 0-100% cross-node range verification confidence score. |
+| `bool` | [`is_thermally_settled`](#is_thermally_settled)  | True if steady-state thermal criteria (\|T2-T1\| <= gate) are met. |
 | `uint16_t` | [`valid_trend`](#valid_trend)  | Monotonic count of consecutive thermally settled Flow A samples. |
 | `uint32_t` | [`sample_count`](#sample_count-1)  | Total monotonic environmental telemetry sample count. |
+| `uint32_t` | [`flow_a_period_sec`](#flow_a_period_sec-1)  | Active Flow A sensor sample interval in seconds. |
+| `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec-1)  | Active Flow B display refresh interval in seconds. |
 | `uint16_t` | [`battery_mv`](#battery_mv)  | Sampled battery terminal voltage in millivolts. |
+| `uint16_t` | [`boot_vbat_mv`](#boot_vbat_mv)  | Initial non-USB battery voltage captured on boot in millivolts. |
 | `uint8_t` | [`battery_percent`](#battery_percent)  | Estimated battery state-of-charge percentage (0..100%). |
 | `bool` | [`is_usb_powered`](#is_usb_powered)  | True if USB VBUS power connection is actively detected. |
 
@@ -13270,7 +13217,7 @@ float ambient_temp_c
 
 Defined in h1os/h1os.h:127
 
-Filtered ambient temperature in degrees Celsius.
+Trusted steady-state SHTC3 ambient temperature in degrees Celsius.
 
 ---
 
@@ -13284,7 +13231,7 @@ float ambient_temp_f
 
 Defined in h1os/h1os.h:128
 
-Filtered ambient temperature in degrees Fahrenheit.
+Trusted steady-state SHTC3 ambient temperature in degrees Fahr.
 
 ---
 
@@ -13298,7 +13245,7 @@ float ambient_rh_pct
 
 Defined in h1os/h1os.h:129
 
-Filtered ambient relative humidity percentage (0..100%).
+Trusted steady-state SHTC3 relative humidity percentage (0..100%).
 
 ---
 
@@ -13330,6 +13277,20 @@ Psychrometrically calculated dew point in degrees Fahrenheit.
 
 ---
 
+{#vapor_pressure_hpa}
+
+#### vapor_pressure_hpa
+
+```cpp
+float vapor_pressure_hpa
+```
+
+Defined in h1os/h1os.h:132
+
+Calculated water vapor partial pressure in hectopascals (hPa).
+
+---
+
 {#absolute_humidity_g}
 
 #### absolute_humidity_g
@@ -13338,7 +13299,7 @@ Psychrometrically calculated dew point in degrees Fahrenheit.
 float absolute_humidity_g
 ```
 
-Defined in h1os/h1os.h:132
+Defined in h1os/h1os.h:133
 
 Calculated absolute humidity in grams per cubic meter (g/m³).
 
@@ -13352,7 +13313,7 @@ Calculated absolute humidity in grams per cubic meter (g/m³).
 float window_low_c
 ```
 
-Defined in h1os/h1os.h:134
+Defined in h1os/h1os.h:135
 
 Valid Window Floor (minimum over valid 32-sample window).
 
@@ -13366,7 +13327,7 @@ Valid Window Floor (minimum over valid 32-sample window).
 float window_high_c
 ```
 
-Defined in h1os/h1os.h:135
+Defined in h1os/h1os.h:136
 
 Valid Window Ceiling (maximum over valid 32-sample window).
 
@@ -13380,7 +13341,7 @@ Valid Window Ceiling (maximum over valid 32-sample window).
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/h1os.h:136
+Defined in h1os/h1os.h:137
 
 Short-term valid SHTC3 sensor window average in degrees Celsius.
 
@@ -13394,7 +13355,7 @@ Short-term valid SHTC3 sensor window average in degrees Celsius.
 float window_avg_die_c
 ```
 
-Defined in h1os/h1os.h:137
+Defined in h1os/h1os.h:138
 
 Short-term valid MCU Die internal sensor window average.
 
@@ -13408,7 +13369,7 @@ Short-term valid MCU Die internal sensor window average.
 float temp_historical_c
 ```
 
-Defined in h1os/h1os.h:138
+Defined in h1os/h1os.h:139
 
 Long-term light EWMA historical baseline temperature.
 
@@ -13422,7 +13383,7 @@ Long-term light EWMA historical baseline temperature.
 float rh_historical_pct
 ```
 
-Defined in h1os/h1os.h:139
+Defined in h1os/h1os.h:140
 
 Long-term light EWMA historical baseline relative humidity.
 
@@ -13436,7 +13397,7 @@ Long-term light EWMA historical baseline relative humidity.
 float raw_shtc3_temp_c
 ```
 
-Defined in h1os/h1os.h:141
+Defined in h1os/h1os.h:142
 
 Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 
@@ -13450,7 +13411,7 @@ Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 float mcu_die_temp_c
 ```
 
-Defined in h1os/h1os.h:142
+Defined in h1os/h1os.h:143
 
 Instantaneous ESP32-S3 internal TSENS die temperature.
 
@@ -13464,7 +13425,7 @@ Instantaneous ESP32-S3 internal TSENS die temperature.
 float epd_glass_temp_c
 ```
 
-Defined in h1os/h1os.h:143
+Defined in h1os/h1os.h:144
 
 Instantaneous SSD1681 display on-glass temperature sensor reading.
 
@@ -13478,9 +13439,9 @@ Instantaneous SSD1681 display on-glass temperature sensor reading.
 float trinode_temp_c
 ```
 
-Defined in h1os/h1os.h:144
+Defined in h1os/h1os.h:145
 
-Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0.
+Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.
 
 ---
 
@@ -13492,9 +13453,9 @@ Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0.
 float trinode_delta_c
 ```
 
-Defined in h1os/h1os.h:145
+Defined in h1os/h1os.h:146
 
-Thermal gradient delta: T_valid - T_trinode.
+Cross-node verification delta: T_valid - T_trinode.
 
 ---
 
@@ -13506,9 +13467,9 @@ Thermal gradient delta: T_valid - T_trinode.
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/h1os.h:146
+Defined in h1os/h1os.h:147
 
-0-100% linear psychrometric confidence score.
+0-100% cross-node range verification confidence score.
 
 ---
 
@@ -13520,9 +13481,9 @@ Defined in h1os/h1os.h:146
 bool is_thermally_settled
 ```
 
-Defined in h1os/h1os.h:148
+Defined in h1os/h1os.h:149
 
-True if thermal equilibrium criteria are satisfied.
+True if steady-state thermal criteria (|T2-T1| <= gate) are met.
 
 ---
 
@@ -13534,7 +13495,7 @@ True if thermal equilibrium criteria are satisfied.
 uint16_t valid_trend
 ```
 
-Defined in h1os/h1os.h:149
+Defined in h1os/h1os.h:150
 
 Monotonic count of consecutive thermally settled Flow A samples.
 
@@ -13548,9 +13509,37 @@ Monotonic count of consecutive thermally settled Flow A samples.
 uint32_t sample_count
 ```
 
-Defined in h1os/h1os.h:150
+Defined in h1os/h1os.h:151
 
 Total monotonic environmental telemetry sample count.
+
+---
+
+{#flow_a_period_sec-1}
+
+#### flow_a_period_sec
+
+```cpp
+uint32_t flow_a_period_sec
+```
+
+Defined in h1os/h1os.h:152
+
+Active Flow A sensor sample interval in seconds.
+
+---
+
+{#flow_b_period_sec-1}
+
+#### flow_b_period_sec
+
+```cpp
+uint32_t flow_b_period_sec
+```
+
+Defined in h1os/h1os.h:153
+
+Active Flow B display refresh interval in seconds.
 
 ---
 
@@ -13562,9 +13551,23 @@ Total monotonic environmental telemetry sample count.
 uint16_t battery_mv
 ```
 
-Defined in h1os/h1os.h:151
+Defined in h1os/h1os.h:154
 
 Sampled battery terminal voltage in millivolts.
+
+---
+
+{#boot_vbat_mv}
+
+#### boot_vbat_mv
+
+```cpp
+uint16_t boot_vbat_mv
+```
+
+Defined in h1os/h1os.h:155
+
+Initial non-USB battery voltage captured on boot in millivolts.
 
 ---
 
@@ -13576,7 +13579,7 @@ Sampled battery terminal voltage in millivolts.
 uint8_t battery_percent
 ```
 
-Defined in h1os/h1os.h:152
+Defined in h1os/h1os.h:156
 
 Estimated battery state-of-charge percentage (0..100%).
 
@@ -13590,7 +13593,7 @@ Estimated battery state-of-charge percentage (0..100%).
 bool is_usb_powered
 ```
 
-Defined in h1os/h1os.h:153
+Defined in h1os/h1os.h:157
 
 True if USB VBUS power connection is actively detected.
 
@@ -13647,7 +13650,7 @@ Defined in h1os_lvgl.cpp:48
 struct es8311_reg_entry_t
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:71
 
 ### Public Attributes
 
@@ -13666,7 +13669,7 @@ Defined in sub_audio.c:69
 uint8_t reg
 ```
 
-Defined in sub_audio.c:70
+Defined in sub_audio.c:72
 
 ---
 
@@ -13678,7 +13681,7 @@ Defined in sub_audio.c:70
 uint8_t val
 ```
 
-Defined in sub_audio.c:71
+Defined in sub_audio.c:73
 
 {#h1os_wake_context_t}
 
@@ -13851,12 +13854,12 @@ Retained across all deep sleep cycles and wake stub executions.
 | `uint8_t` | [`flags`](#flags)  | Operating state flags (ORCH_FLAG_*). |
 | `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason)  | Reason code from last ULP coprocessor dispatch. |
 | `uint16_t` | [`last_vbat_mv`](#last_vbat_mv-1)  | Last sampled battery terminal voltage in millivolts. |
+| `uint16_t` | [`boot_vbat_mv`](#boot_vbat_mv-1)  | Initial non-USB battery voltage captured on boot in millivolts. |
 | `uint32_t` | [`sample_interval_sec`](#sample_interval_sec)  | Interval between Flow A sensor samples in seconds. |
-| `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec-1)  | Interval between Flow B display refreshes in seconds. |
+| `uint32_t` | [`flow_b_period_sec`](#flow_b_period_sec-2)  | Interval between Flow B display refreshes in seconds. |
 | `uint32_t` | [`last_ewma_sample_seq`](#last_ewma_sample_seq)  | Sample sequence number of last processed EWMA & ring debug update. |
 | `uint16_t` | [`epd_partial_refresh_count`](#epd_partial_refresh_count)  | Consecutive differential partial refreshes on EPD. |
-| `uint16_t` | [`valid_trend`](#valid_trend-1)  | Monotonic count of consecutive settled cold samples. |
-| `int16_t` | [`amb_floor_temp_centi_c`](#amb_floor_temp_centi_c)  | Lowest observed ambient baseline temperature in centi-°C. |
+| `uint16_t` | [`valid_trend`](#valid_trend-1)  | Monotonic count of consecutive settled steady-state samples. |
 | `int16_t` | [`window_low_temp_centi_c`](#window_low_temp_centi_c)  | Valid Window Floor (minimum over active window) in centi-°C. |
 | `int16_t` | [`window_high_temp_centi_c`](#window_high_temp_centi_c)  | Valid Window Ceiling (maximum over active window) in centi-°C. |
 | `int16_t` | [`last_glass_temp_centi_c`](#last_glass_temp_centi_c)  | Last sampled EPD glass temperature in centi-°C. |
@@ -13864,17 +13867,16 @@ Retained across all deep sleep cycles and wake stub executions.
 | `float` | [`window_avg_die_c`](#window_avg_die_c-1)  | Short-term valid MCU Die window average in degrees Celsius. |
 | `float` | [`temp_historical_c`](#temp_historical_c-1)  | Long-term light EWMA baseline temperature. |
 | `float` | [`rh_historical_pct`](#rh_historical_pct-1)  | Long-term light EWMA baseline relative humidity. |
-| `float` | [`reconstructed_amb_temp_c`](#reconstructed_amb_temp_c)  | Psychrometrically reconstructed ambient temperature. |
-| `float` | [`reconstructed_amb_rh_pct`](#reconstructed_amb_rh_pct)  | Psychrometrically reconstructed ambient relative humidity. |
-| `float` | [`reconstructed_dew_point_c`](#reconstructed_dew_point_c)  | Reconstructed dew point temperature. |
-| `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa)  | Conserved ambient water vapor partial pressure in hPa. |
-| `float` | [`trinode_temp_c`](#trinode_temp_c-1)  | Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0. |
-| `float` | [`trinode_delta_c`](#trinode_delta_c-1)  | Thermal gradient delta: T_valid - T_trinode. |
-| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct-1)  | 0-100% linear psychrometric confidence score. |
+| `float` | [`ambient_temp_c`](#ambient_temp_c-1)  | Trusted steady-state SHTC3 ambient temperature in °C. |
+| `float` | [`ambient_rh_pct`](#ambient_rh_pct-1)  | Trusted steady-state SHTC3 ambient relative humidity in %. |
+| `float` | [`dew_point_c`](#dew_point_c-1)  | Calculated dew point temperature in °C. |
+| `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa-1)  | Calculated water vapor partial pressure in hPa. |
+| `float` | [`trinode_temp_c`](#trinode_temp_c-1)  | Tri-Node verification average: (T_valid + T_die + T_glass) / 3.0. |
+| `float` | [`trinode_delta_c`](#trinode_delta_c-1)  | Cross-sensor verification delta: T_valid - T_trinode. |
+| `uint8_t` | [`trinode_confidence_pct`](#trinode_confidence_pct-1)  | 0-100% cross-sensor range verification score. |
 | `bool` | [`ewma_inited`](#ewma_inited)  | True if EWMA filters have been seeded with initial samples. |
 | `int16_t` | [`tsens_cal_centi_c`](#tsens_cal_centi_c)  | Factory calibrated TSENS eFuse offset in centi-degrees Celsius. |
 | `int16_t` | [`tsens_offset_centi_c`](#tsens_offset_centi_c)  | Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c). |
-| `int16_t` | [`die_tare_centi_c`](#die_tare_centi_c)  | Settled deep-sleep tare offset (T_shtc3_cold - T_die_cold). |
 | [`orch_tri_node_sample_t`](#orch_tri_node_sample_t) | [`ring`](#ring)  | Circular ring buffer of historical telemetry samples. |
 | `uint8_t` | [`ring_head`](#ring_head)  | Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1). |
 | `uint32_t` | [`total_samples`](#total_samples)  | Total lifetime samples recorded across all sessions. |
@@ -13965,6 +13967,20 @@ Last sampled battery terminal voltage in millivolts.
 
 ---
 
+{#boot_vbat_mv-1}
+
+#### boot_vbat_mv
+
+```cpp
+uint16_t boot_vbat_mv
+```
+
+Defined in h1os/orch_state.h:64
+
+Initial non-USB battery voltage captured on boot in millivolts.
+
+---
+
 {#sample_interval_sec}
 
 #### sample_interval_sec
@@ -13973,13 +13989,13 @@ Last sampled battery terminal voltage in millivolts.
 uint32_t sample_interval_sec
 ```
 
-Defined in h1os/orch_state.h:65
+Defined in h1os/orch_state.h:66
 
 Interval between Flow A sensor samples in seconds.
 
 ---
 
-{#flow_b_period_sec-1}
+{#flow_b_period_sec-2}
 
 #### flow_b_period_sec
 
@@ -13987,7 +14003,7 @@ Interval between Flow A sensor samples in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/orch_state.h:66
+Defined in h1os/orch_state.h:67
 
 Interval between Flow B display refreshes in seconds.
 
@@ -14001,7 +14017,7 @@ Interval between Flow B display refreshes in seconds.
 uint32_t last_ewma_sample_seq
 ```
 
-Defined in h1os/orch_state.h:67
+Defined in h1os/orch_state.h:68
 
 Sample sequence number of last processed EWMA & ring debug update.
 
@@ -14015,7 +14031,7 @@ Sample sequence number of last processed EWMA & ring debug update.
 uint16_t epd_partial_refresh_count
 ```
 
-Defined in h1os/orch_state.h:69
+Defined in h1os/orch_state.h:70
 
 Consecutive differential partial refreshes on EPD.
 
@@ -14029,23 +14045,9 @@ Consecutive differential partial refreshes on EPD.
 uint16_t valid_trend
 ```
 
-Defined in h1os/orch_state.h:70
+Defined in h1os/orch_state.h:71
 
-Monotonic count of consecutive settled cold samples.
-
----
-
-{#amb_floor_temp_centi_c}
-
-#### amb_floor_temp_centi_c
-
-```cpp
-int16_t amb_floor_temp_centi_c
-```
-
-Defined in h1os/orch_state.h:72
-
-Lowest observed ambient baseline temperature in centi-°C.
+Monotonic count of consecutive settled steady-state samples.
 
 ---
 
@@ -14147,49 +14149,49 @@ Long-term light EWMA baseline relative humidity.
 
 ---
 
-{#reconstructed_amb_temp_c}
+{#ambient_temp_c-1}
 
-#### reconstructed_amb_temp_c
+#### ambient_temp_c
 
 ```cpp
-float reconstructed_amb_temp_c
+float ambient_temp_c
 ```
 
 Defined in h1os/orch_state.h:82
 
-Psychrometrically reconstructed ambient temperature.
+Trusted steady-state SHTC3 ambient temperature in °C.
 
 ---
 
-{#reconstructed_amb_rh_pct}
+{#ambient_rh_pct-1}
 
-#### reconstructed_amb_rh_pct
+#### ambient_rh_pct
 
 ```cpp
-float reconstructed_amb_rh_pct
+float ambient_rh_pct
 ```
 
 Defined in h1os/orch_state.h:83
 
-Psychrometrically reconstructed ambient relative humidity.
+Trusted steady-state SHTC3 ambient relative humidity in %.
 
 ---
 
-{#reconstructed_dew_point_c}
+{#dew_point_c-1}
 
-#### reconstructed_dew_point_c
+#### dew_point_c
 
 ```cpp
-float reconstructed_dew_point_c
+float dew_point_c
 ```
 
 Defined in h1os/orch_state.h:84
 
-Reconstructed dew point temperature.
+Calculated dew point temperature in °C.
 
 ---
 
-{#vapor_pressure_hpa}
+{#vapor_pressure_hpa-1}
 
 #### vapor_pressure_hpa
 
@@ -14199,7 +14201,7 @@ float vapor_pressure_hpa
 
 Defined in h1os/orch_state.h:85
 
-Conserved ambient water vapor partial pressure in hPa.
+Calculated water vapor partial pressure in hPa.
 
 ---
 
@@ -14213,7 +14215,7 @@ float trinode_temp_c
 
 Defined in h1os/orch_state.h:87
 
-Tri-Node consensus temperature: (T_valid + T_die + T_glass) / 3.0.
+Tri-Node verification average: (T_valid + T_die + T_glass) / 3.0.
 
 ---
 
@@ -14227,7 +14229,7 @@ float trinode_delta_c
 
 Defined in h1os/orch_state.h:88
 
-Thermal gradient delta: T_valid - T_trinode.
+Cross-sensor verification delta: T_valid - T_trinode.
 
 ---
 
@@ -14241,7 +14243,7 @@ uint8_t trinode_confidence_pct
 
 Defined in h1os/orch_state.h:89
 
-0-100% linear psychrometric confidence score.
+0-100% cross-sensor range verification score.
 
 ---
 
@@ -14287,20 +14289,6 @@ Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c).
 
 ---
 
-{#die_tare_centi_c}
-
-#### die_tare_centi_c
-
-```cpp
-int16_t die_tare_centi_c
-```
-
-Defined in h1os/orch_state.h:93
-
-Settled deep-sleep tare offset (T_shtc3_cold - T_die_cold).
-
----
-
 {#ring}
 
 #### ring
@@ -14309,7 +14297,7 @@ Settled deep-sleep tare offset (T_shtc3_cold - T_die_cold).
 orch_tri_node_sample_t ring[32]
 ```
 
-Defined in h1os/orch_state.h:95
+Defined in h1os/orch_state.h:94
 
 Circular ring buffer of historical telemetry samples.
 
@@ -14323,7 +14311,7 @@ Circular ring buffer of historical telemetry samples.
 uint8_t ring_head
 ```
 
-Defined in h1os/orch_state.h:97
+Defined in h1os/orch_state.h:96
 
 Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1).
 
@@ -14337,7 +14325,7 @@ Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1).
 uint32_t total_samples
 ```
 
-Defined in h1os/orch_state.h:98
+Defined in h1os/orch_state.h:97
 
 Total lifetime samples recorded across all sessions.
 
@@ -14516,7 +14504,7 @@ Defined in sub_power.c:47
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -14536,7 +14524,7 @@ Defined in sub_audio.c:58
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:61
 
 ---
 
@@ -14548,7 +14536,7 @@ Defined in sub_audio.c:59
 size_t sample_count
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:62
 
 ---
 
@@ -14560,7 +14548,7 @@ Defined in sub_audio.c:60
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:63
 
 {#structparamstone}
 
@@ -14570,7 +14558,7 @@ Defined in sub_audio.c:61
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:51
+Defined in sub_audio.c:53
 
 ### Public Attributes
 
@@ -14589,7 +14577,7 @@ Defined in sub_audio.c:51
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:52
+Defined in sub_audio.c:54
 
 ---
 
@@ -14601,7 +14589,7 @@ Defined in sub_audio.c:52
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:53
+Defined in sub_audio.c:55
 
 {#structsession}
 
@@ -14688,7 +14676,7 @@ Period between unattended display flushes in seconds.
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:57
 
 ### Public Attributes
 
@@ -14706,7 +14694,7 @@ Defined in sub_audio.c:55
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:58
 
 {#structpresentation}
 
@@ -14795,7 +14783,7 @@ Acoustic presentation master volume (0..100%).
 union [union].params
 ```
 
-Defined in sub_audio.c:50
+Defined in sub_audio.c:52
 
 ### Public Attributes
 
@@ -14815,7 +14803,7 @@ Defined in sub_audio.c:50
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:54
+Defined in sub_audio.c:56
 
 ---
 
@@ -14827,7 +14815,7 @@ Defined in sub_audio.c:54
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:59
 
 ---
 
@@ -14839,7 +14827,7 @@ Defined in sub_audio.c:57
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:64
 
 {#structparamstone}
 
@@ -14849,7 +14837,7 @@ Defined in sub_audio.c:62
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:51
+Defined in sub_audio.c:53
 
 ### Public Attributes
 
@@ -14868,7 +14856,7 @@ Defined in sub_audio.c:51
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:52
+Defined in sub_audio.c:54
 
 ---
 
@@ -14880,7 +14868,7 @@ Defined in sub_audio.c:52
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:53
+Defined in sub_audio.c:55
 
 {#structparamschime}
 
@@ -14890,7 +14878,7 @@ Defined in sub_audio.c:53
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:57
 
 ### Public Attributes
 
@@ -14908,7 +14896,7 @@ Defined in sub_audio.c:55
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:58
 
 {#structparamspcm}
 
@@ -14918,7 +14906,7 @@ Defined in sub_audio.c:56
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:60
 
 ### Public Attributes
 
@@ -14938,7 +14926,7 @@ Defined in sub_audio.c:58
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:61
 
 ---
 
@@ -14950,7 +14938,7 @@ Defined in sub_audio.c:59
 size_t sample_count
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:62
 
 ---
 
@@ -14962,6 +14950,6 @@ Defined in sub_audio.c:60
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:63
 
 Generated by [Moxygen](https://0state.com/moxygen)
