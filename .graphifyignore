@@ -6,6 +6,7 @@
 *.woff2
 
 # ---| Image & Meta Files |---
+*.pdf
 *.log
 *.json
 *.stp
