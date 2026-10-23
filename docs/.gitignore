@@ -1,3 +1,6 @@
 # Removed Docs from Repo
 /doxygen/
+# Tracked in Another Repo
+/Hardware_Docs/
 moxygen.log
+_note.txt

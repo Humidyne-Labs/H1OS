@@ -9,9 +9,9 @@ sdkconfig.*
 *.bak
 # NOT Tracking Logs
 *.log
+/graphify-out/
+.graphifyignore
 
 # Python artifacts
 __pycache__/
 *.py[cod]
-
-/h1os_backup_20261019_182851/
