@@ -2,7 +2,8 @@
 
 # ---| Font Files |---
 *.ttf
-*.wolff
+*.woff
+*.woff2
 
 # ---| Image & Meta Files |---
 *.log
