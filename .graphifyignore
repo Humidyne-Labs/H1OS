@@ -1,0 +1,78 @@
+# ===| Static Files & Images |===
+
+# ---| Font Files |---
+*.ttf
+*.wolff
+
+# ---| Image & Meta Files |---
+*.log
+*.json
+*.stp
+*.dwg
+*.png
+*.jpg
+*.bmp
+*.tiff
+*.zip
+*.py
+*.yml
+*.csv
+
+# ---| Build & Meta Files |---
+*.lock
+*.clangd
+*.gitignore
+*.clang-format
+*.graphifyignore
+
+# ---| Doxygen and License Files |---
+Doxyfile
+LICENSE
+LICENSE-CC-BY-4.0
+
+# ---| Agent & Config Directories |---
+/.agents/
+/.jules/
+/.vscode/
+/graphify-out/
+
+# ---| Aux File Directories |---
+/tools/
+/profiles/
+/tools/usb/
+/tools/fonts/
+/partition-table/
+/tools/fonts/font_license/
+
+# ---| Doc Sub-directories |---
+/docs/_note.txt
+
+/docs/logs/
+/docs/agent_notes/
+/docs/doxygen/
+/docs/hardware_docs/datasheets/shtc3_doc/c_code/
+
+# ===| Example Sub-directories |===
+
+# ---| Example Template |---
+/examples/boilerplate/
+/examples/boilerplate/build/
+/examples/boilerplate/.vscode/
+/examples/boilerplate/build_dev/
+/examples/boilerplate/build_prod/
+/examples/boilerplate/managed_components/
+
+# ---| Main Usage Example |---
+/examples/H1OS/build/
+/examples/H1OS/.vscode/
+/examples/H1OS/build_dev/
+/examples/H1OS/build_prod/
+/examples/H1OS/managed_components/
+
+# ---| Deepsleep RISC-V Test |---
+/examples/riscv_test/
+/examples/riscv_test/build/
+/examples/riscv_test/.vscode/
+/examples/riscv_test/build_dev/
+/examples/riscv_test/build_prod/
+/examples/riscv_test/managed_components/

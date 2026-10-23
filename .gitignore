@@ -1,17 +1,18 @@
-*.lock
-# Tracking .agents workspace skills and rules
 # /.agents/
+# .graphifyignore
+
+*.lock
+*.bak
+*.log
 build/
 build_*/
 sdkconfig
 sdkconfig.*
 !sdkconfig.defaults*
-*.bak
-# NOT Tracking Logs
-*.log
-/graphify-out/
-.graphifyignore
 
-# Python artifacts
+# Graphify Output Dir
+/graphify-out/
+
+# Python Artifacts
 __pycache__/
 *.py[cod]
