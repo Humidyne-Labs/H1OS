@@ -48,7 +48,9 @@ LICENSE*
 /docs/logs/
 /docs/agent_notes/
 /docs/doxygen/
+/docs/hardware_docs/README.md
 /docs/hardware_docs/datasheets/
+/docs/hardware_docs/datasheets/README.md
 
 # ===| Example Sub-directories |===
 
