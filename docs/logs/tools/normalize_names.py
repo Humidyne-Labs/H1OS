@@ -4,36 +4,31 @@ import re
 from pathlib import Path
 from PIL import Image
 
-# Set to False to apply deduplication, conversion, and renaming
 DRY_RUN = False
-
-# Target formats to process
 INPUT_EXTENSIONS = {".jpg", ".jpeg", ".webp", ".bmp", ".png"}
 
-# Timestamp regex patterns
+# 1. Hyphenated: 2026-10-21-21-27-07-818_002
 PAT_HYPHEN = re.compile(
     r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})-"
     r"(?P<hour>\d{2})-(?P<min>\d{2})-(?P<sec>\d{2})"
     r"(?:-(?P<subseq>\d+))?(?:_(?P<extra>\w+))?$"
 )
 
+# 2. Standard IMG: IMG_20261023_013334847
 PAT_IMG = re.compile(
     r"^IMG_(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})_"
     r"(?P<hour>\d{2})(?P<min>\d{2})(?P<sec>\d{2})"
     r"(?P<subseq>\d+)?$"
 )
 
-
-def get_file_hash(path: Path, chunk_size: int = 65536) -> str:
-    """Computes SHA-256 hash of file contents to detect exact duplicates."""
-    hasher = hashlib.sha256()
-    with open(path, "rb") as f:
-        while chunk := f.read(chunk_size):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+# 3. Compact instrument IMG: IMG230600194427 (IMG + 6 digits + HHMMSS)
+PAT_IMG_COMPACT = re.compile(
+    r"^IMG(?P<p1>\d{2})(?P<p2>\d{2})(?P<p3>\d{2})(?P<hour>\d{2})(?P<min>\d{2})(?P<sec>\d{2})$"
+)
 
 
 def parse_timestamp(stem: str) -> str | None:
+    # Pattern 1
     m = PAT_HYPHEN.match(stem)
     if m:
         d = m.groupdict()
@@ -45,6 +40,7 @@ def parse_timestamp(stem: str) -> str | None:
             parts.append(d["extra"])
         return "_".join(parts)
 
+    # Pattern 2
     m = PAT_IMG.match(stem)
     if m:
         d = m.groupdict()
@@ -54,9 +50,34 @@ def parse_timestamp(stem: str) -> str | None:
             parts.append(d["subseq"])
         return "_".join(parts)
 
+    # Pattern 3: Compact 12-digit (IMG DD MM YY HH MM SS or YY MM DD HH MM SS)
+    m = PAT_IMG_COMPACT.match(stem)
+    if m:
+        d = m.groupdict()
+        p1, p2, p3 = d["p1"], d["p2"], d["p3"]
+        h, mn, s = d["hour"], d["min"], d["sec"]
+
+        # Option A (DD-MM-YY -> 20YY-MM-DD): 23-06-00 -> 2000-06-23
+        year = f"20{p3}"
+        month = p2
+        day = p1
+
+        # Option B: If your device uses YY-MM-DD instead, uncomment this line:
+        # year, month, day = f"20{p1}", p2, p3
+
+        return f"{year}-{month}-{day}_{h}-{mn}-{s}"
+
     return None
+    
+def get_file_hash(path: Path, chunk_size: int = 65536) -> str:
+    """Computes SHA-256 hash of file contents to detect exact duplicates."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
-
+    
 def main():
     folder = Path(".")
     seen_hashes = {}
@@ -107,4 +128,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()    
