@@ -28,6 +28,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E8** | SSD1681 E-Paper Display | Shared `MOSI/SDA` line for glass thermistor read `0x1B` | Dedicated `MISO` trace or discrete bezel thermistor |
 | **E9** | Slow Clock Domain | Missing 32.768 kHz crystal; pins 15/16 multiplexed to I2S | Dedicated 32.768 kHz crystal on XTAL32K pads (route I2S elsewhere) |
 | **E10** | USB VBUS / Charger Detection | Missing dedicated VBUS/VUSB voltage monitor pin | Resistor divider from 5V VBUS to RTC GPIO for hardware USB detect |
+| **E11** | Battery Charger (ME4057/TP4056) | Missing charge status indicator (CHRG/STDBY) routed to readable MCU IO | Route charger `/CHRG` and `/STDBY` open-drain pins with 10kΩ pull-ups to RTC GPIOs |
 
 ---
 
@@ -316,6 +317,37 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board routes external 5V powe
 
 ---
 
+### Errata E11: Missing Charger Hardware Status Output Lines (CHRG / STDBY)
+
+#### 1. Physical Defect Analysis
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a standalone linear Li-Ion battery management controller (ME4057 / TP4056 or pin-compatible IC). The controller provides two open-drain status pins:
+- **`Pin 1` (`/CHRG`):** Open-drain active-low output pulled low when battery is actively being charged in constant-current or constant-voltage modes.
+- **`Pin 5` (`/STDBY` / `/DONE`):** Open-drain active-low output pulled low when battery charging is complete (trickle charge / standby termination).
+
+On the Waveshare v2 PCB, these status pins are **wired strictly to surface-mount LEDs** (Red/Blue or Red/Green) with current-limiting series resistors to $V_{\text{BUS}}$. **Neither status pin is routed to any ESP32-S3 GPIO**.
+
+#### 2. Metrological & Firmware Impact
+1. **Zero Direct Knowledge of Charge State:** Firmware has no digital feedback regarding whether the battery is actively receiving charge, fully saturated, disconnected, or faulted.
+2. **Ambiguity on Wall Chargers:** Combined with Erratum **E10** (missing VBUS divider), the MCU is completely blind to charging events on non-data USB power bricks. Even when connected to 5V power, firmware cannot distinguish between active 400 mA constant-current charging and 0 mA standby float without continuously monitoring consecutive millivolt trends.
+3. **Loss of Charger Fault Visibility:** Hardware charger failure modes (thermal regulation foldback, input undervoltage lockout, dead-cell trickle timeout) cannot be sensed or presented to the user.
+
+#### 3. Current H1OS Firmware Mitigations
+- In `sub_power.c`, H1OS infers operational state through a two-sample comparator on the 8-entry circular ring buffer `ulp_vbat_ring[8]`:
+  - If USB host data packets are detected via `sub_power_connected_usb()`:
+    - $V_{\text{BAT}} \ge 4180\text{ mV} \implies$ `H1OS_BATTERY_CHARGED`.
+    - Else $\implies$ `H1OS_BATTERY_CHARGING`.
+  - If standalone wall charger (no host data negotiation):
+    - If $V_{\text{new}} \ge V_{\text{prev}} + 15\text{ mV} \implies$ `H1OS_BATTERY_CHARGING`.
+    - If $V_{\text{new}} \ge 4180\text{ mV}$ and $|V_{\text{new}} - V_{\text{prev}}| \le 5\text{ mV} \implies$ `H1OS_BATTERY_CHARGED`.
+    - Else $\implies$ `H1OS_BATTERY_DISCHARGING`.
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **Route `/CHRG` and `/STDBY` to RTC GPIOs:** Connect ME4057 `Pin 1` (`/CHRG`) and `Pin 5` (`/STDBY`) through $10\text{ k}\Omega$ pull-up resistors to the $V_{\text{DD\_3V3}}$ rail, routing directly to available RTC GPIO pins (e.g., `GPIO 1` and `GPIO 2`, or `GPIO 7` and `GPIO 8`).
+- **Zero-Latency State Detection:** Allows both the dual-core Xtensa CPU and the ULP-RISC-V coprocessor to read exact charger hardware states in $<1\ \mu\text{s}$ via single-cycle register bit reads (`REG_READ(RTC_GPIO_IN_REG)`), completely eliminating heuristic $\Delta V$ rate-of-rise algorithms.
+- **Hardware Interrupt on Charge Complete:** Enables falling-edge interrupts on the `/STDBY` line to wake the PMU and update UI status immediately when charge termination occurs.
+
+---
+
 ## 3. Summary of Rev B BOM & Schematic Modifications
 
 | Component Type | Part Number / Spec | Reference Designator | Purpose |
@@ -329,6 +361,7 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board routes external 5V powe
 | **ESD Suppressors** | STMicroelectronics USBLC6-2 | `D_ESD1`, `D_ESD2` | Button & MicroSD ESD protection |
 | **Slot Milling** | 2.0 mm PCB Routing Path | `MECHANICAL` | SHTC3 cantilevered thermal isolation tab |
 | **VBUS Divider** | 300 kΩ / 200 kΩ 0402 1% Resistors | `R_VBUS1`, `R_VBUS2` | 5V VBUS monitor divider to RTC GPIO |
+| **Charger Status Pull-ups** | 10 kΩ 0402 1% Resistors | `R_CHRG1`, `R_CHRG2` | Pull-ups on `/CHRG` and `/STDBY` routed to RTC GPIOs |
 
 ---
 
