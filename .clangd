@@ -1,5 +1,8 @@
 CompileFlags:
-  CompilationDatabase: "examples/H1OS/build_prod"
+  CompilationDatabase:
+    - "examples/H1OS/build_prod"
+    - "examples/H1OS/build_dev"
+    - "examples/H1OS/build"
   Add:
     - -Wno-unknown-attributes
     - -Wno-macro-redefined
