@@ -29,6 +29,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E9** | Slow Clock Domain | Missing 32.768 kHz crystal; pins 15/16 multiplexed to I2S | Dedicated 32.768 kHz crystal on XTAL32K pads (route I2S elsewhere) |
 | **E10** | USB VBUS / Charger Detection | Missing dedicated VBUS/VUSB voltage monitor pin | Resistor divider from 5V VBUS to RTC GPIO for hardware USB detect |
 | **E11** | 5-Pin LiPo Charger (STAT & ISET) | STAT pin only wired to LED (not MCU IO); ISET fixed with static resistor | Route STAT to RTC GPIO with pull-up; connect ISET to I2C digipot for programmable charge rates |
+| **E12** | LiPo Battery Thermal Protection | Missing battery thermistor (NTC); 2-pin socket lacks cell temperature sense | 3-pin JST-PH connector (`BAT+`, `BAT-`, `NTC`) or PCB cradle 10k NTC to RTC ADC |
 
 ---
 
@@ -350,6 +351,35 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a compact 
 
 ---
 
+### Errata E12: Missing Battery Cell Thermistor (NTC) & Thermal Runaway Protection
+
+#### 1. Physical Defect Analysis
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a standard 2-pin JST-PH 2.0 mm connector (and parallel solder pads) wired exclusively for `BAT+` and `BAT-` (GND).
+- **No Third Sense Pin:** There is no third connector pin for an internal battery pack Negative Temperature Coefficient (NTC) thermistor.
+- **No On-Board Battery Contact Thermistor:** No discrete NTC thermistor footprint exists on the PCB underside where the battery pouch typically rests.
+- **Unqualified Charger IC:** The onboard 5-pin linear charger lacks a thermal qualification (`TS` / `TEMP`) input, meaning hardware charging continues unconditionally regardless of ambient or cell temperature.
+
+#### 2. Metrological, Chemical & Safety Impact
+1. **Lithium Plating Hazard (< 0°C Charging):** Charging a Lithium-Polymer cell at sub-zero temperatures ($\le 0^\circ\text{C}$) causes metallic lithium to electroplate onto the graphite anode rather than intercalating into the lattice. Over successive cycles, this forms irreversible microscopic lithium dendrites that pierce the internal polyolefin separator, resulting in permanent capacity loss, internal short circuits, and catastrophic thermal runaway.
+2. **Thermal Breakdown & Gas Generation (> 45°C Charging):** Charging at elevated temperatures ($\ge 45^\circ\text{C}$) accelerates cathode transition metal dissolution, electrolyte oxidation, and pouch swelling / gas generation, presenting severe fire and safety hazards.
+3. **Tri-Node Thermal Estimation Mismatch:** While H1OS monitors ambient temperature via the SHTC3, on-glass temperature via the SSD1681, and internal die temperature via MCU TSENS, none of these sensors represent the physical core temperature of the battery pouch when placed in an enclosure or subjected to external solar loading.
+
+#### 3. Current H1OS Firmware Mitigations
+- In `h1os_lifecycle.c`, firmware uses the settled SHTC3 ambient temperature snapshot (`ambient_temp_c`) as a proxy safety envelope:
+  - If ambient temperature $T_{\text{ambient}} \le 0.0^\circ\text{C}$ or $T_{\text{ambient}} \ge 45.0^\circ\text{C}$, the firmware flags a thermal hazard and issues warning telemetry.
+  - However, because the SHTC3 is thermally isolated on its edge tab (Erratum **E1**) and the battery may retain heat or freeze independently, proxy ambient monitoring cannot replace direct cell contact thermometry.
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **3-Pin JST-PH Battery Connector:** Upgrade the 2-pin socket to a standard 3-pin JST-PH connector:
+  - `Pin 1:` `BAT+` (Battery Anode)
+  - `Pin 2:` `NTC` / `TS` (10 kΩ NTC B=3950K Thermistor Sense Node)
+  - `Pin 3:` `BAT-` (System Ground)
+- **RTC ADC Sense Channel:** Bias the `NTC` pin with a precision $10.0\text{ k}\Omega$ 0.1% pull-up resistor to an RTC-switchable $V_{\text{REF}}$ or $V_{\text{DD\_3V3}}$ rail, routed directly to an available RTC ADC pin (e.g. `ADC1_CH2` / `GPIO 3`).
+- **Surface Mount Cradle NTC Option:** Provide an unpopulated 0603 footprint for a surface-mount 10 kΩ NTC thermistor placed in the center of the PCB battery landing zone, thermally coupled to the cell via thermally conductive gap filler.
+- **Hardware Charge Cutoff (JEITA Compliance):** In Rev B, select an upgraded charger IC with a dedicated `TS` (Temperature Sense) input (such as TI BQ24040, BQ24090, or Analog Devices LTC4065) configured for JEITA temperature profile compliance (automatic current reduction at $45^\circ\text{C}$ and full cutoff at $0^\circ\text{C}$ and $60^\circ\text{C}$).
+
+---
+
 ## 3. Summary of Rev B BOM & Schematic Modifications
 
 | Component Type | Part Number / Spec | Reference Designator | Purpose |
@@ -365,6 +395,8 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a compact 
 | **VBUS Divider** | 300 kΩ / 200 kΩ 0402 1% Resistors | `R_VBUS1`, `R_VBUS2` | 5V VBUS monitor divider to RTC GPIO |
 | **STAT Pull-up** | 10 kΩ 0402 1% Resistor | `R_STAT` | Pull-up on charger `STAT` pin routed to RTC GPIO |
 | **ISET Digipot** | Microchip MCP4017 (I2C) | `U_ISET_POT` | Software-programmable dynamic battery charge rate control |
+| **3-Pin Battery Socket** | JST B3B-PH-K-S (2.0 mm) | `J_BAT` | 3-pin connector with dedicated NTC cell thermistor pin |
+| **NTC Bias Resistor** | 10.0 kΩ 0402 0.1% Resistor | `R_NTC_BIAS` | Precision reference pull-up for battery NTC ADC channel |
 
 ---
 
