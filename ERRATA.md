@@ -31,6 +31,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E11** | 5-Pin LiPo Charger (STAT & ISET) | STAT pin only wired to LED (not MCU IO); ISET fixed with static resistor | Route STAT to RTC GPIO with pull-up; connect ISET to I2C digipot for programmable charge rates |
 | **E12** | LiPo Battery Thermal Protection | Missing battery thermistor (NTC); 2-pin socket lacks cell temperature sense | 3-pin JST-PH connector (`BAT+`, `BAT-`, `NTC`) or PCB cradle 10k NTC to RTC ADC |
 | **E13** | Enclosure & Form Factor Packaging | Protruding rear IO headers waste enclosure volume that should house a larger battery | Eliminate rear headers; planar rear battery landing zone accommodating high-capacity pouch |
+| **E14** | Board Identity & Calibration Storage | Missing board-level silicon UID / EEPROM; identity coupled to MCU eFuse MAC | Microchip 24AA02UID / AT24CS02 SOT-23 on I2C bus for factory serial number & cal storage |
 
 ---
 
@@ -405,6 +406,30 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates standard 2
 
 ---
 
+### Errata E14: Missing Board-Level Unique Hardware Identity & Calibration EEPROM
+
+#### 1. Physical Defect Analysis
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board contains no discrete non-volatile memory or unique silicon identity device on its I2C bus.
+- **Coupled to ESP32 Module:** The physical board's serial identity is derived entirely from the ESP32-S3's internal factory-burned eFuse Block 0 base MAC address via `esp_read_mac()`.
+- **No Board-Level Calibration Non-Volatile Storage:** Metrological calibration constants (such as SHTC3 temperature trimming, exact physical resistor divider ratios for battery ADC, and display factory batch data) have no permanent hardware residence on the PCB itself.
+
+#### 2. Architectural & Manufacturing Impact
+1. **Loss of Identity Across Module Replacement:** If an ESP32-S3 module fails or is reworked during manufacturing, the physical PCB appliance loses its identity, serial number, and calibration profile.
+2. **Flash Wipe / NVS Vulnerability:** Storing calibration offsets in Flash NVS partitions is subject to accidental erasure during full-chip development reflashes (`esptool.py erase_flash`), partition table updates, or corrupted sector recovery.
+3. **Automated Factory Production & Provisioning Friction:** Without an automated factory-programmed globally unique identifier in hardware, every manufactured PCB requires custom provisioning firmware to burn serial numbers into OTP eFuses or flash sectors.
+
+#### 3. Current H1OS Firmware Mitigations
+- In `h1os_lifecycle.c`, device identity is read dynamically from the ESP32-S3 hardware eFuse MAC address via `esp_efuse_mac_get_default()`.
+- Calibration and telemetry history are mirrored to Flash NVS via `sub_nvs.c`, with runtime fallback defaults if NVS is blank.
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **Populate I2C Serial Number IC (24AA02UID / AT24CS02):** Place a tiny 5-pin SOT-23-5 I2C EEPROM with factory-programmed Globally Unique Identifier (such as Microchip `24AA02UID` or `AT24CS02`) on the main sensor I2C bus (`SDA`/`SCL`):
+  - **Globally Unique 32-Bit / 48-Bit / 64-Bit Silicon Serial Number:** Factory write-protected at wafer fabrication; readable at I2C address `0x58` (or `0x50` upper bank).
+  - **2 Kbit (256-Byte) Parameter EEPROM:** Provides permanent board-level storage for hardware revision (`Rev B.1`), manufacturing timestamp, factory ADC divider slope/offset trim, and sensor calibration offsets at I2C address `0x50`.
+  - **Zero GPIO Overhead & Ultra-Low Power:** Connects directly to the existing I2C bus with zero additional MCU pins, consuming $<1\,\mu\text{A}$ standby current.
+
+---
+
 ## 3. Summary of Rev B BOM & Schematic Modifications
 
 | Component Type | Part Number / Spec | Reference Designator | Purpose |
@@ -422,6 +447,7 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates standard 2
 | **ISET Digipot** | Microchip MCP4017 (I2C) | `U_ISET_POT` | Software-programmable dynamic battery charge rate control |
 | **3-Pin Battery Socket** | JST B3B-PH-K-S (2.0 mm) | `J_BAT` | 3-pin connector with dedicated NTC cell thermistor pin |
 | **NTC Bias Resistor** | 10.0 kΩ 0402 0.1% Resistor | `R_NTC_BIAS` | Precision reference pull-up for battery NTC ADC channel |
+| **I2C UID EEPROM** | Microchip 24AA02UIDT-I/OT (SOT-23-5) | `U_UID_EEPROM` | Factory-programmed silicon unique serial number & 256-byte calibration storage |
 
 ---
 
