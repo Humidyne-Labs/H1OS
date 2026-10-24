@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * **Discharge Lap Reset & Singularity Guard:** Automatically resets cumulative runtimes and latches starting SoC when transitioning from charging/USB to battery discharge; returns `-1.0f` to display `"Autonomy: ~CALIBRATING..."` until $\ge 1.0\%$ SoC is empirically consumed.
   * **Persistent Runtimes Across Power Off & Reflash:** Cumulative runtimes reside in RTC Slow SRAM across sleep and are mirrored into Flash NVS (`sub_nvs`) before sleep and on shutdown.
   * **Example Calculator Deletion:** Removed redundant `battery_estimator.c/.h` from `examples/H1OS/main/`, unifying all battery logic into Layer 2 `sub_power`.
-  * **Hardware Errata E10, E11 & E12:** Documented the lack of a dedicated VBUS/VUSB monitor divider pin (E10), unrouted charger `STAT` output / static `ISET` resistor (E11), and missing battery pack NTC cell thermistor sense channel (E12) on the Waveshare PCB in `ERRATA.md`.
+  * **Hardware Errata E10, E11, E12 & E13:** Documented the lack of a dedicated VBUS/VUSB monitor divider pin (E10), unrouted charger `STAT` output / static `ISET` resistor (E11), missing battery pack NTC cell thermistor sense channel (E12), and protruding rear IO headers defeating flush all-in-one enclosure packaging (E13) on the Waveshare PCB in `ERRATA.md`.
 
 ### 🛡️ Fixed & Hardened (Firmware Safety Invariants Audit)
 

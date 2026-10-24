@@ -30,6 +30,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E10** | USB VBUS / Charger Detection | Missing dedicated VBUS/VUSB voltage monitor pin | Resistor divider from 5V VBUS to RTC GPIO for hardware USB detect |
 | **E11** | 5-Pin LiPo Charger (STAT & ISET) | STAT pin only wired to LED (not MCU IO); ISET fixed with static resistor | Route STAT to RTC GPIO with pull-up; connect ISET to I2C digipot for programmable charge rates |
 | **E12** | LiPo Battery Thermal Protection | Missing battery thermistor (NTC); 2-pin socket lacks cell temperature sense | 3-pin JST-PH connector (`BAT+`, `BAT-`, `NTC`) or PCB cradle 10k NTC to RTC ADC |
+| **E13** | Enclosure & Form Factor Packaging | Protruding rear through-hole IO headers destroy all-in-one slim profile | Eliminate rear headers; planar rear battery landing zone with flush pogo test pads |
 
 ---
 
@@ -377,6 +378,30 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a standard
 - **RTC ADC Sense Channel:** Bias the `NTC` pin with a precision $10.0\text{ k}\Omega$ 0.1% pull-up resistor to an RTC-switchable $V_{\text{REF}}$ or $V_{\text{DD\_3V3}}$ rail, routed directly to an available RTC ADC pin (e.g. `ADC1_CH2` / `GPIO 3`).
 - **Surface Mount Cradle NTC Option:** Provide an unpopulated 0603 footprint for a surface-mount 10 kΩ NTC thermistor placed in the center of the PCB battery landing zone, thermally coupled to the cell via thermally conductive gap filler.
 - **Hardware Charge Cutoff (JEITA Compliance):** In Rev B, select an upgraded charger IC with a dedicated `TS` (Temperature Sense) input (such as TI BQ24040, BQ24090, or Analog Devices LTC4065) configured for JEITA temperature profile compliance (automatic current reduction at $45^\circ\text{C}$ and full cutoff at $0^\circ\text{C}$ and $60^\circ\text{C}$).
+
+---
+
+### Errata E13: Protruding Rear IO Breakouts & Mechanical Enclosure Incompatibility
+
+#### 1. Physical Layout Analysis
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates standard 2.54 mm pitch through-hole male pin header breakout rows extending perpendicularly out the rear (bottom) copper layer of the PCB.
+1. **Vertical Clearance (Z-Height Inflation):** Standard 2.54 mm through-hole header pins extend $8.5\text{–}11.5\text{ mm}$ above the rear PCB surface. To enclose the board, an enclosure cavity must add $\ge 12\text{ mm}$ of dead air space just to clear unused pin tips, ballooning an otherwise slim 5 mm appliance into a clunky $>18\text{ mm}$ brick.
+2. **LiPo Pouch Puncture & Short-Circuit Hazard:** In an all-in-one appliance, the Li-Polymer pouch battery is designed to mount flat against the rear of the PCB using thin double-sided adhesive. Pointed, trimmed through-hole solder tails and header pins present sharp puncturing hazards directly against the fragile aluminum/polyolefin pouch lining, creating a severe fire and short-circuit risk if compressed.
+3. **Ergonomic & Portability Breakdown:** Utilizing any pin from the rear breakout requires plugging in DuPont jumper cables or mating daughterboards that protrude backwards, making flush wall mounting, pocket carry, desktop resting, and sleek handheld use impossible.
+
+#### 2. Architectural Impact on All-In-One Form Factor
+- The core vision of H1OS is an autonomous, ultra-thin, all-in-one environmental monitoring appliance.
+- Because essential peripherals (buttons, display, SHTC3 sensor, MicroSD, RTC, and battery charger) are already on the board, external header jumpers serve no runtime purpose in production deployment.
+- Having unswitched, unbuffered general-purpose digital IO lines hanging out into free air on long traces creates parasitic antenna loops that increase radiated RF EMI and ESD vulnerability.
+
+#### 3. Current H1OS Firmware Mitigations
+- In firmware configuration, all unused rear digital breakout GPIOs are placed into low-power high-impedance (floating) or pull-down states upon deep sleep entry to minimize pin capacitance and leakage currents.
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **Eliminate Through-Hole Header Footprints:** Completely remove all 2.54 mm through-hole header strips from the rear of the board.
+- **Planar Battery Landing Zone:** Design the rear PCB copper surface as a completely smooth, planar landing zone devoid of through-hole component leads or tall SMT passives, allowing a 400–600 mAh pouch battery to adhere directly to the PCB with double-sided thermal foam tape.
+- **Flush Test Pads (Pogo Targets):** If factory programming, automated flashing, or diagnostic access is required, place flush, round gold test pads ($\varnothing 1.0\text{ mm}$ circular ENIG pads) on the PCB periphery or under the battery for bed-of-nails / pogo-pin test fixtures.
+- **Edge-Aligned Low-Profile Expansion (Optional):** If optional sensor expansion (e.g. external particulate PM2.5 or VOC sensor) is desired without compromising the all-in-one profile, route a single right-angle horizontal JST-SH 1.0 mm 4-pin connector (Qwiic / Stemma QT format, max height $<1.8\text{ mm}$) flush with the bottom board edge, or utilize castellated side edge pads.
 
 ---
 
