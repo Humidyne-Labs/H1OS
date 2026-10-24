@@ -68,10 +68,12 @@ static const struct {
 
 uint16_t sub_power_mv_to_soc_tenths(uint16_t mv)
 {
-    if (mv >= s_lipo_table[0].mv)
+    if (mv >= s_lipo_table[0].mv) {
         return 1000;
-    if (mv <= s_lipo_table[LIPO_TABLE_SIZE - 1].mv)
+    }
+    if (mv <= s_lipo_table[LIPO_TABLE_SIZE - 1].mv) {
         return 0;
+    }
 
     for (size_t i = 0; i < LIPO_TABLE_SIZE - 1; i++) {
         if (mv <= s_lipo_table[i].mv && mv >= s_lipo_table[i + 1].mv) {
@@ -86,7 +88,7 @@ uint16_t sub_power_mv_to_soc_tenths(uint16_t mv)
 
 static uint8_t mv_to_percent(uint16_t mv)
 {
-    return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5) / 10);
+    return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);
 }
 
 /**
@@ -96,8 +98,9 @@ static uint8_t mv_to_percent(uint16_t mv)
  */
 esp_err_t sub_power_init(void)
 {
-    if (s_adc_handle != NULL)
+    if (s_adc_handle != NULL) {
         return ESP_OK;
+    }
 
     adc_oneshot_unit_init_cfg_t unit_cfg = {
         .unit_id = ADC_UNIT_1,
@@ -130,7 +133,7 @@ esp_err_t sub_power_init(void)
     if (err == ESP_OK) {
         s_cali_valid = true;
     } else {
-        ESP_LOGW(TAG, "ADC calibration creation failed: %s, falling back to raw math", esp_err_to_name(err));
+        ESP_LOGW(TAG, "ADC calibration creation failed: %s, using default linear coefficients", esp_err_to_name(err));
     }
 #endif
 
@@ -177,12 +180,17 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
     }
 
     const volatile uint32_t *ring = (const volatile uint32_t *)&ulp_vbat_ring;
-    uint32_t head  = ulp_vbat_ring_head % 8;
+    uint32_t head  = ulp_vbat_ring_head % 8U;
     uint32_t count = ulp_vbat_ring_count;
     uint32_t vbat  = ulp_last_vbat_mv;
+    bool usb_conn  = sub_power_connected_usb();
 
-    if (vbat == 0 || vbat > 4500) {
-        vbat = 4000;
+    /* Zero-Volt Cable Guard: When running on USB bench power without a LiPo cell attached,
+     * the 200k/200k divider floats or reads <100 mV. Force 4200 mV (100% CHARGED). */
+    if (usb_conn && vbat < 3300U) {
+        vbat = 4200U;
+    } else if (vbat == 0U || vbat > 4500U) {
+        vbat = 4000U;
     }
 
     uint16_t vbat_mv = (uint16_t)vbat;
@@ -194,17 +202,19 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
     }
 
     h1os_battery_state_t state = H1OS_BATTERY_DISCHARGING;
-    if (sub_power_connected_usb()) {
-        state = (vbat_mv >= 4180) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
-    } else if (count >= 2) {
-        uint32_t newest_idx = (head == 0)       ? 7 : (head - 1);
-        uint32_t prev_idx   = (newest_idx == 0) ? 7 : (newest_idx - 1);
+    if (usb_conn) {
+        state = (vbat_mv >= 4180U) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
+    } else if (count >= 2U) {
+        uint32_t newest_idx = (head == 0U) ? 7U : (head - 1U);
+        /* Compare newest sample against sample from 2 cycles prior (or 1 cycle prior if count == 2) */
+        uint32_t lookback   = (count >= 3U) ? 2U : 1U;
+        uint32_t prev_idx   = (newest_idx + 8U - lookback) % 8U;
         uint32_t v_new      = ring[newest_idx];
         uint32_t v_prev     = ring[prev_idx];
 
-        if (v_new >= v_prev + 15) {
+        if (v_new >= v_prev + 15U) {
             state = H1OS_BATTERY_CHARGING;
-        } else if (v_new >= 4180 && (v_new > v_prev ? (v_new - v_prev) : (v_prev - v_new)) <= 5) {
+        } else if (v_new >= 4180U && (v_new > v_prev ? (v_new - v_prev) : (v_prev - v_new)) <= 5U) {
             state = H1OS_BATTERY_CHARGED;
         } else {
             state = H1OS_BATTERY_DISCHARGING;
@@ -225,7 +235,7 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 }
 
 /**
- * @brief Compute macro wall-clock current draw and projected autonomy days.
+ * @brief Compute empirical battery autonomy metrics over total elapsed runtime.
  */
 void sub_power_calc_autonomy(uint16_t initial_soc_x10,
                              uint16_t current_soc_x10,
@@ -237,15 +247,15 @@ void sub_power_calc_autonomy(uint16_t initial_soc_x10,
         return;
     }
 
-    out_metrics->wall_draw_ma  = -1.0f;
+    out_metrics->avg_draw_ma   = -1.0f;
     out_metrics->autonomy_days = -1.0f;
     out_metrics->mah_spent_lap = 0.0f;
 
-    float wall_sec   = (float)total_sleep_sec + ((float)total_app_ms / 1000.0f);
-    float wall_hours = wall_sec / 3600.0f;
+    float elapsed_sec   = (float)total_sleep_sec + ((float)total_app_ms / 1000.0f);
+    float elapsed_hours = elapsed_sec / 3600.0f;
 
-    /* Singularity & calibration guard (< 1.0% drop or < 60s elapsed wall time) */
-    if (initial_soc_x10 <= current_soc_x10 || wall_sec < 60.0f) {
+    /* Calibration guard: require >= 1.0% (10 tenths) SoC drop and >= 60s elapsed runtime */
+    if (initial_soc_x10 <= current_soc_x10 || elapsed_sec < 60.0f) {
         return;
     }
 
@@ -259,12 +269,12 @@ void sub_power_calc_autonomy(uint16_t initial_soc_x10,
     float delta_c_lap   = nominal_mah * (delta_soc_pct / 100.0f);
     out_metrics->mah_spent_lap = delta_c_lap;
 
-    float i_wall = delta_c_lap / wall_hours;
-    out_metrics->wall_draw_ma = i_wall;
+    float avg_draw_ma = delta_c_lap / elapsed_hours;
+    out_metrics->avg_draw_ma = avg_draw_ma;
 
     float current_soc_pct = (float)current_soc_x10 / 10.0f;
     float c_rem = nominal_mah * (current_soc_pct / 100.0f);
-    float h_rem = c_rem / i_wall;
+    float h_rem = c_rem / avg_draw_ma;
     out_metrics->autonomy_days = h_rem / 24.0f;
 }
 
@@ -278,8 +288,9 @@ void sub_power_calc_autonomy(uint16_t initial_soc_x10,
  */
 esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_mv)
 {
-    if (out_scale == NULL || out_offset_mv == NULL)
+    if (out_scale == NULL || out_offset_mv == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     if (s_cali_valid && s_cali_handle != NULL) {
         int v_2000 = 0;
@@ -353,7 +364,10 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
     } else if (ulp_last_wake_cause == 3) {
         /* Account for the final Flow B sleep slice when woken by the RTC countdown timer */
         volatile orch_persisted_state_t *st = orch_state_get();
-        uint32_t final_slice = (s_remainder_sec > 0) ? s_remainder_sec : s_flow_a_sec;
+        uint32_t flow_a = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60U;
+        uint32_t flow_b = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : 300U;
+        uint32_t rem    = flow_b % flow_a;
+        uint32_t final_slice = (rem > 0) ? rem : flow_a;
         st->total_sleep_sec += final_slice;
     }
     return ESP_OK;
@@ -452,9 +466,17 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     esp_sleep_enable_ulp_wakeup();
 
     uint32_t drain_wait_us = 0;
-    while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000) {
+    while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000U) {
         esp_rom_delay_us(500);
-        drain_wait_us += 500;
+        drain_wait_us += 500U;
+    }
+
+    /* Wait up to 100 ms for any lingering button press on BOOT or POWER to release HIGH */
+    uint32_t btn_drain_us = 0;
+    while ((rtc_gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0 || rtc_gpio_get_level(HAL_PIN_BUTTON_POWER) == 0) &&
+           btn_drain_us < 100000U) {
+        esp_rom_delay_us(1000);
+        btn_drain_us += 1000U;
     }
 
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -497,7 +519,7 @@ void sub_power_cut_power_latch(void)
 bool sub_power_connected_usb(void)
 {
     bool usb_state = hal_check_usb_ll();
-    ESP_LOGI(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
+    ESP_LOGD(TAG, "USB is %s", usb_state ? "Connected" : "NOT Connected");
     return usb_state;
 }
 
@@ -508,12 +530,12 @@ static esp_pm_lock_handle_t s_cpu_max_lock = NULL;
 esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 {
 #if CONFIG_PM_ENABLE
-    int max_freq = (mode == SYS_CLK_MODE_FIXED_MIN) ? 80 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-    int min_freq = (mode == SYS_CLK_MODE_FIXED_MAX) ? CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ : 80;
+    int32_t max_freq = (mode == SYS_CLK_MODE_FIXED_MIN) ? 80 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+    int32_t min_freq = (mode == SYS_CLK_MODE_FIXED_MAX) ? CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ : 80;
 
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = max_freq,
-        .min_freq_mhz = min_freq,
+        .max_freq_mhz = (int)max_freq,
+        .min_freq_mhz = (int)min_freq,
         .light_sleep_enable = false,
     };
     esp_err_t err = esp_pm_configure(&pm_config);

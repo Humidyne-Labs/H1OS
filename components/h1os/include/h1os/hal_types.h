@@ -103,7 +103,7 @@ typedef enum {
     H1OS_CHIME_SLEEP,    /**< Descending sleep preparation chime.    */
     H1OS_CHIME_SHUTDOWN, /**< Dual-tone shutdown confirmation chime. */
     H1OS_CHIME_ALARM,    /**< Repetitive alert chime pattern.        */
-    H1OS_CHIME_MAX       /**< Sentinel maximum chime enum value.     */
+    H1OS_CHIME_MAX       /**< Maximum chime enum value.              */
 } h1os_chime_type_t;
 
 /**

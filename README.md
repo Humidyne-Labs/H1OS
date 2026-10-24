@@ -3,7 +3,7 @@
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.1-blue.svg)](https://idf.espressif.com/)
 [![Target](https://img.shields.io/badge/Hardware-Waveshare%20ESP32--S3--ePaper--1.54%20V2-green.svg)](https://www.waveshare.com)
 [![Graphics](https://img.shields.io/badge/LVGL-v9.6.0-orange.svg)](https://lvgl.io/)
-[![Version](https://img.shields.io/badge/H1OS-v2.3.3--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
+[![Version](https://img.shields.io/badge/H1OS-v2.4.0--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
 [![Docs](https://img.shields.io/badge/Docs-Developer%20Guide-blue.svg)](docs/guide.md)
 [![Errata](https://img.shields.io/badge/Hardware-Errata%20%26%20Rev%20B-orange.svg)](ERRATA.md)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
@@ -16,6 +16,7 @@ H1OS turns the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32
 > - **[H1OS Developer Guide & Reference Manual](docs/guide.md)**
 > - **[API Reference](docs/api.md)**
 > - **[Tri-Node Temperature & Psychrometric Sensor Operation](docs/architecture/A7_sensor_psychrometrics.md)**
+> - **[Battery Metrology, Power Management & Autonomy Engine](docs/architecture/A8_battery_and_power_management.md)**
 > - **[Firmware Engineering & Safety Standards](docs/architecture/B3_firmware_standards.md)**
 > - **[Hardware Errata & PCB Rev B Guide](ERRATA.md)**
 > - **[Hardware Pinout Map](docs/pinout.md)**
@@ -70,7 +71,7 @@ H1OS enforces a strict unidirectional dependency model: **Upper layers call lowe
 ```mermaid
 graph TD
     L4["Layer 4: Application API and Lifecycle (h1os.h, h1os_lvgl.h, h1os_time.h)"]
-    L3["Layer 3: Core Middleware and Orchestration (orch_flow, orch_math, orch_state, ULP Monitor)"]
+    L3["Layer 3: Core Middleware and Orchestration (orch_flow, orch_math, orch_state, orch_wake_stub, ULP Monitor)"]
     L2["Layer 2: Peripheral Subsystems (sub_display, sub_rtc, sub_power, sub_audio, sub_sdcard, sub_nvs)"]
     L1["Layer 1: Hardware Abstraction Layer and ESP-IDF (hal_io, hal_i2c, hal_spi, hal_flash, FreeRTOS)"]
     L4 --> L3
@@ -83,10 +84,10 @@ graph TD
 
 ## Zero-Heat Sensing & Psychrometric Invariants
 
-H1OS resolves sensor self-heating bias by maintaining strict thermodynamic invariants:
+H1OS resolves sensor self-heating bias by enforcing strict steady-state sampling and thermodynamic invariants:
 
-1. **Flow A Headless Sensor Sample Burst:** Wakes only the RTC Fast Memory stub to sample SHTC3 telemetry in normal power mode for full ADC precision before entering deep sleep, eliminating PCB thermal conduction into the cavity.
-2. **True Invariant Tracking:** Uses August-Roche-Magnus equations to calculate ambient vapor pressure ($e$), true dew point ($T_{\text{dew}}$), and reconstructed relative humidity ($RH_{\text{amb}}$) based on dynamic ambient floor tracking.
+1. **Flow A Headless Sensor Sample Burst:** Wakes only the RTC Fast Memory stub (`bsp_wake_stub`) to sample SHTC3 telemetry in normal power mode (`0x7866`) for full ADC precision and internal MCU Die TSENS before immediately returning to deep sleep, eliminating PCB thermal conduction into the cavity.
+2. **Direct Factory-Calibrated SHTC3 Trust & Psychrometrics:** Once consecutive Flow A samples satisfy the thermal plateau gate ($|\Delta T| \le 0.20^\circ\text{C}$), the factory-calibrated SHTC3 reading is trusted directly with zero synthetic offsets or reconstitutions. August-Roche-Magnus equations derive saturation vapor pressure ($e_s$), actual vapor pressure ($e$), true dew point ($T_{\text{dew}}$), and absolute humidity ($d_v$), while the SSD1681 on-glass sensor and ESP32-S3 die sensor serve strictly for Tri-Node range verification.
 
 ---
 
@@ -96,11 +97,11 @@ H1OS resolves sensor self-heating bias by maintaining strict thermodynamic invar
 | --- | --- | --- | --- |
 | **`BAT_CTRL`** | `GPIO 17` | Digital Output | Master battery LDO power latch (**Active HIGH: latched via bootloader and RTC pad hold in sleep**) |
 | **`EPD_3V3_EN`** | `GPIO 6` | Digital Output | Peripheral & display rail gate (**Active LOW: held LOW in sleep to keep display RAM energized**) |
-| **`STATUS_LED`** | `GPIO 3` | Open-Drain Output | User LED & Flow A oscilloscope benchmark test point (Active LOW) |
-| **`BAT_ADC`** | `GPIO 4` | Analog Input | Battery voltage sense (ADC1 CH3, 1:2 divider: 200kΩ/200kΩ, 0-3.1V sensing) |
+| **`STATUS_LED`** | `GPIO 3` | Open-Drain Output | User LED & hardware LEDC PWM breathing indicator (Active LOW) |
+| **`BAT_ADC`** | `GPIO 4` | Analog Input | Battery voltage sense (ADC1 CH3, 1:2 divider: 200kΩ/200kΩ, 0-3.1V sensing, sampled in quiet sleep by ULP) |
 | **`RTC_INT`** | `GPIO 5` | Digital Input | PCF85063A hardware countdown timer interrupt (**Active LOW, internal pull-up required**) |
-| **`BOOT`** | `GPIO 0` | Digital Input | Tactile BOOT key (`LV_KEY_NEXT`, wakes into Flow B, screen toggles) |
-| **`BAT_KEY`** | `GPIO 18` | Digital Input | Tactile BAT_KEY (`LV_KEY_ENTER`, wakes into Flow B) |
+| **`BOOT`** | `GPIO 0` | Digital Input | Tactile BOOT key (`LV_KEY_RIGHT`, wakes into Flow B, forward carousel navigation) |
+| **`BAT_KEY`** | `GPIO 18` | Digital Input | Tactile BAT_KEY (`LV_KEY_ENTER`, wakes into Flow B, reverse navigation / long-press shutdown) |
 | **`I2C_SDA`** | `GPIO 47` | I2C Open-Drain | Shared I2C0 Serial Data (SHTC3, PCF85063, ES8311; external 4.7kΩ pull-up) |
 | **`I2C_SCL`** | `GPIO 48` | I2C Open-Drain | Shared I2C0 Serial Clock (400 kHz) |
 | **`EPD_BUSY`** | `GPIO 8` | Digital Input | SSD1681 busy indicator (Active HIGH; monitored for falling edge) |
@@ -141,10 +142,10 @@ void app_main(void) {
         .on_pre_sleep = app_on_pre_sleep,
         .on_shutdown = NULL,
         .session = {
-            .inactivity_timeout_sec = 30, // Developer-configured inactivity sleep timeout
-            .enable_dfs_80mhz = true,
-            .flow_a_period_sec = 60,      // Developer-configured sensor sample burst interval
-            .flow_b_period_sec = 120,     // Developer-configured display refresh interval
+            .inactivity_timeout_sec = 30,             // Developer-configured inactivity sleep timeout
+            .clk_mode = SYS_CLK_MODE_DYNAMIC,         // Dynamic 80 MHz baseline / 240 MHz turbo bursts
+            .flow_a_period_sec = 60,                  // Developer-configured sensor sample burst interval
+            .flow_b_period_sec = 300,                 // Developer-configured display refresh interval
         },
     };
 
@@ -158,19 +159,19 @@ void app_main(void) {
 ## Interactive Flow B & Configurable Inactivity Sleep
 
 * **Button Wake:** Waking the system by tapping `BOOT` or `POWER` launches an interactive session governed by `inactivity_timeout_sec` (default: 30s). Any button click resets the timer. An inverted page badge in the UI header shows the active awake state.
-* **RTC Periodic Wake:** When woken by the PCF85063A countdown timer for a scheduled telemetry update, H1OS renders the new frame, flushes the display, and **immediately returns to deep sleep** to preserve battery.
-* **Sleep Transition Sequence:** Drains LVGL $\to$ waits audio idle $\to$ waits `EPD_BUSY` falling edge $\to$ waits 250 ms particle settling delay $\to$ saves frame to flash if dirty $\to$ commands SSD1681 into Deep Sleep Mode 1 $\to$ arms RTC countdown $\to$ enters hardware deep sleep.
+* **RTC Periodic Wake:** When woken by the PCF85063A countdown timer (`ulp_slice_counter >= ulp_overflow_limit`) for a scheduled telemetry update, H1OS renders the new frame, flushes the display, and **immediately returns to deep sleep** to preserve battery.
+* **Sleep Transition Sequence:** Drains LVGL $\to$ waits audio idle and enters standby $\to$ waits `EPD_BUSY` falling edge $\to$ saves frame to flash if dirty $\to$ commands SSD1681 into Deep Sleep Mode 1 $\to$ arms PCF85063A countdown slice $\to$ installs RTC wake stub and enters hardware deep sleep.
 
 ---
 
 ## ULP-RISC-V Coprocessor Monitor
 
-Runs autonomously in RTC Slow SRAM while the main dual-core CPU is asleep:
+Runs autonomously in Pure Event Mode (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) in RTC Slow SRAM while the main dual-core CPU is asleep:
 
-* **Brownout Threshold Detection:** Autonomous ADC sampling on GPIO 4 with emergency wake if $V_{\text{bat}} < 3.25\text{V}$.
-* **Zero-Volt Cable Guard:** Ignores brownout when $V_{\text{bat}} < 100\text{mV}$ (USB cable powered without battery).
-* **Wake-on-Release:** Wakes Xtensa strictly when the button transitions back HIGH.
-* **Hold Classification:** Holds $> 2.5\text{s}$ prime ROM bootloader or power cut.
+* **Quiet-State Battery Metrology & Brownout Guard:** Autonomous SAR ADC1_CH3 sampling on GPIO 4 into an 8-entry ring buffer (`ulp_vbat_ring[8]`) with folded eFuse calibration and emergency wake if $V_{\text{bat}} < 3.25\text{V}$.
+* **Zero-Volt Cable Guard:** Bypasses brownout shutdown when USB power is connected (`ulp_usb_connected`) or when $V_{\text{bat}} < 100\text{mV}$.
+* **Event-Mode RTC Slicing:** Counts PCF85063A `/INT` pulses on `GPIO 5` (`slice_counter` vs `overflow_limit`), dispatching headless Flow A wake stub bursts (`ULP_DISPATCH_SENSOR_SAMPLE`) on intermediate slices and full Flow B UI wakes (`ULP_DISPATCH_MAIN_WAKE`) on overflow.
+* **Wake-on-Release & Hold Classification:** Wakes Xtensa strictly upon button release (`30ms..2500ms` tap) so LVGL boots with clean idle lines; holds $\ge 2.5\text{s}$ dispatch ROM bootloader jump (`BOOT`) or orderly power cut (`POWER`).
 
 ---
 
@@ -193,6 +194,6 @@ idf.py -B build_dev -p COMx flash monitor
 
 ## License
 
-This framework and runtime is open-source software licensed under the [MIT License](https://www.google.com/search?q=LICENSE).
+This framework and runtime is open-source software licensed under the [MIT License](LICENSE).
 
 Copyright (c) 2026 Humidyne Labs / Humiditron.

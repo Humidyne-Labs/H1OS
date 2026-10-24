@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 // clang-format off
-#define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation sentinel word ('SLAT').               */
+#define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation magic word ('SLAT').                  */
 #define ORCH_RING_CAPACITY          32         /**< Fixed capacity of historical telemetry sample ring buffer. */
 
 /**
@@ -55,7 +55,7 @@ typedef struct {
  * Retained across all deep sleep cycles and wake stub executions.
  */
 typedef struct {
-    uint32_t magic;                     /**< Sentinel validation magic word (ORCH_RTC_MAGIC).                      */
+    uint32_t magic;                     /**< State validation magic word (ORCH_RTC_MAGIC).                         */
     uint32_t boot_count;                /**< Total monotonic system boot cycles.                                   */
     uint32_t wake_count;                /**< Monotonic deep sleep wake cycle count.                                */
     uint8_t flags;                      /**< Operating state flags (ORCH_FLAG_*).                                  */
@@ -97,9 +97,7 @@ typedef struct {
     uint32_t total_samples;             /**< Total lifetime samples recorded across all sessions.                  */
 
     uint32_t total_sleep_sec;           /**< Cumulative seconds spent in deep sleep.                                */
-    uint32_t total_ulp_ms;              /**< Cumulative milliseconds executing RISC-V ULP (State a).                */
-    uint32_t total_wake_stub_ms;        /**< Cumulative milliseconds executing RTC wake stub (State c).             */
-    uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main CPU app (State b).              */
+    uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main processor application.          */
     uint16_t initial_soc_x10;           /**< State of Charge at start of discharge lap in tenths of % (0..1000).   */
     uint8_t  _pad_soc[2];               /**< Alignment padding to 32-bit boundary.                                  */
 } orch_persisted_state_t;

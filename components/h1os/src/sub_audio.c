@@ -251,7 +251,9 @@ static const es8311_reg_entry_t s_es8311_deinit[] =
  */
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 {
-    if (pct > 100) pct = 100;
+    if (pct > 100) {
+        pct = 100;
+    }
     return es8311_perceptual_vol_table[pct];
 }
 
@@ -317,7 +319,7 @@ static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
  *
  * @return ESP_OK on success, or an error code.
  */
-static esp_err_t __unused sub_audio_flush_frame(void)
+static esp_err_t sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (s_audio_inited && s_i2s_chan_enabled) {
@@ -344,8 +346,9 @@ static esp_err_t __unused sub_audio_flush_frame(void)
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 {
     uint16_t chip_id = 0x0000;
-    if (sub_audio_read_chip_id(&chip_id) != ESP_OK)
+    if (sub_audio_read_chip_id(&chip_id) != ESP_OK) {
         return ESP_ERR_INVALID_STATE;
+    }
 
     uint32_t elapsed_ms = 0;
     const uint32_t step_ms = 5;
@@ -433,13 +436,13 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     /* Disable Class D Audio Amp during codec pre-charge */
     sub_audio_park_warm(true);
 
-	/* Probe Bus for Device */
-	esp_err_t err = hal_i2c_probe(HAL_I2C_ADDR_ES8311);
-	if (err != ESP_OK) {
+    /* Probe Bus for Device */
+    esp_err_t err = hal_i2c_probe(HAL_I2C_ADDR_ES8311);
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Device Not Found: %s", esp_err_to_name(err));
         s_audio_inited = false;
-        audio_cpu_max_release();        
-		return ESP_ERR_NOT_FOUND;
+        audio_cpu_max_release();
+        return ESP_ERR_NOT_FOUND;
     }
 
     uint16_t chip_id = 0x0000;
@@ -515,7 +518,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 register initialization returned error: %d", err);
     } else {
-        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", s_volume_pct);
+        ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", volume_pct);
     }
 
     if (s_audio_queue == NULL) {
@@ -581,7 +584,7 @@ static esp_err_t sub_audio_park_warm(bool park_mute)
         gpio_set_level(HAL_PIN_PA_CTRL, target_level);
         s_pa_enabled = target_enabled;
 
-        /* Startup / Shutdown Times Confirmed:  */ 
+        /* Startup / Shutdown Times Confirmed:  */
         /*   120ms up   (target_enabled=true)   */
         /*   80ms  down (park_mute=true)        */
         vTaskDelay(pdMS_TO_TICKS(target_enabled ? 120 : 80));
@@ -644,8 +647,9 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
 
     while (samples_generated < total_samples) {
         size_t chunk_size = total_samples - samples_generated;
-        if (chunk_size > FRAME_SIZE)
+        if (chunk_size > FRAME_SIZE) {
             chunk_size = FRAME_SIZE;
+        }
 
         for (size_t i = 0; i < chunk_size; i++) {
             uint32_t idx = samples_generated + (uint32_t)i;
@@ -659,8 +663,9 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
             }
             buffer[i] = (int16_t)(sinf(phase) * 28000.0f * env);
             phase += phase_step;
-            if (phase >= 2.0f * (float)M_PI)
+            if (phase >= 2.0f * (float)M_PI) {
                 phase -= 2.0f * (float)M_PI;
+            }
         }
 
         if (chunk_size < FRAME_SIZE) {
@@ -683,15 +688,17 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
  */
 static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_count)
 {
-    if (samples == NULL || sample_count == 0)
+    if (samples == NULL || sample_count == 0) {
         return;
+    }
 
     int16_t *buffer = s_audio_work_buffer;
     size_t samples_sent = 0;
     while (samples_sent < sample_count) {
         size_t chunk = sample_count - samples_sent;
-        if (chunk > FRAME_SIZE)
+        if (chunk > FRAME_SIZE) {
             chunk = FRAME_SIZE;
+        }
 
         memcpy(buffer, &samples[samples_sent], chunk * sizeof(int16_t));
         if (chunk < FRAME_SIZE) {
@@ -713,8 +720,9 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
 {
     if (!s_audio_inited || s_tx_chan == NULL) {
         esp_err_t err = sub_audio_init(s_volume_pct);
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             return err;
+        }
     }
 
     if (s_tx_chan != NULL && !s_i2s_chan_enabled) {
@@ -752,8 +760,9 @@ static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms
     ESP_LOGI(TAG, "Playing tone: %lu Hz for %lu ms (Vol: %u%%)", (unsigned long)frequency_hz,
              (unsigned long)duration_ms, s_volume_pct);
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK) {
         return ret;
+    }
 
     sub_audio_render_tone_samples(frequency_hz, duration_ms);
     return ESP_OK;
@@ -772,8 +781,9 @@ static esp_err_t sub_audio_exec_pcm(const int16_t *samples, size_t sample_count,
 {
     (void)sample_rate_hz;
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK) {
         return ret;
+    }
 
     sub_audio_render_pcm_samples(samples, sample_count);
     return ESP_OK;
@@ -791,8 +801,9 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
     ESP_LOGI(TAG, "Executing acoustic presentation chime (Type %u)...", type);
 
     esp_err_t ret = sub_audio_prepare_and_unmute();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK) {
         return ret;
+    }
 
     switch (type) {
     case H1OS_CHIME_BOOT:
@@ -822,7 +833,7 @@ static esp_err_t sub_audio_exec_chime(uint8_t type)
         break;
 
     case H1OS_CHIME_ALARM:
-        for (int i = 0; i < 2; i++) {
+        for (int32_t i = 0; i < 2; i++) {
             sub_audio_render_tone_samples(1760, 80);
             vTaskDelay(pdMS_TO_TICKS(10));
             sub_audio_render_tone_samples(880, 80);
@@ -876,6 +887,11 @@ static void audio_worker_task(void *pvParameters)
                 break;
             }
 
+            /* When queue drains empty, flush a silent I2S DMA frame so final samples never clip */
+            if (uxQueueMessagesWaiting(s_audio_queue) == 0) {
+                (void)sub_audio_flush_frame();
+            }
+
             if (cmd.result) {
                 *cmd.result = res;
             }
@@ -903,8 +919,9 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
 {
     if (s_audio_queue == NULL) {
         esp_err_t err = sub_audio_init(s_volume_pct);
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             return err;
+        }
     }
 
     if (s_cmd_sync_sem == NULL) {
@@ -952,31 +969,35 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
  */
 esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
 {
-    if (data == NULL)
+    if (data == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     audio_cmd_t cmd = {0};
 
     switch (type) {
     case SUB_AUDIO_TONE: {
         const uint32_t *params = (const uint32_t *)data;
-        if (len < (2 * sizeof(uint32_t)))
+        if (len < (2 * sizeof(uint32_t))) {
             return ESP_ERR_INVALID_ARG;
+        }
         cmd.type = AUDIO_CMD_TONE;
         cmd.params.tone.frequency_hz = params[0];
         cmd.params.tone.duration_ms = params[1];
         break;
     }
     case SUB_AUDIO_CHIME: {
-        if (len < 1)
+        if (len < 1) {
             return ESP_ERR_INVALID_ARG;
+        }
         cmd.type = AUDIO_CMD_CHIME;
         cmd.params.chime.chime_type = *(const uint8_t *)data;
         break;
     }
     case SUB_AUDIO_PCM: {
-        if (len < sizeof(int16_t))
+        if (len < sizeof(int16_t)) {
             return ESP_ERR_INVALID_ARG;
+        }
         cmd.type = AUDIO_CMD_PCM;
         cmd.params.pcm.samples = (const int16_t *)data;
         cmd.params.pcm.sample_count = len / sizeof(int16_t);
@@ -997,11 +1018,13 @@ esp_err_t sub_audio_play(sub_audio_type_t type, const void *data, size_t len)
  */
 bool sub_audio_is_busy(void)
 {
-    if (s_audio_is_busy)
+    if (s_audio_is_busy) {
         return true;
+    }
 
-    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0)
+    if (s_audio_queue && uxQueueMessagesWaiting(s_audio_queue) > 0) {
         return true;
+    }
 
     return false;
 }
@@ -1073,13 +1096,15 @@ esp_err_t sub_audio_deinit(void)
  */
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 {
-    if (volume_pct > 100) volume_pct = 100;
+    if (volume_pct > 100) {
+        volume_pct = 100;
+    }
     s_volume_pct = volume_pct;
 
     if (s_audio_inited && s_i2s_chan_enabled) {
         uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
         es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
-        ESP_LOGI(TAG, "Volume set to %d [0x%2X]", volume_pct, vol_reg);
+        ESP_LOGI(TAG, "Volume set to %u [0x%02X]", volume_pct, vol_reg);
     }
     return ESP_OK;
 }

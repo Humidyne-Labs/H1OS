@@ -79,8 +79,9 @@ static bool s_is_shutting_down = false;
  */
 static void keypad_event_cb(lv_event_t *e)
 {
-    if (s_is_shutting_down)
+    if (s_is_shutting_down) {
         return;
+    }
 
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -227,7 +228,6 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
     (void)user_data;
     ESP_LOGI(TAG, "Lifecycle: SPLASH hook executing (Type %d)", (int)type);
     if (type == H1OS_SPLASH_BOOT) {
-        h1os_lvgl_lock(100);
         lv_obj_t *scr = lv_screen_active();
         lv_obj_clean(scr);
         lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
@@ -237,9 +237,11 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
         lv_refr_now(NULL);
-        h1os_lvgl_unlock();
 
+        /* Release CPU 240 MHz lock during 2s splash viewing delay so CPU drops to 80 MHz */
+        h1os_lvgl_unlock();
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
+        h1os_lvgl_lock(1000);
     }
 }
 

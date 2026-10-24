@@ -251,7 +251,9 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     // 4. Battery ADC sensing pin: input only, unheld
     rtc_gpio_init(HAL_PIN_BATTERY_ADC);
-    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_DISABLED);
+    rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
+    rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
 
     // 5. ULP Wakeup Source & Event Mode Configuration

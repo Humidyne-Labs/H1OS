@@ -49,7 +49,7 @@
 #define RTC_TIMER_TE_BIT      (1 << 2)
 #define RTC_TIMER_TCF_MASK    (3 << 3)
 #define RTC_TIMER_TCF_MIN     (3 << 3)
-#define RTC_CTRL2_COF_OFF      0x07
+#define RTC_CTRL2_COF_OFF     0x07
 // clang-format on
 
 static inline void RTC_IRAM_ATTR i2c_delay(void)
@@ -107,7 +107,7 @@ static void RTC_IRAM_ATTR i2c_stop(void)
 
 static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
 {
-    for (int i = 7; i >= 0; i--) {
+    for (int32_t i = 7; i >= 0; i--) {
         if ((byte >> i) & 1) {
             sda_high();
         } else {
@@ -135,12 +135,12 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
     uint8_t byte = 0;
     sda_high();
 
-    for (int i = 7; i >= 0; i--) {
+    for (int32_t i = 7; i >= 0; i--) {
         i2c_delay();
         scl_high();
         i2c_delay();
         if (sda_read()) {
-            byte |= (1 << i);
+            byte |= (uint8_t)(1U << i);
         }
         scl_low();
     }
@@ -167,9 +167,9 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
         crc ^= data[i];
         for (uint8_t bit = 8; bit > 0; --bit) {
             if (crc & 0x80) {
-                crc = (crc << 1) ^ 0x31;
+                crc = (uint8_t)((crc << 1) ^ 0x31);
             } else {
-                crc = (crc << 1);
+                crc = (uint8_t)(crc << 1);
             }
         }
     }
@@ -180,11 +180,11 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
  * @brief Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
  *
  * @param[in]    offset_centi_c   Pre-computed intercept (2052 + tsens_cal_centi_c).
- * @param[in]    fallback_centi_c Fallback temperature if conversion fails.
+ * @param[in]    default_centi_c  Default temperature if conversion fails.
  *
  * @return Sampled die temperature in centi-°C.
  */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t fallback_centi_c)
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
@@ -197,7 +197,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
-    int timeout = 100;
+    int32_t timeout = 100;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
         esp_rom_delay_us(5);
     }
@@ -208,13 +208,13 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
     REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
 
     if (timeout <= 0 || raw == 0 || raw == 0xFF) {
-        return fallback_centi_c;
+        return default_centi_c;
     }
 
     /* Division-free Q12 fixed-point transfer: 43.86 * 4096 = 179651 */
     int32_t t_centi = (((int32_t)raw * 179651) >> 12) - (int32_t)offset_centi_c;
     if (t_centi < -4000 || t_centi > 12500) {
-        return fallback_centi_c;
+        return default_centi_c;
     }
     return (int16_t)t_centi;
 }
@@ -224,7 +224,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
  */
 static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
 {
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < 3; attempt++) {
         bool ok = false;
         i2c_start();
         if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
@@ -248,7 +248,9 @@ static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
  */
 static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 {
-    if (seconds == 0) return;
+    if (seconds == 0) {
+        return;
+    }
 
     uint8_t timer_val = 0;
     uint8_t clk_src = 0;
@@ -285,7 +287,7 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 {
     bool ok = false;
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < 3; attempt++) {
         i2c_start();
         if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
             if (i2c_write_byte(0xB0) && i2c_write_byte(0x98)) {
@@ -293,7 +295,9 @@ static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
             }
         }
         i2c_stop();
-        if (ok) break;
+        if (ok) {
+            break;
+        }
         esp_rom_delay_us(50);
     }
     return ok;
@@ -319,7 +323,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     volatile orch_persisted_state_t *st = orch_state_get();
 
-    /* Account for the elapsed Flow A deep sleep slice that triggered this wake stub */
+    /* Account for the elapsed Flow A deep sleep slice */
     st->total_sleep_sec += (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60U;
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
@@ -410,7 +414,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             .shtc3_rh_centi_pct = rh_centi_pct,
             .mcu_tsens_centi_c  = die_centi_c,
             .epd_glass_centi_c  = st->last_glass_temp_centi_c,
-            .timestamp_sec      = 0,
+            .timestamp_sec      = st->total_sleep_sec,
             .quality_flags      = q_flags,
         };
         orch_state_push_sample(&sample);
@@ -432,7 +436,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     uint32_t timeout_us = 20000;
     while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
         esp_rom_delay_us(500);
-        if (timeout_us <= 500) break;
+        if (timeout_us <= 500) {
+            break;
+        }
         timeout_us -= 500;
     }
 

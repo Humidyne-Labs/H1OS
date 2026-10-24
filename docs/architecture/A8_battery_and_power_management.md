@@ -3,17 +3,17 @@
 ## 1. Core Architectural Philosophy & Invariants
 
 Estimating battery State of Charge (SoC) and operating autonomy on an ultra-low-power, event-driven appliance is fundamentally challenged by the physical chemistry of Lithium-Polymer cells:
-1. **Flat Discharge Plateau:** Between $3.85\text{V}$ and $3.70\text{V}$ (spanning ~60% down to ~25% SoC), cell voltage drops by only $\sim 2.8\text{ mV}$ per 1% of capacity. Deriving current draw from numerical voltage derivatives ($d V / d t$) over short intervals magnifies ADC noise and diurnal temperature swings, inducing massive mathematical singularities.
+1. **Flat Discharge Plateau:** Between $3.85\text{V}$ and $3.70\text{V}$ (spanning ~60% down to ~25% SoC), cell voltage drops by only $\sim 2.8\text{ mV}$ per 1% of capacity. Deriving current draw from numerical voltage derivatives ($d V / d t$) over short intervals magnifies ADC noise and diurnal temperature swings, inducing mathematical singularities.
 2. **Active Load Sag ($I \cdot R$ Drop):** Small LiPo cells ($400\text{ mAh}$) possess internal DC series resistance ($R_{\text{int}} \approx 150 - 350\text{ m}\Omega$). Main CPU execution ($80-240\text{ MHz}$ turbo, SPI bus transmission, e-paper charge pump activation) draws $30 - 100\text{ mA}$, causing an instantaneous $10 - 30\text{ mV}$ voltage drop. Sampling cell voltage during main CPU execution severely corrupts Open-Circuit Voltage (OCV) table lookups.
 
-To achieve metrological reliability, H1OS enforces **six strict battery architecture invariants**:
+To achieve metrological reliability with minimal runtime overhead, H1OS enforces **six strict battery architecture invariants**:
 
 1. **Exclusive ULP Resting Acquisition:** The main dual-core Xtensa CPU **never** triggers the battery SAR ADC while actively executing. The ULP-RISC-V coprocessor samples `ADC1_CHANNEL_3` **exclusively** during quiet deep sleep and commits samples into an 8-entry circular ring buffer in RTC Slow SRAM (`vbat_ring[8]`).
-2. **Zero Hardcoded Current Constants:** The autonomy engine **never** guesses or hardcodes speculative current values ($0.045\text{ mA}$, $28\text{ mA}$, $36\text{ mA}$). Current draw is derived strictly from empirical wall-clock runtime and measured capacity loss.
-3. **Pure Macro Wall-Clock Flight-Time Model:** Total elapsed wall-clock time ($T_{\text{wall}} = T_{\text{sleep}} + T_{\text{app}}$) anchors empirical capacity drop ($\Delta C_{\text{lap}}$) across the $400\text{ mAh}$ budget to compute authoritative average current draw ($I_{\text{wall}}$) and projected remaining days ($\text{Days}_{\text{rem}}$) with zero cycle-counting bloat.
-4. **Dynamic User-Configured Schedules:** The autonomy engine makes zero assumptions about fixed periods (e.g. 60s or 300s). It dynamically integrates elapsed user-configured Flow A (`sample_interval_sec`) and Flow B (`flow_b_period_sec`) sleep slices alongside active main CPU runtime.
-5. **Cross-Session Persistence & Thermal Rebound Guard:** Cumulative hardware runtime counters reside in RTC Slow SRAM (`orch_persisted_state_t`) across sleep cycles and mirror into Flash NVS (`sub_nvs`) before sleep and on shutdown. Lap resets trigger strictly on real charger unplug transitions or $\ge 3.0\%$ jumps, preventing diurnal afternoon temperature rises from wiping accumulated timers.
-6. **Tenths-of-a-Percent Precision & Singularity Guards:** State of Charge is tracked in tenths of a percent (`initial_soc_x10`, `current_soc_x10`, $0..1000 = 0.0\%..100.0\%$) for smooth convergence. If $\Delta\text{SoC} < 1.0\%$ or $T_{\text{wall}} < 60\text{s}$, autonomy displays `"CALIBRATING..."`, guaranteeing zero divide-by-zero singularities.
+2. **Zero Hardcoded Current Constants:** The autonomy engine **never** guesses or hardcodes speculative current values ($0.045\text{ mA}$, $28\text{ mA}$, $36\text{ mA}$). Current draw is derived strictly from total elapsed runtime and measured capacity loss.
+3. **Single-Level Elapsed Runtime Average Current Model (`avg_draw_ma`):** Total elapsed runtime ($T_{\text{elapsed}} = T_{\text{sleep}} + T_{\text{app}}$) anchors empirical capacity drop ($\Delta C_{\text{lap}}$) across the $400\text{ mAh}$ budget to compute average current draw (`avg_draw_ma`) and projected remaining days (`autonomy_days`), without redundant per-domain cycle counters or cross-cycle ratio math.
+4. **Dynamic User-Configured Schedules:** The autonomy engine makes zero assumptions about fixed periods (e.g. 60s or 300s). It dynamically integrates elapsed user-configured Flow A (`sample_interval_sec`) and Flow B (`flow_b_period_sec`) sleep slices alongside active main processor runtime (`total_app_run_ms`).
+5. **Cross-Session Persistence & Thermal Rebound Guard:** Cumulative hardware runtime counters reside in RTC Slow SRAM (`orch_persisted_state_t`) across sleep cycles and mirror into Flash NVS (`sub_nvs`) before sleep and on shutdown. Lap resets trigger strictly on real charger unplug transitions (`s_prev_bat_state` retained in `RTC_DATA_ATTR`) or $\ge 3.0\%$ jumps, preventing diurnal afternoon temperature rises from wiping accumulated timers.
+6. **Tenths-of-a-Percent Precision & Singularity Guards:** State of Charge is tracked in tenths of a percent (`initial_soc_x10`, `current_soc_x10`, $0..1000 = 0.0\%..100.0\%$) for smooth convergence. If $\Delta\text{SoC} < 1.0\%$ or $T_{\text{elapsed}} < 60\text{s}$, autonomy displays `"CALIBRATING..."`, guaranteeing zero divide-by-zero singularities.
 
 ---
 
@@ -29,32 +29,31 @@ flowchart TD
         BROWNOUT -->|Yes| CUT["Dispatch ULP_DISPATCH_CRITICAL_SHUTDOWN<br/>(Release GPIO 17 Power Latch)"]
     end
 
-    subgraph RUNTIMES ["2. Cumulative Wall-Clock Counters"]
-        RTC_T["Elapsed RTC Countdown Slices"] --> T_SLEEP["T_sleep_sec (Cumulative Deep Sleep)"]
-        APP_TIMER["esp_timer_get_time()"] --> T_APP["T_app_run_ms (Cumulative Main App)"]
+    subgraph RUNTIMES ["2. Cumulative Elapsed Runtime Counters"]
+        RTC_T["Elapsed RTC Countdown Slices"] --> T_SLEEP["total_sleep_sec (Cumulative Deep Sleep)"]
+        APP_TIMER["esp_timer_get_time()"] --> T_APP["total_app_run_ms (Cumulative Main Processor Runtime)"]
         
         T_SLEEP --> SRAM["orch_persisted_state_t (RTC Slow SRAM)"]
         T_APP --> SRAM
         SRAM --> NVS["sub_nvs (Flash NVS Mirror)<br/>Persists across power-off & reflash"]
     end
 
-    subgraph AUTONOMY ["3. Macro Wall-Clock Flight Time & Autonomy"]
-        SRAM --> TWALL["T_wall_sec = T_sleep_sec + (T_app_run_ms / 1000.0)"]
-        TWALL --> HWALL["H_wall = T_wall_sec / 3600.0"]
+    subgraph AUTONOMY ["3. Empirical Elapsed Runtime Autonomy"]
+        SRAM --> TELAPSED["elapsed_sec = total_sleep_sec + (total_app_run_ms / 1000.0)"]
+        TELAPSED --> HELAPSED["elapsed_hours = elapsed_sec / 3600.0"]
         
         RING --> SOC["Current SoC Tenths (13-Point LiPo OCV LUT)<br/>0..1000 = 0.0%..100.0%"]
         SOC --> DELTA_SOC["ΔSoC = (initial_soc_x10 - current_soc_x10) / 10.0"]
         DELTA_SOC --> CLAP["ΔC_lap = 400.0 mAh * (ΔSoC / 100.0)"]
         
-        CLAP --> IWALL["I_wall = ΔC_lap / H_wall (mA)"]
+        CLAP --> IAVG["avg_draw_ma = ΔC_lap / elapsed_hours (mA)"]
         SOC --> CREM["C_rem = 400.0 mAh * (current_soc_x10 / 1000.0)"]
-        IWALL --> DAYS["Days_rem = (C_rem / I_wall) / 24.0 = (H_wall / 24) * (current_soc / ΔSoC)"]
+        IAVG --> DAYS["autonomy_days = (C_rem / avg_draw_ma) / 24.0"]
         CREM --> DAYS
     end
 
     DAYS --> S3["Screen 3: System Health Display"]
-    IWALL --> S3
-
+    IAVG --> S3
 ```
 
 ---
@@ -116,38 +115,23 @@ $$\text{SoC}_{\text{x10}}(V_{\text{BAT}}) = \text{SoC}_{k+1} + \frac{(V_{\text{B
 
 ---
 
-## 5. Empirical Wall-Clock Autonomy Math
+## 5. Elapsed Runtime Empirical Autonomy Math (`sub_power_calc_autonomy`)
 
-1. **Aggregated Wall-Clock Flight Time:**
+1. **Total Elapsed Runtime (`elapsed_sec`, `elapsed_hours`):**
 
-$$T_{\text{wall\_sec}} = T_{\text{sleep\_sec}} + \frac{T_{\text{app\_run\_ms}}}{1000.0}$$
+$$T_{\text{elapsed\_sec}} = T_{\text{sleep\_sec}} + \frac{T_{\text{app\_run\_ms}}}{1000.0}, \qquad H_{\text{elapsed}} = \frac{T_{\text{elapsed\_sec}}}{3600.0}\quad [\text{hours}]$$
 
+2. **Empirical Capacity Lost During Discharge Lap (Tenths of a % Resolution):**
 
-$$H_{\text{wall}} = \frac{T_{\text{wall\_sec}}}{3600.0}\quad [\text{hours}]$$
+$$\Delta\text{SoC} = \frac{\text{initial\_soc\_x10} - \text{current\_soc\_x10}}{10.0}\quad [\%], \qquad \Delta C_{\text{lap}} = 400.0\text{ mAh} \times \left(\frac{\Delta\text{SoC}}{100.0}\right)$$
 
+3. **Average Current Draw Over Elapsed Runtime (`avg_draw_ma`):**
 
-2. **Empirical Capacity Lost During Flight Lap (Tenths of a % Resolution):**
+$$I_{\text{avg}} = \frac{\Delta C_{\text{lap}}}{H_{\text{elapsed}}}\quad [\text{mA}]$$
 
-$$\Delta\text{SoC} = \frac{\text{initial\_soc\_x10} - \text{current\_soc\_x10}}{10.0}\quad [\%]$$
+4. **Projected Operating Autonomy (`autonomy_days`):**
 
-
-$$\Delta C_{\text{lap}} = 400.0\text{ mAh} \times \left(\frac{\Delta\text{SoC}}{100.0}\right)$$
-
-
-3. **Authoritative Wall-Clock Average Current Draw ($I_{\text{wall}}$):**
-
-$$I_{\text{wall}} = \frac{\Delta C_{\text{lap}}}{H_{\text{wall}}}\quad [\text{mA}]$$
-
-
-4. **Projected Operating Autonomy:**
-
-$$C_{\text{rem}} = 400.0\text{ mAh} \times \left(\frac{\text{current\_soc\_x10}}{1000.0}\right)$$
-
-
-$$H_{\text{rem}} = \frac{C_{\text{rem}}}{I_{\text{wall}}} = H_{\text{wall}} \times \left(\frac{\text{current\_soc\_x10} / 10.0}{\Delta\text{SoC}}\right)$$
-
-
-$$\text{Days}_{\text{rem}} = \frac{H_{\text{rem}}}{24.0}$$
+$$C_{\text{rem}} = 400.0\text{ mAh} \times \left(\frac{\text{current\_soc\_x10}}{1000.0}\right), \qquad H_{\text{rem}} = \frac{C_{\text{rem}}}{I_{\text{avg}}}, \qquad \text{Days}_{\text{rem}} = \frac{H_{\text{rem}}}{24.0}$$
 
 ---
 
@@ -161,28 +145,26 @@ typedef enum {
     H1OS_BATTERY_CHARGING,        /**< Voltage rising over consecutive reads.      */
     H1OS_BATTERY_CHARGED,         /**< Saturated voltage (>=4180 mV) or USB host.  */
 } h1os_battery_state_t;
-
 ```
 
-State arbitration evaluates the 8-entry ULP ring buffer:
+State arbitration evaluates USB host presence and the 8-entry ULP ring buffer:
 
+* **Zero-Volt Cable Guard:** If USB host is connected (`sub_power_connected_usb()`) and $V_{\text{BAT}} < 3300\text{ mV}$ (floating divider or no battery attached), $V_{\text{BAT}}$ is forced to $4200\text{ mV}$ (`100% CHARGED`).
 * If USB host is detected via `sub_power_connected_usb()`:
-* If $V_{\text{BAT}} \ge 4180\text{ mV} \implies$ **`CHARGED`**.
-* Else $\implies$ **`CHARGING`**.
-
-
+  * If $V_{\text{BAT}} \ge 4180\text{ mV} \implies$ **`CHARGED`**.
+  * Else $\implies$ **`CHARGING`**.
 * If USB host is not detected (standalone battery or 5V wall adapter):
-* Compare newest sample $V_{\text{new}}$ with sample from 2 cycles prior $V_{\text{prev}}$:
-* If $V_{\text{new}} \ge V_{\text{prev}} + 15\text{ mV} \implies$ **`CHARGING`**.
-* If $V_{\text{new}} \ge 4180\text{ mV}$ and $|V_{\text{new}} - V_{\text{prev}}| \le 5\text{ mV} \implies$ **`CHARGED`**.
-* Else $\implies$ **`DISCHARGING`**.
+  * Compare newest sample $V_{\text{new}}$ with sample from 2 cycles prior $V_{\text{prev}}$ (`lookback = (count >= 3) ? 2 : 1`):
+    * If $V_{\text{new}} \ge V_{\text{prev}} + 15\text{ mV} \implies$ **`CHARGING`**.
+    * If $V_{\text{new}} \ge 4180\text{ mV}$ and $|V_{\text{new}} - V_{\text{prev}}| \le 5\text{ mV} \implies$ **`CHARGED`**.
+    * Else $\implies$ **`DISCHARGING`**.
 
 ### 6.2 Lap Reset on Charger Unplug (Thermal Rebound Protection)
 
-To prevent diurnal afternoon temperature rises ($+4^\circ\text{C} \implies +3\text{--}6\text{ mV}$ rebound on the flat plateau) from prematurely wiping accumulated flight timers, a discharge lap reset triggers **strictly** when:
+To prevent diurnal afternoon temperature rises ($+4^\circ\text{C} \implies +3\text{--}6\text{ mV}$ rebound on the flat plateau) from prematurely wiping accumulated timers, a discharge lap reset triggers **strictly** when:
 
 1. `initial_soc_x10 == 0` (uninitialized cold boot), OR
-2. The state machine explicitly transitions from `H1OS_BATTERY_CHARGING` or `H1OS_BATTERY_CHARGED` to `H1OS_BATTERY_DISCHARGING`, OR
+2. The state machine explicitly transitions from `H1OS_BATTERY_CHARGING` or `H1OS_BATTERY_CHARGED` (`s_prev_bat_state` persisted in `RTC_DATA_ATTR`) to `H1OS_BATTERY_DISCHARGING`, OR
 3. `current_soc_x10 >= initial_soc_x10 + 30` (a $\ge 3.0\%$ jump guarantees a real charge event occurred while powered off).
 
 When triggered:
@@ -193,10 +175,10 @@ When triggered:
 
 ### 6.3 Singularity & Calibration Guard
 
-If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_soc\_x10} < 10$) **OR** $T_{\text{wall\_sec}} < 60$:
+If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_soc\_x10} < 10$) **OR** $T_{\text{elapsed\_sec}} < 60$:
 
 * `autonomy_days = -1.0f`
-* `wall_draw_ma = -1.0f`
+* `avg_draw_ma = -1.0f`
 * Screen 3 displays: `"Autonomy: ~CALIBRATING..."` until $\ge 1.0\%$ SoC has been empirically discharged.
 
 ---
@@ -208,6 +190,7 @@ If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_s
 | `sub_power.h` | `sub_power.c` | Single 13-point LiPo LUT (tenths of a % resolution), folded eFuse calibration, state machine, `sub_power_calc_autonomy()`. |
 | `orch_state.h` | `orch_state.c` | Master persistent runtime tracking block (`total_sleep_sec`, `total_app_run_ms`, `initial_soc_x10`) in RTC Slow SRAM. |
 | — | `ulp/main.c` | Autonomous quiet-state SAR ADC read and 8-entry circular ring buffer (`vbat_ring[8]`). |
+| `orch_wake_stub.h` | `orch_wake_stub.c` | Increments `total_sleep_sec` on every headless Flow A sample burst. |
 | `sub_nvs.h` | `sub_nvs.c` | Cross-session Flash NVS mirroring across deep sleep, battery swaps, and reflashes. |
-| `h1os.h` | `h1os_lifecycle.c` | Telemetry public API binding (`h1os_telemetry_t.autonomy` and `battery_state`). |
-| `screens.h` | `screen_system_health.c` | Screen 3 UI presentation of voltage, SoC %, operational state, average draw, and projected days. |
+| `h1os.h` | `h1os_lifecycle.c` | Telemetry public API binding (`h1os_telemetry_t.autonomy` and `battery_state`) and `RTC_DATA_ATTR` state transition tracking. |
+| `screens.h` | `screen_system_health.c` | Screen 3 UI presentation of voltage, SoC %, operational state, and projected days. |

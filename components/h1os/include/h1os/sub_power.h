@@ -36,16 +36,12 @@ typedef enum {
 } h1os_battery_state_t;
 
 /**
- * @brief Level 1 & Level 2 empirical autonomy metrics.
+ * @brief Empirical battery autonomy metrics over total elapsed runtime.
  */
 typedef struct {
-    float wall_draw_ma;         /**< Macro average current draw over wall-clock time (I_wall).   */
-    float active_draw_ma;       /**< Empirical current draw during active execution (I_active).  */
-    float autonomy_days;        /**< Remaining days at current duty cycle (-1.0f if calibrating).*/
-    float f_ulp;                /**< Active ratio (0.0..1.0) for State a (ULP).                  */
-    float f_stub;               /**< Active ratio (0.0..1.0) for State c (Wake Stub).            */
-    float f_app;                /**< Active ratio (0.0..1.0) for State b (Main App).             */
-    float mah_spent_lap;        /**< Total mAh consumed since initial_soc_pct.                   */
+    float avg_draw_ma;          /**< Average current draw over total elapsed runtime in mA.       */
+    float autonomy_days;        /**< Remaining days at current duty cycle (-1.0f if calibrating). */
+    float mah_spent_lap;        /**< Total mAh consumed since initial_soc_x10.                    */
 } h1os_autonomy_metrics_t;
 
 /**
@@ -71,21 +67,17 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
 uint16_t sub_power_mv_to_soc_tenths(uint16_t mv);
 
 /**
- * @brief Calculates Level 1 and Level 2 empirical autonomy metrics.
+ * @brief Calculate empirical battery autonomy metrics over total elapsed runtime.
  *
  * @param[in]  initial_soc_x10 Starting SoC for the current discharge lap in tenths of a % (0..1000).
  * @param[in]  current_soc_x10 Current evaluated SoC in tenths of a % (0..1000).
- * @param[in]  total_sleep_sec Elapsed deep sleep in seconds.
- * @param[in]  total_ulp_ms    Cumulative ULP runtime in milliseconds.
- * @param[in]  total_stub_ms   Cumulative wake stub runtime in milliseconds.
- * @param[in]  total_app_ms    Cumulative main app runtime in milliseconds.
+ * @param[in]  total_sleep_sec Cumulative deep sleep time in seconds.
+ * @param[in]  total_app_ms    Cumulative main processor active runtime in milliseconds.
  * @param[out] out_metrics     Destination structure for calculated autonomy metrics.
  */
 void sub_power_calc_autonomy(uint16_t initial_soc_x10,
                              uint16_t current_soc_x10,
                              uint32_t total_sleep_sec,
-                             uint32_t total_ulp_ms,
-                             uint32_t total_stub_ms,
                              uint32_t total_app_ms,
                              h1os_autonomy_metrics_t *out_metrics);
 

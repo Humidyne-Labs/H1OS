@@ -46,7 +46,7 @@ typedef enum {
     H1OS_SPLASH_BOOT = 0, /**< Initial cold boot / power-on splash screen.        */
     H1OS_SPLASH_SLEEP,    /**< Transition to unattended deep sleep splash screen. */
     H1OS_SPLASH_SHUTDOWN, /**< Orderly physical power-down splash screen.         */
-    H1OS_SPLASH_MAX       /**< Sentinel maximum splash enum value.                */
+    H1OS_SPLASH_MAX       /**< Maximum splash enum value.                         */
 } h1os_splash_type_t;
 
 /**
@@ -157,13 +157,13 @@ typedef struct {
     uint8_t battery_percent;         /**< Estimated battery state-of-charge percentage (0..100%).            */
     bool is_usb_powered;             /**< True if USB VBUS power connection is actively detected.            */
     h1os_battery_state_t battery_state; /**< Charge / discharge / charged operational state.                 */
-    h1os_autonomy_metrics_t autonomy;   /**< Level 1 & Level 2 empirical autonomy metrics.                   */
+    h1os_autonomy_metrics_t autonomy;   /**< Empirical battery autonomy metrics over total elapsed runtime.  */
 } h1os_telemetry_t;
 
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.3.2-dev").
+ * @return Null-terminated semantic version string (e.g. "2.4.0-dev").
  */
 static inline const char *h1os_get_version(void)
 {
