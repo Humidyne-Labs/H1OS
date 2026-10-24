@@ -36,6 +36,7 @@
 
 # ---| Large Files |---
 CHANGELOG.md
+/docs/api.md
 
 # ---| Doxygen and License Files |---
 Doxyfile
