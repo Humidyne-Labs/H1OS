@@ -4,8 +4,7 @@
 
 ---
 
-**Humiditron**
-
+**Humiditron**  
 **HUMIDYNE_LABS - 2026**  
 Licenses: [MIT](LICENSE) (Code) | [CC BY 4.0](LICENSE-ASSETS) (Media Assets)  
 *Co-architected Gemini*   
