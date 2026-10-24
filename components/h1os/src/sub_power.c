@@ -186,16 +186,16 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
             return err;
     }
 
-    int samples[16];
-    for (int i = 0; i < 16; i++) {
+    int32_t samples[16];
+    for (uint32_t i = 0; i < 16; i++) {
         int raw = 0;
         adc_oneshot_read(s_adc_handle, ADC_CHANNEL_3, &raw);
-        samples[i] = raw;
+        samples[i] = (int32_t)raw;
     }
 
-    for (int i = 1; i < 16; i++) {
-        int key = samples[i];
-        int j = i - 1;
+    for (uint32_t i = 1; i < 16; i++) {
+        int32_t key = samples[i];
+        int32_t j = (int32_t)i - 1;
         while (j >= 0 && samples[j] > key) {
             samples[j + 1] = samples[j];
             j--;
@@ -203,11 +203,11 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
         samples[j + 1] = key;
     }
 
-    int sum = 0;
-    for (int i = 4; i < 12; i++) {
+    int32_t sum = 0;
+    for (uint32_t i = 4; i < 12; i++) {
         sum += samples[i];
     }
-    int avg_raw = sum / 8;
+    int32_t avg_raw = sum / 8;
 
     int voltage_mv = 0;
     if (s_cali_valid && s_cali_handle != NULL) {

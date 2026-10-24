@@ -4,6 +4,31 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.3-dev] - 2026-10-24
+
+### 🛡️ Fixed & Hardened (Firmware Safety Invariants Audit)
+
+* **Deterministic Static IPC Semaphores** (`sub_audio.c`):
+  * Replaced dynamic heap semaphore allocation (`xSemaphoreCreateBinary()`) in `sub_audio_send_command()` with static allocation via `xSemaphoreCreateBinaryStatic(&s_cmd_sync_sem_buffer)`.
+  * Replaced unbounded `portMAX_DELAY` with bounded 500 ms timeout to prevent indefinite task hangs during worker latency.
+
+* **Task Stack Relief & Frame Buffer Relocation** (`sub_audio.c`, `orch_flow.c`):
+  * Relieved 512-byte audio DMA frame buffers from task stacks in `sub_audio_flush_frame()`, `sub_audio_exec_tone()`, and `sub_audio_render_pcm_samples()`, consolidating into `.bss` static workspace `s_audio_work_buffer`.
+  * Relieved 512-byte debug telemetry arrays (`shtc3T_ring`, `shtc3RH_ring`, `mcuT_ring`, `epdT_ring`) from `orch_flow_dump_ring_debug()` into static `.bss` storage, guaranteeing stack frames remain well below the 128-byte embedded invariant.
+
+* **Inter-Core & ULP Volatile Memory Coherency** (`orch_state.h/.c`, `h1os_lifecycle.c`, `orch_display_sync.c`, `orch_flow.c`, `orch_wake_stub.c`, `screen_diagnostics.c`):
+  * Qualified persistent RTC Slow Memory state block as `volatile orch_persisted_state_t s_persisted_state` to ensure cache coherency across Core 0, Core 1, the RV32IMC ULP coprocessor, and the RTC Fast Memory wake stub.
+  * Updated `orch_state_get(void)` accessor signature and all callers across Layers 3 and 4 to retain `volatile` qualifiers without compiler casting warnings.
+
+* **Single-Precision Hardware FPU32 Discipline** (`orch_flow.c`):
+  * Replaced double-precision literals `/ 100.0` with `/ 100.0f` across telemetry conversion routines (`st->tsens_cal_centi_c`, `st->last_glass_temp_centi_c`, `latest_raw.shtc3_temp_centi_c`, `latest_raw.shtc3_rh_centi_pct`), ensuring divisions execute via hardware single-cycle FPU instructions rather than 50-cycle software double emulation.
+
+* **Fixed-Width Type Discipline** (`sub_power.c`):
+  * Converted naked `int` declarations in battery ADC oneshot filtering to explicit `int32_t` and `uint32_t` width types.
+
+* **Defensive Enum Switch Exhaustion** (`h1os_lifecycle.c`):
+  * Added mandatory `default:` trap to `h1os_log_flow_banner()` to log and handle corrupted or uninitialized lifecycle flow enum values defensively.
+
 ## [2.3.2-dev] - 2026-10-21
 
 ### 🚀 Added

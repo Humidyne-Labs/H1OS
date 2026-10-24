@@ -13,9 +13,9 @@
 
 #include <string.h>
 
-RTC_NOINIT_ATTR static orch_persisted_state_t s_persisted_state;
+RTC_NOINIT_ATTR static volatile orch_persisted_state_t s_persisted_state;
 
-orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
+volatile orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
 {
     if (s_persisted_state.magic != ORCH_RTC_MAGIC) {
         orch_state_reset();
@@ -30,7 +30,7 @@ orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
  */
 void RTC_IRAM_ATTR orch_state_reset(void)
 {
-    uint8_t *p = (uint8_t *)&s_persisted_state;
+    volatile uint8_t *p = (volatile uint8_t *)&s_persisted_state;
     for (size_t i = 0; i < sizeof(s_persisted_state); i++) {
         p[i] = 0;
     }
@@ -57,7 +57,7 @@ void RTC_IRAM_ATTR orch_state_push_sample(const orch_tri_node_sample_t *sample)
     if (sample == NULL)
         return;
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     st->ring[st->ring_head] = *sample;
     st->ring_head = (st->ring_head + 1) % ORCH_RING_CAPACITY;
     st->total_samples++;
@@ -75,7 +75,7 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample)
     if (out_sample == NULL)
         return false;
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     if (st->total_samples == 0)
         return false;
 
@@ -98,7 +98,7 @@ bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample)
     if (out_sample == NULL)
         return false;
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     if (st->total_samples == 0)
         return false;
 

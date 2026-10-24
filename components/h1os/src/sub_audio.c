@@ -89,6 +89,10 @@ static volatile bool s_audio_is_busy     = false;
 
 static uint8_t s_volume_pct = 0;
 
+static StaticSemaphore_t s_cmd_sync_sem_buffer;
+static SemaphoreHandle_t s_cmd_sync_sem = NULL;
+static int16_t           s_audio_work_buffer[FRAME_SIZE];
+
 #if CONFIG_PM_ENABLE
 static esp_pm_lock_handle_t s_audio_pm_lock = NULL;
 #endif
@@ -317,12 +321,12 @@ static esp_err_t __unused sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (s_audio_inited && s_i2s_chan_enabled) {
-        int16_t buffer[FRAME_SIZE];
-        memset(buffer, 0x0000, sizeof(buffer));
+        int16_t *buffer = s_audio_work_buffer;
+        memset(buffer, 0x0000, sizeof(s_audio_work_buffer));
 
         size_t buffer_written = 0;
-        ret = i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &buffer_written, pdMS_TO_TICKS(100));
-        ret = ((ret == ESP_OK) && (buffer_written == sizeof(buffer))) ? ESP_OK : ESP_ERR_INVALID_STATE;
+        ret = i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &buffer_written, pdMS_TO_TICKS(100));
+        ret = ((ret == ESP_OK) && (buffer_written == sizeof(s_audio_work_buffer))) ? ESP_OK : ESP_ERR_INVALID_STATE;
 
         /* ~16ms to stream one frame at 16Khz */
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -632,7 +636,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
     const uint32_t total_samples = (sample_rate * duration_ms) / 1000;
     const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);
 
-    int16_t buffer[FRAME_SIZE];
+    int16_t *buffer = s_audio_work_buffer;
     uint32_t samples_generated = 0;
 
     float phase      = 0.0f;
@@ -664,7 +668,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         }
 
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
+        i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
 }
@@ -682,7 +686,7 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
     if (samples == NULL || sample_count == 0)
         return;
 
-    int16_t buffer[FRAME_SIZE];
+    int16_t *buffer = s_audio_work_buffer;
     size_t samples_sent = 0;
     while (samples_sent < sample_count) {
         size_t chunk = sample_count - samples_sent;
@@ -695,7 +699,7 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
         }
 
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, buffer, sizeof(buffer), &bytes_written, pdMS_TO_TICKS(100));
+        i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_sent += chunk;
     }
 }
@@ -903,30 +907,32 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
             return err;
     }
 
+    if (s_cmd_sync_sem == NULL) {
+        s_cmd_sync_sem = xSemaphoreCreateBinaryStatic(&s_cmd_sync_sem_buffer);
+    }
+
     audio_cmd_t local_cmd = *cmd;
-    SemaphoreHandle_t sync_sem = NULL;
-    esp_err_t exec_result = ESP_OK;
+    esp_err_t   exec_result = ESP_OK;
 
     if (is_sync) {
-        sync_sem = xSemaphoreCreateBinary();
-        if (sync_sem == NULL)
-            return ESP_ERR_NO_MEM;
-        local_cmd.done_sem = sync_sem;
-        local_cmd.result = &exec_result;
+        (void)xSemaphoreTake(s_cmd_sync_sem, 0);
+        local_cmd.done_sem = s_cmd_sync_sem;
+        local_cmd.result   = &exec_result;
     } else {
         local_cmd.done_sem = NULL;
-        local_cmd.result = NULL;
+        local_cmd.result   = NULL;
     }
 
     if (xQueueSend(s_audio_queue, &local_cmd, pdMS_TO_TICKS(wait_ms)) != pdTRUE) {
-        if (sync_sem)
-            vSemaphoreDelete(sync_sem);
         return ESP_ERR_TIMEOUT;
     }
 
     if (is_sync) {
-        xSemaphoreTake(sync_sem, portMAX_DELAY);
-        vSemaphoreDelete(sync_sem);
+        const uint32_t timeout_ms = (wait_ms > 0) ? wait_ms : 500;
+        if (xSemaphoreTake(s_cmd_sync_sem, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
+            ESP_LOGE(TAG, "Audio command timed out waiting for worker execution");
+            return ESP_ERR_TIMEOUT;
+        }
         return exec_result;
     }
 
