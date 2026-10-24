@@ -1,13 +1,13 @@
 CompileFlags:
-  CompilationDatabase:
-    - "examples/H1OS/build_prod"
-    - "examples/H1OS/build_dev"
-    - "examples/H1OS/build"
+  CompilationDatabase: examples/H1OS/build_dev
   Add:
     - -Wno-unknown-attributes
     - -Wno-macro-redefined
+    - -Wno-unused-variable
   Remove:
+    - -mlongcalls
     - -fno-tree-switch-conversion
+    - -fstrict-volatile-bitfields
     - -f*
     - -m*
 
