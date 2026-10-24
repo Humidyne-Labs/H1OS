@@ -31,12 +31,13 @@
 #include <stdlib.h>
 
 extern const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start");
-extern const uint8_t ulp_h1os_bin_end[] asm("_binary_ulp_h1os_bin_end");
+extern const uint8_t ulp_h1os_bin_end[]   asm("_binary_ulp_h1os_bin_end");
 
 static const char *TAG = "sub_power";
 
 static adc_oneshot_unit_handle_t s_adc_handle = NULL;
-static adc_cali_handle_t s_cali_handle = NULL;
+static adc_cali_handle_t s_cali_handle        = NULL;
+
 static bool s_cali_valid = false;
 
 static uint32_t s_flow_a_sec     = 60;
@@ -120,9 +121,9 @@ esp_err_t sub_power_init(void)
 
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     adc_cali_curve_fitting_config_t cali_cfg = {
-        .unit_id = ADC_UNIT_1,
-        .chan = ADC_CHANNEL_3,
-        .atten = ADC_ATTEN_DB_12,
+        .unit_id  = ADC_UNIT_1,
+        .chan     = ADC_CHANNEL_3,
+        .atten    = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali_handle);
@@ -159,10 +160,11 @@ esp_err_t sub_power_deinit(void)
 }
 
 /**
- * @brief Sample calibrated battery voltage with 16-sample trimmed outlier filtering.
+ * @brief Retrieve calibrated resting battery voltage, SoC %, and charge state from ULP ring buffer.
  *
  * @param[out]   out_mv          Battery voltage in millivolts (e.g. 3850 mV).
  * @param[out]   out_pct         Estimated state of charge (0 to 100%).
+ * @param[out]   out_state       Evaluated battery state (DISCHARGING, CHARGING, CHARGED).
  *
  * @return ESP_OK on success, or an error code.
  */
@@ -195,7 +197,7 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
     if (sub_power_connected_usb()) {
         state = (vbat_mv >= 4180) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
     } else if (count >= 2) {
-        uint32_t newest_idx = (head == 0) ? 7 : (head - 1);
+        uint32_t newest_idx = (head == 0)       ? 7 : (head - 1);
         uint32_t prev_idx   = (newest_idx == 0) ? 7 : (newest_idx - 1);
         uint32_t v_new      = ring[newest_idx];
         uint32_t v_prev     = ring[prev_idx];
@@ -222,11 +224,12 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
     return sub_power_get_battery_status(out_mv, out_pct, &state);
 }
 
+/**
+ * @brief Compute macro wall-clock current draw and projected autonomy days.
+ */
 void sub_power_calc_autonomy(uint16_t initial_soc_x10,
                              uint16_t current_soc_x10,
                              uint32_t total_sleep_sec,
-                             uint32_t total_ulp_ms,
-                             uint32_t total_stub_ms,
                              uint32_t total_app_ms,
                              h1os_autonomy_metrics_t *out_metrics)
 {
@@ -234,37 +237,26 @@ void sub_power_calc_autonomy(uint16_t initial_soc_x10,
         return;
     }
 
-    out_metrics->wall_draw_ma   = -1.0f;
-    out_metrics->active_draw_ma = -1.0f;
-    out_metrics->autonomy_days  = -1.0f;
-    out_metrics->f_ulp          = 0.0f;
-    out_metrics->f_stub         = 0.0f;
-    out_metrics->f_app          = 0.0f;
-    out_metrics->mah_spent_lap  = 0.0f;
+    out_metrics->wall_draw_ma  = -1.0f;
+    out_metrics->autonomy_days = -1.0f;
+    out_metrics->mah_spent_lap = 0.0f;
 
-    uint32_t total_active_ms = total_ulp_ms + total_stub_ms + total_app_ms;
-    float active_sec = (float)total_active_ms / 1000.0f;
-    float wall_sec   = (float)total_sleep_sec + active_sec;
+    float wall_sec   = (float)total_sleep_sec + ((float)total_app_ms / 1000.0f);
     float wall_hours = wall_sec / 3600.0f;
 
-    if (total_active_ms > 0) {
-        out_metrics->f_ulp  = (float)total_ulp_ms / (float)total_active_ms;
-        out_metrics->f_stub = (float)total_stub_ms / (float)total_active_ms;
-        out_metrics->f_app  = (float)total_app_ms / (float)total_active_ms;
-    }
-
-    if (initial_soc_x10 <= current_soc_x10 || wall_sec < 60.0f || total_active_ms == 0) {
+    /* Singularity & calibration guard (< 1.0% drop or < 60s elapsed wall time) */
+    if (initial_soc_x10 <= current_soc_x10 || wall_sec < 60.0f) {
         return;
     }
 
     int32_t delta_x10 = (int32_t)initial_soc_x10 - (int32_t)current_soc_x10;
-    if (delta_x10 < 10) { /* Delta SoC < 1.0% singularity guard */
+    if (delta_x10 < 10) {
         return;
     }
 
-    float delta_soc_pct = (float)delta_x10 / 10.0f;
     const float nominal_mah = 400.0f;
-    float delta_c_lap = nominal_mah * (delta_soc_pct / 100.0f);
+    float delta_soc_pct = (float)delta_x10 / 10.0f;
+    float delta_c_lap   = nominal_mah * (delta_soc_pct / 100.0f);
     out_metrics->mah_spent_lap = delta_c_lap;
 
     float i_wall = delta_c_lap / wall_hours;
@@ -274,11 +266,6 @@ void sub_power_calc_autonomy(uint16_t initial_soc_x10,
     float c_rem = nominal_mah * (current_soc_pct / 100.0f);
     float h_rem = c_rem / i_wall;
     out_metrics->autonomy_days = h_rem / 24.0f;
-
-    float d_active = active_sec / wall_sec;
-    if (d_active > 0.000001f) {
-        out_metrics->active_draw_ma = i_wall / d_active;
-    }
 }
 
 /**
@@ -304,13 +291,13 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
          * m_vbat = (2 * (V_3000 - V_2000) * 4096) / 1000
          * b_vbat = (2 * V_2000) - ((m_vbat * 2000) / 4096)
          */
-        int32_t m_scale = (int32_t)(((int64_t)2 * (v_3000 - v_2000) * 4096LL) / 1000LL);
+        int32_t m_scale  = (int32_t)(((int64_t)2 * (v_3000 - v_2000) * 4096LL) / 1000LL);
         int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));
 
-        *out_scale = (uint32_t)m_scale;
+        *out_scale     = (uint32_t)m_scale;
         *out_offset_mv = b_offset;
     } else {
-        *out_scale = 8601;
+        *out_scale     = 8601;
         *out_offset_mv = 0;
     }
     return ESP_OK;
@@ -318,8 +305,6 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
 
 /**
  * @brief Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
- *
- * @details Loads the binary into RTC Slow SRAM on cold boot, passes ADC eFuse calibration, configures the periodic wake timer (Flow A period), and arms the coprocessor.
  *
  * @param[in]    flow_a_period_sec Periodic wake interval for Flow A telemetry in seconds.
  *
@@ -342,8 +327,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV",
                  (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
         ulp_dispatch_reason = 0;
-        ulp_last_wake_btn = 0;
-        ulp_last_vbat_mv = 4000;
+        ulp_last_wake_btn   = 0;
+        ulp_last_vbat_mv    = 4000;
 
         uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
         ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
@@ -365,6 +350,11 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         rtc_gpio_deinit(HAL_PIN_RTC_INT);
 
         ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized in Pure Event Mode (ERR-001 Mitigated)");
+    } else if (ulp_last_wake_cause == 3) {
+        /* Account for the final Flow B sleep slice when woken by the RTC countdown timer */
+        volatile orch_persisted_state_t *st = orch_state_get();
+        uint32_t final_slice = (s_remainder_sec > 0) ? s_remainder_sec : s_flow_a_sec;
+        st->total_sleep_sec += final_slice;
     }
     return ESP_OK;
 }
@@ -388,8 +378,6 @@ void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32
 /**
  * @brief Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
  *
- * @details Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
- *
  * @param[in]    sleep_seconds   Timer duration in seconds (0 = timer disabled).
  * @param[in]    ext1_pins_mask  Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
  * @param[in]    mode            Full cycle or Flow A burst mode.
@@ -403,7 +391,6 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     volatile orch_persisted_state_t *st = orch_state_get();
     st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
-    st->total_sleep_sec  += s_flow_a_sec;
     orch_state_save_runtimes_to_nvs();
 
     hal_io_isolate_sleep_pads();
@@ -496,39 +483,17 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     return ESP_OK;
 }
 
-/**
- * @brief Configure EXT1 wake sources and enter deep sleep (defaults to SUB_POWER_SLEEP_FULL_CYCLE).
- *
- * @details Maintains RTC pad holds on power latch (GPIO 17) and EPD rail (GPIO 6) to keep rails active.
- *
- * @param[in]    sleep_seconds   Timer duration in seconds (0 = timer disabled).
- * @param[in]    ext1_pins_mask  Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
- *
- * @return Does not return on success (enters deep sleep).
- */
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 {
     return sub_power_enter_deep_sleep_mode(sleep_seconds, ext1_pins_mask, SUB_POWER_SLEEP_FULL_CYCLE);
 }
 
-/**
- * @brief Power off system completely by releasing battery power latch (GPIO 17).
- *
- * @details Used for critical low-battery shutdown or explicit user power-off.
- */
 void sub_power_cut_power_latch(void)
 {
     ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");
     hal_io_release_power_latch();
 }
 
-/**
- * @brief Check to see if USB is connected.
- *
- * @details Used for charger detection.
- *
- * @return true if usb is connected, or false if disconnected.
- */
 bool sub_power_connected_usb(void)
 {
     bool usb_state = hal_check_usb_ll();
@@ -540,19 +505,6 @@ bool sub_power_connected_usb(void)
 static esp_pm_lock_handle_t s_cpu_max_lock = NULL;
 #endif
 
-/**
- * @brief Initialize Dynamic Frequency Scaling (DFS) power management.
- *
- * @details Configures CPU frequency scaling based on the selected clock mode.
- *          SYS_CLK_MODE_DYNAMIC gates CPU cores to 80 MHz baseline during quiescent periods,
- *          allowing transient turbo scaling (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) during heavy UI/compute bursts.
- *          SYS_CLK_MODE_FIXED_MAX locks CPU cores permanently to maximum clock (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ).
- *          SYS_CLK_MODE_FIXED_MIN locks CPU cores permanently to 80 MHz baseline.
- *
- * @param[in]    mode            Clock scaling mode (SYS_CLK_MODE_DYNAMIC, FIXED_MAX, FIXED_MIN).
- *
- * @return ESP_OK on success, or an error code.
- */
 esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 {
 #if CONFIG_PM_ENABLE
@@ -594,13 +546,6 @@ esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 #endif
 }
 
-/**
- * @brief Acquire 240 MHz CPU performance lock (e.g. during LVGL rendering blitz).
- *
- * @details Boosts CPU cores from 80 MHz baseline to 240 MHz turbo clock.
- *
- * @return ESP_OK on success.
- */
 esp_err_t sub_power_cpu_max_acquire(void)
 {
 #if CONFIG_PM_ENABLE
@@ -611,13 +556,6 @@ esp_err_t sub_power_cpu_max_acquire(void)
     return ESP_OK;
 }
 
-/**
- * @brief Release 240 MHz CPU performance lock.
- *
- * @details Allows CPU cores to gate back down to 80 MHz baseline.
- *
- * @return ESP_OK on success.
- */
 esp_err_t sub_power_cpu_max_release(void)
 {
 #if CONFIG_PM_ENABLE

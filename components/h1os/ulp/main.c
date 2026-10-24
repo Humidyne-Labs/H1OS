@@ -28,8 +28,6 @@ volatile uint32_t remainder_sec   = 0;
 volatile uint32_t rtc_int_stuck   = 0;
 volatile uint32_t dispatch_reason = 0;
 volatile uint32_t gpio_status_raw = 0;
-volatile uint32_t entry_ccount    = 0;
-volatile uint32_t exit_ccount     = 0;
 
 volatile uint32_t cal_scale       = 8601;
 volatile int32_t  cal_offset      = 0;
@@ -41,8 +39,6 @@ volatile uint32_t usb_connected   = 0;
 volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};
 volatile uint32_t vbat_ring_head  = 0;
 volatile uint32_t vbat_ring_count = 0;
-volatile uint32_t last_run_cycles = 0;
-volatile uint32_t total_cycles    = 0;
 
 #define RTC_INT_PIN                GPIO_NUM_5
 #define RTC_INT_TIMEOUT_US         50000
@@ -290,8 +286,6 @@ int main(void)
     wake_counter++;
     asm volatile("fence" ::: "memory");
 
-    entry_ccount = ULP_RISCV_GET_CCOUNT();
-
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     gpio_status_raw = rtcio_int_st;
 
@@ -302,10 +296,7 @@ int main(void)
     bool is_btn_event = (((rtcio_int_st & (BIT(0) | BIT(18))) != 0) || boot_btn == 0 || pwr_btn == 0);
 
     uint32_t vbat_mv = last_vbat_mv;
-    if (usb_connected) {
-        vbat_mv = 4200;
-        last_vbat_mv = 4200;
-    } else if (!is_btn_event) {
+    if (!is_btn_event) {
         int32_t raw_adc = 0;
         if (ulp_read_vbat_adc_bounded(&raw_adc) && raw_adc > 0) {
             vbat_raw_adc = (uint32_t)raw_adc;
@@ -317,12 +308,6 @@ int main(void)
                 vbat_ring_count++;
             }
         }
-    }
-
-    exit_ccount = ULP_RISCV_GET_CCOUNT();
-    if (exit_ccount >= entry_ccount) {
-        last_run_cycles = exit_ccount - entry_ccount;
-        total_cycles += last_run_cycles;
     }
 
     ulp_dispatch_and_wake(rtcio_int_st, boot_btn, pwr_btn, rtc_int, vbat_mv);
