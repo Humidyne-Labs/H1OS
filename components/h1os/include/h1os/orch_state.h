@@ -95,6 +95,13 @@ typedef struct {
 
     uint8_t ring_head;                  /**< Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1). */
     uint32_t total_samples;             /**< Total lifetime samples recorded across all sessions.                  */
+
+    uint32_t total_sleep_sec;           /**< Cumulative seconds spent in deep sleep.                                */
+    uint32_t total_ulp_ms;              /**< Cumulative milliseconds executing RISC-V ULP (State a).                */
+    uint32_t total_wake_stub_ms;        /**< Cumulative milliseconds executing RTC wake stub (State c).             */
+    uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main CPU app (State b).              */
+    uint16_t initial_soc_x10;           /**< State of Charge at start of discharge lap in tenths of % (0..1000).   */
+    uint8_t  _pad_soc[2];               /**< Alignment padding to 32-bit boundary.                                  */
 } orch_persisted_state_t;
 
 // clang-format off
@@ -142,6 +149,23 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample);
  * @return True if a valid settled sample was located, false otherwise.
  */
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample);
+
+/**
+ * @brief Save cumulative battery autonomy runtimes to Flash NVS.
+ */
+void orch_state_save_runtimes_to_nvs(void);
+
+/**
+ * @brief Restore cumulative battery autonomy runtimes from Flash NVS.
+ */
+void orch_state_load_runtimes_from_nvs(void);
+
+/**
+ * @brief Reset discharge lap runtimes on charger unplug or cycle anchor.
+ *
+ * @param[in] current_soc_x10 Starting SoC in tenths of a percent (0..1000) for the new discharge lap.
+ */
+void orch_state_reset_discharge_lap(uint16_t current_soc_x10);
 
 #ifdef __cplusplus
 }

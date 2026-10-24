@@ -382,6 +382,8 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     volatile orch_persisted_state_t *st = orch_state_get();
+    uint32_t stub_entry_ccount = 0;
+    asm volatile("rsr %0, ccount" : "=a"(stub_entry_ccount));
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
@@ -523,6 +525,15 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_INPUT_DISABLE(IO_MUX_GPIO48_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO48_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
+
+    uint32_t stub_exit_ccount = 0;
+    asm volatile("rsr %0, ccount" : "=a"(stub_exit_ccount));
+    if (stub_exit_ccount >= stub_entry_ccount) {
+        uint32_t stub_elapsed_cycles = stub_exit_ccount - stub_entry_ccount;
+        st->total_wake_stub_ms += (stub_elapsed_cycles / 20000U);
+    } else {
+        st->total_wake_stub_ms += 16U;
+    }
 
     esp_wake_stub_sleep(&bsp_wake_stub);
 }

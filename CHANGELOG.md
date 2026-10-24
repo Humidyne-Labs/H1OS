@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [2.3.3-dev] - 2026-10-24
 
+### 🚀 Added & Architectural Evolution
+
+* **Two-Level Empirical Battery Autonomy Engine & Exclusive ULP Resting Acquisition** (`sub_power.h/.c`, `orch_state.h/.c`, `orch_wake_stub.c`, `ulp/main.c`, `h1os_lifecycle.c`, `screen_system_health.c`, `docs/architecture/A8_battery_and_power_management.md`):
+  * **Zero Hardcoded Currents:** Completely eliminated speculative current constants (0.045 mA, 28 mA, 36 mA) and noisy flat-plateau delta-V current derivations.
+  * **Level 1 (Macro Wall-Clock Flight Time):** Anchored true continuous current ($I_{\text{wall}}$) and remaining autonomy days strictly against elapsed calendar time ($T_{\text{wall}} = T_{\text{sleep}} + T_{\text{active}}$) and empirical capacity loss ($\Delta\text{SoC}$) on the 400 mAh reservoir.
+  * **Level 2 (Active Execution Matrix & Task Attribution):** Isolated active execution ($T_{\text{active}} = T_{\text{ulp}} + T_{\text{stub}} + T_{\text{app}}$) as The Active Whole (1.0), attributing consumed mAh across ULP background monitoring, RTC wake stub sampling, and main application execution proportional to active time fractions ($f_{\text{ulp}}, f_{\text{stub}}, f_{\text{app}}$).
+  * **Zero Hardcoded Schedule Intervals:** Dynamically reads user-configured Flow A and Flow B periods (`sample_interval_sec` and `flow_b_period_sec` from `h1os_lifecycle_t.session`), seamlessly adapting to custom schedules without assuming 60s or 300s.
+  * **Exclusive ULP ADC & Ring Buffer:** Retired main CPU ADC reads during active execution to eliminate $I \cdot R$ load sag. The ULP-RISC-V coprocessor samples battery ADC exclusively during quiet deep sleep into an 8-entry circular ring buffer in RTC Slow SRAM (`ulp_vbat_ring[8]`).
+  * **Folded Factor-of-2 Divider in ULP Calibration Handoff:** Pre-computed linear calibration parameters folding the $2\times$ divider directly into slope ($m_{\text{vbat}}$) and offset ($b_{\text{vbat}}$) using raw counts 2000 and 3000, allowing the ULP coprocessor to evaluate resting $V_{\text{BAT}}$ via a single shift and add without runtime multiplication.
+  * **Diurnal Thermal Rebound Guard:** Protected discharge lap runtimes against daytime ambient temperature rises ($+4^\circ\text{C} \implies +3\text{--}6\text{ mV}$ rebound on the flat plateau) by restricting lap resets strictly to uninitialized boots, transitions from charging/charged to discharging, or $\ge 3.0\%$ SoC increases.
+  * **Tenths-of-a-Percent SoC Resolution:** Upgraded `initial_soc_x10` and `current_soc_x10` to tenths of a percent ($0..1000 = 0.0\%..100.0\%$) to eliminate up to 50% integer quantization error during the first few percent of battery discharge.
+  * **17.5 MHz ULP Cycle Accumulation:** Accumulated ULP coprocessor execution cycles directly in RTC Slow SRAM and converted to milliseconds using the exact 17.5 MHz RTC_FAST_CLK divisor ($17500\text{ cycles/ms}$).
+  * **Discharge Lap Reset & Singularity Guard:** Automatically resets cumulative runtimes and latches starting SoC when transitioning from charging/USB to battery discharge; returns `-1.0f` to display `"Autonomy: ~CALIBRATING..."` until $\ge 1.0\%$ SoC is empirically consumed.
+  * **Persistent Runtimes Across Power Off & Reflash:** Cumulative runtimes reside in RTC Slow SRAM across sleep and are mirrored into Flash NVS (`sub_nvs`) before sleep and on shutdown.
+  * **Example Calculator Deletion:** Removed redundant `battery_estimator.c/.h` from `examples/H1OS/main/`, unifying all battery logic into Layer 2 `sub_power`.
+  * **Hardware Errata E10:** Documented the lack of a dedicated VBUS/VUSB monitor divider pin on the Waveshare PCB in `ERRATA.md`.
+
 ### 🛡️ Fixed & Hardened (Firmware Safety Invariants Audit)
 
 * **Deterministic Static IPC Semaphores** (`sub_audio.c`):

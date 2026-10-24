@@ -83,19 +83,24 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer);
 ---
 
 ### 3.4 `sub_power.c/.h` (Battery Monitor & Sleep Execution Driver)
-- **12 dB ADC Curve Fitting**: Reads `GPIO 4` (ADC1_CH3 across 200kΩ/200kΩ divider) with 16-sample trimmed mean.
-- **Zero-Volt Cable Guard**: If latch is asserted and $V_{\text{bat}} \approx 0\text{mV}$, detects instrument is running from USB VBUS without a battery; bypasses low-battery shutdown.
-- **Hardware Sleep Entry**: Configures EXT1 wakeup and puts CPU into deep sleep.
+- **Exclusive ULP Quiet-State Sensing**: Retired main CPU ADC reads during active run; reads resting battery terminal voltage from the 8-entry ULP-RISC-V Slow SRAM ring buffer (`ulp_vbat_ring[8]`), eliminating active $I \cdot R$ load sag. See [A8 Battery Metrology & Autonomy Engine](A8_battery_and_power_management.md).
+- **Single 13-Point LiPo OCV Lookup Curve**: Piecewise linear interpolation mapping resting terminal millivolts to 0..100% SoC.
+- **Battery State Machine**: Evaluates $\Delta V$ over sleep cycles to classify `H1OS_BATTERY_DISCHARGING`, `H1OS_BATTERY_CHARGING`, and `H1OS_BATTERY_CHARGED`.
+- **Two-Level Empirical Autonomy Engine**: Computes Level 1 macro flight current ($I_{\text{wall}}$), remaining operating days ($\text{Days}_{\text{rem}}$), and Level 2 active execution task fractions with zero hardcoded currents.
+- **Hardware Sleep Entry**: Configures EXT1 wakeup, RTC IO pad holds, and enters deep sleep.
 - **Dynamic Frequency Scaling (DFS)**: Gates CPU cores to an 80 MHz baseline during quiescent wait/polling periods, while providing `sub_power_cpu_max_acquire()` and `sub_power_cpu_max_release()` to burst the clock to 240 MHz turbo during compute-heavy operations (LVGL rendering blitz and I2S audio synthesis).
 
 ```c
 esp_err_t sub_power_init(void);
 esp_err_t sub_power_deinit(void);
+esp_err_t sub_power_get_battery_status(uint16_t *out_mv, uint8_t *out_pct, h1os_battery_state_t *out_state);
 esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct);
-bool      sub_power_is_usb_powered(void);
+void      sub_power_calc_autonomy(uint16_t initial_soc_x10, uint16_t current_soc_x10, uint32_t total_sleep_sec, uint32_t total_ulp_ms, uint32_t total_stub_ms, uint32_t total_app_ms, h1os_autonomy_metrics_t *out_metrics);
+bool      sub_power_connected_usb(void);
+esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode);
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask);
 void      sub_power_cut_power_latch(void);
-esp_err_t sub_power_init_dfs(bool enable_dfs);
+esp_err_t sub_power_init_dfs(sys_clk_mode_t mode);
 esp_err_t sub_power_cpu_max_acquire(void);
 esp_err_t sub_power_cpu_max_release(void);
 ```

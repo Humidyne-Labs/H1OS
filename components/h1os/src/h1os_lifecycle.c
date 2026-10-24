@@ -156,7 +156,8 @@ static void h1os_session_monitor_task(void *arg)
 static void debug_dump_ulp_telemetry(void)
 {
     uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
-    uint32_t exec_us = exec_cycles / 17;
+    /* ULP RISC-V runs on RTC_FAST_CLK at 17.5 MHz: 17,500 cycles per ms = 17.5 cycles per us */
+    uint32_t exec_us = (uint32_t)(((uint64_t)exec_cycles * 10ULL) / 175ULL);
 
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
     ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
@@ -183,6 +184,11 @@ static void debug_dump_ulp_telemetry(void)
     }
     if (ulp_last_wake_cause == 6) {
         ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);
+    }
+    if (ulp_total_cycles > 0) {
+        volatile orch_persisted_state_t *st = orch_state_get();
+        /* 17,500 cycles per millisecond on 17.5 MHz RTC_FAST_CLK */
+        st->total_ulp_ms = (uint32_t)(ulp_total_cycles / 17500U);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
@@ -264,6 +270,7 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     hal_i2c_init();
 
     sub_nvs_init();
+    orch_state_load_runtimes_from_nvs();
 
     /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
@@ -510,15 +517,39 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
-    if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
+    h1os_battery_state_t bat_state = H1OS_BATTERY_DISCHARGING;
+    if (sub_power_get_battery_status(&vbat_mv, &vbat_pct, &bat_state) == ESP_OK) {
         out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        out_telemetry->is_usb_powered  = sub_power_connected_usb();
+        out_telemetry->is_usb_powered  = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
+        out_telemetry->battery_state   = bat_state;
         st->last_vbat_mv               = vbat_mv;
         if (!out_telemetry->is_usb_powered && (st->boot_vbat_mv == 0 || vbat_mv > st->boot_vbat_mv)) {
             st->boot_vbat_mv = vbat_mv;
         }
         out_telemetry->boot_vbat_mv = st->boot_vbat_mv;
+
+        uint16_t current_soc_x10 = sub_power_mv_to_soc_tenths(vbat_mv);
+        static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
+
+        if (bat_state == H1OS_BATTERY_DISCHARGING) {
+            bool state_transition_from_charge = (s_prev_bat_state == H1OS_BATTERY_CHARGING ||
+                                                 s_prev_bat_state == H1OS_BATTERY_CHARGED);
+            if (st->initial_soc_x10 == 0 ||
+                state_transition_from_charge ||
+                current_soc_x10 >= st->initial_soc_x10 + 30) {
+                orch_state_reset_discharge_lap(current_soc_x10);
+            }
+        }
+        s_prev_bat_state = bat_state;
+
+        sub_power_calc_autonomy(st->initial_soc_x10,
+                                current_soc_x10,
+                                st->total_sleep_sec,
+                                st->total_ulp_ms,
+                                st->total_wake_stub_ms,
+                                st->total_app_run_ms,
+                                &out_telemetry->autonomy);
     }
 
     return ret;

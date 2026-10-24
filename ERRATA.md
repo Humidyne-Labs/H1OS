@@ -27,6 +27,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E7** | Tactile Buttons (`BOOT`/`PWR`) | External 10 kΩ pull-up resistors without RC filtering | Standard 10 kΩ pull-ups with 100 nF RC filter |
 | **E8** | SSD1681 E-Paper Display | Shared `MOSI/SDA` line for glass thermistor read `0x1B` | Dedicated `MISO` trace or discrete bezel thermistor |
 | **E9** | Slow Clock Domain | Missing 32.768 kHz crystal; pins 15/16 multiplexed to I2S | Dedicated 32.768 kHz crystal on XTAL32K pads (route I2S elsewhere) |
+| **E10** | USB VBUS / Charger Detection | Missing dedicated VBUS/VUSB voltage monitor pin | Resistor divider from 5V VBUS to RTC GPIO for hardware USB detect |
 
 ---
 
@@ -294,6 +295,27 @@ On the Waveshare ESP32-S3 ePaper 1.54" V2 development board, **no external 32.76
 
 ---
 
+### Errata E10: Missing Dedicated USB VBUS Hardware Voltage Monitor
+
+#### 1. Physical Defect Analysis
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board routes external 5V power from the USB Type-C connector directly into the linear battery charger IC (ME4057 / TP4056) and onboard 3.3V LDO. However, **no voltage divider or digital sense line connects the 5V `VBUS` rail to any MCU GPIO**.
+
+#### 2. Metrological & Firmware Impact
+1. **Blindness to Standalone Wall Adapters (Dumb Chargers):** Software USB detection via `hal_check_usb_ll()` tests for USB 1.1/2.0 Start-of-Frame (SOF) packets on the ESP32-S3 USB-Serial-JTAG peripheral. When plugged into a host PC, SOF packets arrive every 1.0 ms and USB is detected. However, when connected to a standard 5V USB wall adapter or battery bank with no data negotiation, zero SOF packets arrive, and `hal_check_usb_ll()` reports `false`.
+2. **Charging State Misclassification:** Because the MCU cannot sense `VBUS` directly on a wall charger, the charger raises the battery rail to 4.20V in CC/CV mode, which software risks misclassifying as an autonomous resting battery voltage.
+3. **Charger Disconnect Latch Failure:** When unplugging from a wall adapter, software cannot rely on a hardware edge to immediately trigger battery discharge lap resets.
+
+#### 3. Current H1OS Firmware Mitigations
+- Combines low-level USB-Serial-JTAG frame activity checking with rate-of-rise $\Delta V$ voltage tracking.
+- If $V_{\text{BAT}}$ rises by $\ge +15\text{ mV}$ between quiet sleep readings, the battery state machine latches `H1OS_BATTERY_CHARGING` regardless of USB host data presence.
+- When $V_{\text{BAT}}$ stabilizes $\ge 4180\text{ mV}$ with zero discharge drop, the state machine asserts `H1OS_BATTERY_CHARGED`.
+
+#### 4. Rev B Hardware Redesign Recommendations
+- **Route Dedicated VBUS Divider:** Tap the 5V `VBUS` rail with a high-impedance divider ($300\text{ k}\Omega / 200\text{ k}\Omega$, 1:2.5 scale down to 2.0V) routed to an available RTC GPIO (e.g. `GPIO 1` or `GPIO 2`).
+- **RTC Edge Wakeup:** Enable active-high level/edge detection on the `VBUS` sense pin so the ULP and PMU instantly wake and record charger attach/detach events.
+
+---
+
 ## 3. Summary of Rev B BOM & Schematic Modifications
 
 | Component Type | Part Number / Spec | Reference Designator | Purpose |
@@ -306,6 +328,7 @@ On the Waveshare ESP32-S3 ePaper 1.54" V2 development board, **no external 32.76
 | **Button Filters** | 100 nF 0402 16V X7R Caps | `C_BTN1`, `C_BTN2` | Hardware RC contact debounce |
 | **ESD Suppressors** | STMicroelectronics USBLC6-2 | `D_ESD1`, `D_ESD2` | Button & MicroSD ESD protection |
 | **Slot Milling** | 2.0 mm PCB Routing Path | `MECHANICAL` | SHTC3 cantilevered thermal isolation tab |
+| **VBUS Divider** | 300 kΩ / 200 kΩ 0402 1% Resistors | `R_VBUS1`, `R_VBUS2` | 5V VBUS monitor divider to RTC GPIO |
 
 ---
 

@@ -66,27 +66,27 @@ $$
 
 ---
 
-## 3. LiPo Open-Circuit Voltage (OCV) Lookup Table
+## 3. LiPo Open-Circuit Voltage (OCV) Lookup Table & Metrology
 
-Lithium-Polymer discharge chemistry is non-linear. The BSP translates resting battery voltage into percentage using a 13-point calibrated OCV piecewise lookup table:
+Lithium-Polymer discharge chemistry is non-linear. To eliminate active $I \cdot R$ load sag, the battery ADC is read exclusively during deep sleep quiescence by the ULP-RISC-V coprocessor and committed to an 8-entry ring buffer (`ulp_vbat_ring[8]`). The BSP translates resting battery voltage into percentage using the unified 13-point calibrated OCV piecewise lookup table (see [A8 Battery Metrology & Autonomy Engine](../architecture/A8_battery_and_power_management.md)):
 
 | Cell Voltage ($V_{\text{BAT}}$) | State of Charge (SoC %) | Operating Region |
 |---|---|---|
 | **≥ 4200 mV** | 100% | Full Charge Cutoff |
-| **4060 mV** | 92% | Near Full |
-| **3980 mV** | 85% | Upper Plateau |
-| **3920 mV** | 75% | Upper Plateau |
-| **3870 mV** | 65% | Nominal Plateau |
-| **3820 mV** | 55% | Nominal Plateau |
-| **3780 mV** | 45% | Nominal Plateau |
-| **3750 mV** | 35% | Nominal Plateau |
+| **4120 mV** | 95% | Upper Knee Transition |
+| **4040 mV** | 88% | Upper Plateau |
+| **3960 mV** | 80% | Upper Plateau |
+| **3890 mV** | 73% | Upper Plateau |
+| **3820 mV** | 60% | Flat Discharge Plateau |
+| **3780 mV** | 48% | Flat Discharge Plateau |
+| **3750 mV** | 36% | Flat Discharge Plateau |
 | **3720 mV** | 25% | Lower Plateau |
-| **3680 mV** | 15% | Knee Region |
+| **3680 mV** | 15% | Knee Departure |
 | **3600 mV** | 8% | Low Battery Warning |
 | **3450 mV** | 3% | Critical Cutoff Imminent |
 | **≤ 3300 mV** | 0% | Absolute Discharge Cutoff |
 
-Piecewise linear interpolation is evaluated between points for continuous 1% percentage resolution.
+Piecewise linear interpolation is evaluated between points for continuous 1% percentage resolution. Remaining operating autonomy is calculated via the Two-Level Empirical Model without hardcoded current constants.
 
 ---
 

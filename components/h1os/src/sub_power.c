@@ -7,6 +7,7 @@
  */
 
 #include "h1os/sub_power.h"
+#include "h1os/orch_state.h"
 
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
@@ -17,6 +18,7 @@
 #include "esp_pm.h"
 #include "esp_rom_sys.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "h1os/hal_io.h"
@@ -44,49 +46,46 @@ static uint32_t s_remainder_sec  = 0;
 
 static const struct {
     uint16_t mv;
-    uint8_t pct;
-} s_lipo_table[] =
-{
-    {4200, 100},
-    {4120, 95},
-    {4040, 88},
-    {3960, 80},
-    {3890, 73},
-    {3820, 60},
-    {3780, 48},
-    {3750, 36},
-    {3720, 25},
-    {3680, 15},
-    {3600, 8},
-    {3450, 3},
+    uint16_t soc_x10;
+} s_lipo_table[] = {
+    {4200, 1000},
+    {4120, 950},
+    {4040, 880},
+    {3960, 800},
+    {3890, 730},
+    {3820, 600},
+    {3780, 480},
+    {3750, 360},
+    {3720, 250},
+    {3680, 150},
+    {3600, 80},
+    {3450, 30},
     {3300, 0}
 };
 
 #define LIPO_TABLE_SIZE (sizeof(s_lipo_table) / sizeof(s_lipo_table[0]))
 
-/**
- * @brief Mv to percent.
- *
- * @param[in]    mv              Parameter mv.
- *
- * @return Return value of type static uint8_t.
- */
-static uint8_t mv_to_percent(uint16_t mv)
+uint16_t sub_power_mv_to_soc_tenths(uint16_t mv)
 {
     if (mv >= s_lipo_table[0].mv)
-        return 100;
+        return 1000;
     if (mv <= s_lipo_table[LIPO_TABLE_SIZE - 1].mv)
         return 0;
 
     for (size_t i = 0; i < LIPO_TABLE_SIZE - 1; i++) {
         if (mv <= s_lipo_table[i].mv && mv >= s_lipo_table[i + 1].mv) {
-            uint16_t span_mv = s_lipo_table[i].mv - s_lipo_table[i + 1].mv;
-            uint8_t span_pct = s_lipo_table[i].pct - s_lipo_table[i + 1].pct;
-            uint16_t diff_mv = mv - s_lipo_table[i + 1].mv;
-            return s_lipo_table[i + 1].pct + (uint8_t)((diff_mv * span_pct) / span_mv);
+            uint32_t span_mv  = s_lipo_table[i].mv - s_lipo_table[i + 1].mv;
+            uint32_t span_soc = s_lipo_table[i].soc_x10 - s_lipo_table[i + 1].soc_x10;
+            uint32_t diff_mv  = mv - s_lipo_table[i + 1].mv;
+            return (uint16_t)(s_lipo_table[i + 1].soc_x10 + ((diff_mv * span_soc) / span_mv));
         }
     }
     return 0;
+}
+
+static uint8_t mv_to_percent(uint16_t mv)
+{
+    return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5) / 10);
 }
 
 /**
@@ -167,63 +166,119 @@ esp_err_t sub_power_deinit(void)
  *
  * @return ESP_OK on success, or an error code.
  */
-esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
+esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
+                                       uint8_t *out_pct,
+                                       h1os_battery_state_t *out_state)
 {
-    if (out_mv == NULL)
+    if (out_mv == NULL) {
         return ESP_ERR_INVALID_ARG;
-
-    if (sub_power_connected_usb()) {
-        *out_mv = 4200;
-        if (out_pct != NULL) {
-            *out_pct = 100;
-        }
-        return ESP_OK;
     }
 
-    if (s_adc_handle == NULL) {
-        esp_err_t err = sub_power_init();
-        if (err != ESP_OK)
-            return err;
+    const volatile uint32_t *ring = (const volatile uint32_t *)&ulp_vbat_ring;
+    uint32_t head  = ulp_vbat_ring_head % 8;
+    uint32_t count = ulp_vbat_ring_count;
+    uint32_t vbat  = ulp_last_vbat_mv;
+
+    if (vbat == 0 || vbat > 4500) {
+        vbat = 4000;
     }
 
-    int32_t samples[16];
-    for (uint32_t i = 0; i < 16; i++) {
-        int raw = 0;
-        adc_oneshot_read(s_adc_handle, ADC_CHANNEL_3, &raw);
-        samples[i] = (int32_t)raw;
-    }
-
-    for (uint32_t i = 1; i < 16; i++) {
-        int32_t key = samples[i];
-        int32_t j = (int32_t)i - 1;
-        while (j >= 0 && samples[j] > key) {
-            samples[j + 1] = samples[j];
-            j--;
-        }
-        samples[j + 1] = key;
-    }
-
-    int32_t sum = 0;
-    for (uint32_t i = 4; i < 12; i++) {
-        sum += samples[i];
-    }
-    int32_t avg_raw = sum / 8;
-
-    int voltage_mv = 0;
-    if (s_cali_valid && s_cali_handle != NULL) {
-        adc_cali_raw_to_voltage(s_cali_handle, avg_raw, &voltage_mv);
-    } else {
-        voltage_mv = (avg_raw * 3100) / 4095;
-    }
-
-    uint16_t vbat_mv = (uint16_t)(voltage_mv * 2);
+    uint16_t vbat_mv = (uint16_t)vbat;
+    uint8_t pct      = mv_to_percent(vbat_mv);
 
     *out_mv = vbat_mv;
     if (out_pct != NULL) {
-        *out_pct = mv_to_percent(vbat_mv);
+        *out_pct = pct;
+    }
+
+    h1os_battery_state_t state = H1OS_BATTERY_DISCHARGING;
+    if (sub_power_connected_usb()) {
+        state = (vbat_mv >= 4180) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
+    } else if (count >= 2) {
+        uint32_t newest_idx = (head == 0) ? 7 : (head - 1);
+        uint32_t prev_idx   = (newest_idx == 0) ? 7 : (newest_idx - 1);
+        uint32_t v_new      = ring[newest_idx];
+        uint32_t v_prev     = ring[prev_idx];
+
+        if (v_new >= v_prev + 15) {
+            state = H1OS_BATTERY_CHARGING;
+        } else if (v_new >= 4180 && (v_new > v_prev ? (v_new - v_prev) : (v_prev - v_new)) <= 5) {
+            state = H1OS_BATTERY_CHARGED;
+        } else {
+            state = H1OS_BATTERY_DISCHARGING;
+        }
+    }
+
+    if (out_state != NULL) {
+        *out_state = state;
     }
 
     return ESP_OK;
+}
+
+esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
+{
+    h1os_battery_state_t state;
+    return sub_power_get_battery_status(out_mv, out_pct, &state);
+}
+
+void sub_power_calc_autonomy(uint16_t initial_soc_x10,
+                             uint16_t current_soc_x10,
+                             uint32_t total_sleep_sec,
+                             uint32_t total_ulp_ms,
+                             uint32_t total_stub_ms,
+                             uint32_t total_app_ms,
+                             h1os_autonomy_metrics_t *out_metrics)
+{
+    if (out_metrics == NULL) {
+        return;
+    }
+
+    out_metrics->wall_draw_ma   = -1.0f;
+    out_metrics->active_draw_ma = -1.0f;
+    out_metrics->autonomy_days  = -1.0f;
+    out_metrics->f_ulp          = 0.0f;
+    out_metrics->f_stub         = 0.0f;
+    out_metrics->f_app          = 0.0f;
+    out_metrics->mah_spent_lap  = 0.0f;
+
+    uint32_t total_active_ms = total_ulp_ms + total_stub_ms + total_app_ms;
+    float active_sec = (float)total_active_ms / 1000.0f;
+    float wall_sec   = (float)total_sleep_sec + active_sec;
+    float wall_hours = wall_sec / 3600.0f;
+
+    if (total_active_ms > 0) {
+        out_metrics->f_ulp  = (float)total_ulp_ms / (float)total_active_ms;
+        out_metrics->f_stub = (float)total_stub_ms / (float)total_active_ms;
+        out_metrics->f_app  = (float)total_app_ms / (float)total_active_ms;
+    }
+
+    if (initial_soc_x10 <= current_soc_x10 || wall_sec < 60.0f || total_active_ms == 0) {
+        return;
+    }
+
+    int32_t delta_x10 = (int32_t)initial_soc_x10 - (int32_t)current_soc_x10;
+    if (delta_x10 < 10) { /* Delta SoC < 1.0% singularity guard */
+        return;
+    }
+
+    float delta_soc_pct = (float)delta_x10 / 10.0f;
+    const float nominal_mah = 400.0f;
+    float delta_c_lap = nominal_mah * (delta_soc_pct / 100.0f);
+    out_metrics->mah_spent_lap = delta_c_lap;
+
+    float i_wall = delta_c_lap / wall_hours;
+    out_metrics->wall_draw_ma = i_wall;
+
+    float current_soc_pct = (float)current_soc_x10 / 10.0f;
+    float c_rem = nominal_mah * (current_soc_pct / 100.0f);
+    float h_rem = c_rem / i_wall;
+    out_metrics->autonomy_days = h_rem / 24.0f;
+
+    float d_active = active_sec / wall_sec;
+    if (d_active > 0.000001f) {
+        out_metrics->active_draw_ma = i_wall / d_active;
+    }
 }
 
 /**
@@ -240,18 +295,22 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
         return ESP_ERR_INVALID_ARG;
 
     if (s_cali_valid && s_cali_handle != NULL) {
-        int v_low = 0;
-        int v_high = 0;
-        adc_cali_raw_to_voltage(s_cali_handle, 1000, &v_low);
-        adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_high);
+        int v_2000 = 0;
+        int v_3000 = 0;
+        adc_cali_raw_to_voltage(s_cali_handle, 2000, &v_2000);
+        adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_3000);
 
-        int32_t m_scale = (int32_t)(((int64_t)(v_high - v_low) * 4096) / 2000);
-        int32_t b_offset = (int32_t)(v_low - ((m_scale * 1000LL) / 4096));
+        /* Fold the 2x divider directly into slope and offset:
+         * m_vbat = (2 * (V_3000 - V_2000) * 4096) / 1000
+         * b_vbat = (2 * V_2000) - ((m_vbat * 2000) / 4096)
+         */
+        int32_t m_scale = (int32_t)(((int64_t)2 * (v_3000 - v_2000) * 4096LL) / 1000LL);
+        int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));
 
         *out_scale = (uint32_t)m_scale;
-        *out_offset_mv = b_offset * 2;
+        *out_offset_mv = b_offset;
     } else {
-        *out_scale = 3100;
+        *out_scale = 8601;
         *out_offset_mv = 0;
     }
     return ESP_OK;
@@ -341,6 +400,11 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 {
     (void)sleep_seconds;
     (void)ext1_pins_mask;
+
+    volatile orch_persisted_state_t *st = orch_state_get();
+    st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
+    st->total_sleep_sec  += s_flow_a_sec;
+    orch_state_save_runtimes_to_nvs();
 
     hal_io_isolate_sleep_pads();
 

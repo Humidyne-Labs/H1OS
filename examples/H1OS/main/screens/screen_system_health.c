@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "battery_estimator.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
+#include "h1os/sub_power.h"
 #include "h1os/sub_sdcard.h"
 #include "screens.h"
 
@@ -24,31 +24,30 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_t *scr = screen_base_create("SYSTEM HEALTH", "3/4", event_cb);
 
     lv_obj_t *lbl_bat = lv_label_create(scr);
-    if (telem->is_usb_powered) {
-        lv_label_set_text(lbl_bat, "Power:       USB CABLE");
+    if (telem->battery_state == H1OS_BATTERY_CHARGED) {
+        lv_label_set_text_fmt(lbl_bat, "Power:       CHARGED (%.2fV)",
+                              (double)((float)telem->battery_mv / 1000.0f));
+    } else if (telem->battery_state == H1OS_BATTERY_CHARGING) {
+        lv_label_set_text_fmt(lbl_bat, "Power:       CHARGING (%.2fV)",
+                              (double)((float)telem->battery_mv / 1000.0f));
     } else {
         lv_label_set_text_fmt(lbl_bat, "Battery:     %.2fV (%u%%)",
-                                            (double)((float)telem->battery_mv / 1000.0f),
-                                            telem->battery_percent);
+                              (double)((float)telem->battery_mv / 1000.0f),
+                              telem->battery_percent);
     }
     lv_obj_set_style_text_font(lbl_bat, H1OS_FONT_14, 0);
     lv_obj_align(lbl_bat, LV_ALIGN_TOP_LEFT, 6, 30);
 
     lv_obj_t *lbl_autonomy = lv_label_create(scr);
-    if (telem->is_usb_powered) {
+    if (telem->battery_state == H1OS_BATTERY_CHARGED) {
+        lv_label_set_text(lbl_autonomy, "Autonomy:    EXTERNAL USB");
+    } else if (telem->battery_state == H1OS_BATTERY_CHARGING) {
         lv_label_set_text(lbl_autonomy, "Autonomy:    CHARGING");
+    } else if (telem->autonomy.autonomy_days < 0.0f) {
+        lv_label_set_text(lbl_autonomy, "Autonomy:    ~CALIBRATING...");
     } else {
-        float sched_ma = battery_estimate_schedule_current_ma(telem->flow_a_period_sec, telem->flow_b_period_sec);
-        float avg_ma   = sched_ma;
-        uint32_t elapsed_sec = telem->sample_count * ((telem->flow_a_period_sec > 0) ? telem->flow_a_period_sec : 60);
-        if (elapsed_sec >= 3600 && telem->boot_vbat_mv > (telem->battery_mv + 15)) {
-            float emp_ma = battery_estimate_avg_current_ma(500, telem->boot_vbat_mv, telem->battery_mv, elapsed_sec);
-            if (emp_ma > 0.02f && emp_ma < 50.0f) {
-                avg_ma = (0.60f * emp_ma) + (0.40f * sched_ma);
-            }
-        }
-        float days = battery_estimate_remaining_days(500, telem->battery_mv, avg_ma);
-        lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days", (double)days);
+        lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days",
+                              (double)telem->autonomy.autonomy_days);
     }
     lv_obj_set_style_text_font(lbl_autonomy, H1OS_FONT_14, 0);
     lv_obj_align(lbl_autonomy, LV_ALIGN_TOP_LEFT, 6, 52);

@@ -12,6 +12,7 @@
 #include "esp_sleep.h"
 #include "esp_system.h"
 #include "hal_types.h"
+#include "sub_power.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -155,6 +156,8 @@ typedef struct {
     uint16_t boot_vbat_mv;           /**< Initial non-USB battery voltage captured on boot in millivolts.    */
     uint8_t battery_percent;         /**< Estimated battery state-of-charge percentage (0..100%).            */
     bool is_usb_powered;             /**< True if USB VBUS power connection is actively detected.            */
+    h1os_battery_state_t battery_state; /**< Charge / discharge / charged operational state.                 */
+    h1os_autonomy_metrics_t autonomy;   /**< Level 1 & Level 2 empirical autonomy metrics.                   */
 } h1os_telemetry_t;
 
 /**
