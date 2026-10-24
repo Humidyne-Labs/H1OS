@@ -27,6 +27,12 @@
 *.gitignore
 *.clang-format
 *.graphifyignore
+*.cmake
+*.ci
+*.dev
+*.prod
+*.defaults
+*.doclingignore
 
 # ---| Doxygen and License Files |---
 Doxyfile
