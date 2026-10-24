@@ -34,6 +34,9 @@
 *.defaults
 *.doclingignore
 
+# ---| Large Files |---
+CHANGELOG.md
+
 # ---| Doxygen and License Files |---
 Doxyfile
 LICENSE*
