@@ -1307,6 +1307,48 @@ Defined in sub_audio.c:42
 
 ---
 
+{#s_es8311_init_pre_charge_size}
+
+### S_ES8311_INIT_PRE_CHARGE_SIZE
+
+```cpp
+#define S_ES8311_INIT_PRE_CHARGE_SIZE (sizeof(s_es8311_init_pre_charge)  / sizeof(s_es8311_init_pre_charge[0]) )
+```
+
+Defined in sub_audio.c:241
+
+Pre Charge Table Size Macro.
+
+---
+
+{#s_es8311_init_post_charge_size}
+
+### S_ES8311_INIT_POST_CHARGE_SIZE
+
+```cpp
+#define S_ES8311_INIT_POST_CHARGE_SIZE (sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]))
+```
+
+Defined in sub_audio.c:242
+
+Post Charge Table Size Macro.
+
+---
+
+{#s_es8311_deinit_size}
+
+### S_ES8311_DEINIT_SIZE
+
+```cpp
+#define S_ES8311_DEINIT_SIZE (sizeof(s_es8311_deinit)           / sizeof(s_es8311_deinit[0])          )
+```
+
+Defined in sub_audio.c:243
+
+Deinit Table Size Macro.
+
+---
+
 {#lipo_table_size}
 
 ### LIPO_TABLE_SIZE
@@ -1546,7 +1588,7 @@ Minor version number (backward-compatible features).
 ### H1OS_VERSION_PATCH
 
 ```cpp
-#define H1OS_VERSION_PATCH 2
+#define H1OS_VERSION_PATCH 3
 ```
 
 Defined in h1os/h1os_version.h:19
@@ -1574,7 +1616,7 @@ Pre-release release track tag.
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.3.2-dev"
+#define H1OS_VERSION_STRING "2.3.3-dev"
 ```
 
 Defined in h1os/h1os_version.h:21
@@ -3288,7 +3330,7 @@ ESP_OK on success.
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in hal_io.c:435
+Defined in hal_io.c:449
 
 Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
 
@@ -3305,7 +3347,7 @@ ESP_OK on success.
 bool hal_check_usb_ll(void)
 ```
 
-Defined in hal_io.c:461
+Defined in hal_io.c:482
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
 
@@ -4816,7 +4858,7 @@ ESP_OK on success, or an error code.
 static esp_err_t pcf85063_write_reg_u8(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_rtc.c:119
+Defined in sub_rtc.c:121
 
 Pcf85063 write reg u8.
 
@@ -4840,7 +4882,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_rtc_init(void)
 ```
 
-Defined in sub_rtc.c:131
+Defined in sub_rtc.c:133
 
 Initialize PCF85063A RTC.
 
@@ -4868,7 +4910,7 @@ ESP_OK on success, or I2C communication error.
 esp_err_t sub_rtc_get_time(struct tm * out_time)
 ```
 
-Defined in sub_rtc.c:174
+Defined in sub_rtc.c:183
 
 Read current date and time into POSIX struct tm.
 
@@ -4894,7 +4936,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_rtc_set_time(const struct tm * time)
 ```
 
-Defined in sub_rtc.c:205
+Defined in sub_rtc.c:214
 
 Set RTC calendar date and time.
 
@@ -4920,7 +4962,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 ```
 
-Defined in sub_rtc.c:242
+Defined in sub_rtc.c:251
 
 Arm hardware countdown timer.
 
@@ -4950,7 +4992,7 @@ ESP_OK on success, or error code.
 esp_err_t sub_rtc_cancel_countdown(void)
 ```
 
-Defined in sub_rtc.c:313
+Defined in sub_rtc.c:322
 
 Cancel and disarm hardware countdown timer.
 
@@ -4967,7 +5009,7 @@ ESP_OK on success.
 esp_err_t sub_rtc_get_remaining_seconds(uint32_t * out_sec)
 ```
 
-Defined in sub_rtc.c:332
+Defined in sub_rtc.c:341
 
 Read remaining seconds on the active countdown timer.
 
@@ -4997,7 +5039,7 @@ ESP_OK on success, or error code.
 esp_err_t sub_rtc_get_and_clear_interrupts(bool * out_alarm, bool * out_timer)
 ```
 
-Defined in sub_rtc.c:372
+Defined in sub_rtc.c:381
 
 Inspect and acknowledge RTC interrupt flags.
 
@@ -6897,7 +6939,7 @@ True if radio/CPU self-heating is actively decaying.
 `static`
 
 ```cpp
-static void orch_flow_dump_ring_debug(const orch_persisted_state_t * st)
+static void orch_flow_dump_ring_debug(const volatile orch_persisted_state_t * st)
 ```
 
 Defined in orch_flow.c:125
@@ -6911,7 +6953,7 @@ Return value of type static void.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `st` | const [`orch_persisted_state_t`](#orch_persisted_state_t) * | Parameter st. |
+| `st` | const volatile [`orch_persisted_state_t`](#orch_persisted_state_t) * | Parameter st. |
 
 ---
 
@@ -6922,7 +6964,7 @@ Return value of type static void.
 `static`
 
 ```cpp
-static void orch_flow_scan_ring_metrics(orch_persisted_state_t * st)
+static void orch_flow_scan_ring_metrics(volatile orch_persisted_state_t * st)
 ```
 
 Defined in orch_flow.c:161
@@ -6936,7 +6978,7 @@ Return value of type static void.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `st` | [`orch_persisted_state_t`](#orch_persisted_state_t) * | Parameter st. |
+| `st` | volatile [`orch_persisted_state_t`](#orch_persisted_state_t) * | Parameter st. |
 
 ---
 
@@ -7121,7 +7163,7 @@ Actual vapor pressure in hectopascals (hPa).
 float orch_math_calc_dew_point(float temp_c, float rh_pct)
 ```
 
-Defined in orch_math.c:61
+Defined in orch_math.c:66
 
 Calculate true dew point (T_dew) in Celsius from temperature and relative humidity.
 
@@ -7152,7 +7194,7 @@ Dew point in degrees Celsius.
 void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float * out_vp_hpa, float * out_dew_c)
 ```
 
-Defined in orch_math.c:82
+Defined in orch_math.c:90
 
 Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibrated SHTC3 readings.
 
@@ -7179,7 +7221,7 @@ Calculate vapor pressure (e) and dew point (T_dew) directly from factory-calibra
 float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_c)
 ```
 
-Defined in orch_math.c:103
+Defined in orch_math.c:111
 
 Calculate absolute humidity (vapor density) in grams per cubic meter (g/m³).
 
@@ -7212,7 +7254,7 @@ Absolute humidity in g/m³.
 float orch_math_update_ewma(float current_sample, float previous_ewma, float alpha)
 ```
 
-Defined in orch_math.c:122
+Defined in orch_math.c:132
 
 Update continuous recursive EWMA filter.
 
@@ -7246,7 +7288,7 @@ Updated EWMA value.
 bool RTC_IRAM_ATTR orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c, int16_t gate_threshold_centi_c)
 ```
 
-Defined in orch_math.c:142
+Defined in orch_math.c:156
 
 Evaluates whether sensor package has settled to thermal plateau (|initial - current| <= gate_threshold).
 
@@ -7282,7 +7324,7 @@ True if |initial - current| <= gate_threshold.
 static inline void audio_cpu_max_acquire(void)
 ```
 
-Defined in sub_audio.c:99
+Defined in sub_audio.c:103
 
 Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 
@@ -7298,7 +7340,7 @@ Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 static inline void audio_cpu_max_release(void)
 ```
 
-Defined in sub_audio.c:114
+Defined in sub_audio.c:118
 
 Release 240 MHz CPU frequency lock.
 
@@ -7314,7 +7356,7 @@ Release 240 MHz CPU frequency lock.
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 ```
 
-Defined in sub_audio.c:243
+Defined in sub_audio.c:252
 
 Volume pct to es8311 reg.
 
@@ -7339,7 +7381,7 @@ Return value of type static inline uint8_t.
 static void audio_worker_task(void * pvParameters)
 ```
 
-Defined in sub_audio.c:821
+Defined in sub_audio.c:847
 
 Audio worker task.
 
@@ -7364,7 +7406,7 @@ Return value of type static void.
 static esp_err_t sub_audio_park_warm(bool enable)
 ```
 
-Defined in sub_audio.c:550
+Defined in sub_audio.c:575
 
 Control NS4168 Class-D amplifier hardware mute state (HAL_PIN_PA_CTRL / GPIO 46).
 
@@ -7385,7 +7427,7 @@ ESP_OK on success.
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_audio.c:260
+Defined in sub_audio.c:269
 
 Es8311 write reg.
 
@@ -7411,7 +7453,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t * val)
 ```
 
-Defined in sub_audio.c:274
+Defined in sub_audio.c:283
 
 Es8311 read reg.
 
@@ -7437,7 +7479,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_read_chip_id(uint16_t * chip_id)
 ```
 
-Defined in sub_audio.c:286
+Defined in sub_audio.c:295
 
 Sub audio read chip id.
 
@@ -7459,10 +7501,10 @@ ESP_OK on success, or an error code.
 `static`
 
 ```cpp
-static esp_err_t sub_audio_flush_frame(void)
+static esp_err_t __unused sub_audio_flush_frame(void)
 ```
 
-Defined in sub_audio.c:310
+Defined in sub_audio.c:320
 
 Sub audio flush frame (single zero-frame write serving as valid I2S transfer pipeline indicator).
 
@@ -7479,7 +7521,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:334
+Defined in sub_audio.c:344
 
 Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
 
@@ -7509,7 +7551,7 @@ ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
 bool sub_audio_is_ready(void)
 ```
 
-Defined in sub_audio.c:364
+Defined in sub_audio.c:374
 
 Quick status check of whether ES8311 codec is ready.
 
@@ -7535,7 +7577,7 @@ True if audio worker is operational, false otherwise.
 static esp_err_t es8311_write_table(const es8311_reg_entry_t * table, size_t count)
 ```
 
-Defined in sub_audio.c:377
+Defined in sub_audio.c:387
 
 Es8311 write table.
 
@@ -7561,7 +7603,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_init_dac_registers(void)
 ```
 
-Defined in sub_audio.c:391
+Defined in sub_audio.c:401
 
 Initialize es8311_init_dac_registers module resources.
 
@@ -7578,7 +7620,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_init(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:417
+Defined in sub_audio.c:425
 
 Initialize ES8311 codec and NS4168 amplifier.
 
@@ -7612,7 +7654,7 @@ ESP_OK on success, or driver error code.
 esp_err_t sub_audio_standby(void)
 ```
 
-Defined in sub_audio.c:575
+Defined in sub_audio.c:602
 
 Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
 
@@ -7642,7 +7684,7 @@ ESP_OK on success.
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:607
+Defined in sub_audio.c:633
 
 Sub audio render tone samples.
 
@@ -7668,7 +7710,7 @@ Return value of type static void.
 static void sub_audio_render_pcm_samples(const int16_t * samples, size_t sample_count)
 ```
 
-Defined in sub_audio.c:658
+Defined in sub_audio.c:684
 
 Sub audio render pcm samples.
 
@@ -7694,7 +7736,7 @@ Return value of type static void.
 static esp_err_t sub_audio_prepare_and_unmute(void)
 ```
 
-Defined in sub_audio.c:686
+Defined in sub_audio.c:712
 
 Sub audio prepare and unmute.
 
@@ -7713,7 +7755,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:724
+Defined in sub_audio.c:750
 
 Sub audio exec tone.
 
@@ -7739,7 +7781,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:745
+Defined in sub_audio.c:771
 
 Sub audio exec pcm.
 
@@ -7766,7 +7808,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:763
+Defined in sub_audio.c:789
 
 Sub audio exec chime.
 
@@ -7791,7 +7833,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_send_command(const audio_cmd_t * cmd, bool is_sync, uint32_t wait_ms)
 ```
 
-Defined in sub_audio.c:880
+Defined in sub_audio.c:902
 
 Sub audio send command.
 
@@ -7816,7 +7858,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_play(sub_audio_type_t type, const void * data, size_t len)
 ```
 
-Defined in sub_audio.c:929
+Defined in sub_audio.c:953
 
 Unified asynchronous audio playback dispatcher.
 
@@ -7850,7 +7892,7 @@ ESP_OK if command was queued to worker, or error code.
 bool sub_audio_is_busy(void)
 ```
 
-Defined in sub_audio.c:974
+Defined in sub_audio.c:998
 
 Check if audio playback is currently active or queue has pending items.
 
@@ -7874,7 +7916,7 @@ True if amplifier is active and audio samples are playing.
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:992
+Defined in sub_audio.c:1016
 
 Wait until background audio worker completes all playback and enters standby.
 
@@ -7904,7 +7946,7 @@ ESP_OK when playback is idle, ESP_ERR_TIMEOUT on expiration.
 esp_err_t sub_audio_deinit(void)
 ```
 
-Defined in sub_audio.c:1007
+Defined in sub_audio.c:1031
 
 Teardown audio subsystem, stop background worker task, and delete I2S channel.
 
@@ -7928,7 +7970,7 @@ ESP_OK on success.
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:1050
+Defined in sub_audio.c:1074
 
 Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
 
@@ -7960,7 +8002,7 @@ ESP_OK on success.
 uint8_t sub_audio_get_volume(void)
 ```
 
-Defined in sub_audio.c:1068
+Defined in sub_audio.c:1092
 
 Get currently configured output volume percentage (0 - 100).
 
@@ -7984,7 +8026,7 @@ Current volume level (0..100%).
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 ```
 
-Defined in sub_audio.c:1082
+Defined in sub_audio.c:1106
 
 Configure ES8311 DAC power mode (Low-Power vs Normal).
 
@@ -8016,7 +8058,7 @@ ESP_OK on success.
 bool sub_audio_get_low_power_mode(void)
 ```
 
-Defined in sub_audio.c:1096
+Defined in sub_audio.c:1120
 
 Query whether audio subsystem is in Low-Power Mode.
 
@@ -8448,7 +8490,7 @@ ESP_OK on success.
 ### orch_state_get
 
 ```cpp
-orch_persisted_state_t * orch_state_get(void)
+volatile orch_persisted_state_t * orch_state_get(void)
 ```
 
 Defined in h1os/orch_state.h:114
@@ -8729,7 +8771,7 @@ ESP_OK on success, or an error code.
 ### orch_state_get
 
 ```cpp
-orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
+volatile orch_persisted_state_t *RTC_IRAM_ATTR orch_state_get(void)
 ```
 
 Defined in orch_state.c:18
@@ -9699,7 +9741,7 @@ Defined in h1os/h1os_version.h:85
 Get complete version string.
 
 #### Returns
-Full version string (e.g. "2.3.2-dev").
+Full version string (e.g. "2.3.3-dev").
 
 ---
 
@@ -10332,7 +10374,7 @@ Return value of type static void.
 static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os_lifecycle.c:249
+Defined in h1os_lifecycle.c:254
 
 H1os early system bringup.
 
@@ -10357,7 +10399,7 @@ Return value of type static [orch_flow_type_t](#orch_flow_type_t).
 static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 ```
 
-Defined in h1os_lifecycle.c:303
+Defined in h1os_lifecycle.c:308
 
 H1os handle non ui flows.
 
@@ -10382,7 +10424,7 @@ True on success, false otherwise.
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 ```
 
-Defined in h1os_lifecycle.c:330
+Defined in h1os_lifecycle.c:335
 
 H1os launch interactive session.
 
@@ -10405,7 +10447,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os_lifecycle.c:439
+Defined in h1os_lifecycle.c:444
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -10436,7 +10478,7 @@ Configures hardware subsystems, determines boot/wake flow, initializes FreeRTOS 
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os_lifecycle.c:461
+Defined in h1os_lifecycle.c:466
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -10466,7 +10508,7 @@ Copies the latest validated psychrometric invariants, sensor readings, and batte
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:529
+Defined in h1os_lifecycle.c:534
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -10498,7 +10540,7 @@ Arms the PCF85063A countdown timer, isolates GPIO sleep pads, holds power latch,
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:555
+Defined in h1os_lifecycle.c:560
 
 Execute system shutdown.
 
@@ -10521,7 +10563,7 @@ Return value of type static void.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:604
+Defined in h1os_lifecycle.c:609
 
 Orderly system shutdown and physical battery power cut.
 
@@ -10537,7 +10579,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:618
+Defined in h1os_lifecycle.c:623
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -10559,7 +10601,7 @@ Performs pure white full OTP refresh on electrophoretic display before cutting p
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:630
+Defined in h1os_lifecycle.c:635
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -10977,15 +11019,15 @@ Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
 `static`
 
 ```cpp
-static void RTC_IRAM_ATTR shtc3_send_sleep(void)
+static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 ```
 
 Defined in orch_wake_stub.c:347
 
-Shtc3 send sleep.
+Reliable SHTC3 sleep dispatch with ACK verification.
 
 #### Returns
-Return value of type static void RTC_IRAM_ATTR.
+Return value of sleep command wright status.
 
 ---
 
@@ -10997,7 +11039,7 @@ Return value of type static void RTC_IRAM_ATTR.
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 ```
 
-Defined in orch_wake_stub.c:364
+Defined in orch_wake_stub.c:371
 
 Master RTC Wake Stub entry function.
 
@@ -11022,7 +11064,7 @@ Executes fast sub-3ms Flow A sensor bursts using bitbanged I2C without booting t
 void orch_wake_stub_install(void)
 ```
 
-Defined in orch_wake_stub.c:528
+Defined in orch_wake_stub.c:535
 
 Install the RTC deep sleep wake stub.
 
@@ -12048,6 +12090,48 @@ Defined in sub_audio.c:90
 
 ---
 
+{#s_cmd_sync_sem_buffer}
+
+### s_cmd_sync_sem_buffer
+
+`static`
+
+```cpp
+StaticSemaphore_t s_cmd_sync_sem_buffer
+```
+
+Defined in sub_audio.c:92
+
+---
+
+{#s_cmd_sync_sem}
+
+### s_cmd_sync_sem
+
+`static`
+
+```cpp
+SemaphoreHandle_t s_cmd_sync_sem = NULL
+```
+
+Defined in sub_audio.c:93
+
+---
+
+{#s_audio_work_buffer}
+
+### s_audio_work_buffer
+
+`static`
+
+```cpp
+int16_t s_audio_work_buffer[0x100]
+```
+
+Defined in sub_audio.c:94
+
+---
+
 {#es8311_perceptual_vol_table}
 
 ### es8311_perceptual_vol_table
@@ -12058,7 +12142,7 @@ Defined in sub_audio.c:90
 const uint8_t es8311_perceptual_vol_table[101]
 ```
 
-Defined in sub_audio.c:123
+Defined in sub_audio.c:127
 
 ---
 
@@ -12072,7 +12156,7 @@ Defined in sub_audio.c:123
 const es8311_reg_entry_t s_es8311_init_pre_charge[]
 ```
 
-Defined in sub_audio.c:148
+Defined in sub_audio.c:152
 
 ---
 
@@ -12086,7 +12170,7 @@ Defined in sub_audio.c:148
 const es8311_reg_entry_t s_es8311_init_post_charge[]
 ```
 
-Defined in sub_audio.c:192
+Defined in sub_audio.c:196
 
 ---
 
@@ -12100,7 +12184,7 @@ Defined in sub_audio.c:192
 const es8311_reg_entry_t s_es8311_deinit[]
 ```
 
-Defined in sub_audio.c:214
+Defined in sub_audio.c:218
 
 ---
 
@@ -12237,10 +12321,10 @@ Defined in sub_power.c:63
 `static`
 
 ```cpp
-RTC_NOINIT_ATTR orch_persisted_state_t s_persisted_state
+RTC_NOINIT_ATTR volatile orch_persisted_state_t s_persisted_state
 ```
 
-Type: RTC_NOINIT_ATTR [`orch_persisted_state_t`](#orch_persisted_state_t)
+Type: RTC_NOINIT_ATTR volatile [`orch_persisted_state_t`](#orch_persisted_state_t)
 
 Defined in orch_state.c:16
 
