@@ -28,7 +28,7 @@ While H1OS implements software mitigations across Layers 1–3, these defects in
 | **E8** | SSD1681 E-Paper Display | Shared `MOSI/SDA` line for glass thermistor read `0x1B` | Dedicated `MISO` trace or discrete bezel thermistor |
 | **E9** | Slow Clock Domain | Missing 32.768 kHz crystal; pins 15/16 multiplexed to I2S | Dedicated 32.768 kHz crystal on XTAL32K pads (route I2S elsewhere) |
 | **E10** | USB VBUS / Charger Detection | Missing dedicated VBUS/VUSB voltage monitor pin | Resistor divider from 5V VBUS to RTC GPIO for hardware USB detect |
-| **E11** | Battery Charger (ME4057/TP4056) | Missing charge status indicator (CHRG/STDBY) routed to readable MCU IO | Route charger `/CHRG` and `/STDBY` open-drain pins with 10kΩ pull-ups to RTC GPIOs |
+| **E11** | 5-Pin LiPo Charger (STAT & ISET) | STAT pin only wired to LED (not MCU IO); ISET fixed with static resistor | Route STAT to RTC GPIO with pull-up; connect ISET to I2C digipot for programmable charge rates |
 
 ---
 
@@ -317,19 +317,20 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 development board routes external 5V powe
 
 ---
 
-### Errata E11: Missing Charger Hardware Status Output Lines (CHRG / STDBY)
+### Errata E11: 5-Pin LiPo Charger Architecture: Unrouted STAT Output & Fixed ISET Current Programming
 
 #### 1. Physical Defect Analysis
-The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a standalone linear Li-Ion battery management controller (ME4057 / TP4056 or pin-compatible IC). The controller provides two open-drain status pins:
-- **`Pin 1` (`/CHRG`):** Open-drain active-low output pulled low when battery is actively being charged in constant-current or constant-voltage modes.
-- **`Pin 5` (`/STDBY` / `/DONE`):** Open-drain active-low output pulled low when battery charging is complete (trickle charge / standby termination).
-
-On the Waveshare v2 PCB, these status pins are **wired strictly to surface-mount LEDs** (Red/Blue or Red/Green) with current-limiting series resistors to $V_{\text{BUS}}$. **Neither status pin is routed to any ESP32-S3 GPIO**.
+The Waveshare ESP32-S3 ePaper 1.54" V2 development board incorporates a compact SOT-23-5 single-cell Li-Ion linear charger controller (e.g. MCP73831, ME4054, TP4054, or pin-compatible clone). In this 5-pin architecture (`VDD`, `VBAT`, `VSS`, `STAT`, and `ISET`/`PROG`), exactly two functional control pins exist:
+- **`STAT` (Status Output):** Open-drain / tri-state indicator output (LOW = Charging active, High-Z = Charge termination standby or no input power). On the PCB, this pin is **wired strictly to a surface-mount LED** with a series resistor to $V_{\text{BUS}}$, with zero trace routing to any ESP32-S3 GPIO.
+- **`ISET` / `PROG` (Charge Current Setting):** Program pin where charge current is inversely proportional to resistance to ground ($I_{\text{CHG}} \approx \frac{1000\text{V}}{R_{\text{ISET}}}$). On the PCB, this is tied to a static, unswitched surface-mount resistor to ground, locking the device into an immutable, hardwired charge current rate (nominally ~200 mA - 400 mA).
 
 #### 2. Metrological & Firmware Impact
-1. **Zero Direct Knowledge of Charge State:** Firmware has no digital feedback regarding whether the battery is actively receiving charge, fully saturated, disconnected, or faulted.
+1. **Zero Direct Knowledge of Charge State:** Firmware has no digital feedback regarding whether the battery is actively receiving constant-current charge, sitting at float cutoff, or unpowered.
 2. **Ambiguity on Wall Chargers:** Combined with Erratum **E10** (missing VBUS divider), the MCU is completely blind to charging events on non-data USB power bricks. Even when connected to 5V power, firmware cannot distinguish between active 400 mA constant-current charging and 0 mA standby float without continuously monitoring consecutive millivolt trends.
-3. **Loss of Charger Fault Visibility:** Hardware charger failure modes (thermal regulation foldback, input undervoltage lockout, dead-cell trickle timeout) cannot be sensed or presented to the user.
+3. **Zero Software Charge Current Control:** Because `ISET` is hardwired to a static resistor rather than a programmable element (such as a digital potentiometer or MCU-gated dual-resistor network), firmware cannot:
+   - Throttle charge current during high ambient temperature events (preventing cell self-heating and thermal degradation).
+   - Comply with USB 2.0 unconfigured 100 mA host power limits versus 500 mA high-power ports.
+   - Execute gentle low-current pre-conditioning for deeply discharged or cold battery cells.
 
 #### 3. Current H1OS Firmware Mitigations
 - In `sub_power.c`, H1OS infers operational state through a two-sample comparator on the 8-entry circular ring buffer `ulp_vbat_ring[8]`:
@@ -342,9 +343,10 @@ On the Waveshare v2 PCB, these status pins are **wired strictly to surface-mount
     - Else $\implies$ `H1OS_BATTERY_DISCHARGING`.
 
 #### 4. Rev B Hardware Redesign Recommendations
-- **Route `/CHRG` and `/STDBY` to RTC GPIOs:** Connect ME4057 `Pin 1` (`/CHRG`) and `Pin 5` (`/STDBY`) through $10\text{ k}\Omega$ pull-up resistors to the $V_{\text{DD\_3V3}}$ rail, routing directly to available RTC GPIO pins (e.g., `GPIO 1` and `GPIO 2`, or `GPIO 7` and `GPIO 8`).
-- **Zero-Latency State Detection:** Allows both the dual-core Xtensa CPU and the ULP-RISC-V coprocessor to read exact charger hardware states in $<1\ \mu\text{s}$ via single-cycle register bit reads (`REG_READ(RTC_GPIO_IN_REG)`), completely eliminating heuristic $\Delta V$ rate-of-rise algorithms.
-- **Hardware Interrupt on Charge Complete:** Enables falling-edge interrupts on the `/STDBY` line to wake the PMU and update UI status immediately when charge termination occurs.
+- **Route `STAT` to RTC GPIO:** Route the charger `STAT` pin through a $10\text{ k}\Omega$ pull-up resistor to the $V_{\text{DD\_3V3}}$ rail directly into an available RTC GPIO (e.g. `GPIO 1` or `GPIO 2`). This gives both the dual-core Xtensa CPU and the ULP-RISC-V coprocessor instantaneous single-cycle digital readback of charging status and enables falling-edge interrupts on charge completion.
+- **Connect `ISET` to Digital Potentiometer:** Wire `ISET` to an I2C-controlled digital potentiometer (e.g., Microchip MCP4017 / Analog Devices AD5245) or an MCU-switched dual-resistor network:
+  - **Trickle / USB 100 mA Mode:** Select higher resistance ($R_{\text{ISET}} \approx 10\text{ k}\Omega \implies 100\text{ mA}$) for low-power host ports or thermal foldback during warm ambient conditions.
+  - **Fast Charge Mode:** Select lower resistance ($R_{\text{ISET}} \approx 2.5\text{ k}\Omega \implies 400\text{ mA}$) for rapid charging on dedicated AC wall adapters when thermals are cool.
 
 ---
 
@@ -361,7 +363,8 @@ On the Waveshare v2 PCB, these status pins are **wired strictly to surface-mount
 | **ESD Suppressors** | STMicroelectronics USBLC6-2 | `D_ESD1`, `D_ESD2` | Button & MicroSD ESD protection |
 | **Slot Milling** | 2.0 mm PCB Routing Path | `MECHANICAL` | SHTC3 cantilevered thermal isolation tab |
 | **VBUS Divider** | 300 kΩ / 200 kΩ 0402 1% Resistors | `R_VBUS1`, `R_VBUS2` | 5V VBUS monitor divider to RTC GPIO |
-| **Charger Status Pull-ups** | 10 kΩ 0402 1% Resistors | `R_CHRG1`, `R_CHRG2` | Pull-ups on `/CHRG` and `/STDBY` routed to RTC GPIOs |
+| **STAT Pull-up** | 10 kΩ 0402 1% Resistor | `R_STAT` | Pull-up on charger `STAT` pin routed to RTC GPIO |
+| **ISET Digipot** | Microchip MCP4017 (I2C) | `U_ISET_POT` | Software-programmable dynamic battery charge rate control |
 
 ---
 
