@@ -196,7 +196,7 @@ static void debug_dump_ulp_telemetry(void)
  */
 static void h1os_log_flow_banner(orch_flow_type_t flow)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     const char *flow_title = "UNKNOWN FLOW";
     const char *trigger_desc = "None";
 
@@ -226,6 +226,11 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
     case ORCH_FLOW_BOOTLOADER_JUMP:
         flow_title = "[ROM BOOTLOADER JUMP MODE]";
         trigger_desc = "BOOT Button Long-Press (>= 3.0s)";
+        break;
+    default:
+        flow_title = "[UNKNOWN / CORRUPTED FLOW STATE]";
+        trigger_desc = "Invalid Flow Enum Trapped";
+        ESP_LOGE(TAG, "Unhandled or corrupted lifecycle flow detected: %d", (int)flow);
         break;
     }
 
@@ -265,7 +270,7 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
 
     orch_flow_type_t flow = orch_flow_determine_wakeup();
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     if (s_app_lifecycle.session.flow_a_period_sec > 0) {
         st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
     }
@@ -377,7 +382,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         h1os_reset_session_timer();
     }
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
@@ -466,7 +471,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
     float t = 0.0f, rh = 0.0f, dew = 0.0f;
     esp_err_t ret = orch_flow_query_telemetry(&t, &rh, &dew);
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     if (ret == ESP_OK) {
         out_telemetry->ambient_temp_c       = t;

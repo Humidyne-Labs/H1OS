@@ -18,36 +18,36 @@
 
 static const char *TAG = "sub_rtc";
 
-#define RTC_REG_CONTROL_1 0x00
-#define RTC_REG_CONTROL_2 0x01
-#define RTC_REG_OFFSET 0x02
-#define RTC_REG_RAM_BYTE 0x03
-#define RTC_REG_SECONDS 0x04
-#define RTC_REG_MINUTES 0x05
-#define RTC_REG_HOURS 0x06
-#define RTC_REG_DAYS 0x07
-#define RTC_REG_WEEKDAYS 0x08
-#define RTC_REG_MONTHS 0x09
-#define RTC_REG_YEARS 0x0A
-#define RTC_REG_ALARM_SEC 0x0B
+#define RTC_REG_CONTROL_1   0x00
+#define RTC_REG_CONTROL_2   0x01
+#define RTC_REG_OFFSET      0x02
+#define RTC_REG_RAM_BYTE    0x03
+#define RTC_REG_SECONDS     0x04
+#define RTC_REG_MINUTES     0x05
+#define RTC_REG_HOURS       0x06
+#define RTC_REG_DAYS        0x07
+#define RTC_REG_WEEKDAYS    0x08
+#define RTC_REG_MONTHS      0x09
+#define RTC_REG_YEARS       0x0A
+#define RTC_REG_ALARM_SEC   0x0B
 #define RTC_REG_TIMER_VALUE 0x10
-#define RTC_REG_TIMER_MODE 0x11
+#define RTC_REG_TIMER_MODE  0x11
 
-#define CTRL1_STOP_MASK (1 << 5)
-#define CTRL1_12_24_MASK (1 << 1)
+#define CTRL1_STOP_MASK      (1 << 5)
+#define CTRL1_12_24_MASK     (1 << 1)
 #define CTRL1_CAP_SEL_12_5PF (1 << 0)
-#define CTRL1_SW_RESET_CMD 0x58
+#define CTRL1_SW_RESET_CMD    0x58
 
-#define CTRL2_AF_MASK (1 << 6)
-#define CTRL2_TF_MASK (1 << 3)
+#define CTRL2_AF_MASK  (1 << 6)
+#define CTRL2_TF_MASK  (1 << 3)
 #define CTRL2_AIE_MASK (1 << 7)
-#define CTRL2_COF_OFF 0x07
+#define CTRL2_COF_OFF   0x07
 
-#define TIMER_CLK_4096_HZ (0 << 3)
-#define TIMER_CLK_64_HZ (1 << 3)
-#define TIMER_CLK_1_HZ (2 << 3)
-#define TIMER_CLK_1_60_HZ (3 << 3)
-#define TIMER_ENABLE_BIT (1 << 2)
+#define TIMER_CLK_4096_HZ    (0 << 3)
+#define TIMER_CLK_64_HZ      (1 << 3)
+#define TIMER_CLK_1_HZ       (2 << 3)
+#define TIMER_CLK_1_60_HZ    (3 << 3)
+#define TIMER_ENABLE_BIT     (1 << 2)
 #define TIMER_INT_ENABLE_BIT (1 << 1)
 #define TIMER_PULSE_MODE_BIT (1 << 0)
 
@@ -101,8 +101,10 @@ static esp_err_t pcf85063_read_reg(uint8_t reg, uint8_t *val, size_t len)
 static esp_err_t pcf85063_write_reg(uint8_t reg, const uint8_t *val, size_t len)
 {
     uint8_t buf[16];
-    if (len + 1 > sizeof(buf))
+    if (len + 1 > sizeof(buf)) {
         return ESP_ERR_INVALID_SIZE;
+    }
+
     buf[0] = reg;
     memcpy(&buf[1], val, len);
     return hal_i2c_write(HAL_I2C_ADDR_PCF85063, buf, len + 1, pdMS_TO_TICKS(50));
@@ -130,6 +132,13 @@ static esp_err_t pcf85063_write_reg_u8(uint8_t reg, uint8_t val)
  */
 esp_err_t sub_rtc_init(void)
 {
+    /* Probe Bus for Device */
+    esp_err_t err0 = hal_i2c_probe(HAL_I2C_ADDR_PCF85063);
+    if (err0 != ESP_OK) {
+        ESP_LOGE(TAG, "Device Not Found: %s", esp_err_to_name(err0));
+        return ESP_ERR_NOT_FOUND;
+    }
+
     uint8_t ctrl1 = 0;
     esp_err_t err = pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1);
     if (err == ESP_OK) {

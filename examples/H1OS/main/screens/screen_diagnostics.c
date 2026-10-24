@@ -68,7 +68,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     h1os_lvgl_lock(100);
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "4/4", event_cb);
 
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     lv_obj_t *lbl_rst = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_rst, "Reset:  %s", get_reset_reason_str(esp_reset_reason()));

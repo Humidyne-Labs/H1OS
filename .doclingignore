@@ -1,0 +1,16 @@
+# ===| 1,500+ Page Vendor Manuals |===
+esp32_s3_technical_reference_manual_en.pdf
+
+# ===| Mechanical CAD & Schematic Prints |===
+/docs/hardware_docs/mech/
+esp32_s3_touch_epaper_1.54_schematic.pdf
+ns4150b_english_translation.pdf
+
+# ===| Vendor Marketing & Non-Technical Overviews |===
+sensirion_at_a_glance.pdf
+sensirion_introduction_to_relative_humidity.pdf
+sensirion_specification_statement.pdf
+sensirion_ht_transition_guide_shtc3_sht4x_1.pdf
+
+# ===| Optional: Generic Bus Specs |===
+um10204.pdf

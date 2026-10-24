@@ -51,7 +51,7 @@ static const char *TAG = "orch_flow";
 orch_flow_type_t orch_flow_determine_wakeup(void)
 {
     uint32_t causes = esp_sleep_get_wakeup_causes();
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     if ((causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED)) || esp_reset_reason() != ESP_RST_DEEPSLEEP) {
         orch_state_reset();
@@ -72,7 +72,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> 17) & 1U;
         ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C, intercept: %d cC) | BL Hook GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
                         (unsigned long)st->boot_count,
-                        (double)st->tsens_cal_centi_c / 100.0,
+                        (double)((float)st->tsens_cal_centi_c / 100.0f),
                         (int)st->tsens_offset_centi_c,
                         (unsigned long)g17_out,
                         (unsigned long)g17_oe,
@@ -122,15 +122,15 @@ bool orch_flow_is_thermal_lockout(void)
  *
  * @return Return value of type static void.
  */
-static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
+static void orch_flow_dump_ring_debug(const volatile orch_persisted_state_t *st)
 {
     if (st == NULL)
         return;
 
-    float shtc3T_ring[ORCH_RING_CAPACITY];
-    float shtc3RH_ring[ORCH_RING_CAPACITY];
-    float mcuT_ring[ORCH_RING_CAPACITY];
-    float epdT_ring[ORCH_RING_CAPACITY];
+    static float shtc3T_ring[ORCH_RING_CAPACITY];
+    static float shtc3RH_ring[ORCH_RING_CAPACITY];
+    static float mcuT_ring[ORCH_RING_CAPACITY];
+    static float epdT_ring[ORCH_RING_CAPACITY];
 
     memset(shtc3T_ring, 0, sizeof(shtc3T_ring));
     memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
@@ -138,7 +138,7 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
     memset(epdT_ring, 0, sizeof(epdT_ring));
 
     ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
-    for (int i = 0; i < ORCH_RING_CAPACITY; i++) {
+    for (uint32_t i = 0; i < ORCH_RING_CAPACITY; i++) {
         shtc3T_ring[i]  = (float)st->ring[i].shtc3_temp_centi_c / 100.0f;
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
         mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
@@ -158,7 +158,7 @@ static void orch_flow_dump_ring_debug(const orch_persisted_state_t *st)
  *
  * @return Return value of type static void.
  */
-static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
+static void orch_flow_scan_ring_metrics(volatile orch_persisted_state_t *st)
 {
     uint32_t count        = (st->total_samples < ORCH_RING_CAPACITY) ? st->total_samples : ORCH_RING_CAPACITY;
     int16_t  current_low  = INT16_MAX;
@@ -215,7 +215,7 @@ static void orch_flow_scan_ring_metrics(orch_persisted_state_t *st)
  */
 esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float *out_dew_c)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     int16_t disp_glass = sub_display_get_glass_temp_centi_c();
     if (disp_glass != 0) {
@@ -224,7 +224,7 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
 
     if (st->total_samples == 0) {
         ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
-                        (double)st->last_glass_temp_centi_c / 100.0);
+                        (double)((float)st->last_glass_temp_centi_c / 100.0f));
         if (out_temp_c)
             *out_temp_c = 0.0f;
         if (out_rh_pct)
@@ -297,8 +297,8 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
                     (unsigned long)st->total_samples,
                     st->ring_head,
                     st->valid_trend,
-                    (double)latest_raw.shtc3_temp_centi_c / 100.0,
-                    (double)latest_raw.shtc3_rh_centi_pct / 100.0,
+                    (double)((float)latest_raw.shtc3_temp_centi_c / 100.0f),
+                    (double)((float)latest_raw.shtc3_rh_centi_pct / 100.0f),
                     (double)t_die,
                     latest_raw.quality_flags);
 
@@ -359,7 +359,7 @@ static void orch_flow_quiesce_peripherals(void)
  */
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     uint32_t flow_a_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60;
     uint32_t flow_b_sec = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : sleep_sec;
 

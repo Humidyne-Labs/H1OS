@@ -43,10 +43,15 @@ float orch_math_calc_vapor_pressure(float temp_c, float rh_pct)
 {
     float es = orch_math_calc_sat_vapor_pressure(temp_c);
     float rh_norm = rh_pct / 100.0f;
-    if (rh_norm < 0.0f)
+    
+    if (rh_norm < 0.0f) {
         rh_norm = 0.0f;
-    if (rh_norm > 1.0f)
+    }
+
+    if (rh_norm > 1.0f) {
         rh_norm = 1.0f;
+    }
+
     return rh_norm * es;
 }
 
@@ -61,10 +66,13 @@ float orch_math_calc_vapor_pressure(float temp_c, float rh_pct)
 float orch_math_calc_dew_point(float temp_c, float rh_pct)
 {
     float rh_norm = rh_pct / 100.0f;
-    if (rh_norm <= 0.0001f)
+    if (rh_norm <= 0.0001f) {
         rh_norm = 0.0001f;
-    if (rh_norm > 1.0f)
+    }
+
+    if (rh_norm > 1.0f) {
         rh_norm = 1.0f;
+    }
 
     float gamma = logf(rh_norm) + (MAGNUS_A * temp_c) / (MAGNUS_B + temp_c);
 
@@ -103,8 +111,10 @@ void orch_math_calc_psychrometrics(float temp_c, float rh_pct, float *out_vp_hpa
 float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_c)
 {
     float temp_k = 273.15f + amb_temp_c;
-    if (temp_k <= 0.1f)
+    if (temp_k <= 0.1f) {
         return 0.0f;
+    }
+
     return 216.7f * (vapor_pressure_hpa / temp_k);
 }
 
@@ -121,10 +131,14 @@ float orch_math_calc_absolute_humidity(float vapor_pressure_hpa, float amb_temp_
  */
 float orch_math_update_ewma(float current_sample, float previous_ewma, float alpha)
 {
-    if (alpha <= 0.0f)
+    if (alpha <= 0.0f) {
         return previous_ewma;
-    if (alpha >= 1.0f)
+    }
+
+    if (alpha >= 1.0f) {
         return current_sample;
+    }
+
     return (alpha * current_sample) + ((1.0f - alpha) * previous_ewma);
 }
 
@@ -140,11 +154,12 @@ float orch_math_update_ewma(float current_sample, float previous_ewma, float alp
  * @return True if |initial - current| <= gate_threshold.
  */
 bool RTC_IRAM_ATTR orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current_temp_centi_c,
-                                                int16_t gate_threshold_centi_c)
+                                                                              int16_t gate_threshold_centi_c)
 {
     int32_t diff = (int32_t)current_temp_centi_c - (int32_t)initial_temp_centi_c;
     if (diff < 0) {
         diff = -diff;
     }
+
     return (diff <= (int32_t)gate_threshold_centi_c);
 }

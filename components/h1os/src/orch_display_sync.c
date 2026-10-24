@@ -79,7 +79,7 @@ esp_err_t orch_display_sync_save_if_dirty(void)
 esp_err_t orch_display_sync_restore_to_framebuffer(void)
 {
     orch_display_sync_latch_glass_temp();
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     if (!(st->flags & ORCH_FLAG_EPD_FRAME_VALID)) {
         return ESP_ERR_NOT_FOUND;
     }
@@ -108,7 +108,7 @@ esp_err_t orch_display_sync_restore_to_framebuffer(void)
  */
 bool orch_display_sync_should_full_refresh(void)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
 
     if (st->epd_partial_refresh_count >= CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT) {
         ESP_LOGI(TAG, "Anti-ghosting quota reached (%u partial refreshes >= limit %d) -> Full refresh required",
@@ -127,7 +127,7 @@ bool orch_display_sync_should_full_refresh(void)
  */
 void orch_display_sync_record_partial_refresh(void)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count++;
     ESP_LOGD(TAG, "Recorded differential partial refresh #%u / %d",
                     (unsigned)st->epd_partial_refresh_count,
@@ -141,7 +141,7 @@ void orch_display_sync_record_partial_refresh(void)
  */
 void orch_display_sync_record_full_refresh(void)
 {
-    orch_persisted_state_t *st = orch_state_get();
+    volatile orch_persisted_state_t *st = orch_state_get();
     st->epd_partial_refresh_count = 0;
     ESP_LOGI(TAG, "Full OTP refresh recorded: anti-ghosting counter reset to 0");
 }

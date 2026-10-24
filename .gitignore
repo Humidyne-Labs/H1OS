@@ -1,17 +1,13 @@
 *.lock
-# Tracking .agents workspace skills and rules
-# /.agents/
+*.bak
+*.log
 build/
 build_*/
 sdkconfig
 sdkconfig.*
 !sdkconfig.defaults*
-*.bak
-# NOT Tracking Logs
-*.log
+compile_commands.json
 
-# Python artifacts
+# Python Artifacts
 __pycache__/
 *.py[cod]
-
-/h1os_backup_20261019_182851/

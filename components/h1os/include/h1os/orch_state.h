@@ -111,7 +111,7 @@ typedef struct {
  *
  * @return Pointer to persistent state block in RTC Slow Memory.
  */
-orch_persisted_state_t *orch_state_get(void);
+volatile orch_persisted_state_t *orch_state_get(void);
 
 /**
  * @brief Reset persisted state in RTC Slow Memory to clean factory defaults.
