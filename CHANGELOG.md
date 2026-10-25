@@ -4,10 +4,14 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.1-dev] - 2026-10-24
+## [2.4.1-dev] - 2026-10-25
 
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
+* **Repository Identity & Documentation Synchronization** (`idf_component.yml`, `README.md`, `docs/api.md`):
+  * Synchronized semantic version strings across all four core locations (`h1os_version.h`, `idf_component.yml`, `README.md`, `CHANGELOG.md`) to `2.4.1-dev`.
+  * Updated upstream GitHub repository and documentation URLs in `idf_component.yml` to `https://github.com/Humidyne-Labs/H1OS`.
+  * Regenerated markdown API reference (`docs/api.md`) via Doxygen 1.18.0 and Moxygen.
 * **ULP Coprocessor Wake Cause & Button Enumeration** (`orch_state.h`, `hal_types.h`, `ulp/main.c`, `h1os_lifecycle.c`, `sub_power.c`):
   * Replaced magic numeric codes (`1` through `6`) for `last_wake_cause` with strongly-typed `ulp_wake_cause_t` enumerators in portable header `orch_state.h`.
   * Replaced magic numeric button IDs (`0`, `1`, `2`) for `last_wake_btn` with strongly-typed `h1os_wake_btn_t` (`H1OS_WAKE_BTN_NONE = 0`, `H1OS_WAKE_BTN_BOOT = 1`, `H1OS_WAKE_BTN_POWER = 2`), relocating the type to `orch_state.h` so it is shared identically by the RISC-V ULP toolchain and main Xtensa CPU.
