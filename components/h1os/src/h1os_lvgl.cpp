@@ -30,9 +30,17 @@
 
 static const char *TAG = "h1os_lvgl";
 
+#define LVGL_TASK_STACK_PORT      8192U /**< Stack allocation for LVGL port task (8 KB).  */
+#define LVGL_TASK_PRIO_PORT       5     /**< Default FreeRTOS priority for LVGL task.     */
+#define LVGL_SHUTDOWN_TIMEOUT_MS  6000U /**< Max wait for LVGL task deletion (6s).        */
+#define LVGL_SHUTDOWN_STEP_MS     20U   /**< Shutdown poll step interval (20 ms).         */
+#define LVGL_KEYPAD_LONG_PRESS_MS 2000U /**< Keypad long-press actuation time (2.0s).     */
+#define LVGL_PARTIAL_BUFFER_LINES 40U   /**< Lines per partial draw buffer.               */
+
 static lv_display_t *s_lv_display       = NULL;
 static lv_indev_t   *s_lv_keypad_indev  = NULL;
-static TaskHandle_t  s_lvgl_task_handle = NULL;
+
+static volatile TaskHandle_t s_lvgl_task_handle = NULL;
 
 static volatile bool s_lvgl_task_running = false;
 static volatile bool s_flush_in_progress = false;
@@ -63,7 +71,6 @@ static void h1os_lvgl_port_task(void *pvParameters);
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
     (void)timeout_ms;
-    sub_power_cpu_max_acquire();
     if (s_lv_display != NULL) {
         lv_lock();
     }
@@ -78,7 +85,6 @@ void h1os_lvgl_unlock(void)
     if (s_lv_display != NULL) {
         lv_unlock();
     }
-    sub_power_cpu_max_release();
 }
 
 /**
@@ -183,7 +189,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
         if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
             uint16_t bytes_per_line = area_w >> 3;
-            uint16_t start_byte_x = area->x1 >> 3;
+            uint16_t start_byte_x   = area->x1 >> 3;
 
             const uint8_t *src = src_buf;
             uint8_t *dst = dest_buf + (y_start * epd_stride) + start_byte_x;
@@ -197,8 +203,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
             uint16_t x1 = area->x1;
             uint16_t x2 = x1 + area_w - 1;
             if (x1 < EPD_WIDTH) {
-                if (x2 >= EPD_WIDTH)
+                if (x2 >= EPD_WIDTH) {
                     x2 = EPD_WIDTH - 1;
+                }
 
                 uint32_t first_byte = x1 >> 3;
                 uint32_t last_byte = x2 >> 3;
@@ -263,8 +270,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
  */
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
-    if (s_lv_display != NULL)
+    if (s_lv_display != NULL) {
         return ESP_OK;
+    }
 
     esp_err_t ret = sub_display_init(is_wake_cycle);
     if (ret != ESP_OK) {
@@ -285,7 +293,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 
     lv_display_set_color_format(s_lv_display, LV_COLOR_FORMAT_I1);
 
-    uint32_t buffer_lines = 40;
+    uint32_t buffer_lines = LVGL_PARTIAL_BUFFER_LINES;
     uint32_t stride = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
     size_t buf_size = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
     uint8_t *buf1 = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
@@ -309,7 +317,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         lv_indev_set_type(s_lv_keypad_indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_display(s_lv_keypad_indev, s_lv_display);
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
-        lv_indev_set_long_press_time(s_lv_keypad_indev, 2000);
+        lv_indev_set_long_press_time(s_lv_keypad_indev, LVGL_KEYPAD_LONG_PRESS_MS);
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
 
         lv_group_t *def_grp = lv_group_get_default();
@@ -346,24 +354,26 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh)
  */
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 {
-    if (s_lvgl_task_handle != NULL)
+    if (s_lvgl_task_handle != NULL) {
         return ESP_OK;
+    }
 
     esp_err_t ret = h1os_lvgl_init(false);
-    if (ret != ESP_OK)
+    if (ret != ESP_OK) {
         return ret;
+    }
 
-    task_priority = (task_priority > 0) ? task_priority : 5;
+    task_priority = (task_priority > 0) ? task_priority : LVGL_TASK_PRIO_PORT;
     core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
 
     s_lvgl_task_running = true;
 
     BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task,
                                              "h1os_lvgl",
-                                             8192,
+                                             LVGL_TASK_STACK_PORT,
                                              NULL,
                                              task_priority,
-                                             &s_lvgl_task_handle,
+                                             (TaskHandle_t *)&s_lvgl_task_handle,
                                              core_id);
 
     if (res != pdPASS) {
@@ -390,9 +400,9 @@ esp_err_t h1os_lvgl_stop(void)
             return ESP_OK;
         }
         uint32_t wait_ms = 0;
-        while (s_lvgl_task_handle != NULL && wait_ms < 6000) {
-            vTaskDelay(pdMS_TO_TICKS(20));
-            wait_ms += 20;
+        while (s_lvgl_task_handle != NULL && wait_ms < LVGL_SHUTDOWN_TIMEOUT_MS) {
+            vTaskDelay(pdMS_TO_TICKS(LVGL_SHUTDOWN_STEP_MS));
+            wait_ms += LVGL_SHUTDOWN_STEP_MS;
         }
         if (s_lvgl_task_handle != NULL) {
             vTaskDelete(s_lvgl_task_handle);
@@ -409,22 +419,28 @@ esp_err_t h1os_lvgl_stop(void)
  */
 bool h1os_lvgl_has_pending_tasks(void)
 {
-    if (s_lv_display == NULL)
+    if (s_lv_display == NULL) {
         return false;
+    }
 
-    if (s_flush_in_progress)
+    if (s_flush_in_progress) {
         return true;
+    }
 
-    if (s_lvgl_task_handle != NULL && xTaskGetCurrentTaskHandle() == s_lvgl_task_handle)
+    if (s_lvgl_task_handle != NULL && xTaskGetCurrentTaskHandle() == s_lvgl_task_handle) {
         return false;
+    }
 
+    bool pending = false;
+    lv_lock();
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
         if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
-            return true;
+            pending = true;
         }
     }
-    return false;
+    lv_unlock();
+    return pending;
 }
 
 lv_indev_t *h1os_lvgl_get_indev(void)

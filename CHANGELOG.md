@@ -4,30 +4,109 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.3.3-dev] - 2026-10-24
+## [2.4.1-dev] - 2026-10-25
+
+### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
+
+* **Repository Identity & Documentation Synchronization** (`idf_component.yml`, `README.md`, `docs/api.md`):
+  * Synchronized semantic version strings across all four core locations (`h1os_version.h`, `idf_component.yml`, `README.md`, `CHANGELOG.md`) to `2.4.1-dev`.
+  * Updated upstream GitHub repository and documentation URLs in `idf_component.yml` to `https://github.com/Humidyne-Labs/H1OS`.
+  * Regenerated markdown API reference (`docs/api.md`) via Doxygen 1.18.0 and Moxygen.
+* **ULP Coprocessor Wake Cause & Button Enumeration** (`orch_state.h`, `hal_types.h`, `ulp/main.c`, `h1os_lifecycle.c`, `sub_power.c`):
+  * Replaced magic numeric codes (`1` through `6`) for `last_wake_cause` with strongly-typed `ulp_wake_cause_t` enumerators in portable header `orch_state.h`.
+  * Replaced magic numeric button IDs (`0`, `1`, `2`) for `last_wake_btn` with strongly-typed `h1os_wake_btn_t` (`H1OS_WAKE_BTN_NONE = 0`, `H1OS_WAKE_BTN_BOOT = 1`, `H1OS_WAKE_BTN_POWER = 2`), relocating the type to `orch_state.h` so it is shared identically by the RISC-V ULP toolchain and main Xtensa CPU.
+  * Unified ULP wake cause semantics across ULP-RISC-V firmware, power management, and application lifecycle logging: `ULP_WAKE_CAUSE_BOOT_BTN (1)`, `ULP_WAKE_CAUSE_PWR_BTN (2)`, `ULP_WAKE_CAUSE_LONG_OVERFLOW (3)`, `ULP_WAKE_CAUSE_SENSOR_TICK (4)`, `ULP_WAKE_CAUSE_RTC_INT_STUCK (5)`, and `ULP_WAKE_CAUSE_CRITICAL_BATTERY (6)`.
+  * Deduplicated dispatch action definitions by sharing `orch_ulp_dispatch_t` directly between ULP coprocessor and main CPU translation units.
+* **Repository Footprint Sanitization & Transient Audit Tool Pruning** (`tools/`, `docs/agent_notes/audits/`):
+  * Following completion of the hardcoded literal audit and single-file macro dissolution, removed temporary Python analysis scripts (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `tools/analyze_macro_scope.py`) and interim audit ledgers (`docs/agent_notes/audits/hardcoded_integers_audit.md`, `docs/agent_notes/audits/literal_integers_degree_audit.md`) to maintain repository cleanliness and avoid workspace inflation.
+* **Macro Scope Partitioning & Single-File Constant Dissolution** (`h1os_constants.h`, `orch_state.h`, `orch_wake_stub.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `sub_sdcard.c`):
+  * Created automated macro scope analyzer (`tools/analyze_macro_scope.py`) mapping repository macro usage across translation units.
+  * Refactored `h1os_constants.h` to strictly encapsulate public, multi-file configuration contracts (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC`).
+  * Dissolved single-file operational constants out of `h1os_constants.h` back into their respective translation units as private local definitions (`LIFECYCLE_*`, `LVGL_*`, `HAL_IO_*`, `ORCH_*`, `SUB_POWER_*`, `SUB_SDCARD_*`, `SUB_AUDIO_*`, `SUB_DISPLAY_*`), preventing global namespace pollution and unneeded cross-component compilation dependencies.
+  * Restored self-contained RTC memory and wake stub parameters directly in `orch_state.h` and `orch_wake_stub.h`.
+
+* **Architectural Constants Abstraction (`h1os_constants.h`)** (`h1os_constants.h`, `h1os.h`, `orch_state.h`, `orch_wake_stub.h`):
+  * Created centralized `h1os_constants.h` header defining traceable system-wide timing budgets (`H1OS_TSENS_SETTLING_DELAY_US = 400U`, `H1OS_TSENS_READY_POLL_INTERVAL_US = 5U`, `H1OS_TSENS_READY_TIMEOUT_CYCLES = 100U`, `H1OS_SHTC3_CONVERSION_TOTAL_US = 14500U`, `H1OS_TSENS_ESTIMATED_SAMPLE_US = 450U`, `H1OS_SHTC3_POST_TSENS_DELAY_US = 14050U`), autonomy wear-level intervals (`H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600U`), ring buffer capacity (`H1OS_TELEMETRY_RING_CAPACITY = 32U`), default TSENS intercept (`H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C = 2052`), and application lifecycle configuration defaults (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC = 30U`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC = 60U`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC = 300U`).
+  * Added `H1OS_LIFECYCLE_DEFAULT_CONFIG()` convenience macro for clean compound-literal lifecycle initialization in `h1os.h`.
+* **Zero-Initialization Architecture & Fail-Fast Input Validation** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.c`, `sub_power.c`, `h1os_lifecycle.c`):
+  * Eliminated runtime ternary fallback operators (`(val > 0) ? val : DEFAULT`) across `orch_wake_stub.c`, `orch_flow.c`, `sub_power.c`, and `h1os_lifecycle.c`. Telemetry getters (`h1os_get_telemetry()`) now truthfully report the configured flow periods without masking unconfigured (zero) values.
+  * Replaced defensive ternary fallbacks in `orch_flow_execute_sleep()` and `sub_power_init_ulp()` with strict boundary validation that logs errors and fails fast (`ESP_ERR_INVALID_STATE` / `ESP_ERR_INVALID_ARG`) if unconfigured (`0`) flow intervals are passed.
+  * Simplified `orch_state_reset()` to strict memory zeroing retaining only the `ORCH_RTC_MAGIC` word and `H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C`.
+* **Elapsed-Time Autonomy NVS Wear Gating** (`sub_power.c`, `orch_state.h`):
+  * Replaced cycle-modulo NVS commits (`wake_count % 12`) with monotonic elapsed deep-sleep tracking via `st->last_nvs_commit_sec`. Commits to NVS only execute after at least `H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` (3600 seconds) of sleep have elapsed, rendering wear-leveling independent of custom user flow cadences.
+* **Dead Macro Elimination & Constant Linting** (`orch_state.h`):
+  * Removed unreferenced legacy macros `ORCH_DEFAULT_FLOW_A_PERIOD_SEC` and `ORCH_DEFAULT_FLOW_B_PERIOD_SEC` following the elimination of runtime ternary fallbacks.
+* **Codebase Literal Integer Extraction & 3-Degree Risk Classifier** (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `docs/agent_notes/audits/literal_integers_degree_audit.md`):
+  * Added recursive integer scanner utilities that tokenize space-delimited C/C++ tokens, parse numeric decimal and hex literals, and categorize findings into 1st Degree (structural/bitmasks/pins/enums: 65.2%), 2nd Degree (metrological/polynomial math/curve tables: 11.1%), and 3rd Degree (operational magic numbers/timeouts: 23.7%) with actionable markdown review ledgers.
+* **System-Wide Operational Magic Number Elimination** (`h1os_constants.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `sub_power.c`, `sub_sdcard.c`, `sub_audio.c`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_display.cpp`):
+  * Centralized operational magic numbers into `h1os_constants.h` across RTOS task stack floors (`H1OS_TASK_STACK_*`, `H1OS_TASK_PRIO_*`), peripheral drain/busy timeouts (`H1OS_LVGL_DRAIN_*`, `H1OS_ORCH_I2C_RECOVERY_*`, `H1OS_SUB_POWER_RTC_INT_DRAIN_*`, `H1OS_SUB_SDCARD_COMMAND_TIMEOUT_MS`, `H1OS_SUB_AUDIO_AMP_*`), electrical cutoff and charging thresholds (`H1OS_BATTERY_CRITICAL_CUTOFF_MV = 3250U`, `H1OS_BATTERY_FULL_CHARGE_THRESHOLD_MV = 4180U`, `H1OS_BATTERY_REBOUND_GATE_TENTHS_PCT = 30U`), and peripheral loop bounds (`H1OS_RTC_ARM_RETRY_LIMIT`, `H1OS_POWER_KEY_POLL_CYCLES`).
+  * Completely eliminated actionable magic numbers in `h1os_lifecycle.c`, `sub_display.h`, `orch_display_sync.c`, `h1os_boot_hook.c`, and `orch_state.c`.
+
+### Added & Verified (50-Hour Environmental Chamber Metrology Certification)
+
+* **50.2-Hour Hermetic Chamber Soak & Zero-Calibration SHTC3 Verification** (`orch_wake_stub.c`, `orch_flow.c`, `orch_math.c`, `docs/architecture/A7_sensor_psychrometrics.md`):
+  * Certified 50 hours, 10 minutes (602 consecutive 5-minute Flow B cycles / 3,010 Flow A sample bursts) of continuous autonomous operation inside a 1.4 L hermetic acrylic chamber regulated by a 69.0% Boveda two-way osmotic standard alongside a Klaro Valet reference benchmark.
+  * Verified dead-on steady-state temperature agreement (`73.0°F` / `22.8°C` DUT vs. `73.0°F` Ref, `ΔT = 0.0°F`) and asymptotic relative humidity convergence from `50.5% RH` open-air baseline to `68.0% RH` (Cycle #530, `ΔRH = -1.0%`) and `67.8% RH` (Cycle #602, `ΔRH = -1.2%`, `Vapor P = 18.7 hPa`), passing all metrological acceptance gates (`67.5%–70.5% RH` and `18.5–18.8 hPa`) with zero synthetic software offsets.
+  * Confirmed `H1OS-STD-001` Invariant 2 (`PIT-06-A`) compliance by rejecting re-introduction of `die_tare_centi_c` and retaining `ORCH_TRINODE_SPAN_C = 15.0f` in `orch_flow.c`.
+
+### Fixed & Hardened (H1OS-STD-001 Rev 2.0 Codebase Audit Remediation)
+
+* **Wake Stub Pre-Spin Die Temperature Acquisition (`AUD-03` / `PIT-06-D`)** (`orch_wake_stub.c`):
+  * Relocated `wake_stub_read_die_temp_centi_c()` inside `bsp_wake_stub()` to execute immediately after transmitting the SHTC3 measurement command (`0x7866`), overlapping the 400 µs TSENS settling delay within the 14.5 ms SHTC3 conversion window (`450 µs` TSENS read + `14,050 µs` wait). Eliminates 15 ms of pre-sample CPU busy-wait self-heating on the silicon die and reduces Flow A wake stub active duration by 400 µs.
+  * Corrected `SENS_TSENS_XPD_FORCE` register field configuration in `wake_stub_read_die_temp_centi_c()`.
+* **Task Stack Floor Compliance & Checked Task Creation (`AUD-01` / `PIT-05-C`, `PIT-08-A`)** (`h1os_lifecycle.c`, `sub_sdcard.c`):
+  * Increased `h1os_session_monitor_task` (`h1os_sess`) stack allocation from `3072` to `4096` bytes in `h1os_lifecycle.c` and `sdcard_mount_worker_task` (`sd_mount`) from `3584` to `4096` bytes in `sub_sdcard.c`, satisfying the `H1OS-STD-001` 4 KB stack floor for tasks executing VFS, NVS, flash partition erase/write, and formatted logging call chains.
+  * Added explicit `BaseType_t` return status verification on `xTaskCreatePinnedToCore()` for `h1os_sess` with safe fallback to sleep transition on allocation failure.
+* **Cross-Core Volatile Coherency & Atomic Session Expiry (`AUD-02` / `PIT-01-A`, `PIT-01-E`)** (`h1os_lifecycle.c`, `hal_io.c`, `h1os_lvgl.cpp`):
+  * Qualified cross-task shared handles and flags (`s_session_expiry_us`, `s_session_running`, `s_session_task_handle`, `s_breath_task`, `s_breath_period_ms`, and `s_lvgl_task_handle`) with `volatile` and protected 64-bit `s_session_expiry_us` mutations across Core 0 and Core 1 with a critical section spinlock.
+* **LVGL Lock Timeout Enforcement & Splash Refresh 80 MHz Droop (`AUD-04` / `PIT-01-B`, `PIT-07-B`)** (`h1os_lvgl.cpp`, `sub_display.cpp`):
+  * Decoupled unconditional 240 MHz PM lock retention from `h1os_lvgl_lock()` so synchronous full OTP refreshes during boot splash (`lv_refr_now`) drop CPU frequency to 80 MHz during the ~1,400 ms `sub_display_wait_busy()` polling window while retaining 240 MHz `CpuMaxTurboScope` acceleration during pixel packing and SPI DMA frame commits.
+* **Atomic NVS Runtime Blob Commit & Flash Wear Reduction (`AUD-05` / `PIT-05-D`)** (`orch_state.c`, `sub_power.c`):
+  * Consolidated the three separate `sub_nvs_set_u32()` open/commit/close transactions in `orch_state_save_runtimes_to_nvs()` into a single atomic NVS commit, preventing torn multi-key state on brownout and reducing NVS flash wear.
+* **SDMMC Block Timeout Margin & Checked Driver Return Codes (`AUD-06`, `AUD-07`, `AUD-08` / `PIT-04-D`, `PIT-08-A`)** (`sub_sdcard.c`, `sub_rtc.c`, `sub_audio.c/.h`, `sub_nvs.c`, `sub_display.cpp`, `orch_flow.c`, `h1os_lifecycle.c`):
+  * Increased `host.command_timeout_ms` in `sub_sdcard_mount()` from `20 ms` to `100 ms` per `PIT-04-D` to prevent premature block write timeouts on mounted MicroSD media.
+  * Added explicit `esp_err_t` return checking in `sub_rtc_set_time()`, `sub_rtc_cancel_countdown()`, `sub_audio_set_volume()`, and `sub_nvs_*()` initialization paths, and synchronized `sub_audio.h` Doxygen comments and `orch_flow.c` Pure Event Mode sleep logs.
+* **Kconfig Banner Formatting & Spurious `kconfgen_tmp` Warning Elimination** (`sdkconfig.defaults*`):
+  * Resolved recurring `NOTE: .../kconfgen_tmp... line was updated to ...n` notifications during CMake configuration by replacing trailing `=` characters in comment separator banners with `-` across all profile and component `sdkconfig.defaults` files. Upstream Espressif `kconfgen` mistakenly interpreted `# =========================================================================` as an empty key-value assignment (`CONFIG_FOO=`) due to an unconditional `line.endswith("=")` heuristic.
+* **Kconfig Option Linting & Disabled Dependency Pruning** (`components/h1os/sdkconfig.defaults`, `examples/H1OS/sdkconfig.defaults.dev`, `examples/H1OS/sdkconfig.defaults.ci`, `profiles/sdkconfig.defaults.dev`, `profiles/sdkconfig.defaults.ci`, `examples/riscv_test/sdkconfig.defaults`):
+  * Removed deprecated and obsolete LVGL 8 symbols (`CONFIG_LV_USE_OBJ`, `CONFIG_LV_USE_DEMO_TRANSFORM`, `CONFIG_LV_USE_DEMO_SCROLL`) and pruned 9 redundant `CONFIG_LV_USE_DEMO_*=n` sub-options that triggered Kconfig "disabled dependency" notifications while `CONFIG_LV_BUILD_DEMOS=n`.
+  * Replaced non-existent `CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y` with standard ESP-IDF v6.1 `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y`.
+  * Removed `CONFIG_ESP_SYSTEM_USE_EH_FRAME=y` from ESP32-S3 configuration profiles as runtime DWARF unwinding is strictly a RISC-V architectural choice (`depends on IDF_TARGET_ARCH_RISCV`) and invisible on Xtensa LX7.
+
+## [2.4.0-dev] - 2026-10-24
+
+### 🚀 Added & Architectural Evolution
+
+* **Consolidated Elapsed-Runtime Empirical Battery Autonomy Engine & Exclusive ULP Resting Acquisition** (`sub_power.h/.c`, `orch_state.h/.c`, `orch_wake_stub.c`, `ulp/main.c`, `h1os_lifecycle.c`, `h1os_version.h`, `screen_system_health.c`, `docs/architecture/A8_battery_and_power_management.md`):
+  * **Semantic Version Bump (`2.4.0-dev`):** Bumped minor version from `2.3.x` to `2.4.0-dev` following the consolidation of battery autonomy math directly into the `h1os` core (`sub_power`) and removal of external example battery estimators (`battery_estimator.c/.h`).
+  * **Single-Level Elapsed Runtime Average Current (`avg_draw_ma`):** Removed redundant Level 2 active ratio/cycle tracking (`f_ulp`, `f_stub`, `f_app`, `active_draw_ma`, `total_ulp_ms`, `total_wake_stub_ms`, `ulp_entry_ccount`, `ulp_exit_ccount`, `ulp_total_cycles`, and `rdcycle` CSR reads) in favor of a lean, single-level elapsed runtime average current calculation (`avg_draw_ma`, `autonomy_days`, `mah_spent_lap`) over total elapsed time (`elapsed_sec = total_sleep_sec + total_app_run_ms / 1000.0f`).
+  * **Gump Naming Rule & Lexicon Enforcement:** Renamed non-literal `wall_draw_ma` / `wall-clock` identifiers to literal, Gump-proof `avg_draw_ma` (`elapsed_sec`, `elapsed_hours`) and replaced informal jargon across headers and sources per `naming.md` and `lexicon.md`.
+  * **Zero Hardcoded Currents & Dynamic Schedules:** Eliminated speculative current constants (0.045 mA, 28 mA, 36 mA) and dynamically integrates user-configured Flow A (`sample_interval_sec`) and Flow B (`flow_b_period_sec`) intervals.
+  * **Exclusive ULP ADC & 8-Entry Ring Buffer:** Retired main CPU ADC reads during active execution to eliminate $I \cdot R$ load sag. The ULP-RISC-V coprocessor samples battery ADC exclusively during quiet deep sleep into an 8-entry circular ring buffer in RTC Slow SRAM (`ulp_vbat_ring[8]`).
+  * **Folded Factor-of-2 Divider in ULP Calibration Handoff:** Pre-computed linear calibration parameters folding the $2\times$ divider directly into slope ($m_{\text{vbat}}$) and offset ($b_{\text{vbat}}$) using raw counts 2000 and 3000, allowing the ULP coprocessor to evaluate resting $V_{\text{BAT}}$ via a single shift and add.
+  * **Diurnal Thermal Rebound Guard & Tenths-of-a-Percent SoC Resolution:** Upgraded `initial_soc_x10` and `current_soc_x10` to tenths of a percent ($0..1000 = 0.0\%..100.0\%$) and restricted discharge lap resets strictly to uninitialized boots, charger unplug transitions (`s_prev_bat_state` in `RTC_DATA_ATTR`), or $\ge 3.0\%$ SoC increases.
+  * **Hardware Errata Review (`ERR-S3` Reclassified) & Rev B Pogo Interface (`E10`–`E15`):** Reclassified `ERR-S3` in `ERRATA.md` as an ESP-IDF / register semantics misunderstanding (`R/W` vs `W1TC` on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` and level-low comparator clear ordering) rather than a silicon CDC defect, and added **Errata E15** specifying a 3-pin symmetrical center-hot (`[GND] [VBUS +5V] [GND]`) magnetic pogo-pin charging interface for 100% geometric reverse-polarity protection.
 
 ### 🛡️ Fixed & Hardened (Firmware Safety Invariants Audit)
 
-* **Deterministic Static IPC Semaphores** (`sub_audio.c`):
-  * Replaced dynamic heap semaphore allocation (`xSemaphoreCreateBinary()`) in `sub_audio_send_command()` with static allocation via `xSemaphoreCreateBinaryStatic(&s_cmd_sync_sem_buffer)`.
-  * Replaced unbounded `portMAX_DELAY` with bounded 500 ms timeout to prevent indefinite task hangs during worker latency.
+* **ULP, Sleep/Wake & Subsystem Audit Remediation**:
+  * Fixed `REG_GET_BIT` bitmask vs shift bug on `RTC_CNTL_RDY_FOR_WAKEUP` in `ulp/main.c` (`main()`) by using `REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)`.
+  * Expanded ULP button tap detection window from `50..800 ms` to `30..2500 ms` (`BUTTON_TAP_MIN_MS = 30`, `BUTTON_TAP_MAX_MS = 2500`) with a 30 ms release-debounce check in `ulp/main.c`, eliminating the 800..2500 ms dead zone.
+  * Added Zero-Volt Cable Guard in `sub_power_get_battery_status()` (`usb_conn && vbat < 3300U -> 4200 mV`) and fixed 2-cycle ULP ring buffer lookback (`lookback = (count >= 3) ? 2 : 1`).
+  * Fixed NVS runtime load ordering in `h1os_early_system_bringup()` so `orch_state_load_runtimes_from_nvs()` executes after `orch_flow_determine_wakeup()` on cold boot, and added NVS runtime persistence on `execute_system_shutdown()`.
+  * Fixed `sub_power_init_ulp()` invocation on wake flows and computed final Flow B sleep slice duration dynamically from `st->flow_b_period_sec` and `st->sample_interval_sec`.
+  * Populated `sample.timestamp_sec` on each Flow A burst in `orch_wake_stub.c` and persisted `s_prev_bat_state` in `RTC_DATA_ATTR` in `h1os_lifecycle.c`.
+  * Added `sub_rtc_init()` and `h1os_time_sync_rtc_to_system()` to `h1os_early_system_bringup()` so POSIX system time is synchronized with the PCF85063A hardware RTC and 32.768 kHz `CLKOUT` is disabled.
+  * Fixed nested `h1os_lvgl_lock()` and 240 MHz CPU lock retention across the 2-second boot splash delay in `main/main.c` (`app_on_splash`).
+  * Cached `i2c_master_dev_handle_t` handles in `hal_i2c.c` to eliminate runtime heap allocation/free on I2C register transactions; synchronized `sub_sdcard_unmount()` with in-flight async mount tasks; guarded `h1os_lvgl_has_pending_tasks()` with `lv_lock()`/`lv_unlock()`; wired `sub_audio_flush_frame()` on queue drain in `sub_audio.c`; isolated `HAL_PIN_EPD_DC` in `hal_io.c`; and aligned `ORCH_TRINODE_SPAN_C` (`15.0f`) in `orch_flow.c`.
 
-* **Task Stack Relief & Frame Buffer Relocation** (`sub_audio.c`, `orch_flow.c`):
-  * Relieved 512-byte audio DMA frame buffers from task stacks in `sub_audio_flush_frame()`, `sub_audio_exec_tone()`, and `sub_audio_render_pcm_samples()`, consolidating into `.bss` static workspace `s_audio_work_buffer`.
-  * Relieved 512-byte debug telemetry arrays (`shtc3T_ring`, `shtc3RH_ring`, `mcuT_ring`, `epdT_ring`) from `orch_flow_dump_ring_debug()` into static `.bss` storage, guaranteeing stack frames remain well below the 128-byte embedded invariant.
+* **Deterministic Static IPC Semaphores & Stack Relief** (`sub_audio.c`, `orch_flow.c`):
+  * Replaced dynamic heap semaphore allocation (`xSemaphoreCreateBinary()`) in `sub_audio_send_command()` with static allocation via `xSemaphoreCreateBinaryStatic(&s_cmd_sync_sem_buffer)` and bounded 500 ms timeout.
+  * Relieved 512-byte audio DMA frame buffers and 512-byte debug telemetry arrays (`shtc3T_ring`, `shtc3RH_ring`, `mcuT_ring`, `epdT_ring`) from task stacks into static `.bss` storage.
 
-* **Inter-Core & ULP Volatile Memory Coherency** (`orch_state.h/.c`, `h1os_lifecycle.c`, `orch_display_sync.c`, `orch_flow.c`, `orch_wake_stub.c`, `screen_diagnostics.c`):
-  * Qualified persistent RTC Slow Memory state block as `volatile orch_persisted_state_t s_persisted_state` to ensure cache coherency across Core 0, Core 1, the RV32IMC ULP coprocessor, and the RTC Fast Memory wake stub.
-  * Updated `orch_state_get(void)` accessor signature and all callers across Layers 3 and 4 to retain `volatile` qualifiers without compiler casting warnings.
-
-* **Single-Precision Hardware FPU32 Discipline** (`orch_flow.c`):
-  * Replaced double-precision literals `/ 100.0` with `/ 100.0f` across telemetry conversion routines (`st->tsens_cal_centi_c`, `st->last_glass_temp_centi_c`, `latest_raw.shtc3_temp_centi_c`, `latest_raw.shtc3_rh_centi_pct`), ensuring divisions execute via hardware single-cycle FPU instructions rather than 50-cycle software double emulation.
-
-* **Fixed-Width Type Discipline** (`sub_power.c`):
-  * Converted naked `int` declarations in battery ADC oneshot filtering to explicit `int32_t` and `uint32_t` width types.
-
-* **Defensive Enum Switch Exhaustion** (`h1os_lifecycle.c`):
-  * Added mandatory `default:` trap to `h1os_log_flow_banner()` to log and handle corrupted or uninitialized lifecycle flow enum values defensively.
+* **Inter-Core Volatile Coherency, FPU32 Discipline & Defensive Enum Trapping** (`orch_state.h/.c`, `orch_flow.c`, `sub_power.c`, `h1os_lifecycle.c`):
+  * Qualified persistent RTC Slow Memory state block as `volatile orch_persisted_state_t s_persisted_state`.
+  * Replaced double-precision literals `/ 100.0` with `/ 100.0f` across telemetry conversion routines, converted naked `int` declarations to explicit fixed-width types, and added a `default:` trap to `h1os_log_flow_banner()`.
 
 ## [2.3.2-dev] - 2026-10-21
 
@@ -35,7 +114,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **Zero-Calibration Steady-State SHTC3 Trust & Tri-Node Range Verification** (`orch_flow.c`, `orch_wake_stub.c`, `orch_math.h/.c`, `orch_state.h/.c`, `h1os.h`, `h1os_lifecycle.c`):
 
-  * Enforced the **Zero-Calibration Hardware Doctrine**: removed all synthetic temperature offsets, ambient RH reconstitutions (`orch_math_reconstruct_ambient_rh`), slice trimming, fallback sensor substitutions (`orch_flow_evaluate_ambient_selection`), and MCU die taring (`die_tare_centi_c`).
+  * Enforced the **Zero-Calibration Hardware Principle**: removed all synthetic temperature offsets, ambient RH reconstitutions (`orch_math_reconstruct_ambient_rh`), slice trimming, fallback sensor substitutions (`orch_flow_evaluate_ambient_selection`), and MCU die taring (`die_tare_centi_c`).
 
   * Trusted the factory-calibrated Sensirion SHTC3 (`±0.2°C`, `±2% RH`) directly once consecutive Flow A deep-sleep samples satisfy the steady-state plateau gate (`|temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C` / `0.20°C` in `orch_math_is_plateau_settled()`), feeding the settled SHTC3 temperature and relative humidity directly into `orch_math_calc_psychrometrics(t_valid, rh_valid, &vp, &dew)`.
 

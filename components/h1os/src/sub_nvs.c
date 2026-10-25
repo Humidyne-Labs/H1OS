@@ -63,8 +63,12 @@ esp_err_t sub_nvs_set_str(const char *key, const char *value)
 {
     if (key == NULL || value == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -92,8 +96,12 @@ esp_err_t sub_nvs_get_str(const char *key, char *out_val, size_t max_len)
 {
     if (key == NULL || out_val == NULL || max_len == 0)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
@@ -118,8 +126,12 @@ esp_err_t sub_nvs_set_u32(const char *key, uint32_t value)
 {
     if (key == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -146,8 +158,12 @@ esp_err_t sub_nvs_get_u32(const char *key, uint32_t *out_val)
 {
     if (key == NULL || out_val == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
@@ -172,8 +188,12 @@ esp_err_t sub_nvs_set_blob(const char *key, const void *data, size_t len)
 {
     if (key == NULL || data == NULL || len == 0)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -201,8 +221,12 @@ esp_err_t sub_nvs_get_blob(const char *key, void *out_data, size_t *inout_len)
 {
     if (key == NULL || out_data == NULL || inout_len == NULL || *inout_len == 0)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READONLY, &handle);
@@ -225,8 +249,12 @@ esp_err_t sub_nvs_erase_key(const char *key)
 {
     if (key == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -248,8 +276,12 @@ esp_err_t sub_nvs_erase_key(const char *key)
  */
 esp_err_t sub_nvs_erase_all(void)
 {
-    if (!s_nvs_initialized)
-        sub_nvs_init();
+    if (!s_nvs_initialized) {
+        esp_err_t init_err = sub_nvs_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
+    }
 
     nvs_handle_t handle;
     esp_err_t err = nvs_open(SUB_NVS_NAMESPACE, NVS_READWRITE, &handle);

@@ -16,8 +16,32 @@ extern "C" {
 #endif
 
 // clang-format off
-#define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation sentinel word ('SLAT').               */
-#define ORCH_RING_CAPACITY          32         /**< Fixed capacity of historical telemetry sample ring buffer. */
+#define ORCH_RTC_MAGIC                        0x534C4154U /**< RTC state validation magic word ('SLAT').                                    */
+#define ORCH_RING_CAPACITY                    32          /**< Fixed capacity of historical telemetry sample ring buffer.                   */
+#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  2052        /**< Default TSENS Q12 fixed-point intercept in centi-°C (20.52°C).               */
+#define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC 3600U       /**< Minimum elapsed deep sleep interval between unattended NVS commits (1 hour). */
+
+/**
+ * @brief Waking button identifier reported by ULP coprocessor (ulp_last_wake_btn).
+ */
+typedef enum {
+    H1OS_WAKE_BTN_NONE  = 0, /**< Wake was not triggered by a physical button. */
+    H1OS_WAKE_BTN_BOOT  = 1, /**< Woken by BOOT0 button (GPIO 0).              */
+    H1OS_WAKE_BTN_POWER = 2  /**< Woken by POWER button (GPIO 18).             */
+} h1os_wake_btn_t;
+
+/**
+ * @brief ULP coprocessor wake causes (ulp_last_wake_cause).
+ */
+typedef enum {
+    ULP_WAKE_CAUSE_NONE             = 0, /**< Uninitialized / no wake registered.                                */
+    ULP_WAKE_CAUSE_BOOT_BTN         = 1, /**< BOOT0 button event (short tap: session wake, long hold: DFU jump). */
+    ULP_WAKE_CAUSE_PWR_BTN          = 2, /**< POWER button event (short tap: session wake, long hold: shutdown). */
+    ULP_WAKE_CAUSE_LONG_OVERFLOW    = 3, /**< Flow B presentation refresh (slice_counter reached overflow_limit).*/
+    ULP_WAKE_CAUSE_SENSOR_TICK      = 4, /**< Flow A sensor burst wake stub (slice_counter < overflow_limit).    */
+    ULP_WAKE_CAUSE_RTC_INT_STUCK    = 5, /**< PCF85063A INT line stuck LOW hardware bus fault.                   */
+    ULP_WAKE_CAUSE_CRITICAL_BATTERY = 6  /**< Battery dropped below 3250 mV brownout emergency floor.            */
+} ulp_wake_cause_t;
 
 /**
  * @brief ULP coprocessor dispatch wakeup reasons.
@@ -50,12 +74,22 @@ typedef struct {
 } orch_tri_node_sample_t;
 
 /**
+ * @brief Compact 12-byte atomic battery autonomy runtime blob committed to Flash NVS.
+ */
+typedef struct {
+    uint32_t total_sleep_sec;   /**< Cumulative seconds spent in deep sleep.                             */
+    uint32_t total_app_run_ms;  /**< Cumulative milliseconds executing main processor application.       */
+    uint16_t initial_soc_x10;   /**< State of Charge at start of discharge lap in tenths of % (0..1000). */
+    uint16_t reserved;          /**< 16-bit alignment padding / reserved.                                */
+} orch_nvs_runtime_blob_t;
+
+/**
  * @brief Master persistent state block allocated in RTC Slow SRAM.
  *
  * Retained across all deep sleep cycles and wake stub executions.
  */
 typedef struct {
-    uint32_t magic;                     /**< Sentinel validation magic word (ORCH_RTC_MAGIC).                      */
+    uint32_t magic;                     /**< State validation magic word (ORCH_RTC_MAGIC).                         */
     uint32_t boot_count;                /**< Total monotonic system boot cycles.                                   */
     uint32_t wake_count;                /**< Monotonic deep sleep wake cycle count.                                */
     uint8_t flags;                      /**< Operating state flags (ORCH_FLAG_*).                                  */
@@ -95,6 +129,12 @@ typedef struct {
 
     uint8_t ring_head;                  /**< Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1). */
     uint32_t total_samples;             /**< Total lifetime samples recorded across all sessions.                  */
+
+    uint32_t total_sleep_sec;           /**< Cumulative seconds spent in deep sleep.                                */
+    uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main processor application.          */
+    uint32_t last_nvs_commit_sec;       /**< Sleep timestamp (total_sleep_sec) of last successful NVS runtime commit.*/
+    uint16_t initial_soc_x10;           /**< State of Charge at start of discharge lap in tenths of % (0..1000).   */
+    uint8_t  _pad_soc[2];               /**< Alignment padding to 32-bit boundary.                                  */
 } orch_persisted_state_t;
 
 // clang-format off
@@ -142,6 +182,23 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample);
  * @return True if a valid settled sample was located, false otherwise.
  */
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample);
+
+/**
+ * @brief Save cumulative battery autonomy runtimes to Flash NVS.
+ */
+void orch_state_save_runtimes_to_nvs(void);
+
+/**
+ * @brief Restore cumulative battery autonomy runtimes from Flash NVS.
+ */
+void orch_state_load_runtimes_from_nvs(void);
+
+/**
+ * @brief Reset discharge lap runtimes on charger unplug or cycle anchor.
+ *
+ * @param[in] current_soc_x10 Starting SoC in tenths of a percent (0..1000) for the new discharge lap.
+ */
+void orch_state_reset_discharge_lap(uint16_t current_soc_x10);
 
 #ifdef __cplusplus
 }

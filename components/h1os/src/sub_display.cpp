@@ -9,6 +9,7 @@
 #include "h1os/sub_display.h"
 
 #include "driver/gpio.h"
+#include "esp_check.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "esp_timer.h"
@@ -23,11 +24,13 @@
 
 static const char *TAG = "sub_display";
 
+#define SUB_DISPLAY_IDLE_POLL_BOUND 60U /**< Maximum poll loops awaiting EPD idle (approx 15 ms). */
+
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
-static bool s_inited = false;
-static bool s_in_deep_sleep = false;
+static bool s_inited                     = false;
+static bool s_in_deep_sleep              = false;
 static int16_t s_last_glass_temp_centi_c = 0;
 
 static const uint8_t WF_PARTIAL_1IN54[159] = {
@@ -71,7 +74,7 @@ static void epd_reset_pulse(void)
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
     /* Wait up to 15 ms for BUSY (GPIO 8) to assert HIGH after command issue */
-    for (int i = 0; i < 60; i++) {
+    for (int32_t i = 0; i < (int32_t)SUB_DISPLAY_IDLE_POLL_BOUND; i++) {
         if (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
             break;
         }
@@ -96,27 +99,28 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
  *
  * @return Return value of type static void.
  */
-static void epd_configure_base_registers(void)
+static esp_err_t epd_configure_base_registers(void)
 {
     uint8_t d_drv[] = {0xC7, 0x00, 0x00};
-    hal_spi_write_cmd(0x01);
-    hal_spi_write_data(d_drv, sizeof(d_drv));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x01), TAG, "SPI cmd 0x01 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_drv, sizeof(d_drv)), TAG, "SPI data 0x01 failed");
 
     uint8_t d_entry[] = {0x03};
-    hal_spi_write_cmd(0x11);
-    hal_spi_write_data(d_entry, sizeof(d_entry));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x11), TAG, "SPI cmd 0x11 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_entry, sizeof(d_entry)), TAG, "SPI data 0x11 failed");
 
     uint8_t d_xwin[] = {0x00, 0x18};
-    hal_spi_write_cmd(0x44);
-    hal_spi_write_data(d_xwin, sizeof(d_xwin));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x44), TAG, "SPI cmd 0x44 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_xwin, sizeof(d_xwin)), TAG, "SPI data 0x44 failed");
 
     uint8_t d_ywin[] = {0x00, 0x00, 0xC7, 0x00};
-    hal_spi_write_cmd(0x45);
-    hal_spi_write_data(d_ywin, sizeof(d_ywin));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x45), TAG, "SPI cmd 0x45 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_ywin, sizeof(d_ywin)), TAG, "SPI data 0x45 failed");
 
     uint8_t d_border[] = {0x05};
-    hal_spi_write_cmd(0x3C);
-    hal_spi_write_data(d_border, sizeof(d_border));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x3C), TAG, "SPI cmd 0x3C failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_border, sizeof(d_border)), TAG, "SPI data 0x3C failed");
+    return ESP_OK;
 }
 
 /**
@@ -175,13 +179,13 @@ esp_err_t sub_display_init(bool is_wake_cycle)
 
     if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
         if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
-            int8_t temp_int = (int8_t)temp_raw[0];
-            int16_t frac_c = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
+            int8_t  temp_int = (int8_t)temp_raw[0];
+            int16_t frac_c   = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 s_last_glass_temp_centi_c = glass_cc;
                 ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)",
-                         (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
+                         (double)((float)glass_cc / 100.0f), temp_raw[0], temp_raw[1]);
             }
         }
     }
@@ -192,6 +196,23 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
 
     s_inited = true;
+    return ESP_OK;
+}
+
+/**
+ * @brief Deinitialize SSD1681 display subsystem and release SPI bus resources.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_display_deinit(void)
+{
+    if (!s_inited) {
+        return ESP_OK;
+    }
+
+    sub_display_enter_deep_sleep();
+    hal_spi_deinit();
+    s_inited = false;
     return ESP_OK;
 }
 
@@ -218,18 +239,18 @@ void sub_display_clear(uint8_t color)
  *
  * @return Return value of type static void.
  */
-static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
+static esp_err_t epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
 {
     static const uint8_t d_x[] = {0x00};
     static const uint8_t d_y[] = {0x00, 0x00};
 
-    hal_spi_write_cmd(0x4E);
-    hal_spi_write_data(d_x, sizeof(d_x));
-    hal_spi_write_cmd(0x4F);
-    hal_spi_write_data(d_y, sizeof(d_y));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x4E), TAG, "SPI cmd 0x4E failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_x, sizeof(d_x)), TAG, "SPI data 0x4E failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x4F), TAG, "SPI cmd 0x4F failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_y, sizeof(d_y)), TAG, "SPI data 0x4F failed");
 
-    hal_spi_write_cmd(ram_cmd);
-    hal_spi_write_frame_dma(frame_data);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(ram_cmd), TAG, "SPI ram_cmd failed");
+    return hal_spi_write_frame_dma(frame_data);
 }
 
 /**
@@ -243,8 +264,9 @@ static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
  */
 esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
 {
-    if (prev_frame == NULL)
+    if (prev_frame == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     memcpy(s_previous_frame, prev_frame, EPD_BUFFER_SIZE);
     memcpy(s_current_frame, prev_frame, EPD_BUFFER_SIZE);
@@ -270,20 +292,18 @@ esp_err_t sub_display_refresh_full(void)
 
     int64_t t_start = esp_timer_get_time();
 
-    hal_spi_write_cmd(0x12);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x12), TAG, "SPI cmd 0x12 failed");
     sub_display_wait_busy(pdMS_TO_TICKS(1000));
-    epd_configure_base_registers();
+    ESP_RETURN_ON_ERROR(epd_configure_base_registers(), TAG, "Base registers config failed");
 
-    epd_commit_ram_dma(0x24, s_current_frame);
-
-    epd_commit_ram_dma(0x26, s_current_frame);
+    ESP_RETURN_ON_ERROR(epd_commit_ram_dma(0x24, s_current_frame), TAG, "Commit RAM 0x24 failed");
+    ESP_RETURN_ON_ERROR(epd_commit_ram_dma(0x26, s_current_frame), TAG, "Commit RAM 0x26 failed");
 
     uint8_t d_upd[] = {0xF7};
-    hal_spi_write_cmd(0x22);
-    hal_spi_write_data(d_upd, sizeof(d_upd));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x22), TAG, "SPI cmd 0x22 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_upd, sizeof(d_upd)), TAG, "SPI data 0x22 failed");
 
-    hal_spi_write_cmd(0x20);
-
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x20), TAG, "SPI cmd 0x20 failed");
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
 
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
@@ -297,7 +317,7 @@ esp_err_t sub_display_refresh_full(void)
 /**
  * @brief Clear display to pure white and trigger full OTP refresh.
  *
- * @details Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+ * @details Clears and discharges electrophoretic microcapsules to protect against permanent burn-in.
  *          Ensures SPI2 and SSD1681 are initialized and awake even when invoked directly from
  *          deep-sleep ULP power-off wakes (ORCH_FLOW_CRITICAL_OFF).
  *
@@ -321,25 +341,26 @@ esp_err_t sub_display_clear_to_white_full(void)
  *
  * @return Return value of type static void.
  */
-static void epd_load_custom_lut(const uint8_t *lut_buffer)
+static esp_err_t epd_load_custom_lut(const uint8_t *lut_buffer)
 {
-    if (lut_buffer == NULL)
-        return;
+    if (lut_buffer == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-    hal_spi_write_cmd(0x32);
-    hal_spi_write_data(&lut_buffer[0], 153);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x32), TAG, "SPI cmd 0x32 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[0], 153), TAG, "SPI data 0x32 failed");
 
-    hal_spi_write_cmd(0x3F);
-    hal_spi_write_data(&lut_buffer[153], 1);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x3F), TAG, "SPI cmd 0x3F failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[153], 1), TAG, "SPI data 0x3F failed");
 
-    hal_spi_write_cmd(0x03);
-    hal_spi_write_data(&lut_buffer[154], 1);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x03), TAG, "SPI cmd 0x03 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[154], 1), TAG, "SPI data 0x03 failed");
 
-    hal_spi_write_cmd(0x04);
-    hal_spi_write_data(&lut_buffer[155], 3);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x04), TAG, "SPI cmd 0x04 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[155], 3), TAG, "SPI data 0x04 failed");
 
-    hal_spi_write_cmd(0x2C);
-    hal_spi_write_data(&lut_buffer[158], 1);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x2C), TAG, "SPI cmd 0x2C failed");
+    return hal_spi_write_data(&lut_buffer[158], 1);
 }
 
 /**
@@ -355,23 +376,23 @@ esp_err_t sub_display_refresh_partial(void)
 
     int64_t t_start = esp_timer_get_time();
 
-    epd_commit_ram_dma(0x24, s_current_frame);
+    ESP_RETURN_ON_ERROR(epd_commit_ram_dma(0x24, s_current_frame), TAG, "Commit RAM 0x24 failed");
 
-    epd_load_custom_lut(WF_PARTIAL_1IN54);
+    ESP_RETURN_ON_ERROR(epd_load_custom_lut(WF_PARTIAL_1IN54), TAG, "Custom LUT load failed");
 
     static const uint8_t disp_option[10] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00};
-    hal_spi_write_cmd(0x37);
-    hal_spi_write_data(disp_option, sizeof(disp_option));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x37), TAG, "SPI cmd 0x37 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(disp_option, sizeof(disp_option)), TAG, "SPI data 0x37 failed");
 
     uint8_t d_border[] = {0x80};
-    hal_spi_write_cmd(0x3C);
-    hal_spi_write_data(d_border, sizeof(d_border));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x3C), TAG, "SPI cmd 0x3C failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_border, sizeof(d_border)), TAG, "SPI data 0x3C failed");
 
     uint8_t d_upd[] = {0xCF};
-    hal_spi_write_cmd(0x22);
-    hal_spi_write_data(d_upd, sizeof(d_upd));
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x22), TAG, "SPI cmd 0x22 failed");
+    ESP_RETURN_ON_ERROR(hal_spi_write_data(d_upd, sizeof(d_upd)), TAG, "SPI data 0x22 failed");
 
-    hal_spi_write_cmd(0x20);
+    ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x20), TAG, "SPI cmd 0x20 failed");
     sub_display_wait_busy(pdMS_TO_TICKS(2000));
 
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
@@ -401,8 +422,9 @@ int16_t sub_display_get_glass_temp_centi_c(void)
  */
 esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 {
-    if (out_temp_c == NULL)
+    if (out_temp_c == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     if (s_inited) {
         *out_temp_c = (float)s_last_glass_temp_centi_c / 100.0f;

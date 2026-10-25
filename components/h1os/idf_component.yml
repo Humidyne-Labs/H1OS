@@ -1,8 +1,8 @@
 ## Component metadata
-version:     "2.3.3-dev"
+version:     "2.4.1-dev"
 description: "H1OS: E-Class Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8)."
-url:         "https://github.com/Humidyne-Labs/esp32-s3_bsp"
-repository:  "https://github.com/Humidyne-Labs/esp32-s3_bsp.git"
+url:         "https://github.com/Humidyne-Labs/H1OS"
+repository:  "https://github.com/Humidyne-Labs/H1OS.git"
 license:     "MIT"
 tags:
   - h1os

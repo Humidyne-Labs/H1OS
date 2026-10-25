@@ -1,19 +1,18 @@
-# =========================================================================
+# -------------------------------------------------------------------------
 # Target Hardware: ESP32-S3-PICO-1-N8R8
 # Board: Waveshare ESP32-S3-ePaper-1.54 V2
 # Role: Formal ULP-RISC-V Coprocessor Wakeup Validation Test
-# =========================================================================
+# -------------------------------------------------------------------------
 
 CONFIG_IDF_TARGET="esp32s3"
 
 # Compiler Optimization & Rich Crash Diagnostics
 # -Og optimization preserves variables for GDB / OpenOCD debugging
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
-CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
 
 # Decode panic backtraces into source file names and line numbers over UART
 CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
-CONFIG_ESP_SYSTEM_USE_EH_FRAME=y
 
 # System Logging & Color Output
 CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y

@@ -14,8 +14,54 @@
 static const char *TAG = "HAL_I2C";
 
 static i2c_master_bus_handle_t s_bus_handle = NULL;
-static SemaphoreHandle_t s_i2c_mutex = NULL;
-static bool s_is_inited = false;
+static SemaphoreHandle_t s_i2c_mutex        = NULL;
+static bool s_is_inited                     = false;
+
+static i2c_master_dev_handle_t s_dev_es8311   = NULL;
+static i2c_master_dev_handle_t s_dev_pcf85063 = NULL;
+static i2c_master_dev_handle_t s_dev_shtc3    = NULL;
+
+/**
+ * @brief Retrieve or lazily register a cached I2C device handle for known onboard peripherals.
+ */
+static esp_err_t hal_i2c_acquire_dev_handle(uint8_t dev_addr, i2c_master_dev_handle_t *out_handle, bool *out_is_temp)
+{
+    *out_is_temp = false;
+    i2c_master_dev_handle_t *slot = NULL;
+
+    if (dev_addr == HAL_I2C_ADDR_ES8311) {
+        slot = &s_dev_es8311;
+    } else if (dev_addr == HAL_I2C_ADDR_PCF85063) {
+        slot = &s_dev_pcf85063;
+    } else if (dev_addr == HAL_I2C_ADDR_SHTC3) {
+        slot = &s_dev_shtc3;
+    }
+
+    if (slot != NULL && *slot != NULL) {
+        *out_handle = *slot;
+        return ESP_OK;
+    }
+
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address  = dev_addr,
+        .scl_speed_hz    = HAL_I2C_FREQ_HZ,
+    };
+
+    i2c_master_dev_handle_t handle = NULL;
+    esp_err_t ret = i2c_master_bus_add_device(s_bus_handle, &dev_cfg, &handle);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    if (slot != NULL) {
+        *slot = handle;
+    } else {
+        *out_is_temp = true;
+    }
+    *out_handle = handle;
+    return ESP_OK;
+}
 
 /**
  * @brief Initializes the shared I2C master bus hardware.
@@ -75,6 +121,18 @@ esp_err_t hal_i2c_deinit(void)
     }
 
     if (xSemaphoreTakeRecursive(s_i2c_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (s_dev_es8311) {
+            i2c_master_bus_rm_device(s_dev_es8311);
+            s_dev_es8311 = NULL;
+        }
+        if (s_dev_pcf85063) {
+            i2c_master_bus_rm_device(s_dev_pcf85063);
+            s_dev_pcf85063 = NULL;
+        }
+        if (s_dev_shtc3) {
+            i2c_master_bus_rm_device(s_dev_shtc3);
+            s_dev_shtc3 = NULL;
+        }
         if (s_bus_handle) {
             i2c_del_master_bus(s_bus_handle);
             s_bus_handle = NULL;
@@ -101,8 +159,9 @@ esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t writ
 {
     if (!s_is_inited) {
         esp_err_t init_ret = hal_i2c_init();
-        if (init_ret != ESP_OK)
+        if (init_ret != ESP_OK) {
             return init_ret;
+        }
     }
 
     if (!s_bus_handle || !write_data || write_len == 0) {
@@ -113,17 +172,14 @@ esp_err_t hal_i2c_write(uint8_t dev_addr, const uint8_t *write_data, size_t writ
         return ESP_ERR_TIMEOUT;
     }
 
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = dev_addr,
-        .scl_speed_hz = HAL_I2C_FREQ_HZ,
-    };
-
     i2c_master_dev_handle_t dev_handle = NULL;
-    esp_err_t ret = i2c_master_bus_add_device(s_bus_handle, &dev_cfg, &dev_handle);
+    bool is_temp = false;
+    esp_err_t ret = hal_i2c_acquire_dev_handle(dev_addr, &dev_handle, &is_temp);
     if (ret == ESP_OK) {
         ret = i2c_master_transmit(dev_handle, write_data, write_len, timeout_ms);
-        i2c_master_bus_rm_device(dev_handle);
+        if (is_temp) {
+            i2c_master_bus_rm_device(dev_handle);
+        }
     }
 
     xSemaphoreGiveRecursive(s_i2c_mutex);
@@ -144,8 +200,9 @@ esp_err_t hal_i2c_read(uint8_t dev_addr, uint8_t *read_data, size_t read_len, ui
 {
     if (!s_is_inited) {
         esp_err_t init_ret = hal_i2c_init();
-        if (init_ret != ESP_OK)
+        if (init_ret != ESP_OK) {
             return init_ret;
+        }
     }
 
     if (!s_bus_handle || !read_data || read_len == 0) {
@@ -156,17 +213,14 @@ esp_err_t hal_i2c_read(uint8_t dev_addr, uint8_t *read_data, size_t read_len, ui
         return ESP_ERR_TIMEOUT;
     }
 
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = dev_addr,
-        .scl_speed_hz = HAL_I2C_FREQ_HZ,
-    };
-
     i2c_master_dev_handle_t dev_handle = NULL;
-    esp_err_t ret = i2c_master_bus_add_device(s_bus_handle, &dev_cfg, &dev_handle);
+    bool is_temp = false;
+    esp_err_t ret = hal_i2c_acquire_dev_handle(dev_addr, &dev_handle, &is_temp);
     if (ret == ESP_OK) {
         ret = i2c_master_receive(dev_handle, read_data, read_len, timeout_ms);
-        i2c_master_bus_rm_device(dev_handle);
+        if (is_temp) {
+            i2c_master_bus_rm_device(dev_handle);
+        }
     }
 
     xSemaphoreGiveRecursive(s_i2c_mutex);
@@ -190,8 +244,9 @@ esp_err_t hal_i2c_write_read(uint8_t dev_addr, const uint8_t *write_data, size_t
 {
     if (!s_is_inited) {
         esp_err_t init_ret = hal_i2c_init();
-        if (init_ret != ESP_OK)
+        if (init_ret != ESP_OK) {
             return init_ret;
+        }
     }
 
     if (!s_bus_handle || !write_data || write_len == 0 || !read_data || read_len == 0) {
@@ -202,17 +257,14 @@ esp_err_t hal_i2c_write_read(uint8_t dev_addr, const uint8_t *write_data, size_t
         return ESP_ERR_TIMEOUT;
     }
 
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = dev_addr,
-        .scl_speed_hz = HAL_I2C_FREQ_HZ,
-    };
-
     i2c_master_dev_handle_t dev_handle = NULL;
-    esp_err_t ret = i2c_master_bus_add_device(s_bus_handle, &dev_cfg, &dev_handle);
+    bool is_temp = false;
+    esp_err_t ret = hal_i2c_acquire_dev_handle(dev_addr, &dev_handle, &is_temp);
     if (ret == ESP_OK) {
         ret = i2c_master_transmit_receive(dev_handle, write_data, write_len, read_data, read_len, timeout_ms);
-        i2c_master_bus_rm_device(dev_handle);
+        if (is_temp) {
+            i2c_master_bus_rm_device(dev_handle);
+        }
     }
 
     xSemaphoreGiveRecursive(s_i2c_mutex);
@@ -230,8 +282,9 @@ esp_err_t hal_i2c_probe(uint8_t dev_addr)
 {
     if (!s_is_inited) {
         esp_err_t init_ret = hal_i2c_init();
-        if (init_ret != ESP_OK)
+        if (init_ret != ESP_OK) {
             return init_ret;
+        }
     }
 
     if (!s_bus_handle) {

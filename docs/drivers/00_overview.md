@@ -14,7 +14,7 @@ The table below defines the exact hardware assignment, physical pins, electrical
 | **Solomon Systech SSD1681** | SPI2 Master<br>(Mode 0, 4-Wire) | MOSI: `GPIO 13`, SCK: `GPIO 12`<br>CS: `GPIO 11`, DC: `GPIO 10`<br>RST: `GPIO 9`, BUSY: `GPIO 8`<br>3V3 Rail: `GPIO 6` (Active LOW) | Write: 20 MHz SPI DMA<br>Read (Temp): 2 MHz 3-Wire Half-Duplex<br>Ping-Pong RAM `0x24` / `0x26`<br>Partial LUT: 159 Bytes (Non-Touch) | Deep Sleep Mode 1 (`0x10=0x01`)<br>RAM Retained | `components/h1os/src/sub_display.cpp` |
 | **Battery Sensing & Latch** | ADC1_CH3<br>RTC GPIO 17 | ADC: `GPIO 4`<br>BAT_CTRL: `GPIO 17` | ADC 12 dB attenuation (0–3.1V)<br>1:2 Resistive Divider ($200\,\text{k}\Omega / 200\,\text{k}\Omega$)<br>BAT_CTRL: 1 = LDO Enabled | Deep Sleep Pad Hold: `GPIO 17 = 1`<br>Shutdown: `GPIO 17 = 0` | `components/h1os/src/sub_power.c` |
 | **MicroSD Card** | SDMMC 1-Bit Slot | CLK: `GPIO 39`<br>CMD: `GPIO 41`<br>D0: `GPIO 40` | SDMMC Default Speed (20 MHz)<br>FATFS 16KB allocation unit | VFS unmount<br>Pins tristate | `components/h1os/src/sub_sdcard.c` |
-| **Tactile Buttons & LED** | GPIO Digital I/O | BOOT: `GPIO 0`<br>POWER: `GPIO 18`<br>LED: `GPIO 3` (Open-Drain) | External $10\,\text{k}\Omega$ Pull-ups to 3.3V<br>Internal Pull-ups in parallel ($45\,\text{k}\Omega$)<br>LED: 0 = ON, 1 = OFF<br>Debounce: 30ms, Hold: 2500ms | EXT1 Wakeup: ANY_LOW on 0 & 18 | `components/h1os/src/hal_io.c` |
+| **Tactile Buttons & LED** | GPIO Digital I/O | BOOT: `GPIO 0`<br>POWER: `GPIO 18`<br>LED: `GPIO 3` (Open-Drain) | External $10\,\text{k}\Omega$ Pull-ups to 3.3V<br>Internal Pull-ups in parallel ($45\,\text{k}\Omega$)<br>LED: 0 = ON, 1 = OFF<br>Debounce: 30ms, Hold: 2500ms | ULP GPIO Wakeup (Pure Event Mode): LOW level on 0, 5 & 18 | `components/h1os/src/hal_io.c` |
 
 ---
 
@@ -30,9 +30,9 @@ The table below defines the exact hardware assignment, physical pins, electrical
 - **Active Level:** Active LOW (`0 = Power ON`, `1 = Power OFF`).
 - **Deep Sleep:** Held LOW (`0`) in RTC IO domain to keep the SSD1681 and SHTC3 powered in deep sleep so they maintain RAM and calibration.
 
-### Rule 3: PA_EN (GPIO 42) & ESD Diode Clamping Hazard
+### Rule 3: PA_EN (GPIO 42) & Shared I2C Bus Disruption Hazard
 - **Active Level:** Active LOW (`0 = Power ON`, `1 = Power OFF`).
-- **Critical Hardware Quirk:** Cutting `PA_EN` HIGH (`1`) while the shared I2C bus (GPIO 47/48) is pulled up to 3.3V forward-biases the ES8311 internal ESD diodes, clamping SDA/SCL to ~0.7V (see [`ERRATA.md` Errata E4](../../ERRATA.md#e4-es8311-esd-diode-i2c-bus-clamping)).
+- **Critical Hardware Quirk:** Cutting `PA_EN` HIGH (`1`) while the shared I2C bus (GPIO 47/48) is pulled up to 3.3V takes down the entire shared bus, halting communication with the SHTC3 and PCF85063 (see [`ERRATA.md` Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus)).
 - **Mandate:** `PA_EN` **MUST REMAIN ENERGIZED (LOW / 0)** during all normal and sleep operations. Audio power saving is achieved strictly via ES8311 software standby and NS4168 mute (`PA_CTRL GPIO 46 = 0`).
 
 ### Rule 4: I2S Clock Stability & Dynamic Frequency Scaling (DFS)

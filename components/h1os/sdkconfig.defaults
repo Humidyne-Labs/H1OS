@@ -1,20 +1,20 @@
-# =========================================================================
+# -------------------------------------------------------------------------
 # H1OS Hardware & Silicon Invariants (ESP32-S3-PICO-1-N8R8)
 # Target Board: Waveshare ESP32-S3 Touch ePaper 1.54" V2
 # Layer: H1OS Component Hardware Baseline (Shared Across All Applications)
-# =========================================================================
+# -------------------------------------------------------------------------
 
 CONFIG_IDF_TARGET="esp32s3"
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # CPU Frequency: Max 240MHz (DFS Baseline Gated to 80MHz, Turbo Blitz at 240MHz)
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # Flash & Octal PSRAM (ESP32-S3-PICO-1-N8R8 Invariants)
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
@@ -29,9 +29,9 @@ CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
 CONFIG_SPIRAM_MEMTEST=n
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # Power Management & Sleep Power Domains
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_PM_ENABLE=y
 CONFIG_PM_DFS_INIT_AUTO=n
 CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP=y
@@ -40,32 +40,32 @@ CONFIG_PM_RESTORE_CACHE_TAGMEM_AFTER_LIGHT_SLEEP=y
 CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n
 CONFIG_RTC_CLK_SRC_INT_RC=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # Bootloader & Startup Latency Reduction
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_BOOTLOADER_RESERVE_RTC_MEM=y
 CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # Ultra Low Power (ULP) Coprocessor (RISC-V)
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_ULP_COPROC_ENABLED=y
 CONFIG_ULP_COPROC_TYPE_RISCV=y
 CONFIG_ULP_COPROC_RESERVE_MEM=4096
 CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # FreeRTOS & System Invariants
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # LVGL v9 Graphics Engine (Debloated 1-Bit Monochrome SSD1681 200x200)
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_COLOR_DEPTH_1=y
 CONFIG_LV_COLOR_DEPTH=1
@@ -82,7 +82,6 @@ CONFIG_LV_USE_LABEL=y
 CONFIG_LV_USE_BUTTON=y
 CONFIG_LV_USE_LINE=y
 CONFIG_LV_USE_IMAGE=y
-CONFIG_LV_USE_OBJ=y
 
 # Typography: Montserrat 14 & 20
 CONFIG_LV_FONT_MONTSERRAT_14=y
@@ -92,17 +91,6 @@ CONFIG_LV_FONT_MONTSERRAT_20=y
 # Build: Strip Unused Demos and Benchmark Assets
 CONFIG_LV_BUILD_EXAMPLES=n
 CONFIG_LV_BUILD_DEMOS=n
-CONFIG_LV_USE_DEMO_WIDGETS=n
-CONFIG_LV_USE_DEMO_KEYPAD_AND_ENCODER=n
-CONFIG_LV_USE_DEMO_BENCHMARK=n
-CONFIG_LV_USE_DEMO_RENDER=n
-CONFIG_LV_USE_DEMO_STRESS=n
-CONFIG_LV_USE_DEMO_MUSIC=n
-CONFIG_LV_USE_DEMO_FLEX_LAYOUT=n
-CONFIG_LV_USE_DEMO_MULTILANG=n
-CONFIG_LV_USE_DEMO_TRANSFORM=n
-CONFIG_LV_USE_DEMO_SCROLL=n
-CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC=n
 
 # Themes & Layouts
 CONFIG_LV_USE_THEME_DEFAULT=n

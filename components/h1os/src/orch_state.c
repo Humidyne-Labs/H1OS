@@ -7,6 +7,7 @@
  */
 
 #include "h1os/orch_state.h"
+#include "h1os/sub_nvs.h"
 
 #include "esp_attr.h"
 #include "esp_system.h"
@@ -35,14 +36,56 @@ void RTC_IRAM_ATTR orch_state_reset(void)
         p[i] = 0;
     }
 
-    s_persisted_state.magic                    = ORCH_RTC_MAGIC;
-    s_persisted_state.sample_interval_sec      = 0;
-    s_persisted_state.flow_b_period_sec        = 0;
-    s_persisted_state.window_low_temp_centi_c  = 0;
-    s_persisted_state.window_high_temp_centi_c = 0;
-    s_persisted_state.last_glass_temp_centi_c  = 0;
-    s_persisted_state.trinode_confidence_pct   = 0;
-    s_persisted_state.tsens_offset_centi_c     = 2052;
+    s_persisted_state.magic                = ORCH_RTC_MAGIC;
+    s_persisted_state.tsens_offset_centi_c = ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C;
+}
+
+void orch_state_save_runtimes_to_nvs(void)
+{
+    volatile orch_persisted_state_t *st = orch_state_get();
+    orch_nvs_runtime_blob_t blob = {
+        .total_sleep_sec  = st->total_sleep_sec,
+        .total_app_run_ms = st->total_app_run_ms,
+        .initial_soc_x10  = st->initial_soc_x10,
+        .reserved         = 0,
+    };
+    (void)sub_nvs_set_blob("pwr_lap_st", &blob, sizeof(blob));
+}
+
+void orch_state_load_runtimes_from_nvs(void)
+{
+    volatile orch_persisted_state_t *st = orch_state_get();
+    orch_nvs_runtime_blob_t blob = {0};
+    size_t len = sizeof(blob);
+    if (sub_nvs_get_blob("pwr_lap_st", &blob, &len) == ESP_OK && len == sizeof(blob)) {
+        st->total_sleep_sec     = blob.total_sleep_sec;
+        st->total_app_run_ms    = blob.total_app_run_ms;
+        st->initial_soc_x10     = blob.initial_soc_x10;
+        st->last_nvs_commit_sec = blob.total_sleep_sec;
+        return;
+    }
+
+    /* Fallback to legacy u32 keys */
+    uint32_t val = 0;
+    if (sub_nvs_get_u32("pwr_sleep_s", &val) == ESP_OK) {
+        st->total_sleep_sec = val;
+    }
+    if (sub_nvs_get_u32("pwr_app_ms", &val) == ESP_OK) {
+        st->total_app_run_ms = val;
+    }
+    if (sub_nvs_get_u32("pwr_init_s10", &val) == ESP_OK) {
+        st->initial_soc_x10 = (uint16_t)val;
+    }
+}
+
+void orch_state_reset_discharge_lap(uint16_t current_soc_x10)
+{
+    volatile orch_persisted_state_t *st = orch_state_get();
+    st->initial_soc_x10      = (current_soc_x10 > 0) ? current_soc_x10 : 1000;
+    st->total_sleep_sec      = 0;
+    st->total_app_run_ms     = 0;
+    st->last_nvs_commit_sec  = 0;
+    orch_state_save_runtimes_to_nvs();
 }
 
 /**
@@ -87,7 +130,7 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample)
 /**
  * @brief Get the newest sample in the ring buffer marked SAMPLE_FLAG_VALID_COLD.
  *
- * @details Falls back to the latest sample if no sample has been marked valid yet.
+ * @details Defaults to the latest sample if no sample has been marked valid yet.
  *
  * @param[out]   out_sample      Destination pointer.
  *

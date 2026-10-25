@@ -4,12 +4,12 @@
 **Test Window:** `2026-10-21 01:23 AM` to `01:52 PM` (`12 hours 29 minutes` / `749 minutes`)  
 **Firmware Profile:** `H1OS v2.3.2-dev` (`Flow A = 60s`, `Flow B = 300s`, `4 samples + 5th slice wake`)  
 
-## 1. Executive Summary & Architectural Doctrine
+## 1. Executive Summary & Architectural Specification
 
 ### 1.1 Sleep/Wake Orchestration & Runtime Stability: 100% Pass
 Over `749 minutes` of continuous unattended operation, H1OS executed **761 deep-sleep wakes** and **153 full Flow B display cycles** (`4` bare-metal Flow A sensor sprints pushed to the 32-sample ring buffer per cycle, waking into Flow B on slice `5`) with **zero deadlocks, zero sleep rejections, zero ULP traps, and zero I2C bus lockups**. All previous Cycle 7 race conditions between Core 0/1 LVGL flushing, PCF85063A `/INT` open-drain pulse release, and ULP GPIO wakeup gating are completely resolved.
 
-### 1.2 The Zero-Calibration Hardware Doctrine
+### 1.2 The Zero-Calibration Hardware Architecture
 The Sensirion SHTC3 comes **factory-calibrated to a high degree of accuracy (`±0.2°C`, `±2% RH`)**:
 - Comparing the end-of-test water vapor partial pressure (`13.60 hPa`, Dew Point `12.1°C / 53.9°F`) against the true room reference (`71.0°F / 21.67°C`, `53.0% RH`, `13.70 hPa`, Dew Point `11.7°C / 53.0°F`) confirms the SHTC3 sensing element is within **0.7% (`-0.10 hPa`)** of the room reference.
 - The `+2.23°C` (`+4.0°F`) discrepancy observed during the nightly run was **not** a sensor calibration error—it was caused by **board heat** from peripheral bugs (`ES8311` standby reset bug leaving analog bias active at ~4 mA, `NS4168` `PA_CTRL` readback bug, `240 MHz` CPU locks held across mechanical EPD `BUSY` waits, and the 8 MB PSRAM march test running on every wake).

@@ -12,6 +12,7 @@
 #include "esp_sleep.h"
 #include "esp_system.h"
 #include "hal_types.h"
+#include "sub_power.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -20,7 +21,21 @@
 extern "C" {
 #endif
 
+#include "h1os_constants.h"
 #include "h1os_version.h"
+
+/**
+ * @brief Default compound literal macro for standard lifecycle session configuration.
+ */
+#define H1OS_LIFECYCLE_DEFAULT_CONFIG() { \
+    .session = { \
+        .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC, \
+        .clk_mode               = SYS_CLK_MODE_DYNAMIC, \
+        .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC, \
+        .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC, \
+    }, \
+    .presentation = { 0 } \
+}
 
 /**
  * @brief Platform wakeup context descriptor.
@@ -45,7 +60,7 @@ typedef enum {
     H1OS_SPLASH_BOOT = 0, /**< Initial cold boot / power-on splash screen.        */
     H1OS_SPLASH_SLEEP,    /**< Transition to unattended deep sleep splash screen. */
     H1OS_SPLASH_SHUTDOWN, /**< Orderly physical power-down splash screen.         */
-    H1OS_SPLASH_MAX       /**< Sentinel maximum splash enum value.                */
+    H1OS_SPLASH_MAX       /**< Maximum splash enum value.                         */
 } h1os_splash_type_t;
 
 /**
@@ -155,12 +170,14 @@ typedef struct {
     uint16_t boot_vbat_mv;           /**< Initial non-USB battery voltage captured on boot in millivolts.    */
     uint8_t battery_percent;         /**< Estimated battery state-of-charge percentage (0..100%).            */
     bool is_usb_powered;             /**< True if USB VBUS power connection is actively detected.            */
+    h1os_battery_state_t battery_state; /**< Charge / discharge / charged operational state.                 */
+    h1os_autonomy_metrics_t autonomy;   /**< Empirical battery autonomy metrics over total elapsed runtime.  */
 } h1os_telemetry_t;
 
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.3.2-dev").
+ * @return Null-terminated semantic version string (e.g. "2.4.0-dev").
  */
 static inline const char *h1os_get_version(void)
 {

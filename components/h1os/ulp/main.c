@@ -13,6 +13,7 @@
 #include "ulp_riscv_adc_ulp_core.h"
 #include "ulp_riscv_gpio.h"
 #include "ulp_riscv_utils.h"
+#include "orch_state.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -28,35 +29,31 @@ volatile uint32_t remainder_sec   = 0;
 volatile uint32_t rtc_int_stuck   = 0;
 volatile uint32_t dispatch_reason = 0;
 volatile uint32_t gpio_status_raw = 0;
-volatile uint32_t entry_ccount    = 0;
-volatile uint32_t exit_ccount     = 0;
 
-volatile uint32_t cal_scale       = 3100;
+volatile uint32_t cal_scale       = 8601;
 volatile int32_t  cal_offset      = 0;
 volatile uint32_t last_vbat_mv    = 4000;
 volatile uint32_t vbat_raw_adc    = 0;
 volatile uint32_t usb_connected   = 0;
 
-#define RTC_INT_PIN                GPIO_NUM_5
-#define RTC_INT_TIMEOUT_US         50000
-#define RTC_INT_POLL_US            100
+#define ULP_VBAT_RING_SIZE 8
+volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};
+volatile uint32_t vbat_ring_head  = 0;
+volatile uint32_t vbat_ring_count = 0;
 
-#define BUTTON_DEBOUNCE_US         30000
-#define BUTTON_HOLD_US             2500000
-#define BUTTON_TAP_MIN_MS          50
-#define BUTTON_TAP_MAX_MS          800
-#define BUTTON_POLL_US             10000
-#define BUTTON_RELEASE_TIMEOUT_US  50000
+#define RTC_INT_PIN                    GPIO_NUM_5
+#define RTC_INT_TIMEOUT_US             50000
+#define RTC_INT_POLL_US                100
 
-#define PMU_RDY_SPIN_MAX           50000
-#define ADC_CONV_SPIN_MAX          10000
+#define BUTTON_DEBOUNCE_US             30000
+#define BUTTON_HOLD_US                 2500000
+#define BUTTON_TAP_MIN_MS              30
+#define BUTTON_TAP_MAX_MS              2500
+#define BUTTON_POLL_US                 5000
+#define BUTTON_RELEASE_TIMEOUT_US      50000
 
-#define ULP_DISPATCH_NONE              0
-#define ULP_DISPATCH_SENSOR_SAMPLE     1
-#define ULP_DISPATCH_MAIN_WAKE         2
-#define ULP_DISPATCH_CRITICAL_SHUTDOWN 3
-#define ULP_DISPATCH_BOOTLOADER_JUMP   4
-#define ULP_DISPATCH_POWER_OFF         5
+#define PMU_RDY_SPIN_MAX               50000
+#define ADC_CONV_SPIN_MAX              10000
 // clang-format on
 
 /**
@@ -68,11 +65,14 @@ volatile uint32_t usb_connected   = 0;
  */
 static inline uint32_t ulp_raw_to_mv(int32_t raw)
 {
-    if (raw <= 0) return 0;
+    if (raw <= 0) {
+        return 0;
+    }
 
-    uint32_t v_adc = ((uint32_t)raw * cal_scale) >> 12;
-    int32_t vbat = (int32_t)(v_adc * 2) + cal_offset;
-    if (vbat < 0) return 0;
+    int32_t vbat = (int32_t)(((uint32_t)raw * cal_scale) >> 12) + cal_offset;
+    if (vbat < 0) {
+        return 0;
+    }
     return (uint32_t)vbat;
 }
 
@@ -100,6 +100,7 @@ static inline void ulp_disarm_and_wake_main(void)
     while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_timeout > 0) {
     }
 
+    asm volatile("fence" ::: "memory");
     ulp_riscv_wakeup_main_processor();
 }
 
@@ -148,14 +149,14 @@ static bool ulp_read_vbat_adc_bounded(int32_t *out_raw)
  * @param[in]    rtc_int         RTC INT line state (0 = active).
  * @param[in]    vbat_mv         Current battery voltage in millivolts.
  */
-static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_btn, int rtc_int, uint32_t vbat_mv)
+static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32_t pwr_btn, int32_t rtc_int, uint32_t vbat_mv)
 {
     bool wake_main = false;
 
     /* 1. Critical battery brownout guard */
     if (!usb_connected && (vbat_mv >= 100 && vbat_mv < 3250)) {
-        last_wake_cause = 6;
-        last_wake_btn   = 0;
+        last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
+        last_wake_btn   = H1OS_WAKE_BTN_NONE;
         dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
         wake_main       = true;
     }
@@ -164,8 +165,8 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
     if (!wake_main && (((rtcio_int_st & (BIT(0) | BIT(18))) != 0) || boot_btn == 0 || pwr_btn == 0)) {
         ulp_riscv_delay_us(BUTTON_DEBOUNCE_US);
 
-        int boot_now = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-        int pwr_now  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
+        int32_t boot_now = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_0);
+        int32_t pwr_now  = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_18);
 
         if (boot_now == 0 || pwr_now == 0) {
             bool is_boot = (boot_now == 0);
@@ -185,23 +186,27 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
             if (long_held) {
                 if (is_boot) {
-                    last_wake_cause = 1;
-                    last_wake_btn   = 1;
+                    last_wake_cause = ULP_WAKE_CAUSE_BOOT_BTN;
+                    last_wake_btn   = H1OS_WAKE_BTN_BOOT;
                     dispatch_reason = ULP_DISPATCH_BOOTLOADER_JUMP;
                     wake_main       = true;
                 } else {
-                    last_wake_cause = 2;
-                    last_wake_btn   = 2;
+                    last_wake_cause = ULP_WAKE_CAUSE_PWR_BTN;
+                    last_wake_btn   = H1OS_WAKE_BTN_POWER;
                     dispatch_reason = ULP_DISPATCH_POWER_OFF;
                     wake_main       = true;
                 }
             } else {
-                uint32_t hold_ms = elapsed_us / 1000;
-                if (hold_ms >= BUTTON_TAP_MIN_MS && hold_ms <= BUTTON_TAP_MAX_MS) {
-                    last_wake_cause = is_boot ? 1 : 2;
-                    last_wake_btn   = is_boot ? 1 : 2;
-                    dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
-                    wake_main       = true;
+                /* Wait for contact bounce on button release to settle HIGH (Wake-on-Release rule) */
+                ulp_riscv_delay_us(BUTTON_DEBOUNCE_US);
+                if (ulp_riscv_gpio_get_level(pin) != 0) {
+                    uint32_t hold_ms = elapsed_us / 1000U;
+                    if (hold_ms >= BUTTON_TAP_MIN_MS && hold_ms < BUTTON_TAP_MAX_MS) {
+                        last_wake_cause = is_boot ? ULP_WAKE_CAUSE_BOOT_BTN : ULP_WAKE_CAUSE_PWR_BTN;
+                        last_wake_btn   = is_boot ? H1OS_WAKE_BTN_BOOT : H1OS_WAKE_BTN_POWER;
+                        dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
+                        wake_main       = true;
+                    }
                 }
             }
         }
@@ -209,20 +214,20 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
     /* 3. External PCF85063A RTC countdown interrupt evaluation (independent of button glitches) */
     if (!wake_main) {
-        int rtc_int_now = ulp_riscv_gpio_get_level(RTC_INT_PIN);
+        int32_t rtc_int_now = (int32_t)ulp_riscv_gpio_get_level(RTC_INT_PIN);
         if (((rtcio_int_st & BIT(5)) != 0) || rtc_int == 0 || rtc_int_now == 0) {
             slice_counter++;
 
             if (slice_counter < overflow_limit) {
-                last_wake_cause = 4;
-                last_wake_btn   = 0;
+                last_wake_cause = ULP_WAKE_CAUSE_SENSOR_TICK;
+                last_wake_btn   = H1OS_WAKE_BTN_NONE;
                 dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
                 wake_main       = true;
             } else {
                 slice_counter   = 0;
                 remainder_sec   = 0;
-                last_wake_cause = 3;
-                last_wake_btn   = 0;
+                last_wake_cause = ULP_WAKE_CAUSE_LONG_OVERFLOW;
+                last_wake_btn   = H1OS_WAKE_BTN_NONE;
                 dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
                 wake_main       = true;
             }
@@ -243,15 +248,16 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int boot_btn, int pwr_b
 
         /* Wait for any lingering button release or contact bounce to settle high */
         uint32_t btn_wait_us = 0;
-        while ((ulp_riscv_gpio_get_level(GPIO_NUM_0) == 0 || ulp_riscv_gpio_get_level(GPIO_NUM_18) == 0) &&
+        while ((ulp_riscv_gpio_get_level(GPIO_NUM_0)  == 0 || 
+		        ulp_riscv_gpio_get_level(GPIO_NUM_18) == 0) &&
                (btn_wait_us < BUTTON_RELEASE_TIMEOUT_US)) {
             ulp_riscv_delay_us(RTC_INT_POLL_US);
             btn_wait_us += RTC_INT_POLL_US;
         }
 
         if (rtc_int_stuck) {
-            last_wake_cause = 5;
-            last_wake_btn   = 0;
+            last_wake_cause = ULP_WAKE_CAUSE_RTC_INT_STUCK;
+            last_wake_btn   = H1OS_WAKE_BTN_NONE;
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
             ulp_disarm_and_wake_main();
         } else {
@@ -270,10 +276,10 @@ int main(void)
 {
     /* If woken during final microsecond of PMU sleep entry, wait briefly for RDY_FOR_WAKEUP */
     uint32_t rdy_spin = PMU_RDY_SPIN_MAX;
-    while (!REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_spin > 0) {
+    while (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP) && --rdy_spin > 0) {
     }
 
-    if (!REG_GET_BIT(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
+    if (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
         /* Main processor is actively running; disarm ULP GPIO wake to prevent wake storm */
         CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
         ulp_clear_gpio_wakeup_latch();
@@ -284,31 +290,29 @@ int main(void)
     wake_counter++;
     asm volatile("fence" ::: "memory");
 
-    entry_ccount = ULP_RISCV_GET_CCOUNT();
-
     uint32_t rtcio_int_st = REG_GET_FIELD(RTC_GPIO_STATUS_REG, RTC_GPIO_STATUS_INT);
     gpio_status_raw = rtcio_int_st;
 
-    int boot_btn = ulp_riscv_gpio_get_level(GPIO_NUM_0);
-    int pwr_btn  = ulp_riscv_gpio_get_level(GPIO_NUM_18);
-    int rtc_int  = ulp_riscv_gpio_get_level(GPIO_NUM_5);
+    int32_t boot_btn = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_0);
+    int32_t pwr_btn  = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_18);
+    int32_t rtc_int  = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_5);
 
     bool is_btn_event = (((rtcio_int_st & (BIT(0) | BIT(18))) != 0) || boot_btn == 0 || pwr_btn == 0);
 
     uint32_t vbat_mv = last_vbat_mv;
-    if (usb_connected) {
-        vbat_mv = 4200;
-        last_vbat_mv = 4200;
-    } else if (!is_btn_event) {
+    if (!is_btn_event) {
         int32_t raw_adc = 0;
         if (ulp_read_vbat_adc_bounded(&raw_adc) && raw_adc > 0) {
-            vbat_raw_adc = (uint32_t)raw_adc;
-            vbat_mv = ulp_raw_to_mv(raw_adc);
-            last_vbat_mv = vbat_mv;
+            vbat_raw_adc              = (uint32_t)raw_adc;
+            vbat_mv                   = ulp_raw_to_mv(raw_adc);
+            last_vbat_mv              = vbat_mv;
+            vbat_ring[vbat_ring_head] = vbat_mv;
+            vbat_ring_head            = (vbat_ring_head + 1) % ULP_VBAT_RING_SIZE;
+            if (vbat_ring_count < ULP_VBAT_RING_SIZE) {
+                vbat_ring_count++;
+            }
         }
     }
-
-    exit_ccount = ULP_RISCV_GET_CCOUNT();
 
     ulp_dispatch_and_wake(rtcio_int_st, boot_btn, pwr_btn, rtc_int, vbat_mv);
     asm volatile("fence" ::: "memory");

@@ -42,7 +42,7 @@ esp_err_t sub_audio_init(uint8_t volume_pct);
 /**
  * @brief Put audio subsystem into low-power hardware standby.
  *
- * Mutes amplifier (GPIO 46 LOW), disables class-D power gate (GPIO 42 HIGH),
+ * Mutes amplifier (GPIO 46 LOW), maintains class-D power gate energized (GPIO 42 LOW per ERRATA E4),
  * and enters software power-down on ES8311.
  *
  * @return ESP_OK on success.

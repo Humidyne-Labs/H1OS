@@ -22,6 +22,10 @@
 
 static const char *TAG = "HAL_IO";
 
+#define HAL_IO_TASK_STACK_BREATH        2048U /**< LED breath PWM animation task stack.  */
+#define HAL_IO_TASK_PRIO_BREATH         1     /**< Idle-level priority for LED breath.   */
+#define HAL_IO_DEFAULT_BREATH_PERIOD_MS 2000U /**< Default LED breath period in ms (2s). */
+
 /**
  * @brief Early boot initialization of non-latched application pins.
  *
@@ -139,8 +143,9 @@ esp_err_t hal_led_pwm_init(void)
         .deconfigure = false,
     };
     esp_err_t err = ledc_timer_config(&timer_cfg);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     ledc_channel_config_t ch_cfg = {
         .gpio_num = HAL_PIN_STATUS_LED,
@@ -156,8 +161,9 @@ esp_err_t hal_led_pwm_init(void)
             },
     };
     err = ledc_channel_config(&ch_cfg);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     ledc_fade_func_install(0);
     s_led_pwm_active = true;
@@ -176,12 +182,14 @@ esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
 {
     if (!s_led_pwm_active) {
         esp_err_t err = hal_led_pwm_init();
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             return err;
+        }
     }
 
-    if (brightness_pct > 100)
+    if (brightness_pct > 100) {
         brightness_pct = 100;
+    }
     uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;
     ledc_set_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, duty);
     return ledc_update_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL);
@@ -201,20 +209,22 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
 {
     if (!s_led_pwm_active) {
         esp_err_t err = hal_led_pwm_init();
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             return err;
+        }
     }
 
-    if (target_pct > 100)
+    if (target_pct > 100) {
         target_pct = 100;
+    }
     uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;
     ledc_set_fade_with_time(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, target_duty, duration_ms);
     return ledc_fade_start(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
-static TaskHandle_t s_breath_task = NULL;
+static volatile TaskHandle_t s_breath_task = NULL;
 static volatile bool s_breathing_running = false;
-static uint32_t s_breath_period_ms = 2000;
+static volatile uint32_t s_breath_period_ms = HAL_IO_DEFAULT_BREATH_PERIOD_MS;
 
 /**
  * @brief Led breath task.
@@ -227,9 +237,10 @@ static void led_breath_task(void *arg)
 {
     (void)arg;
     while (s_breathing_running) {
-        uint32_t half = s_breath_period_ms / 2;
-        if (half < 100)
-            half = 100;
+        uint32_t half = s_breath_period_ms / 2U;
+        if (half < 100U) {
+            half = 100U;
+        }
 
         hal_led_fade_to(100, half);
         TickType_t start = xTaskGetTickCount();
@@ -237,8 +248,9 @@ static void led_breath_task(void *arg)
         while (s_breathing_running && (xTaskGetTickCount() - start < duration)) {
             vTaskDelay(pdMS_TO_TICKS(50));
         }
-        if (!s_breathing_running)
+        if (!s_breathing_running) {
             break;
+        }
 
         hal_led_fade_to(0, half);
         start = xTaskGetTickCount();
@@ -267,12 +279,13 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 {
     if (!s_led_pwm_active) {
         esp_err_t err = hal_led_pwm_init();
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             return err;
+        }
     }
 
     if (cycle_period_ms == 0) {
-        cycle_period_ms = 2000;
+        cycle_period_ms = HAL_IO_DEFAULT_BREATH_PERIOD_MS;
     }
     s_breath_period_ms = cycle_period_ms;
 
@@ -281,7 +294,7 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     }
 
     s_breathing_running = true;
-    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, &s_breath_task);
+    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", HAL_IO_TASK_STACK_BREATH, NULL, HAL_IO_TASK_PRIO_BREATH, (TaskHandle_t *)&s_breath_task);
     if (res != pdPASS) {
         s_breathing_running = false;
         s_breath_task = NULL;
@@ -301,7 +314,7 @@ esp_err_t hal_led_stop_breathing(void)
         return ESP_OK;
     }
     s_breathing_running = false;
-    int wait_cycles = 15;
+    int32_t wait_cycles = 15;
     while (s_breath_task != NULL && wait_cycles-- > 0) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -346,10 +359,10 @@ esp_err_t hal_led_pwm_deinit(void)
 
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
-        .mode = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1);
@@ -395,7 +408,7 @@ hal_btn_mask_t hal_io_read_buttons(void)
 /**
  * @brief Configures and locks dynamic peripheral lines prior to deep sleep.
  *
- * @details * Latches GPIO 11 (EPD_CS) and GPIO 9 (EPD_RST) HIGH via gpio_hold_en().
+ * @details * Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en().
  * Holds amplifier mute GPIO 46 (PA_CTRL) LOW.
  * Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18).
  * Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
@@ -410,17 +423,20 @@ esp_err_t hal_io_isolate_sleep_pads(void)
     gpio_set_level(HAL_PIN_EPD_RST, 1);
     gpio_hold_en(HAL_PIN_EPD_RST);
 
+    gpio_set_level(HAL_PIN_EPD_DC, 1);
+    gpio_hold_en(HAL_PIN_EPD_DC);
+
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     gpio_hold_en(HAL_PIN_PA_CTRL);
 
     /* Deinit i2s pins and latch to known state */
-    const gpio_num_t i2s_pins[] = { 
-        HAL_PIN_I2S_MCLK, HAL_PIN_I2S_SCLK, 
-        HAL_PIN_I2S_LRCK, HAL_PIN_I2S_DSDIN, 
+    const gpio_num_t i2s_pins[] = {
+        HAL_PIN_I2S_MCLK, HAL_PIN_I2S_SCLK,
+        HAL_PIN_I2S_LRCK, HAL_PIN_I2S_DSDIN,
         HAL_PIN_I2S_ASDOUT
     };
 
-    for(int i = 0;  i < sizeof(i2s_pins)/sizeof(i2s_pins[0]); i++) {
+    for (size_t i = 0; i < sizeof(i2s_pins) / sizeof(i2s_pins[0]); i++) {
         gpio_reset_pin(i2s_pins[i]); /**< Reset State Before Sleep */
         gpio_set_direction(i2s_pins[i], GPIO_MODE_OUTPUT);
         gpio_set_level(i2s_pins[i], 0);
@@ -457,6 +473,7 @@ esp_err_t hal_io_release_pad_holds(void)
 
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);
+    gpio_hold_dis(HAL_PIN_EPD_DC);
     gpio_hold_dis(HAL_PIN_PA_CTRL);
     gpio_hold_dis(HAL_PIN_STATUS_LED);
 

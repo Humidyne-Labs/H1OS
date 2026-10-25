@@ -27,6 +27,61 @@ typedef enum {
 } sub_power_sleep_mode_t;
 
 /**
+ * @brief Battery operational state machine.
+ */
+typedef enum {
+    H1OS_BATTERY_DISCHARGING = 0, /**< Normal autonomous battery discharge.        */
+    H1OS_BATTERY_CHARGING,        /**< Voltage rising over consecutive reads.      */
+    H1OS_BATTERY_CHARGED,         /**< Saturated voltage (>=4180 mV) or USB host.  */
+} h1os_battery_state_t;
+
+/**
+ * @brief Empirical battery autonomy metrics over total elapsed runtime.
+ */
+typedef struct {
+    float avg_draw_ma;          /**< Average current draw over total elapsed runtime in mA.       */
+    float autonomy_days;        /**< Remaining days at current duty cycle (-1.0f if calibrating). */
+    float mah_spent_lap;        /**< Total mAh consumed since initial_soc_x10.                    */
+} h1os_autonomy_metrics_t;
+
+/**
+ * @brief Retrieve calibrated resting battery voltage, SoC percentage, and charge state.
+ *
+ * @param[out] out_mv    Battery terminal voltage in millivolts.
+ * @param[out] out_pct   State-of-charge percentage (0..100%).
+ * @param[out] out_state Battery operational state (DISCHARGING, CHARGING, CHARGED).
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
+                                       uint8_t *out_pct,
+                                       h1os_battery_state_t *out_state);
+
+/**
+ * @brief Map battery terminal voltage to State-of-Charge in tenths of a percent (0..1000 = 0.0%..100.0%).
+ *
+ * @param[in] mv Terminal voltage in millivolts.
+ *
+ * @return State of charge in tenths of a percent (0 to 1000).
+ */
+uint16_t sub_power_mv_to_soc_tenths(uint16_t mv);
+
+/**
+ * @brief Calculate empirical battery autonomy metrics over total elapsed runtime.
+ *
+ * @param[in]  initial_soc_x10 Starting SoC for the current discharge lap in tenths of a % (0..1000).
+ * @param[in]  current_soc_x10 Current evaluated SoC in tenths of a % (0..1000).
+ * @param[in]  total_sleep_sec Cumulative deep sleep time in seconds.
+ * @param[in]  total_app_ms    Cumulative main processor active runtime in milliseconds.
+ * @param[out] out_metrics     Destination structure for calculated autonomy metrics.
+ */
+void sub_power_calc_autonomy(uint16_t initial_soc_x10,
+                             uint16_t current_soc_x10,
+                             uint32_t total_sleep_sec,
+                             uint32_t total_app_ms,
+                             h1os_autonomy_metrics_t *out_metrics);
+
+/**
  * @brief Initialize battery ADC channel and calibration engine.
  *
  * Configures ADC1 Channel 3 on GPIO 4 with curve fitting calibration.

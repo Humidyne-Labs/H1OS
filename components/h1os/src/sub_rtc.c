@@ -8,6 +8,7 @@
 
 #include "h1os/sub_rtc.h"
 
+#include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -36,12 +37,12 @@ static const char *TAG = "sub_rtc";
 #define CTRL1_STOP_MASK      (1 << 5)
 #define CTRL1_12_24_MASK     (1 << 1)
 #define CTRL1_CAP_SEL_12_5PF (1 << 0)
-#define CTRL1_SW_RESET_CMD    0x58
+#define CTRL1_SW_RESET_CMD   0x58
 
 #define CTRL2_AF_MASK  (1 << 6)
 #define CTRL2_TF_MASK  (1 << 3)
 #define CTRL2_AIE_MASK (1 << 7)
-#define CTRL2_COF_OFF   0x07
+#define CTRL2_COF_OFF  0x07
 
 #define TIMER_CLK_4096_HZ    (0 << 3)
 #define TIMER_CLK_64_HZ      (1 << 3)
@@ -60,7 +61,7 @@ static const char *TAG = "sub_rtc";
  */
 static inline uint8_t bcd2dec(uint8_t val)
 {
-    return ((val >> 4) * 10) + (val & 0x0F);
+    return (uint8_t)(((val >> 4) * 10) + (val & 0x0F));
 }
 
 /**
@@ -72,7 +73,7 @@ static inline uint8_t bcd2dec(uint8_t val)
  */
 static inline uint8_t dec2bcd(uint8_t val)
 {
-    return ((val / 10) << 4) | (val % 10);
+    return (uint8_t)(((val / 10) << 4) | (val % 10));
 }
 
 /**
@@ -192,13 +193,13 @@ esp_err_t sub_rtc_get_time(struct tm *out_time)
         return err;
     }
 
-    out_time->tm_sec = bcd2dec(data[0] & 0x7F);
-    out_time->tm_min = bcd2dec(data[1] & 0x7F);
-    out_time->tm_hour = bcd2dec(data[2] & 0x3F);
-    out_time->tm_mday = bcd2dec(data[3] & 0x3F);
-    out_time->tm_wday = data[4] & 0x07;
-    out_time->tm_mon = bcd2dec(data[5] & 0x1F) - 1;
-    out_time->tm_year = bcd2dec(data[6]) + 100;
+    out_time->tm_sec   = bcd2dec(data[0] & 0x7F);
+    out_time->tm_min   = bcd2dec(data[1] & 0x7F);
+    out_time->tm_hour  = bcd2dec(data[2] & 0x3F);
+    out_time->tm_mday  = bcd2dec(data[3] & 0x3F);
+    out_time->tm_wday  = data[4] & 0x07;
+    out_time->tm_mon   = bcd2dec(data[5] & 0x1F) - 1;
+    out_time->tm_year  = bcd2dec(data[6]) + 100;
     out_time->tm_isdst = -1;
 
     return ESP_OK;
@@ -218,9 +219,9 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
     }
 
     uint8_t ctrl1 = 0;
-    pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1);
+    ESP_RETURN_ON_ERROR(pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1), TAG, "Failed to read Control_1");
     ctrl1 |= (1 << 5);
-    pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
+    ESP_RETURN_ON_ERROR(pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1), TAG, "Failed to stop RTC oscillator");
 
     uint8_t data[7];
     data[0] = dec2bcd((uint8_t)time->tm_sec) & 0x7F;
@@ -234,9 +235,9 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
     esp_err_t err = pcf85063_write_reg(RTC_REG_SECONDS, data, sizeof(data));
 
     ctrl1 &= ~(1 << 5);
-    pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
+    esp_err_t resume_err = pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
 
-    return err;
+    return (err != ESP_OK) ? err : resume_err;
 }
 
 /**
@@ -267,25 +268,29 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 
     uint8_t stop_mode = clk_src | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
     esp_err_t err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, stop_mode);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     err = pcf85063_write_reg_u8(RTC_REG_TIMER_VALUE, timer_value);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     uint8_t ctrl2 = 0;
     err = pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
     err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     uint8_t check_ctrl2 = 0xFF;
-    for (int retry = 0; retry < 3; retry++) {
+    for (int32_t retry = 0; retry < 3; retry++) {
         pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);
         if (!(check_ctrl2 & (CTRL2_TF_MASK | CTRL2_AF_MASK))) {
             break;
@@ -299,8 +304,9 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
 
     uint8_t timer_mode = clk_src | TIMER_ENABLE_BIT | TIMER_INT_ENABLE_BIT | TIMER_PULSE_MODE_BIT;
     err = pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, timer_mode);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     uint8_t check_mode = 0;
     pcf85063_read_reg(RTC_REG_TIMER_MODE, &check_mode, 1);
@@ -321,10 +327,10 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
  */
 esp_err_t sub_rtc_cancel_countdown(void)
 {
-    pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0);
+    ESP_RETURN_ON_ERROR(pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0), TAG, "Failed to disable timer mode");
 
     uint8_t ctrl2 = 0;
-    pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
+    ESP_RETURN_ON_ERROR(pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1), TAG, "Failed to read Control_2");
     ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
     return pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
 }
@@ -340,13 +346,15 @@ esp_err_t sub_rtc_cancel_countdown(void)
  */
 esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec)
 {
-    if (out_sec == NULL)
+    if (out_sec == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     uint8_t timer_mode = 0;
     esp_err_t err = pcf85063_read_reg(RTC_REG_TIMER_MODE, &timer_mode, 1);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     if (!(timer_mode & TIMER_ENABLE_BIT)) {
         *out_sec = 0;
@@ -355,8 +363,9 @@ esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec)
 
     uint8_t timer_val = 0;
     err = pcf85063_read_reg(RTC_REG_TIMER_VALUE, &timer_val, 1);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     uint8_t clk_src = timer_mode & (3 << 3);
     if (clk_src == TIMER_CLK_1_60_HZ) {
@@ -382,18 +391,22 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer)
 {
     uint8_t ctrl2 = 0;
     esp_err_t err = pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
-    if (out_alarm)
+    if (out_alarm) {
         *out_alarm = (ctrl2 & CTRL2_AF_MASK) != 0;
-    if (out_timer)
+    }
+    if (out_timer) {
         *out_timer = (ctrl2 & CTRL2_TF_MASK) != 0;
+    }
 
     ctrl2 = (ctrl2 & ~(CTRL2_AF_MASK | CTRL2_TF_MASK)) | CTRL2_COF_OFF;
     err = pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
         return err;
+    }
 
     uint8_t check_ctrl2 = 0;
     pcf85063_read_reg(RTC_REG_CONTROL_2, &check_ctrl2, 1);

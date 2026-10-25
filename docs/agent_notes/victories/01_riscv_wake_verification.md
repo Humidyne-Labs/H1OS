@@ -18,7 +18,7 @@ Across four days of architectural debate and rigorous hardware characterization 
    - In `ulp_riscv_config_and_run()`, the driver deliberately clears `RTC_CNTL_ULP_CP_SLP_TIMER_EN` before arming `GPIO_WAKEUP_ENA`.
 
 4. **Devin's Full and Final Concession**:
-   - Following register readbacks and tick count telemetry, Devin formally conceded the architectural debate, confirming that the Stage 3 PASS banner was a test-harness artifact (`ulp_completed == 1`) and adopting the H1OS doctrine without reservation.
+   - Following register readbacks and tick count telemetry, Devin formally conceded the architectural debate, confirming that the Stage 3 PASS banner was a test-harness artifact (`ulp_completed == 1`) and adopting the H1OS architecture without reservation.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TD
 
 ## Final Architecture Mandates for H1OS
 
-1. **Pure Event Mode Doctrine**:
+1. **Pure Event Mode Architecture Mandate**:
    - The ULP-RISC-V coprocessor must be configured and operated strictly in **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`).
    - `RTC_CNTL_ULP_CP_SLP_TIMER_EN` must remain strictly set to `0`.
 

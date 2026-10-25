@@ -39,7 +39,8 @@ static const char *TAG = "orch_flow";
 #include <string.h>
 
 #define ORCH_HISTORICAL_EWMA_ALPHA 0.25f
-#define ORCH_TRINODE_SPAN_C        5.0f
+#define ORCH_TRINODE_SPAN_C        15.0f
+#define ORCH_RTC_ARM_RETRY_LIMIT   3U /**< Maximum retries attempting PCF85063A countdown timer arming. */
 
 #include "ulp_h1os.h"
 
@@ -65,10 +66,10 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         } else {
             st->tsens_cal_centi_c = 0;
         }
-        st->tsens_offset_centi_c = (int16_t)(2052 + st->tsens_cal_centi_c);
+        st->tsens_offset_centi_c = (int16_t)(ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C + st->tsens_cal_centi_c);
 
-        uint32_t g17_out = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
-        uint32_t g17_oe = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
+        uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
+        uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
         uint32_t g17_hold = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> 17) & 1U;
         ESP_LOGI(TAG, "System boot detected. Boot count: %lu (eFuse TSENS cal: %.2f C, intercept: %d cC) | BL Hook GPIO17[out=%lu, oe=%lu, rtc_hold=%lu]",
                         (unsigned long)st->boot_count,
@@ -124,18 +125,19 @@ bool orch_flow_is_thermal_lockout(void)
  */
 static void orch_flow_dump_ring_debug(const volatile orch_persisted_state_t *st)
 {
-    if (st == NULL)
+    if (st == NULL) {
         return;
+    }
 
     static float shtc3T_ring[ORCH_RING_CAPACITY];
     static float shtc3RH_ring[ORCH_RING_CAPACITY];
     static float mcuT_ring[ORCH_RING_CAPACITY];
     static float epdT_ring[ORCH_RING_CAPACITY];
 
-    memset(shtc3T_ring, 0, sizeof(shtc3T_ring));
+    memset(shtc3T_ring,  0, sizeof(shtc3T_ring));
     memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
-    memset(mcuT_ring, 0, sizeof(mcuT_ring));
-    memset(epdT_ring, 0, sizeof(epdT_ring));
+    memset(mcuT_ring,    0, sizeof(mcuT_ring));
+    memset(epdT_ring,    0, sizeof(epdT_ring));
 
     ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
     for (uint32_t i = 0; i < ORCH_RING_CAPACITY; i++) {
@@ -143,7 +145,7 @@ static void orch_flow_dump_ring_debug(const volatile orch_persisted_state_t *st)
         shtc3RH_ring[i] = (float)st->ring[i].shtc3_rh_centi_pct / 100.0f;
         mcuT_ring[i]    = (float)st->ring[i].mcu_tsens_centi_c / 100.0f;
         epdT_ring[i]    = (float)st->ring[i].epd_glass_centi_c / 100.0f;
-        ESP_LOGI(TAG, " [%02d] %.2f, %.2f, %.2f, %.2f", i,
+        ESP_LOGI(TAG, " [%02lu] %.2f, %.2f, %.2f, %.2f", (unsigned long)i,
                         (double)shtc3T_ring[i],
                         (double)shtc3RH_ring[i],
                         (double)mcuT_ring[i],
@@ -170,10 +172,12 @@ static void orch_flow_scan_ring_metrics(volatile orch_persisted_state_t *st)
     for (uint32_t i = 0; i < count; i++) {
         if (st->ring[i].quality_flags & SAMPLE_FLAG_VALID_COLD) {
             int16_t s_t = st->ring[i].shtc3_temp_centi_c;
-            if (s_t < current_low)
+            if (s_t < current_low) {
                 current_low = s_t;
-            if (s_t > current_high)
+            }
+            if (s_t > current_high) {
                 current_high = s_t;
+            }
             sum_shtc3 += s_t;
             sum_die += st->ring[i].mcu_tsens_centi_c;
             valid_cnt++;
@@ -183,10 +187,12 @@ static void orch_flow_scan_ring_metrics(volatile orch_persisted_state_t *st)
     if (valid_cnt == 0) {
         for (uint32_t i = 0; i < count; i++) {
             int16_t s_t = st->ring[i].shtc3_temp_centi_c;
-            if (s_t < current_low)
+            if (s_t < current_low) {
                 current_low = s_t;
-            if (s_t > current_high)
+            }
+            if (s_t > current_high) {
                 current_high = s_t;
+            }
             sum_shtc3 += s_t;
             sum_die += st->ring[i].mcu_tsens_centi_c;
             valid_cnt++;
@@ -225,12 +231,15 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     if (st->total_samples == 0) {
         ESP_LOGI(TAG, "Flow A Telemetry: [COLD BOOT / NO SAMPLES YET] total_samples=0, glass=%.2f C",
                         (double)((float)st->last_glass_temp_centi_c / 100.0f));
-        if (out_temp_c)
+        if (out_temp_c) {
             *out_temp_c = 0.0f;
-        if (out_rh_pct)
+        }
+        if (out_rh_pct) {
             *out_rh_pct = 0.0f;
-        if (out_dew_c)
+        }
+        if (out_dew_c) {
             *out_dew_c = 0.0f;
+        }
         return ESP_OK;
     }
 
@@ -265,10 +274,12 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     float t_trinode = (t_valid + t_die + t_glass) / 3.0f;
     float delta_trinode = t_valid - t_trinode;
     float conf = 100.0f - ((fabsf(delta_trinode) / ORCH_TRINODE_SPAN_C) * 100.0f);
-    if (conf < 0.0f)
+    if (conf < 0.0f) {
         conf = 0.0f;
-    if (conf > 100.0f)
+    }
+    if (conf > 100.0f) {
         conf = 100.0f;
+    }
 
     st->trinode_temp_c         = t_trinode;
     st->trinode_delta_c        = delta_trinode;
@@ -320,12 +331,15 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
         orch_flow_dump_ring_debug(st);
     }
 
-    if (out_temp_c)
+    if (out_temp_c) {
         *out_temp_c = t_valid;
-    if (out_rh_pct)
+    }
+    if (out_rh_pct) {
         *out_rh_pct = rh_valid;
-    if (out_dew_c)
+    }
+    if (out_dew_c) {
         *out_dew_c = dew;
+    }
     return ESP_OK;
 }
 
@@ -360,8 +374,14 @@ static void orch_flow_quiesce_peripherals(void)
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
-    uint32_t flow_a_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60;
-    uint32_t flow_b_sec = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : sleep_sec;
+    uint32_t flow_a_sec = st->sample_interval_sec;
+    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : st->flow_b_period_sec;
+
+    if (flow_a_sec == 0 || flow_b_sec == 0) {
+        ESP_LOGE(TAG, "Cannot execute sleep: unconfigured flow periods (flow_a=%lu, flow_b=%lu)",
+                 (unsigned long)flow_a_sec, (unsigned long)flow_b_sec);
+        return ESP_ERR_INVALID_STATE;
+    }
 
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder   = flow_b_sec % flow_a_sec;
@@ -372,7 +392,7 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 
     uint32_t initial_arm_sec = (full_slices > 0) ? flow_a_sec : remainder;
     esp_err_t rtc_err = ESP_FAIL;
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < (int32_t)ORCH_RTC_ARM_RETRY_LIMIT; attempt++) {
         rtc_err = sub_rtc_arm_countdown(initial_arm_sec);
         if (rtc_err == ESP_OK) {
             break;
@@ -380,20 +400,21 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
         vTaskDelay(pdMS_TO_TICKS(5));
     }
     if (rtc_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after 3 attempts: %s", esp_err_to_name(rtc_err));
+        ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after %u attempts: %s", (unsigned)ORCH_RTC_ARM_RETRY_LIMIT, esp_err_to_name(rtc_err));
     }
 
     orch_wake_stub_install();
     sub_power_set_sleep_slices(flow_a_sec, flow_b_sec, overflow, remainder);
 
     uint32_t internal_sleep_sec = 0;
-    if (flow_a_sec < sleep_sec) {
+    if (flow_a_sec < flow_b_sec) {
         internal_sleep_sec = flow_a_sec;
     }
 
-    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
-                    (unsigned long)sleep_sec,
-                    (unsigned long)internal_sleep_sec);
+    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus (Pure Event Mode: %lu slices x %lus)",
+                    (unsigned long)flow_b_sec,
+                    (unsigned long)overflow,
+                    (unsigned long)flow_a_sec);
 
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
