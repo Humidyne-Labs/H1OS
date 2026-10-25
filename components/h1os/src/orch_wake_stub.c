@@ -266,7 +266,7 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
         timer_val = (uint8_t)((seconds + 59) / 60);
     }
 
-    uint8_t stop_mode  = clk_src   | RTC_TIMER_INT_EN_BIT | RTC_TIMER_PULSE_BIT;
+    uint8_t stop_mode = clk_src | RTC_TIMER_INT_EN_BIT | RTC_TIMER_PULSE_BIT;
     uint8_t start_mode = stop_mode | RTC_TIMER_TE_BIT;
 
     /* 1. Stop timer */
@@ -335,16 +335,26 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_FUNC_SELECT(IO_MUX_GPIO48_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG); /* I2C SCL */
 
+    uint8_t err_code = ORCH_SENSOR_ERR_NONE;
     bool sample_ok = true;
-    i2c_start();
-    if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
-        i2c_stop();
+
+    if (sda_read() == 0) {
+        err_code = ORCH_SENSOR_ERR_BUS_STUCK;
         sample_ok = false;
-    } else {
-        i2c_write_byte(0x35);
-        i2c_write_byte(0x17);
-        i2c_stop();
-        esp_rom_delay_us(250);
+    }
+
+    if (sample_ok) {
+        i2c_start();
+        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+            i2c_stop();
+            err_code = ORCH_SENSOR_ERR_NACK_WAKE;
+            sample_ok = false;
+        } else {
+            i2c_write_byte(0x35);
+            i2c_write_byte(0x17);
+            i2c_stop();
+            esp_rom_delay_us(250);
+        }
     }
 
     int16_t die_centi_c = 0;
@@ -353,12 +363,13 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
             i2c_stop();
             shtc3_send_sleep();
+            err_code = ORCH_SENSOR_ERR_NACK_MEASURE;
             sample_ok = false;
         } else {
             i2c_write_byte(0x78);
             i2c_write_byte(0x66);
             i2c_stop();
-			
+
             /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
             die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, 0);
             esp_rom_delay_us(ORCH_SHTC3_POST_TSENS_DELAY_US);
@@ -370,6 +381,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         i2c_start();
         if (!i2c_write_byte((I2C_ADDR_SHTC3 << 1) | 1)) {
             i2c_stop();
+            err_code = ORCH_SENSOR_ERR_NACK_ADDR_RD;
             sample_ok = false;
         } else {
             rx[0] = i2c_read_byte(true);
@@ -384,12 +396,20 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         shtc3_send_sleep();
     }
 
-    if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {
-        uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
+    if (sample_ok) {
+        if (shtc3_crc8(&rx[0], 2) != rx[2] || shtc3_crc8(&rx[3], 2) != rx[5]) {
+            err_code = ORCH_SENSOR_ERR_CRC_FAIL;
+            sample_ok = false;
+        }
+    }
+
+    if (sample_ok) {
+        st->last_sensor_error = ORCH_SENSOR_ERR_NONE;
+        uint16_t raw_t = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
         /* Factory-calibrated SHTC3 transfer equations using 32-bit unsigned hardware division (quou) */
-        int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
+        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
         uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
         if (die_centi_c == 0) {
             die_centi_c = temp_centi_c;
@@ -421,12 +441,15 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         orch_tri_node_sample_t sample = {
             .shtc3_temp_centi_c = temp_centi_c,
             .shtc3_rh_centi_pct = rh_centi_pct,
-            .mcu_tsens_centi_c  = die_centi_c,
-            .epd_glass_centi_c  = st->last_glass_temp_centi_c,
-            .timestamp_sec      = st->total_sleep_sec,
-            .quality_flags      = q_flags,
+            .mcu_tsens_centi_c = die_centi_c,
+            .epd_glass_centi_c = st->last_glass_temp_centi_c,
+            .timestamp_sec = st->total_sleep_sec,
+            .quality_flags = q_flags,
         };
         orch_state_push_sample(&sample);
+    } else {
+        st->last_sensor_error = err_code;
+        st->sensor_fail_count++;
     }
 
     st->wake_count++;
@@ -455,10 +478,10 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
     SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
                       RTC_CNTL_SLP_REJECT_INT_CLR |
-                      RTC_CNTL_SLP_WAKEUP_INT_CLR |
-                      RTC_CNTL_COCPU_INT_CLR      |
-                      RTC_CNTL_COCPU_TRAP_INT_CLR |
-                      RTC_CNTL_ULP_CP_INT_CLR);
+                          RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                          RTC_CNTL_COCPU_INT_CLR |
+                          RTC_CNTL_COCPU_TRAP_INT_CLR |
+                          RTC_CNTL_ULP_CP_INT_CLR);
     REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
 

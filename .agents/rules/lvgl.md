@@ -156,3 +156,44 @@ void ui_render_telemetry_screen(const char *title, float temp_c, float rh_pct, f
     h1os_lvgl_unlock();
 }
 ```
+
+
+---
+
+## 9. Font Metric Tables & String Width Verification Tools
+
+To prevent horizontal text clipping and overflow on the 200x200 display (maximum allowable width $\le 188.0\text{ px}$):
+
+### Font Metric CSV Tables (`tools/fonts/`)
+- **Character Advance Widths & Bounding Boxes:**
+  - `tools/fonts/char_widths_montserrat_14.csv`
+  - `tools/fonts/char_widths_montserrat_16.csv`
+  - `tools/fonts/char_widths_montserrat_18.csv`
+  - `tools/fonts/char_widths_montserrat_20.csv`
+  - `tools/fonts/char_widths_montserrat_24.csv`
+  - `tools/fonts/char_widths_montserrat_32.csv`
+- **Class Kerning Pairs (3,400+ pairs per font):**
+  - `tools/fonts/kern_pairs_montserrat_14.csv`
+  - `tools/fonts/kern_pairs_montserrat_16.csv`
+  - `tools/fonts/kern_pairs_montserrat_18.csv`
+  - `tools/fonts/kern_pairs_montserrat_20.csv`
+  - `tools/fonts/kern_pairs_montserrat_24.csv`
+  - `tools/fonts/kern_pairs_montserrat_32.csv`
+
+### Verification Tools
+* **Single String Width Calculation (CLI):**
+  ```powershell
+  python tools/check_string_width.py --size 14 "Power: CHARGED 4.00V"
+  ```
+* **Full Screen Template Automated Audit:**
+  ```powershell
+  python tools/check_string_width.py --audit-screens
+  ```
+* **Font Metric Extractor:**
+  ```powershell
+  python tools/extract_font_metrics.py
+  ```
+* **DuckDB SQL Query:**
+  ```sql
+  SELECT char, width_px FROM 'tools/fonts/char_widths_montserrat_14.csv' ORDER BY width_px DESC LIMIT 10;
+  ```

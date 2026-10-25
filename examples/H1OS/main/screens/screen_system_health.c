@@ -25,13 +25,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
 
     lv_obj_t *lbl_bat = lv_label_create(scr);
     if (telem->battery_state == H1OS_BATTERY_CHARGED) {
-        lv_label_set_text_fmt(lbl_bat, "Power:       CHARGED (%.2fV)",
+        lv_label_set_text_fmt(lbl_bat, "Power: CHARGED %.2fV",
                               (double)((float)telem->battery_mv / 1000.0f));
     } else if (telem->battery_state == H1OS_BATTERY_CHARGING) {
-        lv_label_set_text_fmt(lbl_bat, "Power:       CHARGING (%.2fV)",
+        lv_label_set_text_fmt(lbl_bat, "Power: CHARGING %.2fV",
                               (double)((float)telem->battery_mv / 1000.0f));
     } else {
-        lv_label_set_text_fmt(lbl_bat, "Battery:     %.2fV (%u%%)",
+        lv_label_set_text_fmt(lbl_bat, "Battery: %.2fV (%u%%)",
                               (double)((float)telem->battery_mv / 1000.0f),
                               telem->battery_percent);
     }
@@ -40,13 +40,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
 
     lv_obj_t *lbl_autonomy = lv_label_create(scr);
     if (telem->battery_state == H1OS_BATTERY_CHARGED) {
-        lv_label_set_text(lbl_autonomy, "Autonomy:    EXTERNAL USB");
+        lv_label_set_text(lbl_autonomy, "Autonomy: EXT USB");
     } else if (telem->battery_state == H1OS_BATTERY_CHARGING) {
-        lv_label_set_text(lbl_autonomy, "Autonomy:    CHARGING");
+        lv_label_set_text(lbl_autonomy, "Autonomy: CHARGING");
     } else if (telem->autonomy.autonomy_days < 0.0f) {
-        lv_label_set_text(lbl_autonomy, "Autonomy:    ~CALIBRATING...");
+        lv_label_set_text(lbl_autonomy, "Autonomy: CALIBRATE");
     } else {
-        lv_label_set_text_fmt(lbl_autonomy, "Autonomy:    ~%.0f Days",
+        lv_label_set_text_fmt(lbl_autonomy, "Autonomy: ~%.0f Days",
                               (double)telem->autonomy.autonomy_days);
     }
     lv_obj_set_style_text_font(lbl_autonomy, H1OS_FONT_14, 0);
@@ -55,27 +55,27 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_t *lbl_sd = lv_label_create(scr);
     uint32_t sd_mb = 0;
     if (sub_sdcard_is_mounted() && sub_sdcard_get_capacity_mb(&sd_mb) == ESP_OK) {
-        lv_label_set_text_fmt(lbl_sd, "MicroSD:     %.1f GB OK", (double)((float)sd_mb / 1024.0f));
+        lv_label_set_text_fmt(lbl_sd, "MicroSD: %.1f GB OK", (double)((float)sd_mb / 1024.0f));
     } else {
-        lv_label_set_text(lbl_sd, "MicroSD:     NO CARD");
+        lv_label_set_text(lbl_sd, "MicroSD: NO CARD");
     }
     lv_obj_set_style_text_font(lbl_sd, H1OS_FONT_14, 0);
     lv_obj_align(lbl_sd, LV_ALIGN_TOP_LEFT, 6, 80);
 
     lv_obj_t *lbl_nvs = lv_label_create(scr);
-    lv_label_set_text(lbl_nvs, "Flash NVS:   SLAT ACTIVE");
+    lv_label_set_text(lbl_nvs, "Flash NVS: SLAT ACTIVE");
     lv_obj_set_style_text_font(lbl_nvs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_nvs, LV_ALIGN_TOP_LEFT, 6, 102);
 
     lv_obj_t *lbl_mcu = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_mcu, "MCU Die:     %.1f°C", (double)telem->mcu_die_temp_c);
+    lv_label_set_text_fmt(lbl_mcu, "MCU Die: %.1f°C", (double)telem->mcu_die_temp_c);
     lv_obj_set_style_text_font(lbl_mcu, H1OS_FONT_14, 0);
     lv_obj_align(lbl_mcu, LV_ALIGN_TOP_LEFT, 6, 130);
 
     lv_obj_t *lbl_delta = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_delta, "TriNode ΔT:  %+.1f°C (%u%%)",
-                                        (double)telem->trinode_delta_c,
-                                        telem->trinode_confidence_pct);
+    lv_label_set_text_fmt(lbl_delta, "TriNode: %+.1f°C (%u%%)",
+                          (double)telem->trinode_delta_c,
+                          telem->trinode_confidence_pct);
     lv_obj_set_style_text_font(lbl_delta, H1OS_FONT_14, 0);
     lv_obj_align(lbl_delta, LV_ALIGN_TOP_LEFT, 6, 150);
 

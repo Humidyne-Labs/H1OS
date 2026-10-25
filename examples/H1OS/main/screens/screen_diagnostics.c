@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "esp_private/esp_clk.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
-#include "esp_private/esp_clk.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "h1os/h1os_lvgl.h"
@@ -110,8 +110,8 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     lv_obj_t *lbl_heap = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min",
-                                        (unsigned long)(esp_get_free_heap_size() / 1024),
-                                        (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
+                          (unsigned long)(esp_get_free_heap_size() / 1024),
+                          (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
     lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
     lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
 
@@ -122,19 +122,36 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_stack, LV_ALIGN_TOP_LEFT, 6, 114);
 
     lv_obj_t *lbl_wakes = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)", (unsigned long)st->wake_count, st->ring_head);
+    if (st->sensor_fail_count > 0) {
+        lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Fail: %lu)",
+                              (unsigned long)st->wake_count,
+                              (unsigned long)st->sensor_fail_count);
+    } else {
+        lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)",
+                              (unsigned long)st->wake_count,
+                              st->ring_head);
+    }
     lv_obj_set_style_text_font(lbl_wakes, H1OS_FONT_14, 0);
     lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
 
     lv_obj_t *lbl_dfs = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_dfs, "CPU:  %3luMHz", (unsigned long)base_cpu_mhz);
+    lv_label_set_text_fmt(lbl_dfs, "CPU: %3luMHz", (unsigned long)base_cpu_mhz);
     lv_obj_set_style_text_font(lbl_dfs, H1OS_FONT_14, 0);
     lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
 
+    lv_obj_t *lbl_sensor_err = lv_label_create(scr);
+    if (st->last_sensor_error == ORCH_SENSOR_ERR_NONE) {
+        lv_label_set_text(lbl_sensor_err, "SHT: OK");
+    } else {
+        lv_label_set_text_fmt(lbl_sensor_err, "SHT: ERR_%u", (unsigned int)st->last_sensor_error);
+    }
+    lv_obj_set_style_text_font(lbl_sensor_err, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_sensor_err, LV_ALIGN_TOP_RIGHT, -6, 154);
+
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32,
-                                        h1os_version_get_major(),
-                                        h1os_version_get_minor());
+                          h1os_version_get_major(),
+                          h1os_version_get_minor());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 

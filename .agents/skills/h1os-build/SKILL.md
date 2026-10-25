@@ -43,13 +43,24 @@ Compiles with debug symbols into `build_dev`:
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev build
 ```
 
-### Reconfigure / CMake Refresh
-Forces a clean CMake re-generation without wiping compiled object caches, applying the exact preset configs:
+### Reconfigure / CMake Refresh & Preset Switching
+Forces a clean CMake re-generation applying the exact preset configs:
+
+> [!CRITICAL]
+> **Mandatory `sdkconfig` Removal Invariant:**
+> ESP-IDF's Kconfig defaults policy prioritizes an existing `examples/H1OS/sdkconfig`. When switching presets (e.g. from `dev` to `prod` or vice versa), **YOU MUST ERASE `sdkconfig` AND `sdkconfig.old` FIRST**!
+> Failing to remove `sdkconfig` causes CMake to retain old settings (e.g. `-Og`, debug log levels, heap poisoning) rather than applying the target preset defaults.
+
 ```powershell
+# 1. Remove root sdkconfig before reconfiguring:
+Remove-Item -Force -ErrorAction SilentlyContinue sdkconfig, sdkconfig.old
+
+# 2. Reconfigure target preset:
 # Development profile (debug symbols, dev sdkconfig):
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev reconfigure
 
 # Production profile (size-optimized, production sdkconfig):
+Remove-Item -Force -ErrorAction SilentlyContinue sdkconfig, sdkconfig.old
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod reconfigure
 ```
 
@@ -73,7 +84,7 @@ Generates deep per-component, per-file, binary header breakdown and partition he
 ```
 
 ### Full Clean
-Purges build artifacts if switching major SDK or toolchain versions:
+Removes all build artifacts if switching major SDK or toolchain versions:
 ```powershell
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod fullclean
 ```

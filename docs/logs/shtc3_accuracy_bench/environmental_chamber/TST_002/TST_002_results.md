@@ -5,6 +5,7 @@
 **Reference Benchmark:** Klaro Valet Digital Thermohygrometer (Case Elegance)  
 **Device Under Test (DUT):** HUMID1 (Waveshare ESP32-S3-PICO-1-N8R8 + Sensirion SHTC3 + Solomon SSD1681 1.54" EPD)  
 **DUT Test Firmware:** Commit `025373f` (`v2.4.1-dev` audit remediations AUD-01 through AUD-08)  
+**DUT Build Profile:** Production Release (`profiles/sdkconfig.defaults.prod`: `-O2`, silent assertions, WARN log level; note: Run #1 was executed on `dev` profile with `-Og` and debug logging)  
 **Test Status:** **ABORTED AT 10.4 HOURS (Run #2, n=1) — Zero SHTC3 Telemetry Ingestion / Firmware Malfunction**  
 
 ---
@@ -23,7 +24,7 @@ Following the completion of the 56.4-hour board hydration soak in **Run #1** (`T
 * **Effective Air Volume:** ~1.4 Liters net headspace above the pre-acclimated Spanish cedar substrate.
 * **Vapor Standard:** 1 × 60g Boveda 69% two-way osmotic salt-membrane pack (equilibrated).
 * **Reference Benchmark:** Klaro Valet (0.1°F resolution, 1% integer RH LCD, coin-cell powered, $\le 15\ \mu\text{W}$ dissipation).
-* **DUT Configuration:** HUMID1 running `v2.4.1-dev` test build, 5-minute display refresh cycle (Flow B), 60-second wake-stub sample cycle (Flow A).
+* **DUT Configuration:** HUMID1 running `v2.4.1-dev` compiled under production profile (`sdkconfig.defaults.prod`), 5-minute display refresh cycle (Flow B), 60-second wake-stub sample cycle (Flow A).
 
 ---
 

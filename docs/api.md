@@ -30,14 +30,14 @@
 ### H1OS_LIFECYCLE_DEFAULT_CONFIG
 
 ```cpp
-#define H1OS_LIFECYCLE_DEFAULT_CONFIG() { \
-    .session = { \
+#define H1OS_LIFECYCLE_DEFAULT_CONFIG() {                                                                      \
+    .session = {                                                       \
         .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC, \
-        .clk_mode               = SYS_CLK_MODE_DYNAMIC, \
-        .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC, \
-        .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC, \
-    }, \
-    .presentation = { 0 } \
+        .clk_mode = SYS_CLK_MODE_DYNAMIC,                              \
+        .flow_a_period_sec = H1OS_DEFAULT_FLOW_A_PERIOD_SEC,           \
+        .flow_b_period_sec = H1OS_DEFAULT_FLOW_B_PERIOD_SEC,           \
+    },                                                                 \
+    .presentation = { 0 }                                              \
 }
 ```
 
@@ -1627,7 +1627,7 @@ Minimum elapsed deep sleep interval between unattended NVS commits (1 hour).
 #define SAMPLE_FLAG_VALID_COLD 0x01
 ```
 
-Defined in h1os/orch_state.h:58
+Defined in h1os/orch_state.h:70
 
 Steady-state sample captured during quiescent sleep.
 
@@ -1641,7 +1641,7 @@ Steady-state sample captured during quiescent sleep.
 #define SAMPLE_FLAG_THERMAL_SETTLED 0x02
 ```
 
-Defined in h1os/orch_state.h:59
+Defined in h1os/orch_state.h:71
 
 Thermal plateau settled indicator.
 
@@ -1655,7 +1655,7 @@ Thermal plateau settled indicator.
 #define SAMPLE_DELTA_GATE_CENTI_C 20
 ```
 
-Defined in h1os/orch_state.h:60
+Defined in h1os/orch_state.h:72
 
 Maximum allowable drift for steady state (0.20°C).
 
@@ -1669,7 +1669,7 @@ Maximum allowable drift for steady state (0.20°C).
 #define ORCH_FLAG_NONE 0
 ```
 
-Defined in h1os/orch_state.h:141
+Defined in h1os/orch_state.h:156
 
 No persistent flags active.
 
@@ -1683,7 +1683,7 @@ No persistent flags active.
 #define ORCH_FLAG_EPD_FRAME_VALID (1 << 0)
 ```
 
-Defined in h1os/orch_state.h:142
+Defined in h1os/orch_state.h:157
 
 Flash partition contains valid preserved display frame.
 
@@ -1697,7 +1697,7 @@ Flash partition contains valid preserved display frame.
 #define ORCH_FLAG_CRITICAL_BATTERY (1 << 1)
 ```
 
-Defined in h1os/orch_state.h:143
+Defined in h1os/orch_state.h:158
 
 Battery below brownout threshold.
 
@@ -1711,7 +1711,7 @@ Battery below brownout threshold.
 #define ORCH_FLAG_THERMAL_LOCKOUT (1 << 2)
 ```
 
-Defined in h1os/orch_state.h:144
+Defined in h1os/orch_state.h:159
 
 Self-heating lockout active.
 
@@ -2605,7 +2605,7 @@ Defined in orch_display_sync.c:20
 enum h1os_splash_type_t
 ```
 
-Defined in h1os/h1os.h:59
+Defined in h1os/h1os.h:60
 
 Graphical splash screen trigger types.
 
@@ -2884,6 +2884,29 @@ ULP coprocessor dispatch wakeup reasons.
 | `ULP_DISPATCH_CRITICAL_SHUTDOWN` | Low-battery brownout threshold cut dispatch. |
 | `ULP_DISPATCH_BOOTLOADER_JUMP` | BOOT0 held down during sleep: jump to download mode. |
 | `ULP_DISPATCH_POWER_OFF` | BAT_KEY long-press held down during sleep: power off. |
+
+---
+
+{#orch_sensor_err_t}
+
+### orch_sensor_err_t
+
+```cpp
+enum orch_sensor_err_t
+```
+
+Defined in h1os/orch_state.h:61
+
+SHTC3 sensor acquisition error codes reported by wake stub.
+
+| Value | Description |
+|-------|-------------|
+| `ORCH_SENSOR_ERR_NONE` | Normal operation: reading acknowledged and verified. |
+| `ORCH_SENSOR_ERR_NACK_WAKE` | SHTC3 wake command (0x3517) NACKed. |
+| `ORCH_SENSOR_ERR_NACK_MEASURE` | SHTC3 measurement command (0x7866) NACKed. |
+| `ORCH_SENSOR_ERR_NACK_ADDR_RD` | SHTC3 read address (0x71) NACKed. |
+| `ORCH_SENSOR_ERR_CRC_FAIL` | CRC-8 checksum verification failed on received bytes. |
+| `ORCH_SENSOR_ERR_BUS_STUCK` | SDA or SCL line held low prior to starting transfer. |
 ## Typedefs
 
 ---
@@ -2896,7 +2919,7 @@ ULP coprocessor dispatch wakeup reasons.
 using h1os_boot_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:71
+Defined in h1os/h1os.h:72
 
 System boot and power-on reset callback signature.
 
@@ -2916,7 +2939,7 @@ System boot and power-on reset callback signature.
 using h1os_wake_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:79
+Defined in h1os/h1os.h:80
 
 Interactive wake callback signature (Timer / RTC Alarm / Button Tap).
 
@@ -2937,7 +2960,7 @@ Interactive wake callback signature (Timer / RTC Alarm / Button Tap).
 using h1os_pre_sleep_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:87
+Defined in h1os/h1os.h:88
 
 Callback executed immediately prior to entering deep sleep.
 
@@ -2958,7 +2981,7 @@ Callback executed immediately prior to entering deep sleep.
 using h1os_shutdown_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:94
+Defined in h1os/h1os.h:95
 
 Callback executed immediately prior to battery power cut.
 
@@ -2978,7 +3001,7 @@ Callback executed immediately prior to battery power cut.
 using h1os_splash_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:102
+Defined in h1os/h1os.h:103
 
 Presentation splash screen rendering callback signature.
 
@@ -2999,7 +3022,7 @@ Presentation splash screen rendering callback signature.
 using h1os_chime_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:110
+Defined in h1os/h1os.h:111
 
 Acoustic presentation chime playback callback signature.
 
@@ -3048,7 +3071,7 @@ ESP_OK if external time was synchronized, or error code.
 static inline const char * h1os_get_version(void)
 ```
 
-Defined in h1os/h1os.h:182
+Defined in h1os/h1os.h:185
 
 Get the H1OS semantic version string.
 
@@ -3065,7 +3088,7 @@ Null-terminated semantic version string (e.g. "2.4.0-dev").
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os/h1os.h:200
+Defined in h1os/h1os.h:203
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -3096,7 +3119,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os/h1os.h:214
+Defined in h1os/h1os.h:217
 
 Set audio subsystem output volume percentage.
 
@@ -3130,7 +3153,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os/h1os.h:228
+Defined in h1os/h1os.h:231
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -3160,7 +3183,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os/h1os.h:242
+Defined in h1os/h1os.h:245
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -3190,7 +3213,7 @@ ESP_OK on success, or an error code.
 void h1os_reset_session_timer(void)
 ```
 
-Defined in h1os/h1os.h:250
+Defined in h1os/h1os.h:253
 
 Reset the interactive session inactivity timer.
 
@@ -3210,7 +3233,7 @@ Reset the interactive session inactivity timer.
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os/h1os.h:257
+Defined in h1os/h1os.h:260
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -3230,7 +3253,7 @@ true if running in an interactive user session, false during unattended wakes.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os/h1os.h:265
+Defined in h1os/h1os.h:268
 
 Orderly system shutdown and physical battery power cut.
 
@@ -3246,7 +3269,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os/h1os.h:273
+Defined in h1os/h1os.h:276
 
 Shutdown for long-term storage.
 
@@ -9196,7 +9219,7 @@ ESP_OK on success.
 volatile orch_persisted_state_t * orch_state_get(void)
 ```
 
-Defined in h1os/orch_state.h:154
+Defined in h1os/orch_state.h:169
 
 Retrieve pointer to persistent state structure in RTC Slow SRAM.
 
@@ -9215,7 +9238,7 @@ Pointer to persistent state block in RTC Slow Memory.
 void orch_state_reset(void)
 ```
 
-Defined in h1os/orch_state.h:159
+Defined in h1os/orch_state.h:174
 
 Reset persisted state in RTC Slow Memory to clean factory defaults.
 
@@ -9236,7 +9259,7 @@ Return value of type void RTC_IRAM_ATTR.
 void orch_state_push_sample(const orch_tri_node_sample_t * sample)
 ```
 
-Defined in h1os/orch_state.h:166
+Defined in h1os/orch_state.h:181
 
 Push a new sample into the RTC circular ring buffer.
 
@@ -9263,7 +9286,7 @@ Return value of type void RTC_IRAM_ATTR.
 bool orch_state_get_latest_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:175
+Defined in h1os/orch_state.h:190
 
 Retrieve the most recent sample from the ring buffer.
 
@@ -9293,7 +9316,7 @@ true if reading present, false if buffer empty.
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t * out_sample)
 ```
 
-Defined in h1os/orch_state.h:184
+Defined in h1os/orch_state.h:199
 
 Retrieve the most recent thermally settled, valid sample from the ring buffer.
 
@@ -9325,7 +9348,7 @@ true if a sample is returned, false if buffer empty.
 void orch_state_save_runtimes_to_nvs(void)
 ```
 
-Defined in h1os/orch_state.h:189
+Defined in h1os/orch_state.h:204
 
 Save cumulative battery autonomy runtimes to Flash NVS.
 
@@ -9339,7 +9362,7 @@ Save cumulative battery autonomy runtimes to Flash NVS.
 void orch_state_load_runtimes_from_nvs(void)
 ```
 
-Defined in h1os/orch_state.h:194
+Defined in h1os/orch_state.h:209
 
 Restore cumulative battery autonomy runtimes from Flash NVS.
 
@@ -9353,7 +9376,7 @@ Restore cumulative battery autonomy runtimes from Flash NVS.
 void orch_state_reset_discharge_lap(uint16_t current_soc_x10)
 ```
 
-Defined in h1os/orch_state.h:201
+Defined in h1os/orch_state.h:216
 
 Reset discharge lap runtimes on charger unplug or cycle anchor.
 
@@ -11341,7 +11364,7 @@ Copies the latest validated psychrometric invariants, sensor readings, and batte
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:593
+Defined in h1os_lifecycle.c:595
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -11373,7 +11396,7 @@ Arms the PCF85063A countdown timer, isolates GPIO sleep pads, holds power latch,
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:619
+Defined in h1os_lifecycle.c:621
 
 Execute system shutdown.
 
@@ -11396,7 +11419,7 @@ Return value of type static void.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:673
+Defined in h1os_lifecycle.c:675
 
 Orderly system shutdown and physical battery power cut.
 
@@ -11412,7 +11435,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:687
+Defined in h1os_lifecycle.c:689
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -11434,7 +11457,7 @@ Performs pure white full OTP refresh on electrophoretic display before cutting p
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:699
+Defined in h1os_lifecycle.c:701
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -11817,7 +11840,7 @@ Executes fast sub-3ms Flow A sensor bursts using bitbanged I2C without booting t
 void orch_wake_stub_install(void)
 ```
 
-Defined in orch_wake_stub.c:489
+Defined in orch_wake_stub.c:512
 
 Install the RTC deep sleep wake stub.
 
@@ -13805,7 +13828,7 @@ Defined in sub_audio.c:69
 struct h1os_lifecycle_t
 ```
 
-Defined in h1os/h1os.h:115
+Defined in h1os/h1os.h:116
 
 Declarative application lifecycle configuration structure.
 
@@ -13833,7 +13856,7 @@ h1os_boot_cb_t on_boot
 
 Type: [`h1os_boot_cb_t`](#h1os_boot_cb_t)
 
-Defined in h1os/h1os.h:116
+Defined in h1os/h1os.h:117
 
 System boot / power-on reset hook.
 
@@ -13849,7 +13872,7 @@ h1os_wake_cb_t on_wake
 
 Type: [`h1os_wake_cb_t`](#h1os_wake_cb_t)
 
-Defined in h1os/h1os.h:117
+Defined in h1os/h1os.h:118
 
 Interactive wake hook (Timer / RTC Alarm / Button Tap).
 
@@ -13865,7 +13888,7 @@ h1os_pre_sleep_cb_t on_pre_sleep
 
 Type: [`h1os_pre_sleep_cb_t`](#h1os_pre_sleep_cb_t)
 
-Defined in h1os/h1os.h:118
+Defined in h1os/h1os.h:119
 
 Hook executed immediately prior to entering deep sleep.
 
@@ -13881,7 +13904,7 @@ h1os_shutdown_cb_t on_shutdown
 
 Type: [`h1os_shutdown_cb_t`](#h1os_shutdown_cb_t)
 
-Defined in h1os/h1os.h:119
+Defined in h1os/h1os.h:120
 
 Hook executed immediately prior to battery power cut.
 
@@ -13895,7 +13918,7 @@ Hook executed immediately prior to battery power cut.
 struct h1os_lifecycle_t::@325134365353002276205315372127306003103261015120 presentation
 ```
 
-Defined in h1os/h1os.h:126
+Defined in h1os/h1os.h:127
 
 ---
 
@@ -13907,7 +13930,7 @@ Defined in h1os/h1os.h:126
 struct h1os_lifecycle_t::@146034141124024227100041106135372254367321170003 session
 ```
 
-Defined in h1os/h1os.h:133
+Defined in h1os/h1os.h:134
 
 ---
 
@@ -13919,7 +13942,7 @@ Defined in h1os/h1os.h:133
 void * user_data
 ```
 
-Defined in h1os/h1os.h:135
+Defined in h1os/h1os.h:136
 
 Arbitrary user context pointer passed to lifecycle hooks.
 
@@ -13931,7 +13954,7 @@ Arbitrary user context pointer passed to lifecycle hooks.
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:121
+Defined in h1os/h1os.h:122
 
 ### Public Attributes
 
@@ -13954,7 +13977,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:122
+Defined in h1os/h1os.h:123
 
 Presentation splash screen rendering hook.
 
@@ -13970,7 +13993,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:123
+Defined in h1os/h1os.h:124
 
 Presentation chime playback hook.
 
@@ -13984,7 +14007,7 @@ Presentation chime playback hook.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:124
+Defined in h1os/h1os.h:125
 
 Bitmask of enabled audio chime types.
 
@@ -13998,7 +14021,7 @@ Bitmask of enabled audio chime types.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:125
+Defined in h1os/h1os.h:126
 
 Acoustic presentation master volume (0..100%).
 
@@ -14010,7 +14033,7 @@ Acoustic presentation master volume (0..100%).
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:128
+Defined in h1os/h1os.h:129
 
 ### Public Attributes
 
@@ -14031,7 +14054,7 @@ Defined in h1os/h1os.h:128
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:129
+Defined in h1os/h1os.h:130
 
 Interactive session idle sleep timeout in seconds.
 
@@ -14047,7 +14070,7 @@ sys_clk_mode_t clk_mode
 
 Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
-Defined in h1os/h1os.h:130
+Defined in h1os/h1os.h:131
 
 CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
@@ -14061,7 +14084,7 @@ CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:131
+Defined in h1os/h1os.h:132
 
 Period between headless sensor sample bursts in seconds.
 
@@ -14075,7 +14098,7 @@ Period between headless sensor sample bursts in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:132
+Defined in h1os/h1os.h:133
 
 Period between unattended display flushes in seconds.
 
@@ -14091,7 +14114,7 @@ Period between unattended display flushes in seconds.
 struct h1os_telemetry_t
 ```
 
-Defined in h1os/h1os.h:141
+Defined in h1os/h1os.h:142
 
 Comprehensive environmental telemetry and system metrics snapshot.
 
@@ -14129,6 +14152,8 @@ Comprehensive environmental telemetry and system metrics snapshot.
 | `bool` | [`is_usb_powered`](#is_usb_powered)  | True if USB VBUS power connection is actively detected. |
 | [`h1os_battery_state_t`](#h1os_battery_state_t) | [`battery_state`](#battery_state)  | Charge / discharge / charged operational state. |
 | [`h1os_autonomy_metrics_t`](#h1os_autonomy_metrics_t) | [`autonomy`](#autonomy)  | Empirical battery autonomy metrics over total elapsed runtime. |
+| `uint32_t` | [`sensor_fail_count`](#sensor_fail_count)  | Total count of failed wake-stub sensor sample attempts. |
+| `uint8_t` | [`last_sensor_error`](#last_sensor_error)  | Most recent sensor error enum code ([orch_sensor_err_t](#orch_sensor_err_t)). |
 
 ---
 
@@ -14140,7 +14165,7 @@ Comprehensive environmental telemetry and system metrics snapshot.
 float ambient_temp_c
 ```
 
-Defined in h1os/h1os.h:142
+Defined in h1os/h1os.h:143
 
 Trusted steady-state SHTC3 ambient temperature in degrees Celsius.
 
@@ -14154,7 +14179,7 @@ Trusted steady-state SHTC3 ambient temperature in degrees Celsius.
 float ambient_temp_f
 ```
 
-Defined in h1os/h1os.h:143
+Defined in h1os/h1os.h:144
 
 Trusted steady-state SHTC3 ambient temperature in degrees Fahr.
 
@@ -14168,7 +14193,7 @@ Trusted steady-state SHTC3 ambient temperature in degrees Fahr.
 float ambient_rh_pct
 ```
 
-Defined in h1os/h1os.h:144
+Defined in h1os/h1os.h:145
 
 Trusted steady-state SHTC3 relative humidity percentage (0..100%).
 
@@ -14182,7 +14207,7 @@ Trusted steady-state SHTC3 relative humidity percentage (0..100%).
 float dew_point_c
 ```
 
-Defined in h1os/h1os.h:145
+Defined in h1os/h1os.h:146
 
 Psychrometrically calculated dew point in degrees Celsius.
 
@@ -14196,7 +14221,7 @@ Psychrometrically calculated dew point in degrees Celsius.
 float dew_point_f
 ```
 
-Defined in h1os/h1os.h:146
+Defined in h1os/h1os.h:147
 
 Psychrometrically calculated dew point in degrees Fahrenheit.
 
@@ -14210,7 +14235,7 @@ Psychrometrically calculated dew point in degrees Fahrenheit.
 float vapor_pressure_hpa
 ```
 
-Defined in h1os/h1os.h:147
+Defined in h1os/h1os.h:148
 
 Calculated water vapor partial pressure in hectopascals (hPa).
 
@@ -14224,7 +14249,7 @@ Calculated water vapor partial pressure in hectopascals (hPa).
 float absolute_humidity_g
 ```
 
-Defined in h1os/h1os.h:148
+Defined in h1os/h1os.h:149
 
 Calculated absolute humidity in grams per cubic meter (g/m³).
 
@@ -14238,7 +14263,7 @@ Calculated absolute humidity in grams per cubic meter (g/m³).
 float window_low_c
 ```
 
-Defined in h1os/h1os.h:150
+Defined in h1os/h1os.h:151
 
 Valid Window Floor (minimum over valid 32-sample window).
 
@@ -14252,7 +14277,7 @@ Valid Window Floor (minimum over valid 32-sample window).
 float window_high_c
 ```
 
-Defined in h1os/h1os.h:151
+Defined in h1os/h1os.h:152
 
 Valid Window Ceiling (maximum over valid 32-sample window).
 
@@ -14266,7 +14291,7 @@ Valid Window Ceiling (maximum over valid 32-sample window).
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/h1os.h:152
+Defined in h1os/h1os.h:153
 
 Short-term valid SHTC3 sensor window average in degrees Celsius.
 
@@ -14280,7 +14305,7 @@ Short-term valid SHTC3 sensor window average in degrees Celsius.
 float window_avg_die_c
 ```
 
-Defined in h1os/h1os.h:153
+Defined in h1os/h1os.h:154
 
 Short-term valid MCU Die internal sensor window average.
 
@@ -14294,7 +14319,7 @@ Short-term valid MCU Die internal sensor window average.
 float temp_historical_c
 ```
 
-Defined in h1os/h1os.h:154
+Defined in h1os/h1os.h:155
 
 Long-term light EWMA historical baseline temperature.
 
@@ -14308,7 +14333,7 @@ Long-term light EWMA historical baseline temperature.
 float rh_historical_pct
 ```
 
-Defined in h1os/h1os.h:155
+Defined in h1os/h1os.h:156
 
 Long-term light EWMA historical baseline relative humidity.
 
@@ -14322,7 +14347,7 @@ Long-term light EWMA historical baseline relative humidity.
 float raw_shtc3_temp_c
 ```
 
-Defined in h1os/h1os.h:157
+Defined in h1os/h1os.h:158
 
 Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 
@@ -14336,7 +14361,7 @@ Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 float mcu_die_temp_c
 ```
 
-Defined in h1os/h1os.h:158
+Defined in h1os/h1os.h:159
 
 Instantaneous ESP32-S3 internal TSENS die temperature.
 
@@ -14350,7 +14375,7 @@ Instantaneous ESP32-S3 internal TSENS die temperature.
 float epd_glass_temp_c
 ```
 
-Defined in h1os/h1os.h:159
+Defined in h1os/h1os.h:160
 
 Instantaneous SSD1681 display on-glass temperature sensor reading.
 
@@ -14364,7 +14389,7 @@ Instantaneous SSD1681 display on-glass temperature sensor reading.
 float trinode_temp_c
 ```
 
-Defined in h1os/h1os.h:160
+Defined in h1os/h1os.h:161
 
 Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.
 
@@ -14378,7 +14403,7 @@ Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.
 float trinode_delta_c
 ```
 
-Defined in h1os/h1os.h:161
+Defined in h1os/h1os.h:162
 
 Cross-node verification delta: T_valid - T_trinode.
 
@@ -14392,7 +14417,7 @@ Cross-node verification delta: T_valid - T_trinode.
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/h1os.h:162
+Defined in h1os/h1os.h:163
 
 0-100% cross-node range verification confidence score.
 
@@ -14406,7 +14431,7 @@ Defined in h1os/h1os.h:162
 bool is_thermally_settled
 ```
 
-Defined in h1os/h1os.h:164
+Defined in h1os/h1os.h:165
 
 True if steady-state thermal criteria (|T2-T1| <= gate) are met.
 
@@ -14420,7 +14445,7 @@ True if steady-state thermal criteria (|T2-T1| <= gate) are met.
 uint16_t valid_trend
 ```
 
-Defined in h1os/h1os.h:165
+Defined in h1os/h1os.h:166
 
 Monotonic count of consecutive thermally settled Flow A samples.
 
@@ -14434,7 +14459,7 @@ Monotonic count of consecutive thermally settled Flow A samples.
 uint32_t sample_count
 ```
 
-Defined in h1os/h1os.h:166
+Defined in h1os/h1os.h:167
 
 Total monotonic environmental telemetry sample count.
 
@@ -14448,7 +14473,7 @@ Total monotonic environmental telemetry sample count.
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:167
+Defined in h1os/h1os.h:168
 
 Active Flow A sensor sample interval in seconds.
 
@@ -14462,7 +14487,7 @@ Active Flow A sensor sample interval in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:168
+Defined in h1os/h1os.h:169
 
 Active Flow B display refresh interval in seconds.
 
@@ -14476,7 +14501,7 @@ Active Flow B display refresh interval in seconds.
 uint16_t battery_mv
 ```
 
-Defined in h1os/h1os.h:169
+Defined in h1os/h1os.h:170
 
 Sampled battery terminal voltage in millivolts.
 
@@ -14490,7 +14515,7 @@ Sampled battery terminal voltage in millivolts.
 uint16_t boot_vbat_mv
 ```
 
-Defined in h1os/h1os.h:170
+Defined in h1os/h1os.h:171
 
 Initial non-USB battery voltage captured on boot in millivolts.
 
@@ -14504,7 +14529,7 @@ Initial non-USB battery voltage captured on boot in millivolts.
 uint8_t battery_percent
 ```
 
-Defined in h1os/h1os.h:171
+Defined in h1os/h1os.h:172
 
 Estimated battery state-of-charge percentage (0..100%).
 
@@ -14518,7 +14543,7 @@ Estimated battery state-of-charge percentage (0..100%).
 bool is_usb_powered
 ```
 
-Defined in h1os/h1os.h:172
+Defined in h1os/h1os.h:173
 
 True if USB VBUS power connection is actively detected.
 
@@ -14534,7 +14559,7 @@ h1os_battery_state_t battery_state
 
 Type: [`h1os_battery_state_t`](#h1os_battery_state_t)
 
-Defined in h1os/h1os.h:173
+Defined in h1os/h1os.h:174
 
 Charge / discharge / charged operational state.
 
@@ -14550,9 +14575,37 @@ h1os_autonomy_metrics_t autonomy
 
 Type: [`h1os_autonomy_metrics_t`](#h1os_autonomy_metrics_t)
 
-Defined in h1os/h1os.h:174
+Defined in h1os/h1os.h:175
 
 Empirical battery autonomy metrics over total elapsed runtime.
+
+---
+
+{#sensor_fail_count}
+
+#### sensor_fail_count
+
+```cpp
+uint32_t sensor_fail_count
+```
+
+Defined in h1os/h1os.h:176
+
+Total count of failed wake-stub sensor sample attempts.
+
+---
+
+{#last_sensor_error}
+
+#### last_sensor_error
+
+```cpp
+uint8_t last_sensor_error
+```
+
+Defined in h1os/h1os.h:177
+
+Most recent sensor error enum code ([orch_sensor_err_t](#orch_sensor_err_t)).
 
 {#cpumaxturboscope}
 
@@ -14652,7 +14705,7 @@ Defined in sub_audio.c:79
 struct h1os_wake_context_t
 ```
 
-Defined in h1os/h1os.h:45
+Defined in h1os/h1os.h:46
 
 Platform wakeup context descriptor.
 
@@ -14681,7 +14734,7 @@ Populated during boot and passed to the application lifecycle on_wake hook.
 esp_reset_reason_t reset_reason
 ```
 
-Defined in h1os/h1os.h:46
+Defined in h1os/h1os.h:47
 
 Hardware reset reason code.
 
@@ -14695,7 +14748,7 @@ Hardware reset reason code.
 uint32_t wakeup_causes
 ```
 
-Defined in h1os/h1os.h:47
+Defined in h1os/h1os.h:48
 
 Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).
 
@@ -14709,7 +14762,7 @@ Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).
 uint32_t boot_count
 ```
 
-Defined in h1os/h1os.h:48
+Defined in h1os/h1os.h:49
 
 Monotonic system boot cycle count.
 
@@ -14723,7 +14776,7 @@ Monotonic system boot cycle count.
 uint32_t deep_sleep_count
 ```
 
-Defined in h1os/h1os.h:49
+Defined in h1os/h1os.h:50
 
 Monotonic deep sleep wake cycle count.
 
@@ -14737,7 +14790,7 @@ Monotonic deep sleep wake cycle count.
 bool woke_from_button
 ```
 
-Defined in h1os/h1os.h:50
+Defined in h1os/h1os.h:51
 
 True if system woke due to physical button actuation.
 
@@ -14751,7 +14804,7 @@ True if system woke due to physical button actuation.
 uint8_t wake_button
 ```
 
-Defined in h1os/h1os.h:51
+Defined in h1os/h1os.h:52
 
 Waking button ID ([h1os_wake_btn_t](#h1os_wake_btn_t): 0=None, 1=BOOT, 2=POWER).
 
@@ -14765,7 +14818,7 @@ Waking button ID ([h1os_wake_btn_t](#h1os_wake_btn_t): 0=None, 1=BOOT, 2=POWER).
 uint32_t sleep_duration_sec
 ```
 
-Defined in h1os/h1os.h:52
+Defined in h1os/h1os.h:53
 
 Configured sleep interval prior to wake in seconds.
 
@@ -14779,7 +14832,7 @@ Configured sleep interval prior to wake in seconds.
 void * user_data
 ```
 
-Defined in h1os/h1os.h:53
+Defined in h1os/h1os.h:54
 
 User context pointer passed to lifecycle.
 
@@ -14795,7 +14848,7 @@ User context pointer passed to lifecycle.
 struct orch_persisted_state_t
 ```
 
-Defined in h1os/orch_state.h:91
+Defined in h1os/orch_state.h:103
 
 Master persistent state block allocated in RTC Slow SRAM.
 
@@ -14842,6 +14895,9 @@ Retained across all deep sleep cycles and wake stub executions.
 | `uint32_t` | [`last_nvs_commit_sec`](#last_nvs_commit_sec)  | Sleep timestamp (total_sleep_sec) of last successful NVS runtime commit. |
 | `uint16_t` | [`initial_soc_x10`](#initial_soc_x10)  | State of Charge at start of discharge lap in tenths of % (0..1000). |
 | `uint8_t` | [`_pad_soc`](#_pad_soc)  | Alignment padding to 32-bit boundary. |
+| `uint32_t` | [`sensor_fail_count`](#sensor_fail_count-1)  | Monotonic count of failed wake-stub sensor reads. |
+| `uint8_t` | [`last_sensor_error`](#last_sensor_error-1)  | Last error code ([orch_sensor_err_t](#orch_sensor_err_t)). |
+| `uint8_t` | [`_pad_sensor`](#_pad_sensor)  | Alignment padding to 32-bit boundary. |
 
 ---
 
@@ -14853,7 +14909,7 @@ Retained across all deep sleep cycles and wake stub executions.
 uint32_t magic
 ```
 
-Defined in h1os/orch_state.h:92
+Defined in h1os/orch_state.h:104
 
 State validation magic word (ORCH_RTC_MAGIC).
 
@@ -14867,7 +14923,7 @@ State validation magic word (ORCH_RTC_MAGIC).
 uint32_t boot_count
 ```
 
-Defined in h1os/orch_state.h:93
+Defined in h1os/orch_state.h:105
 
 Total monotonic system boot cycles.
 
@@ -14881,7 +14937,7 @@ Total monotonic system boot cycles.
 uint32_t wake_count
 ```
 
-Defined in h1os/orch_state.h:94
+Defined in h1os/orch_state.h:106
 
 Monotonic deep sleep wake cycle count.
 
@@ -14895,7 +14951,7 @@ Monotonic deep sleep wake cycle count.
 uint8_t flags
 ```
 
-Defined in h1os/orch_state.h:95
+Defined in h1os/orch_state.h:107
 
 Operating state flags (ORCH_FLAG_*).
 
@@ -14909,7 +14965,7 @@ Operating state flags (ORCH_FLAG_*).
 uint8_t ulp_dispatch_reason
 ```
 
-Defined in h1os/orch_state.h:96
+Defined in h1os/orch_state.h:108
 
 Reason code from last ULP coprocessor dispatch.
 
@@ -14923,7 +14979,7 @@ Reason code from last ULP coprocessor dispatch.
 uint16_t last_vbat_mv
 ```
 
-Defined in h1os/orch_state.h:97
+Defined in h1os/orch_state.h:109
 
 Last sampled battery terminal voltage in millivolts.
 
@@ -14937,7 +14993,7 @@ Last sampled battery terminal voltage in millivolts.
 uint16_t boot_vbat_mv
 ```
 
-Defined in h1os/orch_state.h:98
+Defined in h1os/orch_state.h:110
 
 Initial non-USB battery voltage captured on boot in millivolts.
 
@@ -14951,7 +15007,7 @@ Initial non-USB battery voltage captured on boot in millivolts.
 uint32_t sample_interval_sec
 ```
 
-Defined in h1os/orch_state.h:100
+Defined in h1os/orch_state.h:112
 
 Interval between Flow A sensor samples in seconds.
 
@@ -14965,7 +15021,7 @@ Interval between Flow A sensor samples in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/orch_state.h:101
+Defined in h1os/orch_state.h:113
 
 Interval between Flow B display refreshes in seconds.
 
@@ -14979,7 +15035,7 @@ Interval between Flow B display refreshes in seconds.
 uint32_t last_ewma_sample_seq
 ```
 
-Defined in h1os/orch_state.h:102
+Defined in h1os/orch_state.h:114
 
 Sample sequence number of last processed EWMA & ring debug update.
 
@@ -14993,7 +15049,7 @@ Sample sequence number of last processed EWMA & ring debug update.
 uint16_t epd_partial_refresh_count
 ```
 
-Defined in h1os/orch_state.h:104
+Defined in h1os/orch_state.h:116
 
 Consecutive differential partial refreshes on EPD.
 
@@ -15007,7 +15063,7 @@ Consecutive differential partial refreshes on EPD.
 uint16_t valid_trend
 ```
 
-Defined in h1os/orch_state.h:105
+Defined in h1os/orch_state.h:117
 
 Monotonic count of consecutive settled steady-state samples.
 
@@ -15021,7 +15077,7 @@ Monotonic count of consecutive settled steady-state samples.
 int16_t window_low_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:107
+Defined in h1os/orch_state.h:119
 
 Valid Window Floor (minimum over active window) in centi-°C.
 
@@ -15035,7 +15091,7 @@ Valid Window Floor (minimum over active window) in centi-°C.
 int16_t window_high_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:108
+Defined in h1os/orch_state.h:120
 
 Valid Window Ceiling (maximum over active window) in centi-°C.
 
@@ -15049,7 +15105,7 @@ Valid Window Ceiling (maximum over active window) in centi-°C.
 int16_t last_glass_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:109
+Defined in h1os/orch_state.h:121
 
 Last sampled EPD glass temperature in centi-°C.
 
@@ -15063,7 +15119,7 @@ Last sampled EPD glass temperature in centi-°C.
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/orch_state.h:111
+Defined in h1os/orch_state.h:123
 
 Short-term valid SHTC3 window average in degrees Celsius.
 
@@ -15077,7 +15133,7 @@ Short-term valid SHTC3 window average in degrees Celsius.
 float window_avg_die_c
 ```
 
-Defined in h1os/orch_state.h:112
+Defined in h1os/orch_state.h:124
 
 Short-term valid MCU Die window average in degrees Celsius.
 
@@ -15091,7 +15147,7 @@ Short-term valid MCU Die window average in degrees Celsius.
 float temp_historical_c
 ```
 
-Defined in h1os/orch_state.h:113
+Defined in h1os/orch_state.h:125
 
 Long-term light EWMA baseline temperature.
 
@@ -15105,7 +15161,7 @@ Long-term light EWMA baseline temperature.
 float rh_historical_pct
 ```
 
-Defined in h1os/orch_state.h:114
+Defined in h1os/orch_state.h:126
 
 Long-term light EWMA baseline relative humidity.
 
@@ -15119,7 +15175,7 @@ Long-term light EWMA baseline relative humidity.
 float ambient_temp_c
 ```
 
-Defined in h1os/orch_state.h:116
+Defined in h1os/orch_state.h:128
 
 Trusted steady-state SHTC3 ambient temperature in °C.
 
@@ -15133,7 +15189,7 @@ Trusted steady-state SHTC3 ambient temperature in °C.
 float ambient_rh_pct
 ```
 
-Defined in h1os/orch_state.h:117
+Defined in h1os/orch_state.h:129
 
 Trusted steady-state SHTC3 ambient relative humidity in %.
 
@@ -15147,7 +15203,7 @@ Trusted steady-state SHTC3 ambient relative humidity in %.
 float dew_point_c
 ```
 
-Defined in h1os/orch_state.h:118
+Defined in h1os/orch_state.h:130
 
 Calculated dew point temperature in °C.
 
@@ -15161,7 +15217,7 @@ Calculated dew point temperature in °C.
 float vapor_pressure_hpa
 ```
 
-Defined in h1os/orch_state.h:119
+Defined in h1os/orch_state.h:131
 
 Calculated water vapor partial pressure in hPa.
 
@@ -15175,7 +15231,7 @@ Calculated water vapor partial pressure in hPa.
 float trinode_temp_c
 ```
 
-Defined in h1os/orch_state.h:121
+Defined in h1os/orch_state.h:133
 
 Tri-Node verification average: (T_valid + T_die + T_glass) / 3.0.
 
@@ -15189,7 +15245,7 @@ Tri-Node verification average: (T_valid + T_die + T_glass) / 3.0.
 float trinode_delta_c
 ```
 
-Defined in h1os/orch_state.h:122
+Defined in h1os/orch_state.h:134
 
 Cross-sensor verification delta: T_valid - T_trinode.
 
@@ -15203,7 +15259,7 @@ Cross-sensor verification delta: T_valid - T_trinode.
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/orch_state.h:123
+Defined in h1os/orch_state.h:135
 
 0-100% cross-sensor range verification score.
 
@@ -15217,7 +15273,7 @@ Defined in h1os/orch_state.h:123
 bool ewma_inited
 ```
 
-Defined in h1os/orch_state.h:124
+Defined in h1os/orch_state.h:136
 
 True if EWMA filters have been seeded with initial samples.
 
@@ -15231,7 +15287,7 @@ True if EWMA filters have been seeded with initial samples.
 int16_t tsens_cal_centi_c
 ```
 
-Defined in h1os/orch_state.h:125
+Defined in h1os/orch_state.h:137
 
 Factory calibrated TSENS eFuse offset in centi-degrees Celsius.
 
@@ -15245,7 +15301,7 @@ Factory calibrated TSENS eFuse offset in centi-degrees Celsius.
 int16_t tsens_offset_centi_c
 ```
 
-Defined in h1os/orch_state.h:126
+Defined in h1os/orch_state.h:138
 
 Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c).
 
@@ -15259,7 +15315,7 @@ Pre-computed TSENS fixed-point intercept (2052 + tsens_cal_centi_c).
 orch_tri_node_sample_t ring[32]
 ```
 
-Defined in h1os/orch_state.h:128
+Defined in h1os/orch_state.h:140
 
 Circular ring buffer of historical telemetry samples.
 
@@ -15273,7 +15329,7 @@ Circular ring buffer of historical telemetry samples.
 uint8_t ring_head
 ```
 
-Defined in h1os/orch_state.h:130
+Defined in h1os/orch_state.h:142
 
 Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1).
 
@@ -15287,7 +15343,7 @@ Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1).
 uint32_t total_samples
 ```
 
-Defined in h1os/orch_state.h:131
+Defined in h1os/orch_state.h:143
 
 Total lifetime samples recorded across all sessions.
 
@@ -15301,7 +15357,7 @@ Total lifetime samples recorded across all sessions.
 uint32_t total_sleep_sec
 ```
 
-Defined in h1os/orch_state.h:133
+Defined in h1os/orch_state.h:145
 
 Cumulative seconds spent in deep sleep.
 
@@ -15315,7 +15371,7 @@ Cumulative seconds spent in deep sleep.
 uint32_t total_app_run_ms
 ```
 
-Defined in h1os/orch_state.h:134
+Defined in h1os/orch_state.h:146
 
 Cumulative milliseconds executing main processor application.
 
@@ -15329,7 +15385,7 @@ Cumulative milliseconds executing main processor application.
 uint32_t last_nvs_commit_sec
 ```
 
-Defined in h1os/orch_state.h:135
+Defined in h1os/orch_state.h:147
 
 Sleep timestamp (total_sleep_sec) of last successful NVS runtime commit.
 
@@ -15343,7 +15399,7 @@ Sleep timestamp (total_sleep_sec) of last successful NVS runtime commit.
 uint16_t initial_soc_x10
 ```
 
-Defined in h1os/orch_state.h:136
+Defined in h1os/orch_state.h:148
 
 State of Charge at start of discharge lap in tenths of % (0..1000).
 
@@ -15357,7 +15413,49 @@ State of Charge at start of discharge lap in tenths of % (0..1000).
 uint8_t _pad_soc[2]
 ```
 
-Defined in h1os/orch_state.h:137
+Defined in h1os/orch_state.h:149
+
+Alignment padding to 32-bit boundary.
+
+---
+
+{#sensor_fail_count-1}
+
+#### sensor_fail_count
+
+```cpp
+uint32_t sensor_fail_count
+```
+
+Defined in h1os/orch_state.h:150
+
+Monotonic count of failed wake-stub sensor reads.
+
+---
+
+{#last_sensor_error-1}
+
+#### last_sensor_error
+
+```cpp
+uint8_t last_sensor_error
+```
+
+Defined in h1os/orch_state.h:151
+
+Last error code ([orch_sensor_err_t](#orch_sensor_err_t)).
+
+---
+
+{#_pad_sensor}
+
+#### _pad_sensor
+
+```cpp
+uint8_t _pad_sensor[3]
+```
+
+Defined in h1os/orch_state.h:152
 
 Alignment padding to 32-bit boundary.
 
@@ -15439,7 +15537,7 @@ Total mAh consumed since initial_soc_x10.
 struct orch_tri_node_sample_t
 ```
 
-Defined in h1os/orch_state.h:66
+Defined in h1os/orch_state.h:78
 
 Compact 16-byte Tri-Node sample entry in RTC Slow SRAM.
 
@@ -15465,7 +15563,7 @@ Compact 16-byte Tri-Node sample entry in RTC Slow SRAM.
 int16_t shtc3_temp_centi_c
 ```
 
-Defined in h1os/orch_state.h:67
+Defined in h1os/orch_state.h:79
 
 SHTC3 temperature in centi-degrees Celsius (1°C = 100).
 
@@ -15479,7 +15577,7 @@ SHTC3 temperature in centi-degrees Celsius (1°C = 100).
 uint16_t shtc3_rh_centi_pct
 ```
 
-Defined in h1os/orch_state.h:68
+Defined in h1os/orch_state.h:80
 
 SHTC3 relative humidity in centi-percent (1% = 100).
 
@@ -15493,7 +15591,7 @@ SHTC3 relative humidity in centi-percent (1% = 100).
 int16_t mcu_tsens_centi_c
 ```
 
-Defined in h1os/orch_state.h:69
+Defined in h1os/orch_state.h:81
 
 ESP32-S3 internal TSENS die temperature in centi-degrees Celsius.
 
@@ -15507,7 +15605,7 @@ ESP32-S3 internal TSENS die temperature in centi-degrees Celsius.
 int16_t epd_glass_centi_c
 ```
 
-Defined in h1os/orch_state.h:70
+Defined in h1os/orch_state.h:82
 
 SSD1681 on-glass thermal sensor in centi-degrees Celsius.
 
@@ -15521,7 +15619,7 @@ SSD1681 on-glass thermal sensor in centi-degrees Celsius.
 uint32_t timestamp_sec
 ```
 
-Defined in h1os/orch_state.h:71
+Defined in h1os/orch_state.h:83
 
 Sample epoch timestamp in seconds.
 
@@ -15535,7 +15633,7 @@ Sample epoch timestamp in seconds.
 uint8_t quality_flags
 ```
 
-Defined in h1os/orch_state.h:72
+Defined in h1os/orch_state.h:84
 
 Sample qualification bitmask (SAMPLE_FLAG_*).
 
@@ -15549,7 +15647,7 @@ Sample qualification bitmask (SAMPLE_FLAG_*).
 uint8_t _pad[3]
 ```
 
-Defined in h1os/orch_state.h:73
+Defined in h1os/orch_state.h:85
 
 Alignment padding to 32-bit boundary.
 
@@ -15565,7 +15663,7 @@ Alignment padding to 32-bit boundary.
 struct orch_nvs_runtime_blob_t
 ```
 
-Defined in h1os/orch_state.h:79
+Defined in h1os/orch_state.h:91
 
 Compact 12-byte atomic battery autonomy runtime blob committed to Flash NVS.
 
@@ -15588,7 +15686,7 @@ Compact 12-byte atomic battery autonomy runtime blob committed to Flash NVS.
 uint32_t total_sleep_sec
 ```
 
-Defined in h1os/orch_state.h:80
+Defined in h1os/orch_state.h:92
 
 Cumulative seconds spent in deep sleep.
 
@@ -15602,7 +15700,7 @@ Cumulative seconds spent in deep sleep.
 uint32_t total_app_run_ms
 ```
 
-Defined in h1os/orch_state.h:81
+Defined in h1os/orch_state.h:93
 
 Cumulative milliseconds executing main processor application.
 
@@ -15616,7 +15714,7 @@ Cumulative milliseconds executing main processor application.
 uint16_t initial_soc_x10
 ```
 
-Defined in h1os/orch_state.h:82
+Defined in h1os/orch_state.h:94
 
 State of Charge at start of discharge lap in tenths of % (0..1000).
 
@@ -15630,7 +15728,7 @@ State of Charge at start of discharge lap in tenths of % (0..1000).
 uint16_t reserved
 ```
 
-Defined in h1os/orch_state.h:83
+Defined in h1os/orch_state.h:95
 
 16-bit alignment padding / reserved.
 
@@ -15778,7 +15876,7 @@ Defined in sub_audio.c:61
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:128
+Defined in h1os/h1os.h:129
 
 ### Public Attributes
 
@@ -15799,7 +15897,7 @@ Defined in h1os/h1os.h:128
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:129
+Defined in h1os/h1os.h:130
 
 Interactive session idle sleep timeout in seconds.
 
@@ -15815,7 +15913,7 @@ sys_clk_mode_t clk_mode
 
 Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
-Defined in h1os/h1os.h:130
+Defined in h1os/h1os.h:131
 
 CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
@@ -15829,7 +15927,7 @@ CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:131
+Defined in h1os/h1os.h:132
 
 Period between headless sensor sample bursts in seconds.
 
@@ -15843,7 +15941,7 @@ Period between headless sensor sample bursts in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:132
+Defined in h1os/h1os.h:133
 
 Period between unattended display flushes in seconds.
 
@@ -15883,7 +15981,7 @@ Defined in sub_audio.c:64
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:121
+Defined in h1os/h1os.h:122
 
 ### Public Attributes
 
@@ -15906,7 +16004,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:122
+Defined in h1os/h1os.h:123
 
 Presentation splash screen rendering hook.
 
@@ -15922,7 +16020,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:123
+Defined in h1os/h1os.h:124
 
 Presentation chime playback hook.
 
@@ -15936,7 +16034,7 @@ Presentation chime playback hook.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:124
+Defined in h1os/h1os.h:125
 
 Bitmask of enabled audio chime types.
 
@@ -15950,7 +16048,7 @@ Bitmask of enabled audio chime types.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:125
+Defined in h1os/h1os.h:126
 
 Acoustic presentation master volume (0..100%).
 
