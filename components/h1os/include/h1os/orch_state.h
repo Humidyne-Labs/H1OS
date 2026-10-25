@@ -16,10 +16,23 @@ extern "C" {
 #endif
 
 // clang-format off
-#define ORCH_RTC_MAGIC                        0x534C4154U /**< RTC state validation magic word ('SLAT').                  */
-#define ORCH_RING_CAPACITY                    32          /**< Fixed capacity of historical telemetry sample ring buffer. */
-#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  2052        /**< Default TSENS Q12 fixed-point intercept in centi-°C (20.52°C).     */
+#define ORCH_RTC_MAGIC                        0x534C4154U /**< RTC state validation magic word ('SLAT').                                    */
+#define ORCH_RING_CAPACITY                    32          /**< Fixed capacity of historical telemetry sample ring buffer.                   */
+#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  2052        /**< Default TSENS Q12 fixed-point intercept in centi-°C (20.52°C).               */
 #define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC 3600U       /**< Minimum elapsed deep sleep interval between unattended NVS commits (1 hour). */
+
+/**
+ * @brief ULP coprocessor wake causes (ulp_last_wake_cause).
+ */
+typedef enum {
+    ULP_WAKE_CAUSE_NONE             = 0, /**< Uninitialized / no wake registered.                               */
+    ULP_WAKE_CAUSE_BOOT_BTN         = 1, /**< BOOT0 button event (short tap: session wake, long hold: DFU jump).*/
+    ULP_WAKE_CAUSE_PWR_BTN          = 2, /**< POWER button event (short tap: session wake, long hold: shutdown). */
+    ULP_WAKE_CAUSE_LONG_OVERFLOW    = 3, /**< Flow B presentation refresh (slice_counter reached overflow_limit).*/
+    ULP_WAKE_CAUSE_SENSOR_TICK      = 4, /**< Flow A sensor burst wake stub (slice_counter < overflow_limit).    */
+    ULP_WAKE_CAUSE_RTC_INT_STUCK    = 5, /**< PCF85063A INT line stuck LOW hardware bus fault.                   */
+    ULP_WAKE_CAUSE_CRITICAL_BATTERY = 6  /**< Battery dropped below 3250 mV brownout emergency floor.           */
+} ulp_wake_cause_t;
 
 /**
  * @brief ULP coprocessor dispatch wakeup reasons.

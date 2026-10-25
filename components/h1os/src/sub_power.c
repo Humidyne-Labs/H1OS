@@ -36,7 +36,7 @@ extern const uint8_t ulp_h1os_bin_end[]   asm("_binary_ulp_h1os_bin_end");
 
 static const char *TAG = "sub_power";
 
-#define SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US      50000U /**< Timeout awaiting PCF85063A INT release (50 ms). */
+#define SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US      50000U /**< Timeout awaiting PCF85063A INT release (50 ms).  */
 #define SUB_POWER_RTC_INT_DRAIN_STEP_US         500U   /**< Step delay polling PCF85063A INT pin (500 µs).   */
 #define SUB_POWER_VBAT_ZERO_VOLT_GUARD_MV       3300U  /**< Lower floor below which USB assumes charged.     */
 #define SUB_POWER_VBAT_ASSUMED_CHARGED_MV       4200U  /**< Assumed full cell potential on bench power.      */
@@ -123,7 +123,7 @@ esp_err_t sub_power_init(void)
     }
 
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_12,
+        .atten    = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_3, &chan_cfg);
@@ -162,7 +162,7 @@ esp_err_t sub_power_deinit(void)
         adc_cali_delete_scheme_curve_fitting(s_cali_handle);
 #endif
         s_cali_handle = NULL;
-        s_cali_valid = false;
+        s_cali_valid  = false;
     }
 
     if (s_adc_handle != NULL) {
@@ -247,10 +247,8 @@ esp_err_t sub_power_read_battery(uint16_t *out_mv, uint8_t *out_pct)
 /**
  * @brief Compute empirical battery autonomy metrics over total elapsed runtime.
  */
-void sub_power_calc_autonomy(uint16_t initial_soc_x10,
-                             uint16_t current_soc_x10,
-                             uint32_t total_sleep_sec,
-                             uint32_t total_app_ms,
+void sub_power_calc_autonomy(uint16_t initial_soc_x10, uint16_t current_soc_x10,
+                             uint32_t total_sleep_sec, uint32_t total_app_ms,
                              h1os_autonomy_metrics_t *out_metrics)
 {
     if (out_metrics == NULL) {
@@ -374,7 +372,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         rtc_gpio_deinit(HAL_PIN_RTC_INT);
 
         ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized in Pure Event Mode (ERR-001 Mitigated)");
-    } else if (ulp_last_wake_cause == 3) {
+    } else if (ulp_last_wake_cause == ULP_WAKE_CAUSE_LONG_OVERFLOW) {
         /* Account for the final Flow B sleep slice when woken by the RTC countdown timer */
         volatile orch_persisted_state_t *st = orch_state_get();
         if (st->sample_interval_sec > 0) {
@@ -553,8 +551,8 @@ esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
     int32_t min_freq = (mode == SYS_CLK_MODE_FIXED_MAX) ? CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ : 80;
 
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = (int)max_freq,
-        .min_freq_mhz = (int)min_freq,
+        .max_freq_mhz       = (int)max_freq,
+        .min_freq_mhz       = (int)min_freq,
         .light_sleep_enable = false,
     };
     esp_err_t err = esp_pm_configure(&pm_config);

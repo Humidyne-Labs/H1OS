@@ -134,10 +134,10 @@ static void orch_flow_dump_ring_debug(const volatile orch_persisted_state_t *st)
     static float mcuT_ring[ORCH_RING_CAPACITY];
     static float epdT_ring[ORCH_RING_CAPACITY];
 
-    memset(shtc3T_ring, 0, sizeof(shtc3T_ring));
+    memset(shtc3T_ring,  0, sizeof(shtc3T_ring));
     memset(shtc3RH_ring, 0, sizeof(shtc3RH_ring));
-    memset(mcuT_ring, 0, sizeof(mcuT_ring));
-    memset(epdT_ring, 0, sizeof(epdT_ring));
+    memset(mcuT_ring,    0, sizeof(mcuT_ring));
+    memset(epdT_ring,    0, sizeof(epdT_ring));
 
     ESP_LOGI(TAG, "Ring Buffer Dump [TMP, RHP, DIE, EPD]:");
     for (uint32_t i = 0; i < ORCH_RING_CAPACITY; i++) {

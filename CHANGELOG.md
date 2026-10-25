@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
+* **ULP Coprocessor Wake Cause Enumeration & Traceability** (`orch_state.h`, `ulp/main.c`, `h1os_lifecycle.c`, `sub_power.c`):
+  * Replaced magic numeric codes (`1` through `6`) for `last_wake_cause` with strongly-typed `ulp_wake_cause_t` enumerators in portable header `orch_state.h`.
+  * Unified ULP wake cause semantics across ULP-RISC-V firmware, power management, and application lifecycle logging: `ULP_WAKE_CAUSE_BOOT_BTN (1)`, `ULP_WAKE_CAUSE_PWR_BTN (2)`, `ULP_WAKE_CAUSE_LONG_OVERFLOW (3)`, `ULP_WAKE_CAUSE_SENSOR_TICK (4)`, `ULP_WAKE_CAUSE_RTC_INT_STUCK (5)`, and `ULP_WAKE_CAUSE_CRITICAL_BATTERY (6)`.
+  * Deduplicated dispatch action definitions by sharing `orch_ulp_dispatch_t` directly between ULP coprocessor and main CPU translation units.
 * **Repository Footprint Sanitization & Transient Audit Tool Pruning** (`tools/`, `docs/agent_notes/audits/`):
   * Following completion of the hardcoded literal audit and single-file macro dissolution, removed temporary Python analysis scripts (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `tools/analyze_macro_scope.py`) and interim audit ledgers (`docs/agent_notes/audits/hardcoded_integers_audit.md`, `docs/agent_notes/audits/literal_integers_degree_audit.md`) to maintain repository cleanliness and avoid workspace inflation.
 * **Macro Scope Partitioning & Single-File Constant Dissolution** (`h1os_constants.h`, `orch_state.h`, `orch_wake_stub.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `sub_sdcard.c`):

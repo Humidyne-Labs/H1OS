@@ -103,22 +103,22 @@ esp_err_t sub_sdcard_mount(void)
 
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
-        .max_files = 5,
-        .allocation_unit_size = 0,
+        .max_files              = 5,
+        .allocation_unit_size   = 0,
     };
 
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
-    host.flags = SDMMC_HOST_FLAG_1BIT;
+    sdmmc_host_t host       = SDMMC_HOST_DEFAULT();
+    host.max_freq_khz       = SDMMC_FREQ_DEFAULT;
+    host.flags              = SDMMC_HOST_FLAG_1BIT;
     host.command_timeout_ms = SUB_SDCARD_COMMAND_TIMEOUT_MS;
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;
-    slot_config.clk = HAL_PIN_SD_CLK;
-    slot_config.cmd = HAL_PIN_SD_MOSI;
-    slot_config.d0 = HAL_PIN_SD_MISO;
-    slot_config.cd = SDMMC_SLOT_NO_CD;
-    slot_config.wp = SDMMC_SLOT_NO_WP;
+    slot_config.clk   = HAL_PIN_SD_CLK;
+    slot_config.cmd   = HAL_PIN_SD_MOSI;
+    slot_config.d0    = HAL_PIN_SD_MISO;
+    slot_config.cd    = SDMMC_SLOT_NO_CD;
+    slot_config.wp    = SDMMC_SLOT_NO_WP;
 
     esp_log_level_set("sdmmc_common", ESP_LOG_NONE);
     esp_log_level_set("vfs_fat_sdmmc", ESP_LOG_NONE);
@@ -221,5 +221,6 @@ esp_err_t sub_sdcard_format(void)
     if (s_sd_card == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
+	
     return esp_vfs_fat_sdcard_format(SUB_SDCARD_MOUNT_POINT, s_sd_card);
 }

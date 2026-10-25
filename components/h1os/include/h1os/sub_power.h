@@ -30,7 +30,7 @@ typedef enum {
  * @brief Battery operational state machine.
  */
 typedef enum {
-    H1OS_BATTERY_DISCHARGING = 0, /**< Normal autonomous battery discharge.       */
+    H1OS_BATTERY_DISCHARGING = 0, /**< Normal autonomous battery discharge.        */
     H1OS_BATTERY_CHARGING,        /**< Voltage rising over consecutive reads.      */
     H1OS_BATTERY_CHARGED,         /**< Saturated voltage (>=4180 mV) or USB host.  */
 } h1os_battery_state_t;

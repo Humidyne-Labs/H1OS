@@ -71,7 +71,7 @@ esp_err_t h1os_time_sync_system_to_rtc(void)
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Synchronized PCF85063A RTC from POSIX clock: %04d-%02d-%02d %02d:%02d:%02d",
                  timeinfo.tm_year + 1900, 
-				 timeinfo.tm_mon + 1, 
+				 timeinfo.tm_mon  + 1, 
 				 timeinfo.tm_mday, 
 				 timeinfo.tm_hour, 
 				 timeinfo.tm_min,
@@ -106,7 +106,7 @@ esp_err_t h1os_time_sync_rtc_to_system(void)
     settimeofday(&tv, NULL);
     ESP_LOGI(TAG, "Synchronized POSIX clock from PCF85063A: %04d-%02d-%02d %02d:%02d:%02d", 
 					tm_target.tm_year + 1900,
-					tm_target.tm_mon + 1, 
+					tm_target.tm_mon  + 1, 
 					tm_target.tm_mday, 
 					tm_target.tm_hour, 
 					tm_target.tm_min, 

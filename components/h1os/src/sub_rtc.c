@@ -37,12 +37,12 @@ static const char *TAG = "sub_rtc";
 #define CTRL1_STOP_MASK      (1 << 5)
 #define CTRL1_12_24_MASK     (1 << 1)
 #define CTRL1_CAP_SEL_12_5PF (1 << 0)
-#define CTRL1_SW_RESET_CMD    0x58
+#define CTRL1_SW_RESET_CMD   0x58
 
 #define CTRL2_AF_MASK  (1 << 6)
 #define CTRL2_TF_MASK  (1 << 3)
 #define CTRL2_AIE_MASK (1 << 7)
-#define CTRL2_COF_OFF   0x07
+#define CTRL2_COF_OFF  0x07
 
 #define TIMER_CLK_4096_HZ    (0 << 3)
 #define TIMER_CLK_64_HZ      (1 << 3)
@@ -193,13 +193,13 @@ esp_err_t sub_rtc_get_time(struct tm *out_time)
         return err;
     }
 
-    out_time->tm_sec = bcd2dec(data[0] & 0x7F);
-    out_time->tm_min = bcd2dec(data[1] & 0x7F);
-    out_time->tm_hour = bcd2dec(data[2] & 0x3F);
-    out_time->tm_mday = bcd2dec(data[3] & 0x3F);
-    out_time->tm_wday = data[4] & 0x07;
-    out_time->tm_mon = bcd2dec(data[5] & 0x1F) - 1;
-    out_time->tm_year = bcd2dec(data[6]) + 100;
+    out_time->tm_sec   = bcd2dec(data[0] & 0x7F);
+    out_time->tm_min   = bcd2dec(data[1] & 0x7F);
+    out_time->tm_hour  = bcd2dec(data[2] & 0x3F);
+    out_time->tm_mday  = bcd2dec(data[3] & 0x3F);
+    out_time->tm_wday  = data[4] & 0x07;
+    out_time->tm_mon   = bcd2dec(data[5] & 0x1F) - 1;
+    out_time->tm_year  = bcd2dec(data[6]) + 100;
     out_time->tm_isdst = -1;
 
     return ESP_OK;

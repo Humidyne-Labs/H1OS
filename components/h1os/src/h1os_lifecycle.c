@@ -36,21 +36,21 @@
 
 static const char *TAG = "h1os_lifecycle";
 
-#define LIFECYCLE_TASK_STACK_SESSION_MONITOR  4096U /**< Session monitor task stack floor (4 KB). */
-#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR   3     /**< Session monitor FreeRTOS priority.      */
-#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).  */
-#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS     20U   /**< LVGL drain poll step interval (20 ms).  */
+#define LIFECYCLE_TASK_STACK_SESSION_MONITOR  4096U /**< Session monitor task stack floor (4 KB).  */
+#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR   3     /**< Session monitor FreeRTOS priority.        */
+#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).    */
+#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS     20U   /**< LVGL drain poll step interval (20 ms).    */
 #define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V).*/
-#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.  */
-#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.     */
-#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.     */
+#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.    */
+#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.       */
+#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.       */
 
-static h1os_lifecycle_t s_app_lifecycle = {0};
-static volatile int64_t s_session_expiry_us = 0;
+static h1os_lifecycle_t s_app_lifecycle            = {0};
+static volatile int64_t s_session_expiry_us        = 0;
 static volatile TaskHandle_t s_session_task_handle = NULL;
-static volatile bool s_session_running = false;
-static bool s_audio_initialized = false;
-static portMUX_TYPE s_session_mux = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_session_running             = false;
+static bool s_audio_initialized                    = false;
+static portMUX_TYPE s_session_mux                  = portMUX_INITIALIZER_UNLOCKED;
 
 /* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
 RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
@@ -181,13 +181,13 @@ static void debug_dump_ulp_telemetry(void)
     ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
-               (ulp_last_wake_cause == 1) ? "BOOT_BTN"
-             : (ulp_last_wake_cause == 2) ? "PWR_BTN"
-             : (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW"
-             : (ulp_last_wake_cause == 4) ? "SENSOR_TICK"
-             : (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT"
-             : (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY"
-                                          : "UNKNOWN",
+               (ulp_last_wake_cause == ULP_WAKE_CAUSE_BOOT_BTN)         ? "BOOT_BTN"
+             : (ulp_last_wake_cause == ULP_WAKE_CAUSE_PWR_BTN)          ? "PWR_BTN"
+             : (ulp_last_wake_cause == ULP_WAKE_CAUSE_LONG_OVERFLOW)    ? "LONG_OVERFLOW"
+             : (ulp_last_wake_cause == ULP_WAKE_CAUSE_SENSOR_TICK)      ? "SENSOR_TICK"
+             : (ulp_last_wake_cause == ULP_WAKE_CAUSE_RTC_INT_STUCK)    ? "RTC_INT_STUCK_FAULT"
+             : (ulp_last_wake_cause == ULP_WAKE_CAUSE_CRITICAL_BATTERY) ? "CRITICAL_BATTERY"
+             : "UNKNOWN",
              (unsigned long)ulp_slice_counter,
              (unsigned long)ulp_overflow_limit,
              (unsigned long)ulp_last_vbat_mv,
@@ -198,7 +198,7 @@ static void debug_dump_ulp_telemetry(void)
     if (ulp_rtc_int_stuck) {
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
     }
-    if (ulp_last_wake_cause == 6) {
+    if (ulp_last_wake_cause == ULP_WAKE_CAUSE_CRITICAL_BATTERY) {
         ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< %lu mV threshold)!", (unsigned long)ulp_last_vbat_mv, (unsigned long)LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
@@ -361,10 +361,10 @@ static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 {
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    bool is_wake = (flow != ORCH_FLOW_BOOT);
+    bool is_wake     = (flow != ORCH_FLOW_BOOT);
     bool is_rtc_wake = false;
     bool button_woke = false;
-    uint32_t causes = 0;
+    uint32_t causes  = 0;
 
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();

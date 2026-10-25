@@ -30,7 +30,7 @@
 
 static const char *TAG = "h1os_lvgl";
 
-#define LVGL_TASK_STACK_PORT      8192U /**< Stack allocation for LVGL port task (8 KB). */
+#define LVGL_TASK_STACK_PORT      8192U /**< Stack allocation for LVGL port task (8 KB).  */
 #define LVGL_TASK_PRIO_PORT       5     /**< Default FreeRTOS priority for LVGL task.     */
 #define LVGL_SHUTDOWN_TIMEOUT_MS  6000U /**< Max wait for LVGL task deletion (6s).        */
 #define LVGL_SHUTDOWN_STEP_MS     20U   /**< Shutdown poll step interval (20 ms).         */
@@ -39,6 +39,7 @@ static const char *TAG = "h1os_lvgl";
 
 static lv_display_t *s_lv_display       = NULL;
 static lv_indev_t   *s_lv_keypad_indev  = NULL;
+
 static volatile TaskHandle_t s_lvgl_task_handle = NULL;
 
 static volatile bool s_lvgl_task_running = false;
@@ -188,7 +189,7 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
         if ((area->x1 & 7) == 0 && (area_w & 7) == 0) {
             uint16_t bytes_per_line = area_w >> 3;
-            uint16_t start_byte_x = area->x1 >> 3;
+            uint16_t start_byte_x   = area->x1 >> 3;
 
             const uint8_t *src = src_buf;
             uint8_t *dst = dest_buf + (y_start * epd_stride) + start_byte_x;

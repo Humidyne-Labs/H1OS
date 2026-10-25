@@ -32,8 +32,9 @@
 #endif
 
 // clang-format off
-#define ORCH_I2C_RECOVERY_TIMEOUT_US 20000U /**< I2C bus recovery timeout (20 ms). */
+#define ORCH_I2C_RECOVERY_TIMEOUT_US 20000U /**< I2C bus recovery timeout (20 ms).  */
 #define ORCH_I2C_RECOVERY_STEP_US    500U   /**< I2C recovery polling step (500 µs).*/
+
 #define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32))
 #define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32))
 
@@ -357,6 +358,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_write_byte(0x78);
             i2c_write_byte(0x66);
             i2c_stop();
+			
             /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
             die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, 0);
             esp_rom_delay_us(ORCH_SHTC3_POST_TSENS_DELAY_US);

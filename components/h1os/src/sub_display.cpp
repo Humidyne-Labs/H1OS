@@ -29,8 +29,8 @@ static const char *TAG = "sub_display";
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
-static bool s_inited = false;
-static bool s_in_deep_sleep = false;
+static bool s_inited                     = false;
+static bool s_in_deep_sleep              = false;
 static int16_t s_last_glass_temp_centi_c = 0;
 
 static const uint8_t WF_PARTIAL_1IN54[159] = {
@@ -179,8 +179,8 @@ esp_err_t sub_display_init(bool is_wake_cycle)
 
     if (hal_spi_read_data(0x1B, temp_raw, sizeof(temp_raw)) == ESP_OK) {
         if (temp_raw[0] != 0x00 && temp_raw[0] != 0xFF) {
-            int8_t temp_int = (int8_t)temp_raw[0];
-            int16_t frac_c = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
+            int8_t  temp_int = (int8_t)temp_raw[0];
+            int16_t frac_c   = (temp_raw[1] & 0x80) ? SSD1681_TEMP_HALF_DEG_CENTI_C : 0;
             int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 s_last_glass_temp_centi_c = glass_cc;
