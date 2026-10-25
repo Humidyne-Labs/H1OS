@@ -345,8 +345,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
         ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV",
                  (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
-        ulp_dispatch_reason = 0;
-        ulp_last_wake_btn   = 0;
+        ulp_dispatch_reason = ULP_DISPATCH_NONE;
+        ulp_last_wake_btn   = H1OS_WAKE_BTN_NONE;
         ulp_last_vbat_mv    = 4000;
 
         if (flow_a_period_sec == 0) {
@@ -438,8 +438,8 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         ulp_slice_counter = 0;
     }
-    ulp_dispatch_reason = 0;
-    ulp_last_wake_btn   = 0;
+    ulp_dispatch_reason = ULP_DISPATCH_NONE;
+    ulp_last_wake_btn   = H1OS_WAKE_BTN_NONE;
     ulp_rtc_int_stuck   = 0;
     ulp_usb_connected   = sub_power_connected_usb() ? 1 : 0;
     asm volatile("memw" ::: "memory");

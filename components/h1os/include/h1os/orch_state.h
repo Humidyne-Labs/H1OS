@@ -22,16 +22,25 @@ extern "C" {
 #define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC 3600U       /**< Minimum elapsed deep sleep interval between unattended NVS commits (1 hour). */
 
 /**
+ * @brief Waking button identifier reported by ULP coprocessor (ulp_last_wake_btn).
+ */
+typedef enum {
+    H1OS_WAKE_BTN_NONE  = 0, /**< Wake was not triggered by a physical button. */
+    H1OS_WAKE_BTN_BOOT  = 1, /**< Woken by BOOT0 button (GPIO 0).              */
+    H1OS_WAKE_BTN_POWER = 2  /**< Woken by POWER button (GPIO 18).             */
+} h1os_wake_btn_t;
+
+/**
  * @brief ULP coprocessor wake causes (ulp_last_wake_cause).
  */
 typedef enum {
-    ULP_WAKE_CAUSE_NONE             = 0, /**< Uninitialized / no wake registered.                               */
-    ULP_WAKE_CAUSE_BOOT_BTN         = 1, /**< BOOT0 button event (short tap: session wake, long hold: DFU jump).*/
+    ULP_WAKE_CAUSE_NONE             = 0, /**< Uninitialized / no wake registered.                                */
+    ULP_WAKE_CAUSE_BOOT_BTN         = 1, /**< BOOT0 button event (short tap: session wake, long hold: DFU jump). */
     ULP_WAKE_CAUSE_PWR_BTN          = 2, /**< POWER button event (short tap: session wake, long hold: shutdown). */
     ULP_WAKE_CAUSE_LONG_OVERFLOW    = 3, /**< Flow B presentation refresh (slice_counter reached overflow_limit).*/
     ULP_WAKE_CAUSE_SENSOR_TICK      = 4, /**< Flow A sensor burst wake stub (slice_counter < overflow_limit).    */
     ULP_WAKE_CAUSE_RTC_INT_STUCK    = 5, /**< PCF85063A INT line stuck LOW hardware bus fault.                   */
-    ULP_WAKE_CAUSE_CRITICAL_BATTERY = 6  /**< Battery dropped below 3250 mV brownout emergency floor.           */
+    ULP_WAKE_CAUSE_CRITICAL_BATTERY = 6  /**< Battery dropped below 3250 mV brownout emergency floor.            */
 } ulp_wake_cause_t;
 
 /**
@@ -68,10 +77,10 @@ typedef struct {
  * @brief Compact 12-byte atomic battery autonomy runtime blob committed to Flash NVS.
  */
 typedef struct {
-    uint32_t total_sleep_sec;   /**< Cumulative seconds spent in deep sleep.                        */
-    uint32_t total_app_run_ms;  /**< Cumulative milliseconds executing main processor application.  */
+    uint32_t total_sleep_sec;   /**< Cumulative seconds spent in deep sleep.                             */
+    uint32_t total_app_run_ms;  /**< Cumulative milliseconds executing main processor application.       */
     uint16_t initial_soc_x10;   /**< State of Charge at start of discharge lap in tenths of % (0..1000). */
-    uint16_t reserved;          /**< 16-bit alignment padding / reserved.                           */
+    uint16_t reserved;          /**< 16-bit alignment padding / reserved.                                */
 } orch_nvs_runtime_blob_t;
 
 /**

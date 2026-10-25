@@ -228,9 +228,9 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
         break;
     case ORCH_FLOW_B_MAIN_WAKE:
         flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
-        if (ulp_last_wake_btn == 1) {
+        if (ulp_last_wake_btn == H1OS_WAKE_BTN_BOOT) {
             trigger_desc = "ULP Tactile Press (BOOT / GPIO 0)";
-        } else if (ulp_last_wake_btn == 2) {
+        } else if (ulp_last_wake_btn == H1OS_WAKE_BTN_POWER) {
             trigger_desc = "ULP Tactile Press (POWER / GPIO 18)";
         } else {
             trigger_desc = "External RTC Alarm / Timer Tick";

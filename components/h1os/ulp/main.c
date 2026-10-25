@@ -156,7 +156,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
     /* 1. Critical battery brownout guard */
     if (!usb_connected && (vbat_mv >= 100 && vbat_mv < 3250)) {
         last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
-        last_wake_btn   = 0;
+        last_wake_btn   = H1OS_WAKE_BTN_NONE;
         dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
         wake_main       = true;
     }
@@ -187,12 +187,12 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
             if (long_held) {
                 if (is_boot) {
                     last_wake_cause = ULP_WAKE_CAUSE_BOOT_BTN;
-                    last_wake_btn   = 1;
+                    last_wake_btn   = H1OS_WAKE_BTN_BOOT;
                     dispatch_reason = ULP_DISPATCH_BOOTLOADER_JUMP;
                     wake_main       = true;
                 } else {
                     last_wake_cause = ULP_WAKE_CAUSE_PWR_BTN;
-                    last_wake_btn   = 2;
+                    last_wake_btn   = H1OS_WAKE_BTN_POWER;
                     dispatch_reason = ULP_DISPATCH_POWER_OFF;
                     wake_main       = true;
                 }
@@ -203,7 +203,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
                     uint32_t hold_ms = elapsed_us / 1000U;
                     if (hold_ms >= BUTTON_TAP_MIN_MS && hold_ms < BUTTON_TAP_MAX_MS) {
                         last_wake_cause = is_boot ? ULP_WAKE_CAUSE_BOOT_BTN : ULP_WAKE_CAUSE_PWR_BTN;
-                        last_wake_btn   = is_boot ? 1 : 2;
+                        last_wake_btn   = is_boot ? H1OS_WAKE_BTN_BOOT : H1OS_WAKE_BTN_POWER;
                         dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
                         wake_main       = true;
                     }
@@ -220,14 +220,14 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
 
             if (slice_counter < overflow_limit) {
                 last_wake_cause = ULP_WAKE_CAUSE_SENSOR_TICK;
-                last_wake_btn   = 0;
+                last_wake_btn   = H1OS_WAKE_BTN_NONE;
                 dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
                 wake_main       = true;
             } else {
                 slice_counter   = 0;
                 remainder_sec   = 0;
                 last_wake_cause = ULP_WAKE_CAUSE_LONG_OVERFLOW;
-                last_wake_btn   = 0;
+                last_wake_btn   = H1OS_WAKE_BTN_NONE;
                 dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
                 wake_main       = true;
             }
@@ -257,7 +257,7 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
 
         if (rtc_int_stuck) {
             last_wake_cause = ULP_WAKE_CAUSE_RTC_INT_STUCK;
-            last_wake_btn   = 0;
+            last_wake_btn   = H1OS_WAKE_BTN_NONE;
             dispatch_reason = ULP_DISPATCH_MAIN_WAKE;
             ulp_disarm_and_wake_main();
         } else {

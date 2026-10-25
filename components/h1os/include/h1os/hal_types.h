@@ -10,6 +10,7 @@
 
 #include "driver/gpio.h"
 #include "esp_err.h"
+#include "h1os/orch_state.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -85,15 +86,6 @@ typedef enum {
     HAL_BTN_BOOT  = (1 << 0), /**< BOOT0 button depressed (GPIO 0).  */
     HAL_BTN_POWER = (1 << 1)  /**< POWER button depressed (GPIO 18). */
 } hal_btn_mask_t;
-
-/**
- * @brief Waking button identifier reported by ULP coprocessor.
- */
-typedef enum {
-    H1OS_WAKE_BTN_NONE  = 0, /**< Wake was not triggered by a physical button. */
-    H1OS_WAKE_BTN_BOOT  = 1, /**< Woken by BOOT0 button (GPIO 0).              */
-    H1OS_WAKE_BTN_POWER = 2  /**< Woken by POWER button (GPIO 18).             */
-} h1os_wake_btn_t;
 
 /**
  * @brief Acoustic chime sound pattern types.

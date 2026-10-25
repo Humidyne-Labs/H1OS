@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
-* **ULP Coprocessor Wake Cause Enumeration & Traceability** (`orch_state.h`, `ulp/main.c`, `h1os_lifecycle.c`, `sub_power.c`):
+* **ULP Coprocessor Wake Cause & Button Enumeration** (`orch_state.h`, `hal_types.h`, `ulp/main.c`, `h1os_lifecycle.c`, `sub_power.c`):
   * Replaced magic numeric codes (`1` through `6`) for `last_wake_cause` with strongly-typed `ulp_wake_cause_t` enumerators in portable header `orch_state.h`.
+  * Replaced magic numeric button IDs (`0`, `1`, `2`) for `last_wake_btn` with strongly-typed `h1os_wake_btn_t` (`H1OS_WAKE_BTN_NONE = 0`, `H1OS_WAKE_BTN_BOOT = 1`, `H1OS_WAKE_BTN_POWER = 2`), relocating the type to `orch_state.h` so it is shared identically by the RISC-V ULP toolchain and main Xtensa CPU.
   * Unified ULP wake cause semantics across ULP-RISC-V firmware, power management, and application lifecycle logging: `ULP_WAKE_CAUSE_BOOT_BTN (1)`, `ULP_WAKE_CAUSE_PWR_BTN (2)`, `ULP_WAKE_CAUSE_LONG_OVERFLOW (3)`, `ULP_WAKE_CAUSE_SENSOR_TICK (4)`, `ULP_WAKE_CAUSE_RTC_INT_STUCK (5)`, and `ULP_WAKE_CAUSE_CRITICAL_BATTERY (6)`.
   * Deduplicated dispatch action definitions by sharing `orch_ulp_dispatch_t` directly between ULP coprocessor and main CPU translation units.
 * **Repository Footprint Sanitization & Transient Audit Tool Pruning** (`tools/`, `docs/agent_notes/audits/`):
