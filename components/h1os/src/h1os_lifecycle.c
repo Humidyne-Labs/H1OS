@@ -36,21 +36,21 @@
 
 static const char *TAG = "h1os_lifecycle";
 
-#define LIFECYCLE_TASK_STACK_SESSION_MONITOR  4096U /**< Session monitor task stack floor (4 KB).  */
-#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR   3     /**< Session monitor FreeRTOS priority.        */
-#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).    */
-#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS     20U   /**< LVGL drain poll step interval (20 ms).    */
-#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V).*/
-#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.    */
-#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.       */
-#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.       */
+#define LIFECYCLE_TASK_STACK_SESSION_MONITOR 4096U /**< Session monitor task stack floor (4 KB).  */
+#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR 3 /**< Session monitor FreeRTOS priority.        */
+#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS 6000U /**< Max wait to drain LVGL rendering (6s).    */
+#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS 20U /**< LVGL drain poll step interval (20 ms).    */
+#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV 3250U /**< Critical brownout warning voltage (3.25V).*/
+#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U /**< Minimum 3.0% SoC rebound to reset lap.    */
+#define LIFECYCLE_POWER_KEY_POLL_CYCLES 200U /**< Power key debounce loop iterations.       */
+#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD 4U /**< Stable HIGH consecutive read count.       */
 
-static h1os_lifecycle_t s_app_lifecycle            = {0};
-static volatile int64_t s_session_expiry_us        = 0;
+static h1os_lifecycle_t s_app_lifecycle = {0};
+static volatile int64_t s_session_expiry_us = 0;
 static volatile TaskHandle_t s_session_task_handle = NULL;
-static volatile bool s_session_running             = false;
-static bool s_audio_initialized                    = false;
-static portMUX_TYPE s_session_mux                  = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_session_running = false;
+static bool s_audio_initialized = false;
+static portMUX_TYPE s_session_mux = portMUX_INITIALIZER_UNLOCKED;
 
 /* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
 RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
@@ -152,7 +152,7 @@ static void h1os_session_monitor_task(void *arg)
 
         if (expiry > 0 && esp_timer_get_time() >= expiry) {
             ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
-                (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+                     (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
             uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
             if (sleep_sec == 0) {
@@ -181,13 +181,13 @@ static void debug_dump_ulp_telemetry(void)
     ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
-               (ulp_last_wake_cause == ULP_WAKE_CAUSE_BOOT_BTN)         ? "BOOT_BTN"
+             (ulp_last_wake_cause == ULP_WAKE_CAUSE_BOOT_BTN)           ? "BOOT_BTN"
              : (ulp_last_wake_cause == ULP_WAKE_CAUSE_PWR_BTN)          ? "PWR_BTN"
              : (ulp_last_wake_cause == ULP_WAKE_CAUSE_LONG_OVERFLOW)    ? "LONG_OVERFLOW"
              : (ulp_last_wake_cause == ULP_WAKE_CAUSE_SENSOR_TICK)      ? "SENSOR_TICK"
              : (ulp_last_wake_cause == ULP_WAKE_CAUSE_RTC_INT_STUCK)    ? "RTC_INT_STUCK_FAULT"
              : (ulp_last_wake_cause == ULP_WAKE_CAUSE_CRITICAL_BATTERY) ? "CRITICAL_BATTERY"
-             : "UNKNOWN",
+                                                                        : "UNKNOWN",
              (unsigned long)ulp_slice_counter,
              (unsigned long)ulp_overflow_limit,
              (unsigned long)ulp_last_vbat_mv,
@@ -306,11 +306,11 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     }
 
     ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]",
-                    H1OS_NAME,
-                    H1OS_SUBTITLE,
-                    h1os_version_get_string(),
-                    (unsigned long)st->sample_interval_sec,
-                    (unsigned long)st->flow_b_period_sec);
+             H1OS_NAME,
+             H1OS_SUBTITLE,
+             h1os_version_get_string(),
+             (unsigned long)st->sample_interval_sec,
+             (unsigned long)st->flow_b_period_sec);
 
     h1os_log_flow_banner(flow);
 
@@ -361,10 +361,10 @@ static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 {
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    bool is_wake     = (flow != ORCH_FLOW_BOOT);
+    bool is_wake = (flow != ORCH_FLOW_BOOT);
     bool is_rtc_wake = false;
     bool button_woke = false;
-    uint32_t causes  = 0;
+    uint32_t causes = 0;
 
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();
@@ -419,14 +419,14 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
         h1os_lvgl_unlock();
     } else if (s_app_lifecycle.on_wake) {
-        h1os_wake_context_t ctx = {.reset_reason       = esp_reset_reason(),
-                                   .wakeup_causes      = causes,
-                                   .boot_count         = st->boot_count,
-                                   .deep_sleep_count   = st->wake_count,
-                                   .woke_from_button   = button_woke,
-                                   .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
+        h1os_wake_context_t ctx = {.reset_reason = esp_reset_reason(),
+                                   .wakeup_causes = causes,
+                                   .boot_count = st->boot_count,
+                                   .deep_sleep_count = st->wake_count,
+                                   .woke_from_button = button_woke,
+                                   .wake_button = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
                                    .sleep_duration_sec = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
-                                   .user_data          = s_app_lifecycle.user_data};
+                                   .user_data = s_app_lifecycle.user_data};
         h1os_lvgl_lock(1000);
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
         h1os_lvgl_unlock();
@@ -512,37 +512,39 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     volatile orch_persisted_state_t *st = orch_state_get();
 
     if (ret == ESP_OK) {
-        out_telemetry->ambient_temp_c       = t;
-        out_telemetry->ambient_temp_f       = (t * 9.0f / 5.0f) + 32.0f;
-        out_telemetry->ambient_rh_pct       = rh;
-        out_telemetry->dew_point_c          = dew;
-        out_telemetry->dew_point_f          = (dew * 9.0f / 5.0f) + 32.0f;
-        out_telemetry->vapor_pressure_hpa   = st->vapor_pressure_hpa;
+        out_telemetry->ambient_temp_c = t;
+        out_telemetry->ambient_temp_f = (t * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->ambient_rh_pct = rh;
+        out_telemetry->dew_point_c = dew;
+        out_telemetry->dew_point_f = (dew * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->vapor_pressure_hpa = st->vapor_pressure_hpa;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
-        out_telemetry->absolute_humidity_g  = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
+        out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
-    out_telemetry->window_low_c           = (float)st->window_low_temp_centi_c / 100.0f;
-    out_telemetry->window_high_c          = (float)st->window_high_temp_centi_c / 100.0f;
-    out_telemetry->window_avg_shtc3_c     = st->window_avg_shtc3_c;
-    out_telemetry->window_avg_die_c       = st->window_avg_die_c;
-    out_telemetry->temp_historical_c      = st->temp_historical_c;
-    out_telemetry->rh_historical_pct      = st->rh_historical_pct;
-    out_telemetry->trinode_temp_c         = st->trinode_temp_c;
-    out_telemetry->trinode_delta_c        = st->trinode_delta_c;
+    out_telemetry->window_low_c = (float)st->window_low_temp_centi_c / 100.0f;
+    out_telemetry->window_high_c = (float)st->window_high_temp_centi_c / 100.0f;
+    out_telemetry->window_avg_shtc3_c = st->window_avg_shtc3_c;
+    out_telemetry->window_avg_die_c = st->window_avg_die_c;
+    out_telemetry->temp_historical_c = st->temp_historical_c;
+    out_telemetry->rh_historical_pct = st->rh_historical_pct;
+    out_telemetry->trinode_temp_c = st->trinode_temp_c;
+    out_telemetry->trinode_delta_c = st->trinode_delta_c;
     out_telemetry->trinode_confidence_pct = st->trinode_confidence_pct;
-    out_telemetry->valid_trend            = st->valid_trend;
-    out_telemetry->epd_glass_temp_c       = (float)st->last_glass_temp_centi_c / 100.0f;
+    out_telemetry->valid_trend = st->valid_trend;
+    out_telemetry->epd_glass_temp_c = (float)st->last_glass_temp_centi_c / 100.0f;
 
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
-        out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
+        out_telemetry->mcu_die_temp_c = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
-        out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
+        out_telemetry->mcu_die_temp_c = st->window_avg_die_c;
     }
-    out_telemetry->sample_count      = st->total_samples;
+    out_telemetry->sample_count = st->total_samples;
+    out_telemetry->sensor_fail_count = st->sensor_fail_count;
+    out_telemetry->last_sensor_error = st->last_sensor_error;
     out_telemetry->flow_a_period_sec = st->sample_interval_sec;
     out_telemetry->flow_b_period_sec = st->flow_b_period_sec;
 
@@ -550,11 +552,11 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     uint8_t vbat_pct = 0;
     h1os_battery_state_t bat_state = H1OS_BATTERY_DISCHARGING;
     if (sub_power_get_battery_status(&vbat_mv, &vbat_pct, &bat_state) == ESP_OK) {
-        out_telemetry->battery_mv      = vbat_mv;
+        out_telemetry->battery_mv = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        out_telemetry->is_usb_powered  = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
-        out_telemetry->battery_state   = bat_state;
-        st->last_vbat_mv               = vbat_mv;
+        out_telemetry->is_usb_powered = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
+        out_telemetry->battery_state = bat_state;
+        st->last_vbat_mv = vbat_mv;
         if (!out_telemetry->is_usb_powered && (st->boot_vbat_mv == 0 || vbat_mv > st->boot_vbat_mv)) {
             st->boot_vbat_mv = vbat_mv;
         }

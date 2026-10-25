@@ -27,15 +27,16 @@ extern "C" {
 /**
  * @brief Default compound literal macro for standard lifecycle session configuration.
  */
-#define H1OS_LIFECYCLE_DEFAULT_CONFIG() { \
-    .session = { \
-        .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC, \
-        .clk_mode               = SYS_CLK_MODE_DYNAMIC, \
-        .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC, \
-        .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC, \
-    }, \
-    .presentation = { 0 } \
-}
+#define H1OS_LIFECYCLE_DEFAULT_CONFIG()                                    \
+    {                                                                      \
+        .session = {                                                       \
+            .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC, \
+            .clk_mode = SYS_CLK_MODE_DYNAMIC,                              \
+            .flow_a_period_sec = H1OS_DEFAULT_FLOW_A_PERIOD_SEC,           \
+            .flow_b_period_sec = H1OS_DEFAULT_FLOW_B_PERIOD_SEC,           \
+        },                                                                 \
+        .presentation = { 0 }                                              \
+    }
 
 /**
  * @brief Platform wakeup context descriptor.
@@ -43,14 +44,14 @@ extern "C" {
  * Populated during boot and passed to the application lifecycle on_wake hook.
  */
 typedef struct {
-    esp_reset_reason_t reset_reason;       /**< Hardware reset reason code.                                         */
-    uint32_t wakeup_causes;                /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
-    uint32_t boot_count;                   /**< Monotonic system boot cycle count.                                  */
-    uint32_t deep_sleep_count;             /**< Monotonic deep sleep wake cycle count.                              */
-    bool     woke_from_button;             /**< True if system woke due to physical button actuation.               */
-    uint8_t  wake_button;                  /**< Waking button ID (h1os_wake_btn_t: 0=None, 1=BOOT, 2=POWER).        */
-    uint32_t sleep_duration_sec;           /**< Configured sleep interval prior to wake in seconds.                 */
-    void     *user_data;                   /**< User context pointer passed to lifecycle.                           */
+    esp_reset_reason_t reset_reason; /**< Hardware reset reason code.                                         */
+    uint32_t wakeup_causes; /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
+    uint32_t boot_count; /**< Monotonic system boot cycle count.                                  */
+    uint32_t deep_sleep_count; /**< Monotonic deep sleep wake cycle count.                              */
+    bool woke_from_button; /**< True if system woke due to physical button actuation.               */
+    uint8_t wake_button; /**< Waking button ID (h1os_wake_btn_t: 0=None, 1=BOOT, 2=POWER).        */
+    uint32_t sleep_duration_sec; /**< Configured sleep interval prior to wake in seconds.                 */
+    void *user_data; /**< User context pointer passed to lifecycle.                           */
 } h1os_wake_context_t;
 
 /**
@@ -58,9 +59,9 @@ typedef struct {
  */
 typedef enum {
     H1OS_SPLASH_BOOT = 0, /**< Initial cold boot / power-on splash screen.        */
-    H1OS_SPLASH_SLEEP,    /**< Transition to unattended deep sleep splash screen. */
+    H1OS_SPLASH_SLEEP, /**< Transition to unattended deep sleep splash screen. */
     H1OS_SPLASH_SHUTDOWN, /**< Orderly physical power-down splash screen.         */
-    H1OS_SPLASH_MAX       /**< Maximum splash enum value.                         */
+    H1OS_SPLASH_MAX /**< Maximum splash enum value.                         */
 } h1os_splash_type_t;
 
 /**
@@ -113,65 +114,67 @@ typedef void (*h1os_chime_cb_t)(h1os_chime_type_t type, void *user_data);
  * @brief Declarative application lifecycle configuration structure.
  */
 typedef struct {
-    h1os_boot_cb_t on_boot;           /**< System boot / power-on reset hook.                      */
-    h1os_wake_cb_t on_wake;           /**< Interactive wake hook (Timer / RTC Alarm / Button Tap). */
+    h1os_boot_cb_t on_boot; /**< System boot / power-on reset hook.                      */
+    h1os_wake_cb_t on_wake; /**< Interactive wake hook (Timer / RTC Alarm / Button Tap). */
     h1os_pre_sleep_cb_t on_pre_sleep; /**< Hook executed immediately prior to entering deep sleep. */
-    h1os_shutdown_cb_t on_shutdown;   /**< Hook executed immediately prior to battery power cut.   */
+    h1os_shutdown_cb_t on_shutdown; /**< Hook executed immediately prior to battery power cut.   */
 
     struct {
-        h1os_splash_cb_t on_splash;   /**< Presentation splash screen rendering hook.     */
-        h1os_chime_cb_t on_chime;     /**< Presentation chime playback hook.              */
-        uint8_t chime_mask;           /**< Bitmask of enabled audio chime types.          */
-        uint8_t volume_pct;           /**< Acoustic presentation master volume (0..100%). */
+        h1os_splash_cb_t on_splash; /**< Presentation splash screen rendering hook.     */
+        h1os_chime_cb_t on_chime; /**< Presentation chime playback hook.              */
+        uint8_t chime_mask; /**< Bitmask of enabled audio chime types.          */
+        uint8_t volume_pct; /**< Acoustic presentation master volume (0..100%). */
     } presentation;
 
     struct {
         uint32_t inactivity_timeout_sec; /**< Interactive session idle sleep timeout in seconds.              */
-        sys_clk_mode_t clk_mode;         /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
-        uint32_t flow_a_period_sec;      /**< Period between headless sensor sample bursts in seconds.        */
-        uint32_t flow_b_period_sec;      /**< Period between unattended display flushes in seconds.           */
+        sys_clk_mode_t clk_mode; /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
+        uint32_t flow_a_period_sec; /**< Period between headless sensor sample bursts in seconds.        */
+        uint32_t flow_b_period_sec; /**< Period between unattended display flushes in seconds.           */
     } session;
 
-    void *user_data;                     /**< Arbitrary user context pointer passed to lifecycle hooks.       */
+    void *user_data; /**< Arbitrary user context pointer passed to lifecycle hooks.       */
 } h1os_lifecycle_t;
 
 /**
  * @brief Comprehensive environmental telemetry and system metrics snapshot.
  */
 typedef struct {
-    float ambient_temp_c;            /**< Trusted steady-state SHTC3 ambient temperature in degrees Celsius. */
-    float ambient_temp_f;            /**< Trusted steady-state SHTC3 ambient temperature in degrees Fahr.    */
-    float ambient_rh_pct;            /**< Trusted steady-state SHTC3 relative humidity percentage (0..100%). */
-    float dew_point_c;               /**< Psychrometrically calculated dew point in degrees Celsius.         */
-    float dew_point_f;               /**< Psychrometrically calculated dew point in degrees Fahrenheit.      */
-    float vapor_pressure_hpa;        /**< Calculated water vapor partial pressure in hectopascals (hPa).     */
-    float absolute_humidity_g;       /**< Calculated absolute humidity in grams per cubic meter (g/m³).      */
+    float ambient_temp_c; /**< Trusted steady-state SHTC3 ambient temperature in degrees Celsius. */
+    float ambient_temp_f; /**< Trusted steady-state SHTC3 ambient temperature in degrees Fahr.    */
+    float ambient_rh_pct; /**< Trusted steady-state SHTC3 relative humidity percentage (0..100%). */
+    float dew_point_c; /**< Psychrometrically calculated dew point in degrees Celsius.         */
+    float dew_point_f; /**< Psychrometrically calculated dew point in degrees Fahrenheit.      */
+    float vapor_pressure_hpa; /**< Calculated water vapor partial pressure in hectopascals (hPa).     */
+    float absolute_humidity_g; /**< Calculated absolute humidity in grams per cubic meter (g/m³).      */
 
-    float window_low_c;              /**< Valid Window Floor (minimum over valid 32-sample window).          */
-    float window_high_c;             /**< Valid Window Ceiling (maximum over valid 32-sample window).        */
-    float window_avg_shtc3_c;        /**< Short-term valid SHTC3 sensor window average in degrees Celsius.   */
-    float window_avg_die_c;          /**< Short-term valid MCU Die internal sensor window average.           */
-    float temp_historical_c;         /**< Long-term light EWMA historical baseline temperature.              */
-    float rh_historical_pct;         /**< Long-term light EWMA historical baseline relative humidity.        */
+    float window_low_c; /**< Valid Window Floor (minimum over valid 32-sample window).          */
+    float window_high_c; /**< Valid Window Ceiling (maximum over valid 32-sample window).        */
+    float window_avg_shtc3_c; /**< Short-term valid SHTC3 sensor window average in degrees Celsius.   */
+    float window_avg_die_c; /**< Short-term valid MCU Die internal sensor window average.           */
+    float temp_historical_c; /**< Long-term light EWMA historical baseline temperature.              */
+    float rh_historical_pct; /**< Long-term light EWMA historical baseline relative humidity.        */
 
-    float raw_shtc3_temp_c;          /**< Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.  */
-    float mcu_die_temp_c;            /**< Instantaneous ESP32-S3 internal TSENS die temperature.             */
-    float epd_glass_temp_c;          /**< Instantaneous SSD1681 display on-glass temperature sensor reading. */
-    float trinode_temp_c;            /**< Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.*/
-    float trinode_delta_c;           /**< Cross-node verification delta: T_valid - T_trinode.                */
-    uint8_t trinode_confidence_pct;  /**< 0-100% cross-node range verification confidence score.             */
+    float raw_shtc3_temp_c; /**< Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.  */
+    float mcu_die_temp_c; /**< Instantaneous ESP32-S3 internal TSENS die temperature.             */
+    float epd_glass_temp_c; /**< Instantaneous SSD1681 display on-glass temperature sensor reading. */
+    float trinode_temp_c; /**< Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.*/
+    float trinode_delta_c; /**< Cross-node verification delta: T_valid - T_trinode.                */
+    uint8_t trinode_confidence_pct; /**< 0-100% cross-node range verification confidence score.             */
 
-    bool is_thermally_settled;       /**< True if steady-state thermal criteria (|T2-T1| <= gate) are met.   */
-    uint16_t valid_trend;            /**< Monotonic count of consecutive thermally settled Flow A samples.   */
-    uint32_t sample_count;           /**< Total monotonic environmental telemetry sample count.              */
-    uint32_t flow_a_period_sec;      /**< Active Flow A sensor sample interval in seconds.                   */
-    uint32_t flow_b_period_sec;      /**< Active Flow B display refresh interval in seconds.                 */
-    uint16_t battery_mv;             /**< Sampled battery terminal voltage in millivolts.                    */
-    uint16_t boot_vbat_mv;           /**< Initial non-USB battery voltage captured on boot in millivolts.    */
-    uint8_t battery_percent;         /**< Estimated battery state-of-charge percentage (0..100%).            */
-    bool is_usb_powered;             /**< True if USB VBUS power connection is actively detected.            */
+    bool is_thermally_settled; /**< True if steady-state thermal criteria (|T2-T1| <= gate) are met.   */
+    uint16_t valid_trend; /**< Monotonic count of consecutive thermally settled Flow A samples.   */
+    uint32_t sample_count; /**< Total monotonic environmental telemetry sample count.              */
+    uint32_t flow_a_period_sec; /**< Active Flow A sensor sample interval in seconds.                   */
+    uint32_t flow_b_period_sec; /**< Active Flow B display refresh interval in seconds.                 */
+    uint16_t battery_mv; /**< Sampled battery terminal voltage in millivolts.                    */
+    uint16_t boot_vbat_mv; /**< Initial non-USB battery voltage captured on boot in millivolts.    */
+    uint8_t battery_percent; /**< Estimated battery state-of-charge percentage (0..100%).            */
+    bool is_usb_powered; /**< True if USB VBUS power connection is actively detected.            */
     h1os_battery_state_t battery_state; /**< Charge / discharge / charged operational state.                 */
-    h1os_autonomy_metrics_t autonomy;   /**< Empirical battery autonomy metrics over total elapsed runtime.  */
+    h1os_autonomy_metrics_t autonomy; /**< Empirical battery autonomy metrics over total elapsed runtime.  */
+    uint32_t sensor_fail_count; /**< Total count of failed wake-stub sensor sample attempts.         */
+    uint8_t last_sensor_error; /**< Most recent sensor error enum code (orch_sensor_err_t).         */
 } h1os_telemetry_t;
 
 /**

@@ -1,12 +1,17 @@
 # Engineering Nomenclature & Technical Lexicon Policy
 
-This rule establishes strict terminology guidelines for all code, architecture documents, commit messages, and agent responses in the **H1OS** project.
+This rule establishes strict terminology guidelines for all code, architecture documents, commit messages, and repository artifacts in the **H1OS** project.
 
 ## Disciplinary Grounding
 
 We adhere strictly to professional **Embedded Systems Hardware and Software Engineering** standards.
 
 Informal jargon, military slang, pop-culture metaphors, and ideological commentary are strictly prohibited. Always replace non-technical language with standard IEEE, ISO/IEC, and semiconductor industry nomenclature.
+
+## Scope & Enforcement Boundary
+
+1. **Mandatory Repository Artifact Scope:** This policy applies unconditionally to all content stored, persisted, or committed to the repository—including source code (`.c`, `.h`, `.cpp`, `.py`), inline comments, git commit messages, git tags, PR descriptions, documentation (`docs/`, `*.md`), and test ledgers.
+2. **Interactive Chat Exemption:** Conversational brainstorming, casual dialogue, and informal banter within the interactive user chat are exempt from strict lexicon gating. However, the moment any text is written to disk, committed to version control, or generated as a repository artifact, it MUST strictly conform to the engineering lexicon.
 
 ---
 
@@ -49,6 +54,10 @@ To ensure an unassailably professional, objective, and safe engineering environm
 3. **Eliminate Provocative or Threatening Metaphors:**
    - Any turn of phrase that could remotely be perceived as hostile, ominous, punitive, or legally risky is forbidden.
    - Document technical deficiencies and errata objectively without derogatory characterizations, personal blame, or accusatory language.
+4. **No Ordnance or Ordnance Disposal Terminology:**
+   - Strictly prohibit all terms, metaphors, and analogies related to military ordnance, demolition, or ordnance disposal.
+5. **No Pharmacological References:**
+   - Strictly prohibit all pharmacological, medicinal, or toxicological references. Software and electrical faults MUST be described strictly using standard engineering nomenclature (*data corruption*, *memory leak*, *bus lockup*, *voltage brownout*).
 
 ---
 

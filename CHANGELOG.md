@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [2.4.1-dev] - 2026-10-25
 
+### 🛡️ Fixed & Hardened (Chamber Post-Mortem, Typography Suite & Display Bounds Verification)
+
+* **Lean Sensor Error Tracking & Telemetry Propagation** (`orch_state.h`, `h1os.h`, `h1os_lifecycle.c`, `orch_wake_stub.c`, `screen_diagnostics.c`):
+  * Added `orch_sensor_err_t` enum (`ORCH_SENSOR_ERR_NONE = 0`, `ORCH_SENSOR_ERR_NACK_WAKE = 1`, `ORCH_SENSOR_ERR_NACK_MEASURE = 2`, `ORCH_SENSOR_ERR_NACK_ADDR_RD = 3`, `ORCH_SENSOR_ERR_CRC_FAIL = 4`, `ORCH_SENSOR_ERR_BUS_STUCK = 5`) and persistent RTC Slow Memory fields `sensor_fail_count` and `last_sensor_error`.
+  * Preserved the 0.0°C / 0.0% RH baseline invariant on Screen 1 while propagating fail metrics to Screen 4 Line 6 (`Wakes: %lu (Fail: %lu)`) and Line 7 dual columns (`CPU: %luMHz` on left, `SHT: OK` or `SHT: ERR_%u` on right).
+* **200px UI Layout Bounds Hardening** (`screen_system_health.c`, `screen_diagnostics.c`, `screen_env_hero.c`):
+  * Eliminated horizontal text clipping on the 200x200 display panel (<= 188.0 px usable boundary) by tightening string padding from variable whitespace to single-space delimiter layouts (e.g. `Power: CHARGED 4.00V` [175.81 px], `Autonomy: EXT USB` [147.81 px]).
+* **Kerning-Aware Font Metrics Suite & Automated Screen Auditing** (`tools/extract_font_metrics.py`, `tools/check_string_width.py`, `tools/fonts/`):
+  * Built font metric extraction engine generating character advance widths and 3,400+ class kerning pairs into CSV tables across all 6 Montserrat 1bpp sizes (14, 16, 18, 20, 24, 32).
+  * Implemented automated screen template audit (`--audit-screens`) verifying all 35 screen label templates pass within <= 188.0 px under worst-case parameter replacements.
+  * Verified DuckDB MCP querying directly on disk CSV metrics.
+* **Master Agent Specification & Build Invariant Enforcement** (`AGENTS.md`, `.agents/rules/`, `h1os-build/SKILL.md`, `lvgl-ui/SKILL.md`):
+  * Generated unified repository root `AGENTS.md` (22,039 bytes) automatically bound to agent active memory on turn 1, integrating architecture blueprints, documentation laws, and the zero-judgment conversational boundary.
+  * Added mandatory `sdkconfig` removal invariant in `h1os-build/SKILL.md` before preset reconfiguring.
+  * Created dedicated `lvgl-ui/SKILL.md` skill documenting layout bounds, font CSV tables, and width checker tooling.
+
+
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
 * **Repository Identity & Documentation Synchronization** (`idf_component.yml`, `README.md`, `docs/api.md`):

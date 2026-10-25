@@ -5,7 +5,7 @@
 **Reference Benchmark:** Klaro Valet Digital Thermohygrometer (Case Elegance)  
 **Device Under Test (DUT):** HUMID1 (Waveshare ESP32-S3 + Sensirion SHTC3 + SSD1681 EPD)  
 **DUT Test Firmware:** Commit `877b4cc` (Oct 22, 2026, 18:25 UTC-4)  
-**Test Status:** **Initial Hydration & Equilibrated Baseline Soak (Run #1, n=1) — Preliminary Baseline Established**  
+**Test Status:** **Completed 56.4-Hour Chamber Soak (Run #1, n=1) — Empirical Baseline & Invariants Verified**  
 
 ---
 
@@ -50,6 +50,8 @@ The table below records the verified photographic telemetry progression across t
 | **10-24 08:18:11** | #451 | 37.58 h | 71.2°F | 71.3°F (21.8°C) | +0.1°F | 69% | 67.4% | −1.6% | 17.6 hPa | `SETTLED (77%)` Approaching 67.5% gate |
 | **10-24 14:55:09** | #530 | 44.17 h | 72.8°F | 72.6°F (22.6°C) | −0.2°F | 69% | 68.0% | −1.0% | 18.6 hPa | `SETTLED (76%)` Crossed 68.0% RH |
 | **10-24 20:56:42** | #602 | 50.17 h | 73.0°F | 73.0°F (22.8°C) | 0.0°F | 69% | 67.8% | −1.2% | 18.7 hPa | `SETTLED (74%)` 50-hour test freeze |
+| **10-25 03:09:21** | #676 | 56.28 h | 71.9°F | 72.1°F (22.2°C) | +0.2°F | 69% | 67.6% | −1.4% | 18.1 hPa | `SETTLED (78%)` Final chamber unseal |
+| **10-25 03:10:27** | #677 | 56.37 h | 71.9°F | 72.1°F (22.3°C) | +0.2°F | 69% | 67.6% | −1.4% | 18.2 hPa | `SETTLED (77%)` Post-unseal confirmation & 4-screen inspection |
 
 ---
 
