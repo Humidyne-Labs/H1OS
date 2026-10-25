@@ -190,7 +190,7 @@ def generate_flash_now_bat(version: str, flash_info: dict, factory_bin_name: str
     flash_size = flash_info.get("flash_size", "8MB")
 
     return f"""@echo off
-setlocal enabledelayedexpansion
+setlocal EnableDelayedExpansion
 title H1OS {version} Firmware Flasher
 color 0A
 
@@ -200,94 +200,117 @@ echo          Target Hardware: Waveshare ESP32-S3 ePaper 1.54 V2
 echo =========================================================================
 echo.
 
-:: Detect Python or ESPTool
+rem --- Detect Python Interpreter ---
+set "PY_CMD="
 where python >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    set PY_CMD=python
-) else (
-    where python3 >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        set PY_CMD=python3
-    ) else (
-        echo [ERROR] Python is not installed or not in PATH.
-        echo Please install Python 3.8+ with esptool (pip install esptool).
-        pause
-        exit /b 1
-    )
+if not errorlevel 1 (
+    set "PY_CMD=python"
+    goto :check_esptool
+)
+where python3 >nul 2>&1
+if not errorlevel 1 (
+    set "PY_CMD=python3"
+    goto :check_esptool
 )
 
-:: Test esptool module
+rem Check canonical Espressif IDF venv python
+if exist "C:\\Espressif\\tools\\python\\v6.1\\venv\\Scripts\\python.exe" (
+    set "PY_CMD=C:\\Espressif\\tools\\python\\v6.1\\venv\\Scripts\\python.exe"
+    goto :check_esptool
+)
+
+echo [ERROR] Python was not found in PATH or at C:\\Espressif.
+echo Please install Python 3.8 or higher.
+echo.
+pause
+exit /b 1
+
+:check_esptool
 %PY_CMD% -m esptool version >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [WARNING] esptool module not found in Python. Attempting to install...
-    %PY_CMD% -m pip install esptool
-    if !ERRORLEVEL! neq 0 (
-        echo [ERROR] Failed to install esptool. Please run: pip install esptool
-        pause
-        exit /b 1
-    )
+if not errorlevel 1 goto :detect_port
+
+echo [WARNING] esptool module not found. Installing via pip...
+%PY_CMD% -m pip install esptool
+if errorlevel 1 (
+    echo [ERROR] Failed to install esptool. Please run: pip install esptool
+    echo.
+    pause
+    exit /b 1
 )
 
-:: Port Detection
+:detect_port
 echo Scanning serial COM ports...
-set PORT=
+set "PORT="
 for /f "tokens=1" %%p in ('%PY_CMD% -m serial.tools.list_ports 2^>nul') do (
-    set PORT=%%p
+    set "PORT=%%p"
 )
 
 if not "%PORT%"=="" (
     echo [INFO] Detected device port: %PORT%
-    set /p USER_PORT="Press ENTER to use %PORT%, or enter COM port manually (e.g. COM3): "
-    if not "!USER_PORT!"=="" set PORT=!USER_PORT!
+    set /p "USER_PORT=Press ENTER to use %PORT%, or enter COM port manually: "
+    if not "!USER_PORT!"=="" set "PORT=!USER_PORT!"
 ) else (
-    set /p PORT="Enter ESP32-S3 COM port (e.g. COM3): "
+    set /p "PORT=Enter ESP32-S3 COM port [e.g. COM3]: "
 )
 
 if "%PORT%"=="" (
     echo [ERROR] No COM port provided.
+    echo.
     pause
     exit /b 1
 )
 
+:show_menu
 echo.
 echo =========================================================================
 echo Select Flash Option:
-echo [1] Full Factory Flash  - Monolithic Image (0x0, Clean Reinstall) [Recommended]
-echo [2] Fast App Update     - Firmware Only (0x20000, Keeps Settings/NVS)
-echo [3] Full Chip Erase     - Erase Entire Flash, then Full Factory Flash
+echo   [1] Full Factory Flash  - Monolithic Image [0x0, Clean Reinstall]
+echo   [2] Fast App Update     - Firmware Only [0x20000, Keeps Settings]
+echo   [3] Full Chip Erase     - Erase Entire Flash, then Factory Flash
 echo =========================================================================
-set /p CHOICE="Enter choice (1, 2, or 3, default is 1): "
-if "%CHOICE%"=="" set CHOICE=1
+set "CHOICE=1"
+set /p "CHOICE=Enter choice 1, 2, or 3 [default 1]: "
 
 echo.
-if "%CHOICE%"=="1" (
-    echo [INFO] Flashing complete monolithic factory binary at 0x0...
-    %PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x0 {factory_bin_name}
-) else if "%CHOICE%"=="2" (
-    echo [INFO] Flashing application payload only at 0x20000...
-    %PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x20000 {app_bin_name}
-) else if "%CHOICE%"=="3" (
-    echo [WARNING] Erasing entire flash chip...
-    %PY_CMD% -m esptool --chip esp32s3 -p %PORT% erase-flash
-    echo.
-    echo [INFO] Flashing complete monolithic factory binary at 0x0...
-    %PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x0 {factory_bin_name}
-) else (
-    echo [ERROR] Invalid choice.
-    pause
-    exit /b 1
-)
+if "%CHOICE%"=="1" goto :flash_factory
+if "%CHOICE%"=="2" goto :flash_app
+if "%CHOICE%"=="3" goto :erase_and_flash
 
-if %ERRORLEVEL% equ 0 (
+echo [ERROR] Invalid selection "%CHOICE%".
+goto :show_menu
+
+:flash_factory
+echo [INFO] Flashing complete factory binary at 0x0 on %PORT%...
+%PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x0 {factory_bin_name}
+goto :flash_result
+
+:flash_app
+echo [INFO] Flashing application payload only at 0x20000 on %PORT%...
+%PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x20000 {app_bin_name}
+goto :flash_result
+
+:erase_and_flash
+echo [WARNING] Erasing entire flash memory on %PORT%...
+%PY_CMD% -m esptool --chip esp32s3 -p %PORT% erase-flash
+if errorlevel 1 goto :flash_result
+echo.
+echo [INFO] Flashing factory binary at 0x0...
+%PY_CMD% -m esptool --chip esp32s3 -p %PORT% -b {DEFAULT_BAUD} --before default-reset --after hard-reset write-flash --flash-mode {flash_mode} --flash-freq {flash_freq} --flash-size {flash_size} 0x0 {factory_bin_name}
+goto :flash_result
+
+:flash_result
+if errorlevel 1 (
+    echo.
+    echo =========================================================================
+    echo [FAILED] Flash operation encountered an error.
+    echo Please verify USB connection, driver, and selected COM port.
+    echo =========================================================================
+) else (
     echo.
     echo =========================================================================
     echo [SUCCESS] Flash completed successfully! Device is rebooting into H1OS.
     echo =========================================================================
-) else (
-    echo.
-    echo [FAILED] Flash operation encountered an error. Check cable connection and COM port.
 )
-
 echo.
 pause
 """
