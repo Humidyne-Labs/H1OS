@@ -20,8 +20,6 @@ extern "C" {
 // clang-format off
 #define ORCH_RTC_MAGIC                        H1OS_RTC_STATE_MAGIC                  /**< RTC state validation magic word ('SLAT').                  */
 #define ORCH_RING_CAPACITY                    H1OS_TELEMETRY_RING_CAPACITY          /**< Fixed capacity of historical telemetry sample ring buffer. */
-#define ORCH_DEFAULT_FLOW_A_PERIOD_SEC        H1OS_DEFAULT_FLOW_A_PERIOD_SEC        /**< Layer 3 alias for Flow A headless sensor burst period.    */
-#define ORCH_DEFAULT_FLOW_B_PERIOD_SEC        H1OS_DEFAULT_FLOW_B_PERIOD_SEC        /**< Layer 3 alias for Flow B presentation refresh period.     */
 #define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C  /**< Layer 3 alias for TSENS Q12 fixed-point intercept.        */
 #define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC /**< Layer 3 alias for unattended NVS commit interval.         */
 
