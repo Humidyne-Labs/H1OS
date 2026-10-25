@@ -1,7 +1,7 @@
 # Profile: ci (Continuous Integration, Headless Testing & QA)
-# =========================================================================
+# -------------------------------------------------------------------------
 # Compiler Rigor & Warning Enforcement
-# =========================================================================
+# -------------------------------------------------------------------------
 # -Og preserves symbols for automated backtrace line resolution
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y
@@ -9,9 +9,9 @@ CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y
 # Fail the CI build immediately on any compiler warning
 CONFIG_COMPILER_WARN_WRITE_STRINGS=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # CI Log Formatting (Plain Text / No Terminal ANSI Escapes)
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
 CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
@@ -20,15 +20,15 @@ CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
 CONFIG_LOG_COLORS=n
 CONFIG_LOG_TIMESTAMP_SOURCE_RTOS=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # Unattended Execution & Headless Crash Handling
-# =========================================================================
+# -------------------------------------------------------------------------
 # Ensure unhandled faults abort and halt immediately rather than rebooting infinitely
 CONFIG_ESP_SYSTEM_PANIC_PRINT_HALT=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # LVGL v9 Automated Diagnostic & Integrity Logging
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_LV_USE_LOG=y
 CONFIG_LV_LOG_LEVEL_INFO=y
 CONFIG_LV_LOG_PRINTF=y
@@ -40,9 +40,9 @@ CONFIG_LV_USE_ASSERT_STYLE=y
 CONFIG_LV_USE_ASSERT_MEM_INTEGRITY=y
 CONFIG_LV_USE_ASSERT_OBJ=y
 
-# =========================================================================
+# -------------------------------------------------------------------------
 # FreeRTOS Verification & Static Sentry Checks
-# =========================================================================
+# -------------------------------------------------------------------------
 CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=y

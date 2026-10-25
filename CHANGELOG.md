@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
-* **Macro Scope Partitioning & Single-File Constant Dissolution** (`h1os_constants.h`, `tools/analyze_macro_scope.py`, `orch_state.h`, `orch_wake_stub.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `sub_sdcard.c`):
+* **Repository Footprint Sanitization & Transient Audit Tool Pruning** (`tools/`, `docs/agent_notes/audits/`):
+  * Following completion of the hardcoded literal audit and single-file macro dissolution, removed temporary Python analysis scripts (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `tools/analyze_macro_scope.py`) and interim audit ledgers (`docs/agent_notes/audits/hardcoded_integers_audit.md`, `docs/agent_notes/audits/literal_integers_degree_audit.md`) to maintain repository cleanliness and avoid workspace inflation.
+* **Macro Scope Partitioning & Single-File Constant Dissolution** (`h1os_constants.h`, `orch_state.h`, `orch_wake_stub.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `sub_sdcard.c`):
   * Created automated macro scope analyzer (`tools/analyze_macro_scope.py`) mapping repository macro usage across translation units.
   * Refactored `h1os_constants.h` to strictly encapsulate public, multi-file configuration contracts (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC`).
   * Dissolved single-file operational constants out of `h1os_constants.h` back into their respective translation units as private local definitions (`LIFECYCLE_*`, `LVGL_*`, `HAL_IO_*`, `ORCH_*`, `SUB_POWER_*`, `SUB_SDCARD_*`, `SUB_AUDIO_*`, `SUB_DISPLAY_*`), preventing global namespace pollution and unneeded cross-component compilation dependencies.
@@ -55,6 +57,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * **SDMMC Block Timeout Margin & Checked Driver Return Codes (`AUD-06`, `AUD-07`, `AUD-08` / `PIT-04-D`, `PIT-08-A`)** (`sub_sdcard.c`, `sub_rtc.c`, `sub_audio.c/.h`, `sub_nvs.c`, `sub_display.cpp`, `orch_flow.c`, `h1os_lifecycle.c`):
   * Increased `host.command_timeout_ms` in `sub_sdcard_mount()` from `20 ms` to `100 ms` per `PIT-04-D` to prevent premature block write timeouts on mounted MicroSD media.
   * Added explicit `esp_err_t` return checking in `sub_rtc_set_time()`, `sub_rtc_cancel_countdown()`, `sub_audio_set_volume()`, and `sub_nvs_*()` initialization paths, and synchronized `sub_audio.h` Doxygen comments and `orch_flow.c` Pure Event Mode sleep logs.
+* **Kconfig Banner Formatting & Spurious `kconfgen_tmp` Warning Elimination** (`sdkconfig.defaults*`):
+  * Resolved recurring `NOTE: .../kconfgen_tmp... line was updated to ...n` notifications during CMake configuration by replacing trailing `=` characters in comment separator banners with `-` across all profile and component `sdkconfig.defaults` files. Upstream Espressif `kconfgen` mistakenly interpreted `# =========================================================================` as an empty key-value assignment (`CONFIG_FOO=`) due to an unconditional `line.endswith("=")` heuristic.
 
 ## [2.4.0-dev] - 2026-10-24
 
