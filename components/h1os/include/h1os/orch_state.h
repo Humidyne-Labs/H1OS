@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 // clang-format off
-#define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation sentinel word ('SLAT').               */
+#define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation magic word ('SLAT').                  */
 #define ORCH_RING_CAPACITY          32         /**< Fixed capacity of historical telemetry sample ring buffer. */
 
 /**
@@ -55,7 +55,7 @@ typedef struct {
  * Retained across all deep sleep cycles and wake stub executions.
  */
 typedef struct {
-    uint32_t magic;                     /**< Sentinel validation magic word (ORCH_RTC_MAGIC).                      */
+    uint32_t magic;                     /**< State validation magic word (ORCH_RTC_MAGIC).                         */
     uint32_t boot_count;                /**< Total monotonic system boot cycles.                                   */
     uint32_t wake_count;                /**< Monotonic deep sleep wake cycle count.                                */
     uint8_t flags;                      /**< Operating state flags (ORCH_FLAG_*).                                  */
@@ -95,6 +95,11 @@ typedef struct {
 
     uint8_t ring_head;                  /**< Write head index into circular ring buffer (0..ORCH_RING_CAPACITY-1). */
     uint32_t total_samples;             /**< Total lifetime samples recorded across all sessions.                  */
+
+    uint32_t total_sleep_sec;           /**< Cumulative seconds spent in deep sleep.                                */
+    uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main processor application.          */
+    uint16_t initial_soc_x10;           /**< State of Charge at start of discharge lap in tenths of % (0..1000).   */
+    uint8_t  _pad_soc[2];               /**< Alignment padding to 32-bit boundary.                                  */
 } orch_persisted_state_t;
 
 // clang-format off
@@ -142,6 +147,23 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample);
  * @return True if a valid settled sample was located, false otherwise.
  */
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample);
+
+/**
+ * @brief Save cumulative battery autonomy runtimes to Flash NVS.
+ */
+void orch_state_save_runtimes_to_nvs(void);
+
+/**
+ * @brief Restore cumulative battery autonomy runtimes from Flash NVS.
+ */
+void orch_state_load_runtimes_from_nvs(void);
+
+/**
+ * @brief Reset discharge lap runtimes on charger unplug or cycle anchor.
+ *
+ * @param[in] current_soc_x10 Starting SoC in tenths of a percent (0..1000) for the new discharge lap.
+ */
+void orch_state_reset_discharge_lap(uint16_t current_soc_x10);
 
 #ifdef __cplusplus
 }

@@ -6,10 +6,18 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 
 ## 1. What Failed & Why
 
+### 1.0 The Cardinal Rule of Engineering Metrology: Never Claim a Measurement You Did Not Take ("Don't Spec Numbers Without Proof")
+- **What Happened:** During early debugging of the audio power-rail issue and sleep dissipation, documentation and errata asserted that cutting `PA_EN` caused internal ESD diodes to forward-bias and clamp the shared I2C bus down to "~0.7V", and quoted hypothetical unmeasured sleep currents. In physical reality, no multimeter or oscilloscope had touched the bus lines during those initial tests; the tester simply observed that I2C communication failed when the codec power was cut.
+- **Root Cause:** Speculating on unverified voltages and claiming measured numbers without actual instrumented physical verification. Confusing a theoretical mental model (e.g. forward-biased silicon diode drops) with an empirical physical measurement.
+- **Why It Fails:** Fabricating or guessing numbers when you don't have proof damages engineering credibility, misleads root-cause investigations, and introduces false architectural assumptions. It sent investigators down rabbit holes searching for phantom clamping diodes in a datasheet that doesn't even mention ESD protection, rather than focusing on the verified empirical reality: gating unbuffered ICs on a shared bus pulls down the lines.
+- **H1OS Architectural Mandate:** Never spec numbers if you don't have physical proof they exist. Document exactly what was tested and observed—nothing more, nothing less. If a bus went down, state that the bus went down. If a voltage was not probed on an oscilloscope, explicitly state that it is unmeasured. Keep hypotheses clearly labeled as hypotheses, and keep empirical observations unassailable.
+
+---
+
 ### 1.1 The Scaffolding Trap (Conflating Scaffolding with Finished Architecture)
 - **What Happened:** During early migration, legacy BSP files (`bsp_common.c`, `bsp_power.c`, `bsp_button.c`, `bsp_sdcard.c`) were kept and patched in place under the assumption that they were "needed" to maintain build viability. This created confusing hybrid architectures where clean-slate HAL/subsystem designs collided with obsolete monolithic implementations.
 - **Root Cause:** Treating temporary scaffolding as permanent architecture. Labeling defunct code as "needed" falsely implied that the clean-slate architecture was flawed or missing critical peripheral solutions.
-- **H1OS Fix:** Explicit 4-stage construction doctrine ("The Bones", "Housekeeping & Purge", "The Muscle", "The Vanity"). Scaffolding is strictly recognized as disposable bring-up bracing. Once the architectural bones and HAL contracts are drafted, legacy scaffolding is purged completely. Deficiencies are solved in the clean-slate layers (`hal_*` and `sub_*`), not by clinging to legacy relics.
+- **H1OS Fix:** Explicit 4-stage construction process (Stage 1 Core Architecture & Contracts, Stage 2 Legacy Deprecation & Cleanup, Stage 3 Subsystem Integration & Drivers, Stage 4 Application & Presentation). Scaffolding is strictly recognized as disposable bring-up bracing. Once the HAL interfaces and API contracts are drafted, legacy scaffolding is removed completely. Deficiencies are solved in the clean-slate layers (`hal_*` and `sub_*`), not by clinging to legacy relics.
 
 ---
 
@@ -61,7 +69,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **What Happened:** Exploring running periodic SHTC3 acquisition via the ULP-RISC-V coprocessor in deep sleep, and cutting power to peripherals to save current.
 - **Root Cause (The Hardware Traps):**
   1. **ULP Routing:** The shared I2C bus is routed to **GPIO 47 (SDA) and GPIO 48 (SCL)**. On the ESP32-S3, the RTC IO domain is strictly limited to `RTCIO 0..21` (GPIOs 0–21). GPIO 47 and 48 are standard digital matrix pins and **cannot be accessed by the ULP or RTC-I2C controller when the digital core is power-gated in deep sleep**.
-  2. **ES8311 Bus Clamping:** Cutting power to the audio codec while keeping the I2C bus pulled up causes the unpowered ES8311's internal ESD protection diodes to forward-bias, pulling the shared SDA/SCL lines to ground and clamping the entire I2C bus!
+  2. **ES8311 Bus Clamping:** Cutting power to the audio codec while keeping the I2C bus pulled up brings down the shared SDA/SCL lines, failing all communication on the I2C bus!
   3. **EPD 3.3V Power Rail (`GPIO 6`):** Cutting the EPD power rail drops panel charge and can corrupt display RAM. Instead of cutting power to the display, placing the SSD1681 into **Deep Sleep Mode 1 (`0x10, 0x01`)** drops display quiescent current to nominal sleep levels while preserving RAM and image state without rail cycling.
 - **H1OS Fix:**
   - Keep the 3.3V peripheral rail powered and let peripherals sleep natively in low-leakage state (SHTC3 in sleep `0xB098`, ES8311 register `0x0D` power-down, SSD1681 in Deep Sleep Mode 1).
@@ -146,10 +154,10 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **Root Cause:** When periodic wakes did not differentiate between unattended RTC updates and physical user button taps, the audio codec (ES8311) and Class-D amplifier (NS4168) were repeatedly initialized and taken out of standby. Even with zero audio output, powering the amplifier rails dissipates quiescent current directly into the internal enclosure volume.
 - **The Solution:** Audio initialization is strictly gated behind physical user presence (`is_user_wake = (!is_wake) || button_woke`). Unattended RTC countdown wakeups leave the audio hardware in complete <1 µA standby.
 
-### 4.2 The Danger of Silent Fallback Defaults
-- **The Issue:** Functions in the lifecycle engine contained silent magic fallback defaults (e.g. `if (sleep_sec == 0) sleep_sec = 300;` or `if (timeout_sec == 0) timeout_sec = 30;`).
-- **Why It Fails:** Silent fallbacks hide contract violations and configuration errors from the developer. If an application fails to configure a timer, silently substituting synthetic delays masks broken state machines and prevents proper testing.
-- **The Standard:** All silent fallbacks have been replaced with strict error logs (`ESP_LOGE`) and clean aborts (`ESP_ERR_INVALID_ARG`), forcing explicit contractual configuration at the application layer.
+### 4.2 The Danger of Silent Default Substitutions
+- **The Issue:** Functions in the lifecycle engine contained silent magic defaults (e.g. `if (sleep_sec == 0) sleep_sec = 300;` or `if (timeout_sec == 0) timeout_sec = 30;`).
+- **Why It Fails:** Silent substitutions hide contract violations and configuration errors from the developer. If an application fails to configure a timer, silently substituting synthetic delays masks broken state machines and prevents proper testing.
+- **The Standard:** All silent substitutions have been replaced with strict error logs (`ESP_LOGE`) and clean aborts (`ESP_ERR_INVALID_ARG`), forcing explicit contractual configuration at the application layer.
 
 ### 4.3 Telemetry Cold Boot Conventions
 - Initializing persistent memory to synthetic room temperature (`25.0°C`) created false confidence and corrupted historical EWMA baselines during early boot.
@@ -167,10 +175,10 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **Root Cause:** A Peterson software spinlock was introduced between Core 0 and the ULP-RISC-V core to guard shared RTC Slow Memory. When the ULP coprocessor suffered a trap/crash (due to missing `CONFIG_ULP_RISCV_INTERRUPT_ENABLE=y`), it died with its spinlock flag permanently asserted. Core 0 spun indefinitely attempting to acquire the lock before entering sleep.
 - **The Solution:** Eliminate complex cross-core software spinlocks entirely. The ULP and dual-core Xtensa CPUs are naturally mutually exclusive by architecture: the ULP executes *only* while the main CPU is in deep sleep. Shared variables are updated cleanly using memory fences (`asm volatile("fence" ::: "memory")`), and execution is strictly handed off via `ulp_riscv_wakeup_main_processor()` and `ulp_riscv_halt()`.
 
-### 4.6 Clock Domain Crossing (CDC) Timing Rules & Internal RC Oscillator
-- **The Issue:** Intermittent deep sleep re-entry freezes and missed RTC GPIO edge transitions.
-- **Root Cause:** Level clear pulses on `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` were asserted for too short a duration ($50\ \mu\text{s}$). Furthermore, the board has no physical 32.768 kHz quartz crystal (pins `GPIO 15` and `GPIO 16` are dedicated to I2S audio codec routing), so the RTC domain runs on the internal ~136 kHz RC oscillator (`CONFIG_RTC_CLK_SRC_INT_RC=y`). The ESP32-S3 TRM mandates that CDC clear signals must be held for $\ge 3$ slow clock cycles to be sampled by the internal synchronizers.
-- **The Solution:** All wake latch clearing pulses in both ULP firmware and main application code are explicitly delayed for $\ge 120\ \mu\text{s}$ ($> 16$ cycles on the 136 kHz internal RC clock), guaranteeing deterministic synchronization across domains.
+### 4.6 ULP GPIO Wake Latch Semantics & Level-Triggered Clear Ordering (Formerly Misattributed as `ERR-S3`)
+- **The Issue:** Intermittent deep sleep re-entry freezes and runaway spurious re-wakes during early ULP bringup.
+- **Root Cause (ESP-IDF / Register Semantics Misunderstanding, Not Silicon CDC Defect):** Early bringup code treated `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` (bit 30 of `RTC_CNTL_ULP_CP_TIMER_REG`) as a self-clearing write-1-to-clear (`W1TC`) strobe, or pulsed it *before* clearing `RTC_GPIO_STATUS_W1TC_REG` while a `GPIO_INTR_LOW_LEVEL` wake pin (`GPIO 5` `/INT` or button) was still physically LOW. Because `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` is a synchronous `R/W` reset bit rather than `W1TC`, leaving it set held the ULP wake gate in permanent reset, while clearing it before the level-sensitive pin returned HIGH caused `RTC_GPIO_STATUS_REG` to immediately re-assert the wake request.
+- **The Solution:** Wait for level-low inputs (`GPIO 5` `/INT` and buttons) to release HIGH first, write `RTC_GPIO_STATUS_W1TC_REG` to clear the peripheral status register, and then explicitly assert and de-assert `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR`.
 
 ### 4.7 Silicon Invariant: Hardware Timer Suppression of RTC GPIO Wakeups (ERR-001)
 - **The Issue:** Exploring whether the ESP32-S3 internal ULP sleep timer and external RTC GPIO wakeups can run concurrently to handle periodic sampling and tactile key responsiveness simultaneously.
@@ -196,6 +204,3 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **The Issue:** When operating on the bench without a physical LiPo battery installed, the unit continually entered `[CRITICAL LOW POWER SHUTDOWN]` upon boot.
 - **Root Cause:** The 200kΩ/200kΩ battery voltage divider on `GPIO 4` floats to $\approx 1.97\text{ V}$ when unpowered by a battery. The ULP brownout detector interpreted $1972\text{ mV}$ as an emergency depleted battery (falling between $100\text{ mV}$ and $3250\text{ mV}$) and commanded immediate shutdown.
 - **The Solution:** Implement the **Zero-Volt Cable Guard**: when the power latch is held HIGH and the USB VBUS line is active (`hal_check_usb_ll() == true`), the battery is forced to 4200 mV (100%), and the ULP brownout trip is suppressed.
-
-
-

@@ -1,6 +1,6 @@
 # Application Execution Flow & State Machine
 
-This document models the end-to-end execution flow of **H1OS** across deep sleep, the reactive ULP Monitor, isolated Flow A sensor pulses, and the Flow B interactive user session (with a developer-configurable inactivity timeout defaulting to 30 seconds).
+This document models the end-to-end execution flow of **H1OS** across deep sleep, the Pure Event Mode ULP-RISC-V Monitor, isolated Flow A wake stub sensor pulses, and the Flow B interactive user session (with a developer-configurable inactivity timeout defaulting to 30 seconds).
 
 ---
 
@@ -8,42 +8,45 @@ This document models the end-to-end execution flow of **H1OS** across deep sleep
 
 ```mermaid
 graph TD;
-    DeepSleep["Hardware Deep Sleep Standby"] --> ULP_Wake{"ULP Hardware Event"};
+    DeepSleep["Hardware Deep Sleep Standby (Pure Event Mode)"] --> ULP_Wake{"ULP RTC GPIO Event"};
 
     subgraph ULP_Monitor ["ULP-RISC-V Reactive Monitor"]
-        ULP_Wake -- "Internal Timer Expired" --> LaunchFlowA["Set DISPATCH_SENSOR_SAMPLE (Wake Core 0 into Flow A)"];
-        ULP_Wake -- "External Interrupt (GPIO 5)" --> LaunchFlowB_Alarm["Set DISPATCH_MAIN_WAKE (Wake Dual-Core into Flow B)"];
-        ULP_Wake -- "Button Edge (GPIO 0 or 18)" --> CheckHold{"Hold Duration"};
-        CheckHold -- "Short Tap Release" --> LaunchFlowB_Tap["Set DISPATCH_MAIN_WAKE (Wake Dual-Core into Flow B)"];
-        CheckHold -- "BOOT Hold > 2.5s" --> LaunchBL["Set DISPATCH_BOOTLOADER_JUMP (ROM Bootloader)"];
-        CheckHold -- "POWER Hold > 2.5s" --> LaunchPowerOff["Set DISPATCH_POWER_OFF (Execute Power Cut)"];
-        ULP_Wake -- "Battery Guard (GPIO 4)" --> CheckVbat{"Vbat < 3.25V?"};
-        CheckVbat -- "YES (and > 100mV)" --> LaunchCritical["Set DISPATCH_CRITICAL_SHUTDOWN"];
-        CheckVbat -- "Vbat == 0mV (USB)" --> KeepSleeping["Bypass Shutdown and Return to Sleep"];
+        ULP_Wake -- "Non-Button Event" --> SampleADC["Sample SAR ADC1_CH3 (GPIO 4) -> Push to vbat_ring[8]"];
+        SampleADC --> CheckVbat{"!usb_connected && 100 <= Vbat < 3250 mV?"};
+        CheckVbat -- "YES" --> LaunchCritical["Set ULP_DISPATCH_CRITICAL_SHUTDOWN"];
+        CheckVbat -- "NO (Normal / USB)" --> CheckPin{"Evaluate RTC GPIO Trigger"};
+        ULP_Wake -- "Button Edge (GPIO 0 or 18)" --> CheckHold{"Debounce 30ms & Measure Hold"};
+        CheckHold -- "Short Tap Release (30..2500ms)" --> LaunchFlowB_Tap["Set ULP_DISPATCH_MAIN_WAKE (Wake Dual-Core into Flow B)"];
+        CheckHold -- "BOOT Hold >= 2.5s" --> LaunchBL["Set ULP_DISPATCH_BOOTLOADER_JUMP (ROM Bootloader)"];
+        CheckHold -- "POWER Hold >= 2.5s" --> LaunchPowerOff["Set ULP_DISPATCH_POWER_OFF (Execute Power Cut)"];
+        CheckPin -- "RTC_INT Low (GPIO 5)" --> SliceCheck{"++slice_counter < overflow_limit?"};
+        SliceCheck -- "YES (Intermediate Slice)" --> LaunchFlowA["Set ULP_DISPATCH_SENSOR_SAMPLE (Wake Core 0 into Flow A Stub)"];
+        SliceCheck -- "NO (Overflow Reached)" --> LaunchFlowB_Alarm["Reset slice_counter=0, Set ULP_DISPATCH_MAIN_WAKE"];
     end
 
-    subgraph FlowA ["FLOW A: Headless Sensor Pulse"]
-        LaunchFlowA --> StubExec["esp_wake_stub on Core 0 at 80MHz (Core 1 Gated, Flash Unpowered)"];
-        StubExec --> StubI2C["Read SHTC3 Normal Mode and MCU Die TSENS"];
-        StubI2C --> StubMath["Compute Dew Point, Vapor Pressure, and EWMA"];
-        StubMath --> StubCommit["Append to 32-slot Ring in RTC Slow Memory"];
-        StubCommit --> StubRearm["Re-arm Periodic RTC Timer"];
-        StubRearm --> StubSleep["Return Immediately to Deep Sleep"];
+    subgraph FlowA ["FLOW A: Headless Sensor Pulse (<16ms in RTC Fast IRAM)"]
+        LaunchFlowA --> StubExec["bsp_wake_stub on Core 0 (Main OS & Flash Unpowered)"];
+        StubExec --> StubI2C["Read SHTC3 Normal Mode (0x7866) and Q12 MCU Die TSENS"];
+        StubI2C --> StubGate["Evaluate Plateau Gate (|T2 - T1| <= 0.20 C) & Back-Mark Valid"];
+        StubGate --> StubCommit["Append to 32-slot Ring in RTC Slow Memory & Add Runtime Counters"];
+        StubCommit --> StubRearm["Clear PCF85063A TF (0x07) or Rearm Remainder Slice, Drain /INT HIGH"];
+        StubRearm --> StubSleep["Re-arm ULP GPIO Wakeup & Return Immediately to Deep Sleep"];
     end
     StubSleep --> DeepSleep;
 
     subgraph FlowB ["FLOW B: Dual-Core Screen Refresh and Interaction"]
-        LaunchFlowB_Alarm --> Bootloader2["2nd-Stage Bootloader (h1os_boot_hook: Latch BAT_CTRL HIGH)"];
+        LaunchFlowB_Alarm --> Bootloader2["2nd-Stage Bootloader (h1os_boot_hook: Latch Master Rails)"];
         LaunchFlowB_Tap --> Bootloader2;
         Boot["Initial Power On / Boot"] --> Bootloader2;
-        Bootloader2 --> BootFreeRTOS["Initialize FreeRTOS SMP Dual-Core LX7"];
-        BootFreeRTOS --> TurboRender["240 MHz Turbo PM Lock: Read Telemetry and Blit LVGL Screen"];
+        Bootloader2 --> BootFreeRTOS["Initialize FreeRTOS SMP, Sync PCF85063A -> POSIX Clock"];
+        BootFreeRTOS --> TurboRender["Read Pre-Display Glass Temp (0x1B), Evaluate Telemetry & Render LVGL Screen"];
         TurboRender --> WakeSource{"Wake Source?"};
-        WakeSource -- "RTC Countdown Timer" --> SleepStart["Initiate Sleep Transition"];
-        WakeSource -- "User Tap or Boot" --> LVGL_Active["Interactive Session (LVGL Owns Display and Buttons)"];
+        WakeSource -- "RTC Countdown Overflow" --> SleepStart["Initiate Immediate Sleep Transition (Audio Skipped)"];
+        WakeSource -- "User Button Tap or Boot" --> LVGL_Active["Interactive Session (Audio Ready, LVGL Owns Display and Buttons)"];
         LVGL_Active --> UserClick{"User Button Click?"};
-        UserClick -- "BOOT or POWER Click" --> ScreenToggle["Cycle Screen and Reset Inactivity Timer"];
+        UserClick -- "BOOT (Fwd) or POWER (Rev) Click" --> ScreenToggle["Play 50ms Nav Tone, Cycle Screen & Reset Inactivity Timer"];
         ScreenToggle --> LVGL_Active;
+        UserClick -- "POWER / BOOT Hold >= 2.0s" --> LaunchPowerOff;
         UserClick -- "No Interaction (Idle)" --> DFSDrop["Dynamic Frequency Scaling: Drop CPU to 80 MHz"];
         DFSDrop --> InactivityTimer{"Inactivity Timer Expired?"};
         InactivityTimer -- "NO" --> UserClick;
@@ -51,54 +54,56 @@ graph TD;
     end
 
     subgraph Sleep_Transition_Seq ["Coordinated Sleep Transition Sequence"]
-        SleepStart --> PreSleepHook["1. Invoke user on_pre_sleep hook"];
-        PreSleepHook --> DrainLVGL["2. Drain LVGL Buffer and Finish Draw Tasks"];
-        DrainLVGL --> WaitBusy["3. Wait for SSD1681 BUSY release at 80 MHz"];
-        WaitBusy --> SettleDelay["4. 250ms Microcapsule Settling Delay"];
-        SettleDelay --> CheckDirty{"Frame Marked Dirty?"};
-        CheckDirty -- "YES" --> FlashSync["5. Commit 5000B to epd_frame flash"];
-        CheckDirty -- "NO" --> SkipSync["5. Skip Flash Write"];
-        FlashSync --> PanelSleep["6. Put SSD1681 into Deep Sleep Mode 1"];
+        SleepStart --> PreSleepHook["1. Trigger Sleep Chime/Splash & Invoke user on_pre_sleep hook"];
+        PreSleepHook --> DrainLVGL["2. Drain LVGL Pipeline & Stop Core 1 LVGL Task"];
+        DrainLVGL --> QuiesceAudio["3. Wait Audio Idle & Place ES8311 + NS4168 in <1uA Standby"];
+        QuiesceAudio --> WaitBusy["4. Wait for SSD1681 BUSY release at 80 MHz"];
+        WaitBusy --> CheckDirty{"5. Frame Marked Dirty?"};
+        CheckDirty -- "YES" --> FlashSync["Commit 5000B to epd_frame flash"];
+        CheckDirty -- "NO" --> SkipSync["Skip Flash Write"];
+        FlashSync --> PanelSleep["6. Put SSD1681 into Deep Sleep Mode 1 (0x10=0x01)"];
         SkipSync --> PanelSleep;
-        PanelSleep --> ClearTF["7. Clear PCF85063A TF Flag in Control_2"];
-        ClearTF --> GateCheck{"8. Zero-Hour Lookahead Overshoot?"};
-        GateCheck -- "YES" --> ArmExtOnly["Arm ONLY GPIO 5 RTC_INT and Buttons"];
-        GateCheck -- "NO" --> ArmAll["Arm Internal Periodic Timer and EXTINT"];
-        ArmExtOnly --> EnterSleep["9. Enter Hardware Deep Sleep"];
-        ArmAll --> EnterSleep;
+        PanelSleep --> ArmRTC["7. Arm PCF85063A Countdown Slice & Install bsp_wake_stub"];
+        ArmRTC --> EnterSleep["8. Save Runtimes to NVS, Isolate Pads, Drain Wake Pins HIGH & Enter Deep Sleep"];
     end
     EnterSleep --> DeepSleep;
 
     LaunchBL --> ROM_Bootloader["ROM Download Bootloader Mode"];
-    LaunchPowerOff --> CutLatch["Flush Frame and Release GPIO 17 Latch"];
-    LaunchCritical --> EmergencySplash["Draw Low Battery Icon and Cut Latch"];
+    LaunchPowerOff --> CutLatch["Save Runtimes to NVS, Flush Frame & Release GPIO 17 Latch"];
+    LaunchCritical --> CutLatch;
 ```
 
 ---
 
-## 2. Zero-Hour Conflict Elimination Sequence
+## 2. Event-Mode RTC Slicing & Zero-Hour Conflict Elimination
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant App as Orchestrator
-    participant RTC as PCF85063A
+    participant App as Orchestrator (Flow B)
+    participant RTC as PCF85063A (GPIO 5)
     participant ULP as ULP Monitor
-    participant Xtensa as Xtensa Flow B
+    participant Stub as Core 0 Wake Stub (Flow A)
 
-    Note over App: Inactivity Timeout or h1os_sleep()
-    alt Next Sleep Accumulator Overshoots External Timer
-        Note over App: Do NOT arm internal periodic timer
-        App->>ULP: Arm EXTINT only (GPIO 5 Countdown Timer and Buttons)
-        App->>App: Enter Deep Sleep
-        RTC-->>ULP: GPIO 5 falls LOW (Countdown Timer Reaches Zero)
-        ULP->>Xtensa: Catch RTC Timer Interrupt and Wake into Flow B
-    else Next Sleep Accumulator Within Window
-        Note over App: Window is clear, arm both timers
-        App->>ULP: Arm internal periodic timer and EXTINT
-        App->>App: Enter Deep Sleep
-        ULP->>App: Timer expires and Wakes Core 0 into Flow A
+    Note over App: Sleep Transition (e.g. Flow A = 60s, Flow B = 300s -> overflow = 5)
+    App->>RTC: Arm Countdown Timer for 60s (1 Hz pulse mode)
+    App->>ULP: Set slice_counter = 0, overflow_limit = 5, remainder_sec = 0
+    App->>App: Isolate Pads & Enter Deep Sleep
+
+    loop Slices 1..4 (Intermediate Flow A Bursts)
+        RTC-->>ULP: GPIO 5 falls LOW (60s elapsed)
+        ULP->>ULP: Sample ADC1_CH3 (Quiet Vbat) -> vbat_ring[8]
+        ULP->>ULP: slice_counter++ (< 5) -> Set ULP_DISPATCH_SENSOR_SAMPLE
+        ULP->>Stub: Wake Core 0 into bsp_wake_stub()
+        Stub->>Stub: Read SHTC3 (0x7866) + Q12 Die TSENS -> Push to ring[32]
+        Stub->>RTC: Clear TF in Control_2 (0x07) & Wait GPIO 5 HIGH
+        Stub->>ULP: Re-arm ULP GPIO Wakeup & Return to Deep Sleep
     end
+
+    RTC-->>ULP: GPIO 5 falls LOW (Slice 5 == overflow_limit)
+    ULP->>ULP: Sample ADC1_CH3 (Quiet Vbat) -> vbat_ring[8]
+    ULP->>ULP: slice_counter == 5 -> Reset slice_counter = 0, Set ULP_DISPATCH_MAIN_WAKE
+    ULP->>App: Wake Dual-Core Xtensa into Flow B UI Refresh
 ```
 
 ---
@@ -109,24 +114,20 @@ sequenceDiagram
 To prevent unintended audio chirps and spurious screen skipping while deep sleeping:
 1. **First Click in Deep Sleep (Wake Interaction):**
    - Intercepted by the ULP-RISC-V coprocessor in RTC domain.
-   - ULP debounces the release, records `ulp_last_wake_btn`, and wakes the main processor into Flow B.
-   - Flow B boots, detects the user button wake, initializes LVGL, and renders the screen with the **inverted awake badge**.
+   - ULP debounces the press (`30 ms`), waits for release (`30..2500 ms`), records `ulp_last_wake_btn`, and wakes the main processor into Flow B.
+   - Flow B boots, detects the user button wake, initializes LVGL and audio, and renders the screen with the **inverted awake badge**.
    - **No page advance or audio tick occurs on the wake click**, guaranteeing that waking the screen does not skip the user's current view.
 2. **Second Click in Flow B (Active Navigation):**
    - The user is now looking at the awakened UI.
-   - The second click is received directly by the running LVGL keypad driver (`keypad_event_cb`).
-   - LVGL dispatches the page switch, plays the tactile 15ms audio tick, and resets the 30-second inactivity session timer.
+   - Subsequent clicks are received directly by the running LVGL keypad driver (`keypad_event_cb`): `BOOT` advances forward (`1046 Hz`, `50 ms` tone), `POWER` navigates backward (`880 Hz`, `50 ms` tone), and either button resets the 30-second inactivity session timer.
 
 ### 3.2 Audio Codec Standby Gating (<1 µA Invariant)
 - **Unattended Wakes (RTC Countdown Timer):**
   - Environmental display refresh wakes bypass the ES8311 codec and NS4168 amplifier initialization entirely.
-  - The codec remains in hardware standby / power-down state (<1 µA).
-  - This eliminates parasitic heat injection into the enclosure and maximizes battery longevity.
+  - Furthermore, `sub_audio_standby()` tracks `s_rtc_codec_in_standby` in `RTC_DATA_ATTR` so unattended wakes skip redundant I2C deinit writes when the codec is already parked in `<1 µA` standby.
 - **User Wakes (Cold Boot or Tactile Button):**
-  - Audio subsystem initializes only when `is_user_wake` is true.
-  - Initial volume is set strictly from `presentation.volume_pct` (defaulting to 0% / muted if unconfigured).
+  - Audio subsystem initializes only when `is_user_wake` is true, setting volume strictly from `presentation.volume_pct`.
 
 ### 3.3 Strict Lifecycle Contract Validation
 - Silent fallback magic numbers (`300s`, `120s`, `30s`) have been removed from `h1os_lifecycle.c`.
 - If an unconfigured duration or timeout of `0` is passed to `h1os_sleep()`, `inactivity_timeout_sec`, or `flow_b_period_sec`, the system logs an explicit `ESP_LOGE` error detailing the contract violation and triggers clean shutdown rather than silently injecting synthetic delays.
-

@@ -49,76 +49,41 @@
 #define RTC_TIMER_TE_BIT      (1 << 2)
 #define RTC_TIMER_TCF_MASK    (3 << 3)
 #define RTC_TIMER_TCF_MIN     (3 << 3)
-#define RTC_CTRL2_COF_OFF      0x07
+#define RTC_CTRL2_COF_OFF     0x07
 // clang-format on
 
-/**
- * @brief I2c delay.
- *
- * @return Return value of type static inline void RTC_IRAM_ATTR.
- */
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
     esp_rom_delay_us(5);
 }
 
-/**
- * @brief Sda high.
- *
- * @return Return value of type static inline void RTC_IRAM_ATTR.
- */
 static inline void RTC_IRAM_ATTR sda_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
 }
 
-/**
- * @brief Sda low.
- *
- * @return Return value of type static inline void RTC_IRAM_ATTR.
- */
 static inline void RTC_IRAM_ATTR sda_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
 }
 
-/**
- * @brief Scl high.
- *
- * @return Return value of type static inline void RTC_IRAM_ATTR.
- */
 static inline void RTC_IRAM_ATTR scl_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
 }
 
-/**
- * @brief Scl low.
- *
- * @return Return value of type static inline void RTC_IRAM_ATTR.
- */
 static inline void RTC_IRAM_ATTR scl_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SCL_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SCL_BIT_MASK);
 }
 
-/**
- * @brief Sda read.
- *
- * @return Return value of type static inline uint8_t RTC_IRAM_ATTR.
- */
 static inline uint8_t RTC_IRAM_ATTR sda_read(void)
 {
     return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
 }
 
-/**
- * @brief Start i2c_start background operations.
- *
- * @return Return value of type static void RTC_IRAM_ATTR.
- */
 static void RTC_IRAM_ATTR i2c_start(void)
 {
     sda_high();
@@ -130,11 +95,6 @@ static void RTC_IRAM_ATTR i2c_start(void)
     i2c_delay();
 }
 
-/**
- * @brief Stop i2c_stop background operations.
- *
- * @return Return value of type static void RTC_IRAM_ATTR.
- */
 static void RTC_IRAM_ATTR i2c_stop(void)
 {
     sda_low();
@@ -145,16 +105,9 @@ static void RTC_IRAM_ATTR i2c_stop(void)
     i2c_delay();
 }
 
-/**
- * @brief I2c write byte.
- *
- * @param[in]    byte            Parameter byte.
- *
- * @return True on success, false otherwise.
- */
 static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
 {
-    for (int i = 7; i >= 0; i--) {
+    for (int32_t i = 7; i >= 0; i--) {
         if ((byte >> i) & 1) {
             sda_high();
         } else {
@@ -177,24 +130,17 @@ static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
     return ack;
 }
 
-/**
- * @brief I2c read byte.
- *
- * @param[in]    ack             Parameter ack.
- *
- * @return Return value of type static uint8_t RTC_IRAM_ATTR.
- */
 static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
 {
     uint8_t byte = 0;
     sda_high();
 
-    for (int i = 7; i >= 0; i--) {
+    for (int32_t i = 7; i >= 0; i--) {
         i2c_delay();
         scl_high();
         i2c_delay();
         if (sda_read()) {
-            byte |= (1 << i);
+            byte |= (uint8_t)(1U << i);
         }
         scl_low();
     }
@@ -214,14 +160,6 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
     return byte;
 }
 
-/**
- * @brief Shtc3 crc8.
- *
- * @param[in]    data            Parameter data.
- * @param[in]    len             Parameter len.
- *
- * @return Return value of type static uint8_t RTC_IRAM_ATTR.
- */
 static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 {
     uint8_t crc = 0xFF;
@@ -229,9 +167,9 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
         crc ^= data[i];
         for (uint8_t bit = 8; bit > 0; --bit) {
             if (crc & 0x80) {
-                crc = (crc << 1) ^ 0x31;
+                crc = (uint8_t)((crc << 1) ^ 0x31);
             } else {
-                crc = (crc << 1);
+                crc = (uint8_t)(crc << 1);
             }
         }
     }
@@ -242,11 +180,11 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
  * @brief Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
  *
  * @param[in]    offset_centi_c   Pre-computed intercept (2052 + tsens_cal_centi_c).
- * @param[in]    fallback_centi_c Fallback temperature if conversion fails.
+ * @param[in]    default_centi_c  Default temperature if conversion fails.
  *
  * @return Sampled die temperature in centi-°C.
  */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t fallback_centi_c)
+static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
@@ -259,7 +197,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
-    int timeout = 100;
+    int32_t timeout = 100;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
         esp_rom_delay_us(5);
     }
@@ -270,13 +208,13 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
     REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
 
     if (timeout <= 0 || raw == 0 || raw == 0xFF) {
-        return fallback_centi_c;
+        return default_centi_c;
     }
 
     /* Division-free Q12 fixed-point transfer: 43.86 * 4096 = 179651 */
     int32_t t_centi = (((int32_t)raw * 179651) >> 12) - (int32_t)offset_centi_c;
     if (t_centi < -4000 || t_centi > 12500) {
-        return fallback_centi_c;
+        return default_centi_c;
     }
     return (int16_t)t_centi;
 }
@@ -286,7 +224,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
  */
 static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
 {
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < 3; attempt++) {
         bool ok = false;
         i2c_start();
         if (i2c_write_byte(I2C_ADDR_PCF85063 << 1)) {
@@ -310,7 +248,9 @@ static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
  */
 static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 {
-    if (seconds == 0) return;
+    if (seconds == 0) {
+        return;
+    }
 
     uint8_t timer_val = 0;
     uint8_t clk_src = 0;
@@ -341,13 +281,13 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 
 /**
  * @brief Reliable SHTC3 sleep dispatch with ACK verification.
- * 
- * @return Return value of sleep command wright status.
+ *
+ * @return True if sleep command was acknowledged, false otherwise.
  */
 static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 {
     bool ok = false;
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < 3; attempt++) {
         i2c_start();
         if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
             if (i2c_write_byte(0xB0) && i2c_write_byte(0x98)) {
@@ -355,18 +295,18 @@ static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
             }
         }
         i2c_stop();
-        if (ok) break;
+        if (ok) {
+            break;
+        }
         esp_rom_delay_us(50);
     }
-    return ok; /**< Sensor Was Not Sleeping as Expected, Now Fixed */
+    return ok;
 }
 
 /**
  * @brief Master RTC Wake Stub entry function.
  *
  * @details Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
- *
- * @return Return value of type void RTC_IRAM_ATTR.
  */
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
@@ -382,6 +322,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     volatile orch_persisted_state_t *st = orch_state_get();
+
+    /* Account for the elapsed Flow A deep sleep slice */
+    st->total_sleep_sec += (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60U;
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
@@ -422,11 +365,11 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_stop();
             sample_ok = false;
         } else {
-            rx[0] = i2c_read_byte(true );
-            rx[1] = i2c_read_byte(true );
-            rx[2] = i2c_read_byte(true );
-            rx[3] = i2c_read_byte(true );
-            rx[4] = i2c_read_byte(true );
+            rx[0] = i2c_read_byte(true);
+            rx[1] = i2c_read_byte(true);
+            rx[2] = i2c_read_byte(true);
+            rx[3] = i2c_read_byte(true);
+            rx[4] = i2c_read_byte(true);
             rx[5] = i2c_read_byte(false);
             i2c_stop();
         }
@@ -471,7 +414,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             .shtc3_rh_centi_pct = rh_centi_pct,
             .mcu_tsens_centi_c  = die_centi_c,
             .epd_glass_centi_c  = st->last_glass_temp_centi_c,
-            .timestamp_sec      = 0,
+            .timestamp_sec      = st->total_sleep_sec,
             .quality_flags      = q_flags,
         };
         orch_state_push_sample(&sample);
@@ -490,10 +433,12 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
-    uint32_t timeout_us = 20000; // > 1/64 s (~15.6 ms) pulse duration
+    uint32_t timeout_us = 20000;
     while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
         esp_rom_delay_us(500);
-        if (timeout_us <= 500) break; // Guard against an actual stuck bus or hardware short
+        if (timeout_us <= 500) {
+            break;
+        }
         timeout_us -= 500;
     }
 
@@ -515,7 +460,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
-    /* 1. Tear down I2C pads to eliminate deep-sleep leakage */
+    /* Tear down I2C pads to eliminate deep-sleep leakage */
     PIN_INPUT_DISABLE(IO_MUX_GPIO47_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO47_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);

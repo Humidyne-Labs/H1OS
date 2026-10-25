@@ -197,8 +197,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
             uint16_t x1 = area->x1;
             uint16_t x2 = x1 + area_w - 1;
             if (x1 < EPD_WIDTH) {
-                if (x2 >= EPD_WIDTH)
+                if (x2 >= EPD_WIDTH) {
                     x2 = EPD_WIDTH - 1;
+                }
 
                 uint32_t first_byte = x1 >> 3;
                 uint32_t last_byte = x2 >> 3;
@@ -263,8 +264,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
  */
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
-    if (s_lv_display != NULL)
+    if (s_lv_display != NULL) {
         return ESP_OK;
+    }
 
     esp_err_t ret = sub_display_init(is_wake_cycle);
     if (ret != ESP_OK) {
@@ -346,12 +348,14 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh)
  */
 esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 {
-    if (s_lvgl_task_handle != NULL)
+    if (s_lvgl_task_handle != NULL) {
         return ESP_OK;
+    }
 
     esp_err_t ret = h1os_lvgl_init(false);
-    if (ret != ESP_OK)
+    if (ret != ESP_OK) {
         return ret;
+    }
 
     task_priority = (task_priority > 0) ? task_priority : 5;
     core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
@@ -409,22 +413,28 @@ esp_err_t h1os_lvgl_stop(void)
  */
 bool h1os_lvgl_has_pending_tasks(void)
 {
-    if (s_lv_display == NULL)
+    if (s_lv_display == NULL) {
         return false;
+    }
 
-    if (s_flush_in_progress)
+    if (s_flush_in_progress) {
         return true;
+    }
 
-    if (s_lvgl_task_handle != NULL && xTaskGetCurrentTaskHandle() == s_lvgl_task_handle)
+    if (s_lvgl_task_handle != NULL && xTaskGetCurrentTaskHandle() == s_lvgl_task_handle) {
         return false;
+    }
 
+    bool pending = false;
+    lv_lock();
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
     if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
         if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
-            return true;
+            pending = true;
         }
     }
-    return false;
+    lv_unlock();
+    return pending;
 }
 
 lv_indev_t *h1os_lvgl_get_indev(void)

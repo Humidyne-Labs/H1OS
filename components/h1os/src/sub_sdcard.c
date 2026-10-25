@@ -23,7 +23,7 @@
 static const char *TAG = "sub_sdcard";
 
 static sdmmc_card_t *s_sd_card = NULL;
-static TaskHandle_t s_mount_task = NULL;
+static volatile TaskHandle_t s_mount_task = NULL;
 static bool s_card_absent_latched = false;
 
 /**
@@ -72,8 +72,13 @@ esp_err_t sub_sdcard_mount_async(void)
         return ESP_OK;
     }
 
-    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &s_mount_task);
-    return (res == pdPASS) ? ESP_OK : ESP_FAIL;
+    TaskHandle_t handle = NULL;
+    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &handle);
+    if (res == pdPASS) {
+        s_mount_task = handle;
+        return ESP_OK;
+    }
+    return ESP_FAIL;
 }
 
 /**
@@ -93,14 +98,14 @@ esp_err_t sub_sdcard_mount(void)
 
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
-        .max_files = 1,
+        .max_files = 5,
         .allocation_unit_size = 0,
     };
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
     host.flags = SDMMC_HOST_FLAG_1BIT;
-    host.command_timeout_ms = 3;
+    host.command_timeout_ms = 20;
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;
@@ -149,6 +154,12 @@ esp_err_t sub_sdcard_mount(void)
  */
 esp_err_t sub_sdcard_unmount(void)
 {
+    /* Wait briefly if an asynchronous mount worker is still in flight */
+    int32_t wait_cycles = 25;
+    while (s_mount_task != NULL && wait_cycles-- > 0) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
     if (s_sd_card == NULL) {
         return ESP_OK;
     }
@@ -183,13 +194,15 @@ bool sub_sdcard_is_mounted(void)
  */
 esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
 {
-    if (!out_capacity_mb)
+    if (!out_capacity_mb) {
         return ESP_ERR_INVALID_ARG;
-    if (s_sd_card == NULL)
+    }
+    if (s_sd_card == NULL) {
         return ESP_ERR_INVALID_STATE;
+    }
 
     uint64_t bytes = ((uint64_t)s_sd_card->csd.capacity) * s_sd_card->csd.sector_size;
-    *out_capacity_mb = (uint32_t)(bytes / (1024 * 1024));
+    *out_capacity_mb = (uint32_t)(bytes / (1024ULL * 1024ULL));
     return ESP_OK;
 }
 
@@ -200,7 +213,8 @@ esp_err_t sub_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
  */
 esp_err_t sub_sdcard_format(void)
 {
-    if (s_sd_card == NULL)
+    if (s_sd_card == NULL) {
         return ESP_ERR_INVALID_STATE;
+    }
     return esp_vfs_fat_sdcard_format(SUB_SDCARD_MOUNT_POINT, s_sd_card);
 }

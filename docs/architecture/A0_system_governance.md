@@ -40,6 +40,7 @@ h1os/ (Repository Root)
         ├── A5_orchestrator.md         <-- Flow Arbiter & Class-E Math Engine
         ├── A6_ulp_coprocessor.md      <-- ULP-RISC-V Coprocessor Hardware Monitor
         ├── A7_sensor_psychrometrics.md<-- Tri-Node Temperature & Psychrometric Sensor Operation
+        ├── A8_battery_and_power_management.md<-- Battery Metrology, Power Management & Autonomy Engine
         ├── B1_api_and_services.md     <-- Declarative Lifecycle & LVGL v9 Engine
         ├── B2_state_machine.md        <-- Execution Flowcharts & State Machine
         ├── B3_firmware_standards.md   <-- Firmware Engineering, Safety Rules & Style
@@ -47,6 +48,7 @@ h1os/ (Repository Root)
         ├── C2_lessons_learned.md      <-- Post-Mortem & Architectural Rationale
         ├── C3_roadmap.md              <-- Canonical Phased Construction Plan & Milestones
         └── C4_changelog_policy.md     <-- Release Policy & SemVer Management
+		└── D0_std_audit_framework.md  <-- Formal Audit Framework for Code Audits
 ```
 
 ---

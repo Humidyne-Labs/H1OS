@@ -128,7 +128,7 @@ The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](../../components/h1os/bootlo
 3. `HAL_PIN_PA_EN` (GPIO 42, Digital IO):
    - Driven LOW (`GPIO_OUT1_REG` bit 10 = 0) to energize the audio power rail (`0 = ON`).
    - Latched in digital domain via `RTC_CNTL_DIG_PAD_HOLD_REG`.
-   - **Anti-Clamping Invariant:** Keeping the audio rail energized prevents the ES8311 codec's internal ESD protection diodes from forward-biasing and clamping the shared I2C bus (`GPIO 47`/`48`) to 0.7 V. Hardware mute during boot and deep sleep is enforced by driving `HAL_PIN_PA_CTRL` (GPIO 46) LOW.
+   - **Anti-Clamping Invariant:** Keeping the audio rail energized prevents the unpowered ES8311 codec from pulling down the shared I2C bus (`GPIO 47`/`48`). Hardware mute during boot and deep sleep is enforced by driving `HAL_PIN_PA_CTRL` (GPIO 46) LOW.
 
 ### 4.2 Application Static Sleep Isolation
 Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](../../components/h1os/src/hal_io.c) isolates static outputs to prevent parasitic leakage currents through external components:
@@ -251,7 +251,9 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     // 4. Battery ADC sensing pin: input only, unheld
     rtc_gpio_init(HAL_PIN_BATTERY_ADC);
-    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_DISABLED);
+    rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
+    rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
     rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
 
     // 5. ULP Wakeup Source & Event Mode Configuration

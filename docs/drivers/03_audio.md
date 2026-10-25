@@ -17,13 +17,13 @@
 
 ---
 
-## 2. Electrical Invariant: The ESD Diode Clamping Hazard
+## 2. Electrical Invariant: Shared I2C Bus Disruption on Power-Gating
 
 ### Physical Circuit Behavior & Link to Errata E4
 
-The ES8311 has internal ESD clamping diodes connected between its digital input pins (SDA, SCL) and its internal VDD supply rail. Driving `PA_EN` (`GPIO 42`) HIGH to cut power to the audio subsystem causes current to flow from the 3.3V I2C pull-ups through the forward-biased ESD protection diodes into the dead VDD rail, clamping the shared I2C bus down to **~0.7V** and freezing the entire bus.
+Driving `PA_EN` (`GPIO 42`) HIGH to cut power to the audio subsystem causes the shared I2C bus (`GPIO 47/48`) to completely fail, taking down communication with the Sensirion SHTC3 and NXP PCF85063A. The Everest Semiconductor ES8311 documentation lacks ESD protection specifications, contains no I2C pull-up recommendations, and leaves the Chip/Clock State Machine (CSM `S0`–`S7`) undefined. Furthermore, voltage levels during power gating were never measured on hardware (claims of ~0.7V or GND clamping are unverified). 
 
-For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.md` Errata E4](../../ERRATA.md#e4-es8311-esd-diode-i2c-bus-clamping).
+For detailed physical analysis, datasheet gap evaluation, and PCB Rev B redesign guidelines, see [`ERRATA.md` Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus).
 
 ### Immutable Software Requirement
 
@@ -31,18 +31,7 @@ For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.
 
 ---
 
-## 6. Audit & Bug Identification Matrix
-
-| Parameter / Feature             | Legacy Reference (`bsp_audio.c`)                                    | Original `sub_audio.c` (Clean-Slate)                     | Bug Diagnosis & Required Fix                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **PA Power Rail (GPIO 42)**     | `bsp_audio_power_enable(true)` sets `GPIO 42 = 0` (Active LOW)      | **Never configured or initialized!**                     | **FIXED:** Added `HAL_PIN_PA_EN` output configuration and set LOW in `sub_audio_init()` and `hal_io_early_init()`. |
-| **ES8311 Clock Tree**           | Complete 22-register table with OSR, dividers, and reference biases | Wrote only 4 registers (`0x00`, `0x0D`, `0x12`, `0x32`)! | **FIXED:** Ported complete reference register table to guarantee valid clocking and decoding.                      |
-| **Zero-Heat Deep Standby**      | Complete 15-register suspend sequence per `es8311_suspend()`        | Wrote only 2 registers (`0x12=0x03`, `0x0D=0x00`)        | **FIXED:** Implemented reference shutdown sequence to eliminate standby draw and thermal drift.                    |
-| **I2S Clock & DFS Lock**        | Default PLL_160M clock with PM lock                                 | Default PLL_160M                                         | **PASS:** Driver enforces APB max lock during transmission.                                                        |
-| **I2S Channel Format**          | 16-bit 16kHz Philips Standard Mono                                  | 16-bit 16kHz Philips Standard Mono                       | **PASS**                                                                                                           |
-| **I2C Bus Clamping Protection** | Rail kept ON (`0`) during sleep                                     | Rail kept ON (`0`) in `hal_io`                           | **PASS**                                                                                                           |
-
-## Register Map:
+## 3. Register Configuration Map
 
 | **Reg Address** | **Register Name** | **Config Value**   | **Functional Description**                                                                                                                              |
 | --------------- | ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -80,9 +69,9 @@ For detailed schematic analysis and PCB Rev B redesign guidelines, see [`ERRATA.
 
 ---
 
-## 7. Power Management & Sleep Gating Policy
+## 4. Power Management & Sleep Gating Policy
 
-### 7.1 Unattended Wake Isolation (<1 µA Invariant)
+### 4.1 Unattended Wake Isolation (<1 µA Invariant)
 To prevent quiescent current dissipation and thermal contamination of the enclosure:
 - **Unattended Periodic Wakes (RTC Countdown Timer):**
   - The ES8311 codec and NS4168 amplifier are **never initialized or taken out of standby**.
@@ -92,12 +81,11 @@ To prevent quiescent current dissipation and thermal contamination of the enclos
   - When the user presses `BOOT` or `POWER` to interact with the device, `is_user_wake` is asserted.
   - `sub_audio_init()` executes to configure clock dividers and prepare the FreeRTOS audio worker task.
 
-### 7.2 Volume Initialization Contract
+### 4.2 Volume Initialization Contract
 - The internal volume variable `s_volume_pct` is initialized to `0` (muted / unconfigured).
 - Upon user wake, volume is configured strictly from `lifecycle.presentation.volume_pct`.
 - Hardcoded fallback defaults (e.g. `50%` or `60%`) have been removed; audio levels are contractual and developer-defined.
 
-### 7.3 Silicon Errata: Register 0x37 Digital Equalizer Bypass & Low-Power Default
-- **Register 0x37 EQ Bypass Errata:** The Everest Semiconductor ES8311 datasheet incorrectly claims that the internal digital equalizer (EQ) is disabled by default. In physical silicon, failing to write `0x08` to Register `0x37` leaves the hardware EQ filter active in the signal path. Because no biquad coefficients are loaded, the uncalibrated filter stages generate severe phase distortion, clipping, and harsh acoustic buzzing ("sounds like death on 3 wheels"). Programming Register `0x37 = 0x08` explicitly disables the digital volume ramp and completely bypasses/disables the uncalibrated EQ engine.
-- **Low-Power Mode Default (`0x0F = 0x80`):** H1OS defaults to Low-Power DAC bias mode (`s_low_power_mode = true`). The noise floor difference through the NS4168 Class-D amplifier is completely negligible, while delivering measurable dynamic power savings during audio bursts.
-
+### 4.3 Hardware & Silicon Errata References
+- **Register 0x37 Digital Equalizer Bypass:** Writing `0x08` to Register `0x37` is required to disable the volume fade ramp and bypass the uncalibrated hardware EQ filter. For detailed silicon defect analysis, see [`ERRATA.md` ERR-S2](../../ERRATA.md#err-s2-es8311-register-0x37-digital-equalizer-bypass--low-power-default).
+- **Shared I2C Bus Power-Gating Hazard:** For physical defect analysis on keeping `PA_EN` energized, see [`ERRATA.md` Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus).

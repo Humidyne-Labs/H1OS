@@ -71,7 +71,7 @@ static void epd_reset_pulse(void)
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
     /* Wait up to 15 ms for BUSY (GPIO 8) to assert HIGH after command issue */
-    for (int i = 0; i < 60; i++) {
+    for (int32_t i = 0; i < 60; i++) {
         if (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
             break;
         }
@@ -181,7 +181,7 @@ esp_err_t sub_display_init(bool is_wake_cycle)
             if (glass_cc >= -4000 && glass_cc <= 8500) {
                 s_last_glass_temp_centi_c = glass_cc;
                 ESP_LOGI(TAG, "SSD1681 Pre-display Glass Temp acquired: %.2f C (Raw: 0x%02X 0x%02X)",
-                         (double)glass_cc / 100.0, temp_raw[0], temp_raw[1]);
+                         (double)((float)glass_cc / 100.0f), temp_raw[0], temp_raw[1]);
             }
         }
     }
@@ -192,6 +192,23 @@ esp_err_t sub_display_init(bool is_wake_cycle)
     memset(s_previous_frame, 0xFF, EPD_BUFFER_SIZE);
 
     s_inited = true;
+    return ESP_OK;
+}
+
+/**
+ * @brief Deinitialize SSD1681 display subsystem and release SPI bus resources.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_display_deinit(void)
+{
+    if (!s_inited) {
+        return ESP_OK;
+    }
+
+    sub_display_enter_deep_sleep();
+    hal_spi_deinit();
+    s_inited = false;
     return ESP_OK;
 }
 
@@ -243,8 +260,9 @@ static void epd_commit_ram_dma(uint8_t ram_cmd, const uint8_t *frame_data)
  */
 esp_err_t sub_display_sync_previous_frame(const uint8_t *prev_frame)
 {
-    if (prev_frame == NULL)
+    if (prev_frame == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     memcpy(s_previous_frame, prev_frame, EPD_BUFFER_SIZE);
     memcpy(s_current_frame, prev_frame, EPD_BUFFER_SIZE);
@@ -297,7 +315,7 @@ esp_err_t sub_display_refresh_full(void)
 /**
  * @brief Clear display to pure white and trigger full OTP refresh.
  *
- * @details Chemically neutralizes electrophoretic microcapsules to protect against permanent burn-in.
+ * @details Clears and discharges electrophoretic microcapsules to protect against permanent burn-in.
  *          Ensures SPI2 and SSD1681 are initialized and awake even when invoked directly from
  *          deep-sleep ULP power-off wakes (ORCH_FLOW_CRITICAL_OFF).
  *
@@ -323,8 +341,9 @@ esp_err_t sub_display_clear_to_white_full(void)
  */
 static void epd_load_custom_lut(const uint8_t *lut_buffer)
 {
-    if (lut_buffer == NULL)
+    if (lut_buffer == NULL) {
         return;
+    }
 
     hal_spi_write_cmd(0x32);
     hal_spi_write_data(&lut_buffer[0], 153);
@@ -401,8 +420,9 @@ int16_t sub_display_get_glass_temp_centi_c(void)
  */
 esp_err_t sub_display_read_glass_temp(float *out_temp_c)
 {
-    if (out_temp_c == NULL)
+    if (out_temp_c == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
 
     if (s_inited) {
         *out_temp_c = (float)s_last_glass_temp_centi_c / 100.0f;

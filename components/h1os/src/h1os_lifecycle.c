@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "h1os.h"
 #include "h1os_lvgl.h"
+#include "h1os_time.h"
 #include "hal_i2c.h"
 #include "hal_io.h"
 #include "orch_display_sync.h"
@@ -40,6 +41,9 @@ static int64_t s_session_expiry_us = 0;
 static TaskHandle_t s_session_task_handle = NULL;
 static bool s_session_running = false;
 static bool s_audio_initialized = false;
+
+/* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
+RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
 
 /**
  * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
@@ -79,7 +83,7 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
     }
     if (s_app_lifecycle.presentation.on_chime != NULL) {
         s_app_lifecycle.presentation.on_chime(type, s_app_lifecycle.user_data);
-    } else if (s_app_lifecycle.presentation.chime_mask & (1 << type)) {
+    } else if (s_app_lifecycle.presentation.chime_mask & (1U << type)) {
         uint8_t chime = (uint8_t)type;
         sub_audio_play(SUB_AUDIO_CHIME, &chime, sizeof(chime));
     }
@@ -107,9 +111,9 @@ static void h1os_quiesce_lvgl_pipeline(void)
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000) {
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000U) {
             vTaskDelay(pdMS_TO_TICKS(20));
-            wait_ms += 20;
+            wait_ms += 20U;
         }
     }
     h1os_lvgl_stop();
@@ -147,7 +151,7 @@ static void h1os_session_monitor_task(void *arg)
 }
 
 /**
- * @brief Diagnostic dump of ULP wake telemetry and execution performance.
+ * @brief Diagnostic dump of ULP wake telemetry.
  *
  * @details Isolated helper function for development; comment out the call in h1os_start() for release builds.
  *
@@ -155,11 +159,8 @@ static void h1os_session_monitor_task(void *arg)
  */
 static void debug_dump_ulp_telemetry(void)
 {
-    uint32_t exec_cycles = (ulp_exit_ccount >= ulp_entry_ccount) ? (ulp_exit_ccount - ulp_entry_ccount) : 0;
-    uint32_t exec_us = exec_cycles / 17;
-
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
-    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu, cycles=%lu (~%lu us)",
+    ESP_LOGI(TAG, "[ULP TELEMETRY] Wake #%lu: cause=%lu (%s), slice=%lu/%lu, vbat=%lu mV (raw=%lu), btn=%lu, stuck=%lu",
              (unsigned long)ulp_wake_counter,
              (unsigned long)ulp_last_wake_cause,
                (ulp_last_wake_cause == 1) ? "BOOT_BTN"
@@ -174,9 +175,7 @@ static void debug_dump_ulp_telemetry(void)
              (unsigned long)ulp_last_vbat_mv,
              (unsigned long)ulp_vbat_raw_adc,
              (unsigned long)ulp_last_wake_btn,
-             (unsigned long)ulp_rtc_int_stuck,
-             (unsigned long)exec_cycles,
-             (unsigned long)exec_us);
+             (unsigned long)ulp_rtc_int_stuck);
 
     if (ulp_rtc_int_stuck) {
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
@@ -221,11 +220,11 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
         break;
     case ORCH_FLOW_CRITICAL_OFF:
         flow_title = "[CRITICAL LOW POWER SHUTDOWN]";
-        trigger_desc = "Battery Brownout Guard (< 3.25V)";
+        trigger_desc = "Battery Brownout Guard (< 3.25V) / Power Key Hold";
         break;
     case ORCH_FLOW_BOOTLOADER_JUMP:
         flow_title = "[ROM BOOTLOADER JUMP MODE]";
-        trigger_desc = "BOOT Button Long-Press (>= 3.0s)";
+        trigger_desc = "BOOT Button Long-Press (>= 2.5s)";
         break;
     default:
         flow_title = "[UNKNOWN / CORRUPTED FLOW STATE]";
@@ -263,12 +262,22 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
 
     hal_i2c_init();
 
+    /* Initialize PCF85063A RTC (12.5pF load cap, disable 32.768 kHz CLKOUT) and sync POSIX clock */
+    if (sub_rtc_init() == ESP_OK) {
+        (void)h1os_time_sync_rtc_to_system();
+    }
+
     sub_nvs_init();
 
     /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
     orch_flow_type_t flow = orch_flow_determine_wakeup();
+
+    /* Load persisted autonomy runtimes from NVS after cold-boot orch_state_reset() so NVS values are preserved */
+    if (flow == ORCH_FLOW_BOOT) {
+        orch_state_load_runtimes_from_nvs();
+    }
 
     volatile orch_persisted_state_t *st = orch_state_get();
     if (s_app_lifecycle.session.flow_a_period_sec > 0) {
@@ -291,9 +300,8 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         debug_dump_ulp_telemetry();
     }
 
-    if (flow == ORCH_FLOW_BOOT) {
-        sub_power_init_ulp(st->sample_interval_sec);
-    }
+    /* Call sub_power_init_ulp on all flows: loads ULP on cold boot, or accounts for final Flow B sleep slice on RTC overflow wake */
+    sub_power_init_ulp(st->sample_interval_sec);
 
     return flow;
 }
@@ -465,8 +473,9 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
  */
 esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 {
-    if (!out_telemetry)
+    if (!out_telemetry) {
         return ESP_ERR_INVALID_ARG;
+    }
     memset(out_telemetry, 0, sizeof(h1os_telemetry_t));
 
     float t = 0.0f, rh = 0.0f, dew = 0.0f;
@@ -510,15 +519,36 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
-    if (sub_power_read_battery(&vbat_mv, &vbat_pct) == ESP_OK) {
+    h1os_battery_state_t bat_state = H1OS_BATTERY_DISCHARGING;
+    if (sub_power_get_battery_status(&vbat_mv, &vbat_pct, &bat_state) == ESP_OK) {
         out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        out_telemetry->is_usb_powered  = sub_power_connected_usb();
+        out_telemetry->is_usb_powered  = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
+        out_telemetry->battery_state   = bat_state;
         st->last_vbat_mv               = vbat_mv;
         if (!out_telemetry->is_usb_powered && (st->boot_vbat_mv == 0 || vbat_mv > st->boot_vbat_mv)) {
             st->boot_vbat_mv = vbat_mv;
         }
         out_telemetry->boot_vbat_mv = st->boot_vbat_mv;
+
+        uint16_t current_soc_x10 = sub_power_mv_to_soc_tenths(vbat_mv);
+
+        if (bat_state == H1OS_BATTERY_DISCHARGING) {
+            bool state_transition_from_charge = (s_prev_bat_state == H1OS_BATTERY_CHARGING ||
+                                                 s_prev_bat_state == H1OS_BATTERY_CHARGED);
+            if (st->initial_soc_x10 == 0 ||
+                state_transition_from_charge ||
+                current_soc_x10 >= st->initial_soc_x10 + 30) {
+                orch_state_reset_discharge_lap(current_soc_x10);
+            }
+        }
+        s_prev_bat_state = bat_state;
+
+        sub_power_calc_autonomy(st->initial_soc_x10,
+                                current_soc_x10,
+                                st->total_sleep_sec,
+                                st->total_app_run_ms,
+                                &out_telemetry->autonomy);
     }
 
     return ret;
@@ -586,8 +616,13 @@ static void execute_system_shutdown(bool force_clean_white)
     }
     sub_display_enter_deep_sleep();
 
-    int stable_high = 0;
-    for (int i = 0; i < 200 && stable_high < 4; i++) {
+    /* Persist cumulative autonomy runtimes to NVS prior to releasing power latch */
+    volatile orch_persisted_state_t *st = orch_state_get();
+    st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
+    orch_state_save_runtimes_to_nvs();
+
+    int32_t stable_high = 0;
+    for (int32_t i = 0; i < 200 && stable_high < 4; i++) {
         stable_high = (gpio_get_level(HAL_PIN_BUTTON_POWER) == 1) ? stable_high + 1 : 0;
         vTaskDelay(pdMS_TO_TICKS(50));
     }

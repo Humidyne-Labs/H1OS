@@ -37,6 +37,13 @@ extern "C" {
 esp_err_t sub_display_init(bool is_wake_cycle);
 
 /**
+ * @brief Deinitialize SSD1681 display subsystem and release SPI bus resources.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sub_display_deinit(void);
+
+/**
  * @brief Retrieve direct pointer to the active 5000-byte internal RAM framebuffer.
  *
  * @return Pointer to packed 1-bit monochrome pixel array.
