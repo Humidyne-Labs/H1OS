@@ -8,6 +8,7 @@
 
 #include "h1os/sub_rtc.h"
 
+#include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -218,9 +219,9 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
     }
 
     uint8_t ctrl1 = 0;
-    pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1);
+    ESP_RETURN_ON_ERROR(pcf85063_read_reg(RTC_REG_CONTROL_1, &ctrl1, 1), TAG, "Failed to read Control_1");
     ctrl1 |= (1 << 5);
-    pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
+    ESP_RETURN_ON_ERROR(pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1), TAG, "Failed to stop RTC oscillator");
 
     uint8_t data[7];
     data[0] = dec2bcd((uint8_t)time->tm_sec) & 0x7F;
@@ -234,9 +235,9 @@ esp_err_t sub_rtc_set_time(const struct tm *time)
     esp_err_t err = pcf85063_write_reg(RTC_REG_SECONDS, data, sizeof(data));
 
     ctrl1 &= ~(1 << 5);
-    pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
+    esp_err_t resume_err = pcf85063_write_reg_u8(RTC_REG_CONTROL_1, ctrl1);
 
-    return err;
+    return (err != ESP_OK) ? err : resume_err;
 }
 
 /**
@@ -326,10 +327,10 @@ esp_err_t sub_rtc_arm_countdown(uint32_t seconds)
  */
 esp_err_t sub_rtc_cancel_countdown(void)
 {
-    pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0);
+    ESP_RETURN_ON_ERROR(pcf85063_write_reg_u8(RTC_REG_TIMER_MODE, 0), TAG, "Failed to disable timer mode");
 
     uint8_t ctrl2 = 0;
-    pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1);
+    ESP_RETURN_ON_ERROR(pcf85063_read_reg(RTC_REG_CONTROL_2, &ctrl2, 1), TAG, "Failed to read Control_2");
     ctrl2 = (ctrl2 & ~(CTRL2_TF_MASK | CTRL2_AF_MASK)) | CTRL2_COF_OFF;
     return pcf85063_write_reg_u8(RTC_REG_CONTROL_2, ctrl2);
 }

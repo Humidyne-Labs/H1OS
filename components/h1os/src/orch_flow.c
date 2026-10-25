@@ -404,9 +404,10 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
         internal_sleep_sec = flow_a_sec;
     }
 
-    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus, Internal Sample timer = %lus",
+    ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus (Pure Event Mode: %lu slices x %lus)",
                     (unsigned long)flow_b_sec,
-                    (unsigned long)internal_sleep_sec);
+                    (unsigned long)overflow,
+                    (unsigned long)flow_a_sec);
 
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
     return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);

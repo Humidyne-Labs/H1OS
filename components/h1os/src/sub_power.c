@@ -23,6 +23,7 @@
 #include "freertos/task.h"
 #include "h1os/hal_io.h"
 #include "h1os/hal_types.h"
+#include "h1os/h1os.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
 #include "ulp_h1os.h"
@@ -405,7 +406,9 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     volatile orch_persisted_state_t *st = orch_state_get();
     st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
-    orch_state_save_runtimes_to_nvs();
+    if (h1os_is_session_active() || (st->wake_count % 12U == 0U)) {
+        orch_state_save_runtimes_to_nvs();
+    }
 
     hal_io_isolate_sleep_pads();
 

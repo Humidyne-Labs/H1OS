@@ -4,6 +4,33 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1-dev] - 2026-10-24
+
+### Added & Verified (50-Hour Environmental Chamber Metrology Certification)
+
+* **50.2-Hour Hermetic Chamber Soak & Zero-Calibration SHTC3 Verification** (`orch_wake_stub.c`, `orch_flow.c`, `orch_math.c`, `docs/architecture/A7_sensor_psychrometrics.md`):
+  * Certified 50 hours, 10 minutes (602 consecutive 5-minute Flow B cycles / 3,010 Flow A sample bursts) of continuous autonomous operation inside a 1.4 L hermetic acrylic chamber regulated by a 69.0% Boveda two-way osmotic standard alongside a Klaro Valet reference benchmark.
+  * Verified dead-on steady-state temperature agreement (`73.0°F` / `22.8°C` DUT vs. `73.0°F` Ref, `ΔT = 0.0°F`) and asymptotic relative humidity convergence from `50.5% RH` open-air baseline to `68.0% RH` (Cycle #530, `ΔRH = -1.0%`) and `67.8% RH` (Cycle #602, `ΔRH = -1.2%`, `Vapor P = 18.7 hPa`), passing all metrological acceptance gates (`67.5%–70.5% RH` and `18.5–18.8 hPa`) with zero synthetic software offsets.
+  * Confirmed `H1OS-STD-001` Invariant 2 (`PIT-06-A`) compliance by rejecting re-introduction of `die_tare_centi_c` and retaining `ORCH_TRINODE_SPAN_C = 15.0f` in `orch_flow.c`.
+
+### Fixed & Hardened (H1OS-STD-001 Rev 2.0 Codebase Audit Remediation)
+
+* **Wake Stub Pre-Spin Die Temperature Acquisition (`AUD-03` / `PIT-06-D`)** (`orch_wake_stub.c`):
+  * Relocated `wake_stub_read_die_temp_centi_c()` inside `bsp_wake_stub()` to execute immediately after transmitting the SHTC3 measurement command (`0x7866`), overlapping the 400 µs TSENS settling delay within the 14.5 ms SHTC3 conversion window (`450 µs` TSENS read + `14,050 µs` wait). Eliminates 15 ms of pre-sample CPU busy-wait self-heating on the silicon die and reduces Flow A wake stub active duration by 400 µs.
+  * Corrected `SENS_TSENS_XPD_FORCE` register field configuration in `wake_stub_read_die_temp_centi_c()`.
+* **Task Stack Floor Compliance & Checked Task Creation (`AUD-01` / `PIT-05-C`, `PIT-08-A`)** (`h1os_lifecycle.c`, `sub_sdcard.c`):
+  * Increased `h1os_session_monitor_task` (`h1os_sess`) stack allocation from `3072` to `4096` bytes in `h1os_lifecycle.c` and `sdcard_mount_worker_task` (`sd_mount`) from `3584` to `4096` bytes in `sub_sdcard.c`, satisfying the `H1OS-STD-001` 4 KB stack floor for tasks executing VFS, NVS, flash partition erase/write, and formatted logging call chains.
+  * Added explicit `BaseType_t` return status verification on `xTaskCreatePinnedToCore()` for `h1os_sess` with safe fallback to sleep transition on allocation failure.
+* **Cross-Core Volatile Coherency & Atomic Session Expiry (`AUD-02` / `PIT-01-A`, `PIT-01-E`)** (`h1os_lifecycle.c`, `hal_io.c`, `h1os_lvgl.cpp`):
+  * Qualified cross-task shared handles and flags (`s_session_expiry_us`, `s_session_running`, `s_session_task_handle`, `s_breath_task`, `s_breath_period_ms`, and `s_lvgl_task_handle`) with `volatile` and protected 64-bit `s_session_expiry_us` mutations across Core 0 and Core 1 with a critical section spinlock.
+* **LVGL Lock Timeout Enforcement & Splash Refresh 80 MHz Droop (`AUD-04` / `PIT-01-B`, `PIT-07-B`)** (`h1os_lvgl.cpp`, `sub_display.cpp`):
+  * Decoupled unconditional 240 MHz PM lock retention from `h1os_lvgl_lock()` so synchronous full OTP refreshes during boot splash (`lv_refr_now`) drop CPU frequency to 80 MHz during the ~1,400 ms `sub_display_wait_busy()` polling window while retaining 240 MHz `CpuMaxTurboScope` acceleration during pixel packing and SPI DMA frame commits.
+* **Atomic NVS Runtime Blob Commit & Flash Wear Reduction (`AUD-05` / `PIT-05-D`)** (`orch_state.c`, `sub_power.c`):
+  * Consolidated the three separate `sub_nvs_set_u32()` open/commit/close transactions in `orch_state_save_runtimes_to_nvs()` into a single atomic NVS commit, preventing torn multi-key state on brownout and reducing NVS flash wear.
+* **SDMMC Block Timeout Margin & Checked Driver Return Codes (`AUD-06`, `AUD-07`, `AUD-08` / `PIT-04-D`, `PIT-08-A`)** (`sub_sdcard.c`, `sub_rtc.c`, `sub_audio.c/.h`, `sub_nvs.c`, `sub_display.cpp`, `orch_flow.c`, `h1os_lifecycle.c`):
+  * Increased `host.command_timeout_ms` in `sub_sdcard_mount()` from `20 ms` to `100 ms` per `PIT-04-D` to prevent premature block write timeouts on mounted MicroSD media.
+  * Added explicit `esp_err_t` return checking in `sub_rtc_set_time()`, `sub_rtc_cancel_countdown()`, `sub_audio_set_volume()`, and `sub_nvs_*()` initialization paths, and synchronized `sub_audio.h` Doxygen comments and `orch_flow.c` Pure Event Mode sleep logs.
+
 ## [2.4.0-dev] - 2026-10-24
 
 ### 🚀 Added & Architectural Evolution

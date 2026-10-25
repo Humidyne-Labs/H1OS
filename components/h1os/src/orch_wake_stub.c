@@ -190,7 +190,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
     REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);
-    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
     esp_rom_delay_us(400);
@@ -344,6 +344,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         esp_rom_delay_us(250);
     }
 
+    int16_t die_centi_c = 0;
     if (sample_ok) {
         i2c_start();
         if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
@@ -354,7 +355,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_write_byte(0x78);
             i2c_write_byte(0x66);
             i2c_stop();
-            esp_rom_delay_us(14500);
+            /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
+            die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, 0);
+            esp_rom_delay_us(14050);
         }
     }
 
@@ -384,7 +387,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         /* Factory-calibrated SHTC3 transfer equations using 32-bit unsigned hardware division (quou) */
         int16_t  temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
         uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
-        int16_t  die_centi_c  = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, temp_centi_c);
+        if (die_centi_c == 0) {
+            die_centi_c = temp_centi_c;
+        }
 
         uint8_t q_flags = 0;
         if (st->total_samples == 0) {

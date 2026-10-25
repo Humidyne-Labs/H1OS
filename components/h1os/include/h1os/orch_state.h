@@ -50,6 +50,16 @@ typedef struct {
 } orch_tri_node_sample_t;
 
 /**
+ * @brief Compact 12-byte atomic battery autonomy runtime blob committed to Flash NVS.
+ */
+typedef struct {
+    uint32_t total_sleep_sec;   /**< Cumulative seconds spent in deep sleep.                        */
+    uint32_t total_app_run_ms;  /**< Cumulative milliseconds executing main processor application.  */
+    uint16_t initial_soc_x10;   /**< State of Charge at start of discharge lap in tenths of % (0..1000). */
+    uint16_t reserved;          /**< 16-bit alignment padding / reserved.                           */
+} orch_nvs_runtime_blob_t;
+
+/**
  * @brief Master persistent state block allocated in RTC Slow SRAM.
  *
  * Retained across all deep sleep cycles and wake stub executions.

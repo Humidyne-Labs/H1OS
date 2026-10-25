@@ -37,10 +37,11 @@
 static const char *TAG = "h1os_lifecycle";
 
 static h1os_lifecycle_t s_app_lifecycle = {0};
-static int64_t s_session_expiry_us = 0;
-static TaskHandle_t s_session_task_handle = NULL;
-static bool s_session_running = false;
+static volatile int64_t s_session_expiry_us = 0;
+static volatile TaskHandle_t s_session_task_handle = NULL;
+static volatile bool s_session_running = false;
 static bool s_audio_initialized = false;
+static portMUX_TYPE s_session_mux = portMUX_INITIALIZER_UNLOCKED;
 
 /* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
 RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
@@ -55,7 +56,10 @@ void h1os_reset_session_timer(void)
         ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting session timer reset.");
         return;
     }
-    s_session_expiry_us = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
+    int64_t new_expiry = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
+    portENTER_CRITICAL(&s_session_mux);
+    s_session_expiry_us = new_expiry;
+    portEXIT_CRITICAL(&s_session_mux);
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
 
@@ -132,7 +136,12 @@ static void h1os_session_monitor_task(void *arg)
     while (s_session_running) {
         vTaskDelay(pdMS_TO_TICKS(500));
 
-        if (s_session_expiry_us > 0 && esp_timer_get_time() >= s_session_expiry_us) {
+        int64_t expiry = 0;
+        portENTER_CRITICAL(&s_session_mux);
+        expiry = s_session_expiry_us;
+        portEXIT_CRITICAL(&s_session_mux);
+
+        if (expiry > 0 && esp_timer_get_time() >= expiry) {
             ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
                 (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
             s_session_running = false;
@@ -256,18 +265,18 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
         s_app_lifecycle = *config;
     }
 
-    sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
+    (void)sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
 
     hal_io_early_init();
 
-    hal_i2c_init();
+    (void)hal_i2c_init();
 
     /* Initialize PCF85063A RTC (12.5pF load cap, disable 32.768 kHz CLKOUT) and sync POSIX clock */
     if (sub_rtc_init() == ESP_OK) {
         (void)h1os_time_sync_rtc_to_system();
     }
 
-    sub_nvs_init();
+    (void)sub_nvs_init();
 
     /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
@@ -301,7 +310,7 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     }
 
     /* Call sub_power_init_ulp on all flows: loads ULP on cold boot, or accounts for final Flow B sleep slice on RTC overflow wake */
-    sub_power_init_ulp(st->sample_interval_sec);
+    (void)sub_power_init_ulp(st->sample_interval_sec);
 
     return flow;
 }
@@ -383,7 +392,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     /* Always clear any latched PCF85063A interrupt flags on Flow B entry */
     bool alarm_f = false, timer_f = false;
-    sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
+    (void)sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
 
     s_session_running = !is_rtc_wake;
     if (s_session_running) {
@@ -436,7 +445,18 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
         ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
-        xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 3072, NULL, 3, &s_session_task_handle, 0);
+        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 4096, NULL, 3, (TaskHandle_t *)&s_session_task_handle, 0);
+        if (res != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create h1os_sess monitor task (%ld). Entering sleep fallback.", (long)res);
+            s_session_running = false;
+            s_session_task_handle = NULL;
+            uint32_t sleep_sec = st->flow_b_period_sec;
+            if (sleep_sec == 0) {
+                h1os_shutdown();
+                return ESP_ERR_NO_MEM;
+            }
+            return h1os_sleep(sleep_sec);
+        }
     }
 
     return ESP_OK;

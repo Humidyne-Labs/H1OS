@@ -73,7 +73,7 @@ esp_err_t sub_sdcard_mount_async(void)
     }
 
     TaskHandle_t handle = NULL;
-    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 3584, NULL, 2, &handle);
+    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 4096, NULL, 2, &handle);
     if (res == pdPASS) {
         s_mount_task = handle;
         return ESP_OK;
@@ -105,7 +105,7 @@ esp_err_t sub_sdcard_mount(void)
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
     host.flags = SDMMC_HOST_FLAG_1BIT;
-    host.command_timeout_ms = 20;
+    host.command_timeout_ms = 100;
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;

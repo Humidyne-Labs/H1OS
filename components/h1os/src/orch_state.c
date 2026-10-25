@@ -52,14 +52,28 @@ void RTC_IRAM_ATTR orch_state_reset(void)
 void orch_state_save_runtimes_to_nvs(void)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
-    (void)sub_nvs_set_u32("pwr_sleep_s", st->total_sleep_sec);
-    (void)sub_nvs_set_u32("pwr_app_ms", st->total_app_run_ms);
-    (void)sub_nvs_set_u32("pwr_init_s10", (uint32_t)st->initial_soc_x10);
+    orch_nvs_runtime_blob_t blob = {
+        .total_sleep_sec  = st->total_sleep_sec,
+        .total_app_run_ms = st->total_app_run_ms,
+        .initial_soc_x10  = st->initial_soc_x10,
+        .reserved         = 0,
+    };
+    (void)sub_nvs_set_blob("pwr_lap_st", &blob, sizeof(blob));
 }
 
 void orch_state_load_runtimes_from_nvs(void)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
+    orch_nvs_runtime_blob_t blob = {0};
+    size_t len = sizeof(blob);
+    if (sub_nvs_get_blob("pwr_lap_st", &blob, &len) == ESP_OK && len == sizeof(blob)) {
+        st->total_sleep_sec  = blob.total_sleep_sec;
+        st->total_app_run_ms = blob.total_app_run_ms;
+        st->initial_soc_x10  = blob.initial_soc_x10;
+        return;
+    }
+
+    /* Fallback to legacy u32 keys */
     uint32_t val = 0;
     if (sub_nvs_get_u32("pwr_sleep_s", &val) == ESP_OK) {
         st->total_sleep_sec = val;

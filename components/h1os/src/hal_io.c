@@ -218,9 +218,9 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
     return ledc_fade_start(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
-static TaskHandle_t s_breath_task = NULL;
+static volatile TaskHandle_t s_breath_task = NULL;
 static volatile bool s_breathing_running = false;
-static uint32_t s_breath_period_ms = 2000;
+static volatile uint32_t s_breath_period_ms = 2000;
 
 /**
  * @brief Led breath task.
@@ -290,7 +290,7 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     }
 
     s_breathing_running = true;
-    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, &s_breath_task);
+    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, (TaskHandle_t *)&s_breath_task);
     if (res != pdPASS) {
         s_breathing_running = false;
         s_breath_task = NULL;

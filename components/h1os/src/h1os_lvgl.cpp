@@ -32,7 +32,7 @@ static const char *TAG = "h1os_lvgl";
 
 static lv_display_t *s_lv_display       = NULL;
 static lv_indev_t   *s_lv_keypad_indev  = NULL;
-static TaskHandle_t  s_lvgl_task_handle = NULL;
+static volatile TaskHandle_t s_lvgl_task_handle = NULL;
 
 static volatile bool s_lvgl_task_running = false;
 static volatile bool s_flush_in_progress = false;
@@ -63,7 +63,6 @@ static void h1os_lvgl_port_task(void *pvParameters);
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
     (void)timeout_ms;
-    sub_power_cpu_max_acquire();
     if (s_lv_display != NULL) {
         lv_lock();
     }
@@ -78,7 +77,6 @@ void h1os_lvgl_unlock(void)
     if (s_lv_display != NULL) {
         lv_unlock();
     }
-    sub_power_cpu_max_release();
 }
 
 /**
@@ -367,7 +365,7 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
                                              8192,
                                              NULL,
                                              task_priority,
-                                             &s_lvgl_task_handle,
+                                             (TaskHandle_t *)&s_lvgl_task_handle,
                                              core_id);
 
     if (res != pdPASS) {

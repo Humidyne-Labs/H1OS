@@ -104,10 +104,10 @@ static inline void audio_cpu_max_acquire(void)
 {
 #if CONFIG_PM_ENABLE
     if (s_audio_pm_lock == NULL) {
-        esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "sub_audio", &s_audio_pm_lock);
+        (void)esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "sub_audio", &s_audio_pm_lock);
     }
     if (s_audio_pm_lock != NULL) {
-        esp_pm_lock_acquire(s_audio_pm_lock);
+        (void)esp_pm_lock_acquire(s_audio_pm_lock);
     }
 #endif
 }
@@ -119,7 +119,7 @@ static inline void audio_cpu_max_release(void)
 {
 #if CONFIG_PM_ENABLE
     if (s_audio_pm_lock != NULL) {
-        esp_pm_lock_release(s_audio_pm_lock);
+        (void)esp_pm_lock_release(s_audio_pm_lock);
     }
 #endif
 }
@@ -673,7 +673,7 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         }
 
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_generated += chunk_size;
     }
 }
@@ -706,7 +706,7 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
         }
 
         size_t bytes_written = 0;
-        i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
         samples_sent += chunk;
     }
 }
@@ -735,10 +735,10 @@ static esp_err_t sub_audio_prepare_and_unmute(void)
     }
 
     if (s_codec_in_standby) {
-        es8311_init_dac_registers();
+        (void)es8311_init_dac_registers();
         s_codec_in_standby     = false;
         s_rtc_codec_in_standby = false;
-        sub_audio_set_volume(s_volume_pct);
+        (void)sub_audio_set_volume(s_volume_pct);
     }
 
     /* Enable Class D Audio Amp (waits 120ms if transitioning from muted) */
@@ -1103,7 +1103,11 @@ esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 
     if (s_audio_inited && s_i2s_chan_enabled) {
         uint8_t vol_reg = volume_pct_to_es8311_reg(s_volume_pct);
-        es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
+        esp_err_t err = es8311_write_reg(ES8311_REG_DAC_VOL, vol_reg);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set volume register: %s", esp_err_to_name(err));
+            return err;
+        }
         ESP_LOGI(TAG, "Volume set to %u [0x%02X]", volume_pct, vol_reg);
     }
     return ESP_OK;
