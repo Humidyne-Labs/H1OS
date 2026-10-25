@@ -59,6 +59,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Added explicit `esp_err_t` return checking in `sub_rtc_set_time()`, `sub_rtc_cancel_countdown()`, `sub_audio_set_volume()`, and `sub_nvs_*()` initialization paths, and synchronized `sub_audio.h` Doxygen comments and `orch_flow.c` Pure Event Mode sleep logs.
 * **Kconfig Banner Formatting & Spurious `kconfgen_tmp` Warning Elimination** (`sdkconfig.defaults*`):
   * Resolved recurring `NOTE: .../kconfgen_tmp... line was updated to ...n` notifications during CMake configuration by replacing trailing `=` characters in comment separator banners with `-` across all profile and component `sdkconfig.defaults` files. Upstream Espressif `kconfgen` mistakenly interpreted `# =========================================================================` as an empty key-value assignment (`CONFIG_FOO=`) due to an unconditional `line.endswith("=")` heuristic.
+* **Kconfig Option Linting & Disabled Dependency Pruning** (`components/h1os/sdkconfig.defaults`, `examples/H1OS/sdkconfig.defaults.dev`, `examples/H1OS/sdkconfig.defaults.ci`, `profiles/sdkconfig.defaults.dev`, `profiles/sdkconfig.defaults.ci`, `examples/riscv_test/sdkconfig.defaults`):
+  * Removed deprecated and obsolete LVGL 8 symbols (`CONFIG_LV_USE_OBJ`, `CONFIG_LV_USE_DEMO_TRANSFORM`, `CONFIG_LV_USE_DEMO_SCROLL`) and pruned 9 redundant `CONFIG_LV_USE_DEMO_*=n` sub-options that triggered Kconfig "disabled dependency" notifications while `CONFIG_LV_BUILD_DEMOS=n`.
+  * Replaced non-existent `CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y` with standard ESP-IDF v6.1 `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y`.
+  * Removed `CONFIG_ESP_SYSTEM_USE_EH_FRAME=y` from ESP32-S3 configuration profiles as runtime DWARF unwinding is strictly a RISC-V architectural choice (`depends on IDF_TARGET_ARCH_RISCV`) and invisible on Xtensa LX7.
 
 ## [2.4.0-dev] - 2026-10-24
 

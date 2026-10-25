@@ -4,7 +4,7 @@
 # -------------------------------------------------------------------------
 # -Og preserves symbols for automated backtrace line resolution
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
-CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL_DEBUG=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
 
 # Fail the CI build immediately on any compiler warning
 CONFIG_COMPILER_WARN_WRITE_STRINGS=y

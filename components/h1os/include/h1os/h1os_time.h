@@ -23,19 +23,19 @@ extern "C" {
  * @brief Time presentation format options.
  */
 typedef enum {
-    H1OS_TIME_FMT_24H_SEC = 0, /**< 24-hour time with seconds: "14:35:08"    */
-    H1OS_TIME_FMT_24H_MIN = 1, /**< 24-hour time without seconds: "14:35"    */
-    H1OS_TIME_FMT_12H_SEC = 2, /**< 12-hour time with seconds: "02:35:08 PM" */
-    H1OS_TIME_FMT_12H_MIN = 3  /**< 12-hour time without seconds: "02:35 PM" */
+    H1OS_TIME_FMT_24H_SEC = 0, /**< 24-hour time with seconds:    "14:35:08"    */
+    H1OS_TIME_FMT_24H_MIN = 1, /**< 24-hour time without seconds: "14:35"       */
+    H1OS_TIME_FMT_12H_SEC = 2, /**< 12-hour time with seconds:    "02:35:08 PM" */
+    H1OS_TIME_FMT_12H_MIN = 3  /**< 12-hour time without seconds: "02:35 PM"    */
 } h1os_time_format_t;
 
 /**
  * @brief Date presentation format options.
  */
 typedef enum {
-    H1OS_DATE_FMT_MM_DD_YY = 0,     /**< Month/Day/Year format: "09/26/26"          */
-    H1OS_DATE_FMT_DOW = 1,          /**< Day-of-week textual format: "Saturday"     */
-    H1OS_DATE_FMT_MM_DD_YY_DOW = 2  /**< Combined date and day: "09/26/26 Saturday" */
+    H1OS_DATE_FMT_MM_DD_YY     = 0, /**< Month/Day/Year format:      "09/26/26"          */
+    H1OS_DATE_FMT_DOW          = 1, /**< Day-of-week textual format: "Saturday"          */
+    H1OS_DATE_FMT_MM_DD_YY_DOW = 2  /**< Combined date and day:      "09/26/26 Saturday" */
 } h1os_date_format_t;
 
 /**
