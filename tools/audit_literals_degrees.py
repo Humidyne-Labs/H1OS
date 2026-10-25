@@ -3,9 +3,9 @@
 audit_literals_degrees.py
 -------------------------
 Classifies codebase integer literals into 3 distinct risk tiers:
-  - 1st Degree: Bitwise masks, bit shifts, pin mappings, register addresses (OK / Structural)
-  - 2nd Degree: Mathematical polynomials, metrological constants, unit scales (Contextual OK)
-  - 3rd Degree: Timeouts, delays, thresholds, stack sizes, loop bounds (High-Risk Magic Numbers)
+  - 1st Degree: Bitwise masks, shifts, pin mappings, register addresses, state codes, and enums (Structural / State Protocol)
+  - 2nd Degree: Mathematical polynomials, metrological constants, unit scales, state curve tables (Contextual / Metrological)
+  - 3rd Degree: Timeouts, delays, thresholds, stack sizes, loop bounds (High-Risk Operational Magic Numbers)
 """
 
 import os
@@ -25,7 +25,9 @@ def classify_finding(f: dict, file_path: str) -> dict:
     category = "Magic Constant"
     rationale = ""
 
-    # 1st Degree: Pin defines, Hex masks, Bit shifts, Registers
+    # =========================================================================
+    # 1st Degree: Structural, Hardware, State Variables & Enums
+    # =========================================================================
     if f['is_hex']:
         if any(w in ctx for w in ['REG', '0x', '0X', 'ADDR', 'CHIP_ID', 'BIT']):
             degree = 1
@@ -39,7 +41,7 @@ def classify_finding(f: dict, file_path: str) -> dict:
             degree = 1
             category = "Hex Literal"
             rationale = "Hexadecimal constant."
-    elif any(term in ctx for term in ['#define HAL_PIN_', '#define H1OS_PIN_', 'GPIO_NUM_', 'PIN_FUNC_']):
+    elif any(term in ctx for term in ['#define HAL_PIN_', '#define H1OS_PIN_', 'GPIO_NUM_', 'PIN_FUNC_']) or re.search(r'GPIO\s*' + re.escape(norm), ctx):
         degree = 1
         category = "Hardware Pin Mapping"
         rationale = "PCB GPIO physical pin assignment."
@@ -55,8 +57,27 @@ def classify_finding(f: dict, file_path: str) -> dict:
         degree = 1
         category = "Sizeof / Type Boundary"
         rationale = "Type/memory boundary."
+    elif re.search(r'\bcase\s+' + re.escape(norm) + r'\s*:', ctx):
+        degree = 1
+        category = "State Machine Case / Switch Label"
+        rationale = "State machine branch case discriminator."
+    elif any(state_var in ctx for state_var in [
+        'ulp_last_wake_cause', 'ulp_last_wake_btn', 'ulp_dispatch_reason',
+        'flow ==', 'flow !=', 'mode ==', 'mode !=', 'state ==', 'state !=',
+        'status ==', 'status !=', 'cause ==', 'cause !=', 'reason ==', 'reason !=',
+        'valid_trend'
+    ]):
+        degree = 1
+        category = "State Variable / Enum Discriminator"
+        rationale = "Protocol or state machine enum state comparison."
+    elif any(term in ctx for term in ['enum ', 'typedef enum', 'H1OS_CHIME_', 'H1OS_FLOW_']):
+        degree = 1
+        category = "Enum Definition / Identifier"
+        rationale = "Enumeration definition value."
 
-    # 2nd Degree: Math constants, metrology polynomials, unit scales
+    # =========================================================================
+    # 2nd Degree: Math, Metrology, Conversion Scales & Curve Tables
+    # =========================================================================
     elif any(term in ctx for term in ['1000000', '1000ULL', '1000LL', '1000.0', '100ULL', '100LL', '1000']):
         degree = 2
         category = "Unit Scale Factor (s/ms/us)"
@@ -69,12 +90,18 @@ def classify_finding(f: dict, file_path: str) -> dict:
         degree = 2
         category = "Display Geometry Math"
         rationale = "EPD 1-bit-per-pixel buffer geometry math."
+    elif 's_soc_lut' in ctx or any(term in ctx for term in ['{3300,', '{3400,', '{3500,', '{3600,', '{3700,', '{3800,', '{3900,', '{4000,', '{4100,', '{4180,']):
+        degree = 2
+        category = "Battery State-of-Charge Curve Table"
+        rationale = "Empirical LiPo cell discharge lookup table point."
     elif any(term in file_path for term in ['sub_audio.c']) and any(c in ctx for c in ['0x', '{', '}']):
         degree = 2
         category = "Audio Attenuation Table Entry"
         rationale = "Logarithmic attenuation lookup table entry."
 
-    # 3rd Degree: Timeouts, thresholds, priorities, stack floors
+    # =========================================================================
+    # 3rd Degree: Operational Magic Numbers (Timeouts, Thresholds, Allocations)
+    # =========================================================================
     else:
         if any(term in ctx for term in ['timeout', 'wait_ms', 'delay', 'Timeout', 'pdMS_TO_TICKS', 'esp_rom_delay_us', 'vTaskDelay', 'long_press', 'timeout_us']):
             degree = 3
@@ -127,16 +154,16 @@ def generate_markdown_report(results: dict, out_file: str):
     lines.append("")
     lines.append("| Tier | Classification | Criteria | Risk Level | Total Count | Percentage |")
     lines.append("| :---: | :--- | :--- | :---: | :---: | :---: |")
-    lines.append(f"| **1st Degree** | Structural / Hardware | Bitmasks (`& 0xFF`), shifts (`<< 8`), pin mappings (`GPIO 17`), register addresses | **Acceptable** | {d1} | {d1/total*100:.1f}% |")
-    lines.append(f"| **2nd Degree** | Mathematical / Metrology | Sensor transfer functions (`65535`, `17500`), unit scaling (`1000ULL`), LUT curves | **Contextual** | {d2} | {d2/total*100:.1f}% |")
-    lines.append(f"| **3rd Degree** | Operational Magic Numbers | Timeouts, delays, voltage thresholds, stack floors, loop retry bounds | **Actionable** | {d3} | {d3/total*100:.1f}% |")
+    lines.append(f"| **1st Degree** | Structural / Protocol & Enums | Bitmasks (`& 0xFF`), shifts (`<< 8`), pin mappings (`GPIO 17`), register addresses, state machine cases, state variables (`ulp_last_wake_cause`), and enum definitions | **Acceptable** | {d1} | {d1/total*100:.1f}% |")
+    lines.append(f"| **2nd Degree** | Mathematical & Metrology | Sensor transfer functions (`65535`, `17500`), unit scaling (`1000ULL`), battery SoC curve tables (`s_soc_lut`), audio attenuation curves | **Contextual** | {d2} | {d2/total*100:.1f}% |")
+    lines.append(f"| **3rd Degree** | Operational Magic Numbers | Timeouts, delays, electrical cutoff thresholds (`3250` mV), task stack floors, RTOS priorities, loop retry bounds | **Actionable** | {d3} | {d3/total*100:.1f}% |")
     lines.append(f"| **TOTAL** | — | Non-trivial integers across `components/` | — | **{total}** | **100.0%** |")
     lines.append("")
     lines.append("---")
     lines.append("")
     lines.append("## 2. Inventory by Component & Degree")
     lines.append("")
-    lines.append("| Component File | 1st Degree (Structural) | 2nd Degree (Math/Scale) | 3rd Degree (Magic/Timeouts) | Total Literals |")
+    lines.append("| Component File | 1st Degree (Structural & Enums) | 2nd Degree (Math & Curve Tables) | 3rd Degree (Operational Magic Numbers) | Total Literals |")
     lines.append("| :--- | :---: | :---: | :---: | :---: |")
 
     for fpath, items in sorted(results.items()):
@@ -150,7 +177,7 @@ def generate_markdown_report(results: dict, out_file: str):
     lines.append("")
     lines.append("## 3. High-Priority 3rd Degree Magic Literals (Actionable Review)")
     lines.append("")
-    lines.append("The following table details high-risk 3rd degree literals that should be audited for formal macro abstraction into `h1os_constants.h` or subsystem headers:")
+    lines.append("The following table isolates true 3rd degree operational magic numbers (timeouts, stack floors, retry limits, debounce delays, electrical thresholds):")
     lines.append("")
     lines.append("| File | Line | Token | Category | Code Context | Rationale / Recommended Abstraction |")
     lines.append("| :--- | :---: | :---: | :--- | :--- | :--- |")

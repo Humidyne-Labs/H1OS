@@ -9,61 +9,51 @@
 
 | Tier | Classification | Criteria | Risk Level | Total Count | Percentage |
 | :---: | :--- | :--- | :---: | :---: | :---: |
-| **1st Degree** | Structural / Hardware | Bitmasks (`& 0xFF`), shifts (`<< 8`), pin mappings (`GPIO 17`), register addresses | **Acceptable** | 297 | 53.5% |
-| **2nd Degree** | Mathematical / Metrology | Sensor transfer functions (`65535`, `17500`), unit scaling (`1000ULL`), LUT curves | **Contextual** | 38 | 6.8% |
-| **3rd Degree** | Operational Magic Numbers | Timeouts, delays, voltage thresholds, stack floors, loop retry bounds | **Actionable** | 220 | 39.6% |
+| **1st Degree** | Structural / Protocol & Enums | Bitmasks (`& 0xFF`), shifts (`<< 8`), pin mappings (`GPIO 17`), register addresses, state machine cases, state variables (`ulp_last_wake_cause`), and enum definitions | **Acceptable** | 315 | 56.8% |
+| **2nd Degree** | Mathematical & Metrology | Sensor transfer functions (`65535`, `17500`), unit scaling (`1000ULL`), battery SoC curve tables (`s_soc_lut`), audio attenuation curves | **Contextual** | 49 | 8.8% |
+| **3rd Degree** | Operational Magic Numbers | Timeouts, delays, electrical cutoff thresholds (`3250` mV), task stack floors, RTOS priorities, loop retry bounds | **Actionable** | 191 | 34.4% |
 | **TOTAL** | — | Non-trivial integers across `components/` | — | **555** | **100.0%** |
 
 ---
 
 ## 2. Inventory by Component & Degree
 
-| Component File | 1st Degree (Structural) | 2nd Degree (Math/Scale) | 3rd Degree (Magic/Timeouts) | Total Literals |
+| Component File | 1st Degree (Structural & Enums) | 2nd Degree (Math & Curve Tables) | 3rd Degree (Operational Magic Numbers) | Total Literals |
 | :--- | :---: | :---: | :---: | :---: |
-| `components\h1os\bootloader_components\h1os_boot_hook\h1os_boot_hook.c` | 4 | 0 | **1** | 5 |
+| `components\h1os\bootloader_components\h1os_boot_hook\h1os_boot_hook.c` | 5 | 0 | **0** | 5 |
 | `components\h1os\include\h1os\h1os_version.h` | 2 | 0 | **0** | 2 |
 | `components\h1os\include\h1os\hal_types.h` | 0 | 1 | **0** | 1 |
 | `components\h1os\include\h1os\sub_display.h` | 0 | 0 | **1** | 1 |
-| `components\h1os\src\h1os_lifecycle.c` | 1 | 2 | **16** | 19 |
+| `components\h1os\src\h1os_lifecycle.c` | 10 | 2 | **7** | 19 |
 | `components\h1os\src\h1os_lvgl.cpp` | 16 | 3 | **7** | 26 |
 | `components\h1os\src\h1os_time.c` | 0 | 0 | **3** | 3 |
 | `components\h1os\src\hal_flash.c` | 0 | 0 | **2** | 2 |
 | `components\h1os\src\hal_i2c.c` | 0 | 0 | **2** | 2 |
-| `components\h1os\src\hal_io.c` | 2 | 0 | **18** | 20 |
+| `components\h1os\src\hal_io.c` | 3 | 0 | **17** | 20 |
 | `components\h1os\src\hal_spi.c` | 0 | 8 | **7** | 15 |
 | `components\h1os\src\orch_display_sync.c` | 0 | 0 | **1** | 1 |
-| `components\h1os\src\orch_flow.c` | 4 | 0 | **4** | 8 |
+| `components\h1os\src\orch_flow.c` | 5 | 0 | **3** | 8 |
 | `components\h1os\src\orch_state.c` | 0 | 1 | **0** | 1 |
-| `components\h1os\src\orch_wake_stub.c` | 24 | 4 | **19** | 47 |
+| `components\h1os\src\orch_wake_stub.c` | 26 | 4 | **17** | 47 |
 | `components\h1os\src\sub_audio.c` | 116 | 4 | **28** | 148 |
 | `components\h1os\src\sub_display.cpp` | 77 | 3 | **6** | 86 |
-| `components\h1os\src\sub_power.c` | 1 | 10 | **55** | 66 |
+| `components\h1os\src\sub_power.c` | 5 | 13 | **48** | 66 |
 | `components\h1os\src\sub_rtc.c` | 48 | 0 | **11** | 59 |
 | `components\h1os\src\sub_sdcard.c` | 0 | 0 | **5** | 5 |
-| `components\h1os\ulp\main.c` | 2 | 2 | **34** | 38 |
+| `components\h1os\ulp\main.c` | 2 | 10 | **26** | 38 |
 
 ---
 
 ## 3. High-Priority 3rd Degree Magic Literals (Actionable Review)
 
-The following table details high-risk 3rd degree literals that should be audited for formal macro abstraction into `h1os_constants.h` or subsystem headers:
+The following table isolates true 3rd degree operational magic numbers (timeouts, stack floors, retry limits, debounce delays, electrical thresholds):
 
 | File | Line | Token | Category | Code Context | Rationale / Recommended Abstraction |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| `h1os_boot_hook.c` | 84 | `17)` | **Magic Integer Constant** | `ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]",` | Literal integer without named macro abstraction. |
 | `sub_display.h` | 25 | `8)` | **Magic Integer Constant** | `#define EPD_BUFFER_SIZE ((EPD_WIDTH * EPD_HEIGHT) / 8)` | Literal integer without named macro abstraction. |
 | `h1os_lifecycle.c` | 118 | `6000U)` | **Timeout / Delay Duration** | `while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000U) {` | Hardcoded time duration in milliseconds or microseconds. |
 | `h1os_lifecycle.c` | 120 | `20U;` | **Timeout / Delay Duration** | `wait_ms += 20U;` | Hardcoded time duration in milliseconds or microseconds. |
-| `h1os_lifecycle.c` | 176 | `2)` | **Magic Integer Constant** | `: (ulp_last_wake_cause == 2) ? "PWR_BTN"` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 177 | `3)` | **Magic Integer Constant** | `: (ulp_last_wake_cause == 3) ? "LONG_OVERFLOW"` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 178 | `4)` | **Magic Integer Constant** | `: (ulp_last_wake_cause == 4) ? "SENSOR_TICK"` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 179 | `5)` | **Magic Integer Constant** | `: (ulp_last_wake_cause == 5) ? "RTC_INT_STUCK_FAULT"` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 180 | `6)` | **Magic Integer Constant** | `: (ulp_last_wake_cause == 6) ? "CRITICAL_BATTERY"` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 190 | `5)` | **Magic Integer Constant** | `ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 192 | `6)` | **Magic Integer Constant** | `if (ulp_last_wake_cause == 6) {` | Literal integer without named macro abstraction. |
 | `h1os_lifecycle.c` | 193 | `3250` | **Battery / Voltage Threshold** | `ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);` | Critical electrical or state-of-charge threshold limit. |
-| `h1os_lifecycle.c` | 224 | `2)` | **Magic Integer Constant** | `} else if (ulp_last_wake_btn == 2) {` | Literal integer without named macro abstraction. |
-| `h1os_lifecycle.c` | 225 | `18)";` | **Magic Integer Constant** | `trigger_desc = "ULP Tactile Press (POWER / GPIO 18)";` | Literal integer without named macro abstraction. |
 | `h1os_lifecycle.c` | 448 | `4096,` | **Stack Size / RTOS Priority** | `BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 4096, NULL, 3, (TaskHandle_t *)&s_session_task_handle, 0);` | FreeRTOS task stack size or scheduler priority literal. |
 | `h1os_lifecycle.c` | 448 | `3,` | **Stack Size / RTOS Priority** | `BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 4096, NULL, 3, (TaskHandle_t *)&s_session_task_handle, 0);` | FreeRTOS task stack size or scheduler priority literal. |
 | `h1os_lifecycle.c` | 561 | `30)` | **Battery / Voltage Threshold** | `current_soc_x10 >= st->initial_soc_x10 + 30) {` | Critical electrical or state-of-charge threshold limit. |
@@ -83,7 +73,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `hal_i2c.c` | 92 | `7,` | **Magic Integer Constant** | `.glitch_ignore_cnt = 7,` | Literal integer without named macro abstraction. |
 | `hal_i2c.c` | 298 | `50);` | **Magic Integer Constant** | `esp_err_t ret = i2c_master_probe(s_bus_handle, dev_addr, 50);` | Literal integer without named macro abstraction. |
 | `hal_io.c` | 112 | `5000` | **Magic Integer Constant** | `#define HAL_LEDC_FREQUENCY 5000` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 166 | `3` | **Magic Integer Constant** | `ESP_LOGD(TAG, "LEDC PWM initialized on GPIO 3 (Active LOW).");` | Literal integer without named macro abstraction. |
 | `hal_io.c` | 186 | `100)` | **Magic Integer Constant** | `if (brightness_pct > 100) {` | Literal integer without named macro abstraction. |
 | `hal_io.c` | 187 | `100;` | **Magic Integer Constant** | `brightness_pct = 100;` | Literal integer without named macro abstraction. |
 | `hal_io.c` | 189 | `1023U)` | **Magic Integer Constant** | `uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
@@ -109,7 +98,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `hal_spi.c` | 274 | `8;` | **Magic Integer Constant** | `t_read.rxlength = len * 8;` | Literal integer without named macro abstraction. |
 | `orch_display_sync.c` | 20 | `6` | **Magic Integer Constant** | `#define CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT 6` | Literal integer without named macro abstraction. |
 | `orch_flow.c` | 64 | `10);` | **Magic Integer Constant** | `st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);` | Literal integer without named macro abstraction. |
-| `orch_flow.c` | 115 | `2);` | **Magic Integer Constant** | `return (orch_state_get()->valid_trend < 2);` | Literal integer without named macro abstraction. |
 | `orch_flow.c` | 394 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
 | `orch_flow.c` | 402 | `3` | **Loop Bound / Retry Limit** | `ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after 3 attempts: %s", esp_err_to_name(rtc_err));` | Arbitrary loop retry limit or debounce counter. |
 | `orch_wake_stub.c` | 35 | `32))` | **Magic Integer Constant** | `#define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32))` | Literal integer without named macro abstraction. |
@@ -126,8 +114,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `orch_wake_stub.c` | 290 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
 | `orch_wake_stub.c` | 383 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
 | `orch_wake_stub.c` | 383 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 406 | `2)` | **Magic Integer Constant** | `if (st->valid_trend < 2) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 407 | `2;` | **Magic Integer Constant** | `st->valid_trend = 2;` | Literal integer without named macro abstraction. |
 | `orch_wake_stub.c` | 441 | `20000;` | **Timeout / Delay Duration** | `uint32_t timeout_us = 20000;` | Hardcoded time duration in milliseconds or microseconds. |
 | `orch_wake_stub.c` | 444 | `500)` | **Timeout / Delay Duration** | `if (timeout_us <= 500) {` | Hardcoded time duration in milliseconds or microseconds. |
 | `orch_wake_stub.c` | 447 | `500;` | **Timeout / Delay Duration** | `timeout_us -= 500;` | Hardcoded time duration in milliseconds or microseconds. |
@@ -183,11 +169,8 @@ The following table details high-risk 3rd degree literals that should be audited
 | `sub_power.c` | 61 | `250},` | **Magic Integer Constant** | `{3720, 250},` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 62 | `{3680,` | **Magic Integer Constant** | `{3680, 150},` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 62 | `150},` | **Magic Integer Constant** | `{3680, 150},` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 63 | `{3600,` | **Magic Integer Constant** | `{3600, 80},` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 63 | `80},` | **Magic Integer Constant** | `{3600, 80},` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 64 | `{3450,` | **Magic Integer Constant** | `{3450, 30},` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 64 | `30},` | **Magic Integer Constant** | `{3450, 30},` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 65 | `{3300,` | **Battery / Voltage Threshold** | `{3300, 0}` | Critical electrical or state-of-charge threshold limit. |
 | `sub_power.c` | 92 | `5U)` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
 | `sub_power.c` | 92 | `10U);` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
 | `sub_power.c` | 184 | `8U;` | **Battery / Voltage Threshold** | `uint32_t head  = ulp_vbat_ring_head % 8U;` | Critical electrical or state-of-charge threshold limit. |
@@ -209,7 +192,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `sub_power.c` | 307 | `2000LL)` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 307 | `4096LL));` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 343 | `4000;` | **Battery / Voltage Threshold** | `ulp_last_vbat_mv    = 4000;` | Critical electrical or state-of-charge threshold limit. |
-| `sub_power.c` | 368 | `3)` | **Magic Integer Constant** | `} else if (ulp_last_wake_cause == 3) {` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 479 | `50000U)` | **Magic Integer Constant** | `while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < 50000U) {` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 481 | `500U;` | **Magic Integer Constant** | `drain_wait_us += 500U;` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 498 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),` | Literal integer without named macro abstraction. |
@@ -217,9 +199,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `sub_power.c` | 499 | `5)),` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 500 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
 | `sub_power.c` | 500 | `18)));` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 525 | `17)` | **Magic Integer Constant** | `ESP_LOGW(TAG, "Releasing battery power latch (GPIO 17) - SYSTEM SHUTDOWN");` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 543 | `80` | **Magic Integer Constant** | `int32_t max_freq = (mode == SYS_CLK_MODE_FIXED_MIN) ? 80 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 544 | `80;` | **Magic Integer Constant** | `int32_t min_freq = (mode == SYS_CLK_MODE_FIXED_MAX) ? CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ : 80;` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 64 | `10)` | **Magic Integer Constant** | `return (uint8_t)(((val >> 4) * 10) + (val & 0x0F));` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 76 | `10)` | **Magic Integer Constant** | `return (uint8_t)(((val / 10) << 4) \| (val % 10));` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 76 | `10));` | **Magic Integer Constant** | `return (uint8_t)(((val / 10) << 4) \| (val % 10));` | Literal integer without named macro abstraction. |
@@ -240,14 +219,6 @@ The following table details high-risk 3rd degree literals that should be audited
 | `main.c` | 32 | `8601;` | **Magic Integer Constant** | `volatile uint32_t cal_scale       = 8601;` | Literal integer without named macro abstraction. |
 | `main.c` | 34 | `4000;` | **Battery / Voltage Threshold** | `volatile uint32_t last_vbat_mv    = 4000;` | Critical electrical or state-of-charge threshold limit. |
 | `main.c` | 38 | `8` | **Magic Integer Constant** | `#define ULP_VBAT_RING_SIZE 8` | Literal integer without named macro abstraction. |
-| `main.c` | 39 | `{4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000,` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
-| `main.c` | 39 | `4000};` | **Battery / Voltage Threshold** | `volatile uint32_t vbat_ring[ULP_VBAT_RING_SIZE] = {4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000};` | Critical electrical or state-of-charge threshold limit. |
 | `main.c` | 44 | `50000` | **Magic Integer Constant** | `#define RTC_INT_TIMEOUT_US         50000` | Literal integer without named macro abstraction. |
 | `main.c` | 45 | `100` | **Magic Integer Constant** | `#define RTC_INT_POLL_US            100` | Literal integer without named macro abstraction. |
 | `main.c` | 47 | `30000` | **Magic Integer Constant** | `#define BUTTON_DEBOUNCE_US         30000` | Literal integer without named macro abstraction. |
