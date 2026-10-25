@@ -253,10 +253,10 @@ void app_main(void)
     h1os_lifecycle_t lifecycle = {
         .session =
             {
-                .inactivity_timeout_sec = 30,
+                .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC,
                 .clk_mode               = SYS_CLK_MODE_DYNAMIC,
-                .flow_a_period_sec      = 60,
-                .flow_b_period_sec      = 300,
+                .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC,
+                .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC,
             },
 
         .presentation =

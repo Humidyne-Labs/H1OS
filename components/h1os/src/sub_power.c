@@ -41,8 +41,8 @@ static adc_cali_handle_t s_cali_handle        = NULL;
 
 static bool s_cali_valid = false;
 
-static uint32_t s_flow_a_sec     = 60;
-static uint32_t s_flow_b_sec     = 300;
+static uint32_t s_flow_a_sec     = ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
+static uint32_t s_flow_b_sec     = ORCH_DEFAULT_FLOW_B_PERIOD_SEC;
 static uint32_t s_overflow_limit = 5;
 static uint32_t s_remainder_sec  = 0;
 
@@ -342,7 +342,7 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ulp_last_wake_btn   = 0;
         ulp_last_vbat_mv    = 4000;
 
-        uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : 60;
+        uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
         ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
 
         ulp_riscv_cfg_t cfg = {
@@ -384,8 +384,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
  */
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 {
-    s_flow_a_sec     = (flow_a_sec > 0) ? flow_a_sec : 60;
-    s_flow_b_sec     = (flow_b_sec > 0) ? flow_b_sec : 300;
+    s_flow_a_sec     = (flow_a_sec > 0) ? flow_a_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
+    s_flow_b_sec     = (flow_b_sec > 0) ? flow_b_sec : ORCH_DEFAULT_FLOW_B_PERIOD_SEC;
     s_overflow_limit = (overflow > 0) ? overflow : 1;
     s_remainder_sec  = remainder_sec;
 }
@@ -406,8 +406,10 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
 
     volatile orch_persisted_state_t *st = orch_state_get();
     st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
-    if (h1os_is_session_active() || (st->wake_count % 12U == 0U)) {
+    if (h1os_is_session_active() ||
+        (st->total_sleep_sec - st->last_nvs_commit_sec >= ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC)) {
         orch_state_save_runtimes_to_nvs();
+        st->last_nvs_commit_sec = st->total_sleep_sec;
     }
 
     hal_io_isolate_sleep_pads();

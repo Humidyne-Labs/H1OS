@@ -23,6 +23,10 @@ extern "C" {
 
 #include "h1os_version.h"
 
+#define H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC  30U   /**< Default interactive session inactivity sleep timeout in seconds. */
+#define H1OS_DEFAULT_FLOW_A_PERIOD_SEC       60U   /**< Default Flow A headless sensor sample burst period in seconds.    */
+#define H1OS_DEFAULT_FLOW_B_PERIOD_SEC       300U  /**< Default Flow B unattended presentation refresh period in seconds. */
+
 /**
  * @brief Platform wakeup context descriptor.
  *

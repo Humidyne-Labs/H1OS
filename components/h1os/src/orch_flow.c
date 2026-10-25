@@ -65,7 +65,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
         } else {
             st->tsens_cal_centi_c = 0;
         }
-        st->tsens_offset_centi_c = (int16_t)(2052 + st->tsens_cal_centi_c);
+        st->tsens_offset_centi_c = (int16_t)(ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C + st->tsens_cal_centi_c);
 
         uint32_t g17_out  = (REG_READ(GPIO_OUT_REG) >> 17) & 1U;
         uint32_t g17_oe   = (REG_READ(GPIO_ENABLE_REG) >> 17) & 1U;
@@ -373,8 +373,8 @@ static void orch_flow_quiesce_peripherals(void)
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
-    uint32_t flow_a_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60;
-    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : ((st->flow_b_period_sec > 0) ? st->flow_b_period_sec : 300);
+    uint32_t flow_a_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
+    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : ((st->flow_b_period_sec > 0) ? st->flow_b_period_sec : ORCH_DEFAULT_FLOW_B_PERIOD_SEC);
 
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder   = flow_b_sec % flow_a_sec;

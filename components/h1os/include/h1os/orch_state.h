@@ -17,7 +17,11 @@ extern "C" {
 
 // clang-format off
 #define ORCH_RTC_MAGIC              0x534C4154 /**< RTC state validation magic word ('SLAT').                  */
-#define ORCH_RING_CAPACITY          32         /**< Fixed capacity of historical telemetry sample ring buffer. */
+#define ORCH_RING_CAPACITY                    32    /**< Fixed capacity of historical telemetry sample ring buffer. */
+#define ORCH_DEFAULT_FLOW_A_PERIOD_SEC        60U   /**< Default Flow A headless sensor sample burst period in seconds.    */
+#define ORCH_DEFAULT_FLOW_B_PERIOD_SEC        300U  /**< Default Flow B unattended presentation refresh period in seconds. */
+#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  2052  /**< Default TSENS Q12 fixed-point intercept in centi-°C (20.52°C).     */
+#define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC 3600U /**< Minimum elapsed deep sleep interval between unattended NVS commits (1 hour). */
 
 /**
  * @brief ULP coprocessor dispatch wakeup reasons.
@@ -108,6 +112,7 @@ typedef struct {
 
     uint32_t total_sleep_sec;           /**< Cumulative seconds spent in deep sleep.                                */
     uint32_t total_app_run_ms;          /**< Cumulative milliseconds executing main processor application.          */
+    uint32_t last_nvs_commit_sec;       /**< Sleep timestamp (total_sleep_sec) of last successful NVS runtime commit.*/
     uint16_t initial_soc_x10;           /**< State of Charge at start of discharge lap in tenths of % (0..1000).   */
     uint8_t  _pad_soc[2];               /**< Alignment padding to 32-bit boundary.                                  */
 } orch_persisted_state_t;

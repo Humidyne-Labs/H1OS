@@ -193,13 +193,13 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
-    esp_rom_delay_us(400);
+    esp_rom_delay_us(ORCH_TSENS_SETTLING_DELAY_US);
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
-    int32_t timeout = 100;
+    int32_t timeout = (int32_t)ORCH_TSENS_READY_TIMEOUT_CYCLES;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
-        esp_rom_delay_us(5);
+        esp_rom_delay_us(ORCH_TSENS_READY_POLL_INTERVAL_US);
     }
     uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
 
@@ -324,7 +324,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     volatile orch_persisted_state_t *st = orch_state_get();
 
     /* Account for the elapsed Flow A deep sleep slice */
-    st->total_sleep_sec += (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60U;
+    st->total_sleep_sec += (st->sample_interval_sec > 0) ? st->sample_interval_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
@@ -357,7 +357,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_stop();
             /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
             die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, 0);
-            esp_rom_delay_us(14050);
+            esp_rom_delay_us(ORCH_SHTC3_POST_TSENS_DELAY_US);
         }
     }
 

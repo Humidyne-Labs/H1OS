@@ -43,7 +43,8 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     s_persisted_state.window_high_temp_centi_c = 0;
     s_persisted_state.last_glass_temp_centi_c  = 0;
     s_persisted_state.trinode_confidence_pct   = 0;
-    s_persisted_state.tsens_offset_centi_c     = 2052;
+    s_persisted_state.tsens_offset_centi_c     = ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C;
+    s_persisted_state.last_nvs_commit_sec      = 0;
     s_persisted_state.total_sleep_sec          = 0;
     s_persisted_state.total_app_run_ms         = 0;
     s_persisted_state.initial_soc_x10          = 0;
@@ -67,9 +68,10 @@ void orch_state_load_runtimes_from_nvs(void)
     orch_nvs_runtime_blob_t blob = {0};
     size_t len = sizeof(blob);
     if (sub_nvs_get_blob("pwr_lap_st", &blob, &len) == ESP_OK && len == sizeof(blob)) {
-        st->total_sleep_sec  = blob.total_sleep_sec;
-        st->total_app_run_ms = blob.total_app_run_ms;
-        st->initial_soc_x10  = blob.initial_soc_x10;
+        st->total_sleep_sec     = blob.total_sleep_sec;
+        st->total_app_run_ms    = blob.total_app_run_ms;
+        st->initial_soc_x10     = blob.initial_soc_x10;
+        st->last_nvs_commit_sec = blob.total_sleep_sec;
         return;
     }
 
@@ -89,9 +91,10 @@ void orch_state_load_runtimes_from_nvs(void)
 void orch_state_reset_discharge_lap(uint16_t current_soc_x10)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
-    st->initial_soc_x10  = (current_soc_x10 > 0) ? current_soc_x10 : 1000;
-    st->total_sleep_sec  = 0;
-    st->total_app_run_ms = 0;
+    st->initial_soc_x10      = (current_soc_x10 > 0) ? current_soc_x10 : 1000;
+    st->total_sleep_sec      = 0;
+    st->total_app_run_ms     = 0;
+    st->last_nvs_commit_sec  = 0;
     orch_state_save_runtimes_to_nvs();
 }
 
