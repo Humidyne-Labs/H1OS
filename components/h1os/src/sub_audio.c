@@ -7,6 +7,7 @@
  */
 
 #include "h1os/sub_audio.h"
+#include "h1os_constants.h"
 
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
@@ -527,9 +528,9 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
             TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
             BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task,
                                                         "h1os_audio_worker",
-                                                        4096,
+                                                        H1OS_TASK_STACK_AUDIO,
                                                         (void *)current_task,
-                                                        6,
+                                                        H1OS_TASK_PRIO_AUDIO,
                                                         &s_audio_task_handle,
                                                         tskNO_AFFINITY);
             if (res == pdPASS) {
@@ -587,7 +588,7 @@ static esp_err_t sub_audio_park_warm(bool park_mute)
         /* Startup / Shutdown Times Confirmed:  */
         /*   120ms up   (target_enabled=true)   */
         /*   80ms  down (park_mute=true)        */
-        vTaskDelay(pdMS_TO_TICKS(target_enabled ? 120 : 80));
+        vTaskDelay(pdMS_TO_TICKS(target_enabled ? H1OS_SUB_AUDIO_AMP_POWER_ON_DELAY_MS : H1OS_SUB_AUDIO_AMP_POWER_OFF_DELAY_MS));
     }
 
     return ESP_OK;
@@ -945,7 +946,7 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
     }
 
     if (is_sync) {
-        const uint32_t timeout_ms = (wait_ms > 0) ? wait_ms : 500;
+        const uint32_t timeout_ms = (wait_ms > 0) ? wait_ms : H1OS_SUB_AUDIO_DEFAULT_WAIT_TIMEOUT_MS;
         if (xSemaphoreTake(s_cmd_sync_sem, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
             ESP_LOGE(TAG, "Audio command timed out waiting for worker execution");
             return ESP_ERR_TIMEOUT;

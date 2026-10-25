@@ -7,6 +7,7 @@
  */
 
 #include "h1os/orch_wake_stub.h"
+#include "h1os_constants.h"
 
 #include "esp32s3/rom/rtc.h"
 #include "esp_attr.h"
@@ -438,13 +439,13 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
-    uint32_t timeout_us = 20000;
+    uint32_t timeout_us = H1OS_ORCH_I2C_RECOVERY_TIMEOUT_US;
     while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-        esp_rom_delay_us(500);
-        if (timeout_us <= 500) {
+        esp_rom_delay_us(H1OS_ORCH_I2C_RECOVERY_STEP_US);
+        if (timeout_us <= H1OS_ORCH_I2C_RECOVERY_STEP_US) {
             break;
         }
-        timeout_us -= 500;
+        timeout_us -= H1OS_ORCH_I2C_RECOVERY_STEP_US;
     }
 
     /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */

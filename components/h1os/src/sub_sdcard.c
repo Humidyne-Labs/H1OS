@@ -7,6 +7,7 @@
  */
 
 #include "sub_sdcard.h"
+#include "h1os_constants.h"
 
 #include "driver/gpio.h"
 #include "driver/sdmmc_host.h"
@@ -73,7 +74,7 @@ esp_err_t sub_sdcard_mount_async(void)
     }
 
     TaskHandle_t handle = NULL;
-    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", 4096, NULL, 2, &handle);
+    BaseType_t res = xTaskCreate(sdcard_mount_worker_task, "sd_mount", H1OS_TASK_STACK_SD_MOUNT, NULL, H1OS_TASK_PRIO_SD_MOUNT, &handle);
     if (res == pdPASS) {
         s_mount_task = handle;
         return ESP_OK;
@@ -105,7 +106,7 @@ esp_err_t sub_sdcard_mount(void)
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
     host.flags = SDMMC_HOST_FLAG_1BIT;
-    host.command_timeout_ms = 100;
+    host.command_timeout_ms = H1OS_SUB_SDCARD_COMMAND_TIMEOUT_MS;
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     slot_config.width = 1;
@@ -155,7 +156,7 @@ esp_err_t sub_sdcard_mount(void)
 esp_err_t sub_sdcard_unmount(void)
 {
     /* Wait briefly if an asynchronous mount worker is still in flight */
-    int32_t wait_cycles = 25;
+    int32_t wait_cycles = (int32_t)H1OS_SDCARD_UNMOUNT_DRAIN_CYCLES;
     while (s_mount_task != NULL && wait_cycles-- > 0) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }

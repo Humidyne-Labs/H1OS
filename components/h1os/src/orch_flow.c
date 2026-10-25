@@ -7,6 +7,7 @@
  */
 
 #include "h1os/orch_flow.h"
+#include "h1os_constants.h"
 
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -391,7 +392,7 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 
     uint32_t initial_arm_sec = (full_slices > 0) ? flow_a_sec : remainder;
     esp_err_t rtc_err = ESP_FAIL;
-    for (int32_t attempt = 0; attempt < 3; attempt++) {
+    for (int32_t attempt = 0; attempt < (int32_t)H1OS_RTC_ARM_RETRY_LIMIT; attempt++) {
         rtc_err = sub_rtc_arm_countdown(initial_arm_sec);
         if (rtc_err == ESP_OK) {
             break;
@@ -399,7 +400,7 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
         vTaskDelay(pdMS_TO_TICKS(5));
     }
     if (rtc_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after 3 attempts: %s", esp_err_to_name(rtc_err));
+        ESP_LOGE(TAG, "Failed to arm PCF85063A countdown after %u attempts: %s", (unsigned)H1OS_RTC_ARM_RETRY_LIMIT, esp_err_to_name(rtc_err));
     }
 
     orch_wake_stub_install();

@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "h1os_constants.h"
 #include "h1os_lvgl.h"
 
 #include "display/lv_display_private.h"
@@ -285,7 +286,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 
     lv_display_set_color_format(s_lv_display, LV_COLOR_FORMAT_I1);
 
-    uint32_t buffer_lines = 40;
+    uint32_t buffer_lines = H1OS_LVGL_BUFFER_LINES;
     uint32_t stride = lv_draw_buf_width_to_stride(EPD_WIDTH, LV_COLOR_FORMAT_I1);
     size_t buf_size = (stride * buffer_lines) + LVGL_I1_PALETTE_SIZE;
     uint8_t *buf1 = (uint8_t *)heap_caps_aligned_calloc(64, 1, buf_size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
@@ -309,7 +310,7 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
         lv_indev_set_type(s_lv_keypad_indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_display(s_lv_keypad_indev, s_lv_display);
         lv_indev_set_read_cb(s_lv_keypad_indev, lvgl_keypad_read_cb);
-        lv_indev_set_long_press_time(s_lv_keypad_indev, 2000);
+        lv_indev_set_long_press_time(s_lv_keypad_indev, H1OS_KEYPAD_LONG_PRESS_MS);
         lv_indev_set_long_press_repeat_time(s_lv_keypad_indev, 0);
 
         lv_group_t *def_grp = lv_group_get_default();
@@ -355,14 +356,14 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
         return ret;
     }
 
-    task_priority = (task_priority > 0) ? task_priority : 5;
+    task_priority = (task_priority > 0) ? task_priority : H1OS_TASK_PRIO_LVGL;
     core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
 
     s_lvgl_task_running = true;
 
     BaseType_t res = xTaskCreatePinnedToCore(h1os_lvgl_port_task,
                                              "h1os_lvgl",
-                                             8192,
+                                             H1OS_TASK_STACK_LVGL,
                                              NULL,
                                              task_priority,
                                              (TaskHandle_t *)&s_lvgl_task_handle,
@@ -392,9 +393,9 @@ esp_err_t h1os_lvgl_stop(void)
             return ESP_OK;
         }
         uint32_t wait_ms = 0;
-        while (s_lvgl_task_handle != NULL && wait_ms < 6000) {
-            vTaskDelay(pdMS_TO_TICKS(20));
-            wait_ms += 20;
+        while (s_lvgl_task_handle != NULL && wait_ms < H1OS_LVGL_SHUTDOWN_TIMEOUT_MS) {
+            vTaskDelay(pdMS_TO_TICKS(H1OS_LVGL_SHUTDOWN_STEP_MS));
+            wait_ms += H1OS_LVGL_SHUTDOWN_STEP_MS;
         }
         if (s_lvgl_task_handle != NULL) {
             vTaskDelete(s_lvgl_task_handle);

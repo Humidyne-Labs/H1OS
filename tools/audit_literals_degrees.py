@@ -28,6 +28,11 @@ def classify_finding(f: dict, file_path: str) -> dict:
     # =========================================================================
     # 1st Degree: Structural, Hardware, State Variables & Enums
     # =========================================================================
+    if ctx.strip().startswith('#define ') or '#define ' in ctx:
+        f['degree'] = 1
+        f['category'] = "Named Macro Definition"
+        f['rationale'] = "Already abstracted as a named preprocessor constant/macro."
+        return f
     if f['is_hex']:
         if any(w in ctx for w in ['REG', '0x', '0X', 'ADDR', 'CHIP_ID', 'BIT']):
             degree = 1
@@ -45,7 +50,7 @@ def classify_finding(f: dict, file_path: str) -> dict:
         degree = 1
         category = "Hardware Pin Mapping"
         rationale = "PCB GPIO physical pin assignment."
-    elif re.search(r'(<<|>>)\s*' + re.escape(norm), ctx) or re.search(re.escape(norm) + r'\s*(<<|>>)', ctx):
+    elif re.search(r'(<<|>>)\s*' + re.escape(norm), ctx) or re.search(re.escape(norm) + r'\s*(<<|>>)', ctx) or re.search(r'(\*|/)\s*8', ctx) or re.search(r'length\s*=\s*8', ctx):
         degree = 1
         category = "Bit Shift Operator"
         rationale = "Bitwise shift count."
@@ -90,7 +95,7 @@ def classify_finding(f: dict, file_path: str) -> dict:
         degree = 2
         category = "Display Geometry Math"
         rationale = "EPD 1-bit-per-pixel buffer geometry math."
-    elif 's_soc_lut' in ctx or any(term in ctx for term in ['{3300,', '{3400,', '{3500,', '{3600,', '{3700,', '{3800,', '{3900,', '{4000,', '{4100,', '{4180,']):
+    elif 's_soc_lut' in ctx or re.search(r'\{\s*\d{4}\s*,\s*\d+\s*\}', ctx):
         degree = 2
         category = "Battery State-of-Charge Curve Table"
         rationale = "Empirical LiPo cell discharge lookup table point."

@@ -20,7 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * **Dead Macro Elimination & Constant Linting** (`orch_state.h`):
   * Removed unreferenced legacy macros `ORCH_DEFAULT_FLOW_A_PERIOD_SEC` and `ORCH_DEFAULT_FLOW_B_PERIOD_SEC` following the elimination of runtime ternary fallbacks.
 * **Codebase Literal Integer Extraction & 3-Degree Risk Classifier** (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `docs/agent_notes/audits/literal_integers_degree_audit.md`):
-  * Added recursive integer scanner utilities that tokenize space-delimited C/C++ tokens, parse numeric decimal and hex literals, and categorize findings into 1st Degree (structural/bitmasks/pins: 53.5%), 2nd Degree (metrological/polynomial math: 6.8%), and 3rd Degree (operational magic numbers/timeouts: 39.6%) with actionable markdown review ledgers.
+  * Added recursive integer scanner utilities that tokenize space-delimited C/C++ tokens, parse numeric decimal and hex literals, and categorize findings into 1st Degree (structural/bitmasks/pins/enums: 65.2%), 2nd Degree (metrological/polynomial math/curve tables: 11.1%), and 3rd Degree (operational magic numbers/timeouts: 23.7%) with actionable markdown review ledgers.
+* **System-Wide Operational Magic Number Elimination** (`h1os_constants.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `sub_power.c`, `sub_sdcard.c`, `sub_audio.c`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_display.cpp`):
+  * Centralized operational magic numbers into `h1os_constants.h` across RTOS task stack floors (`H1OS_TASK_STACK_*`, `H1OS_TASK_PRIO_*`), peripheral drain/busy timeouts (`H1OS_LVGL_DRAIN_*`, `H1OS_ORCH_I2C_RECOVERY_*`, `H1OS_SUB_POWER_RTC_INT_DRAIN_*`, `H1OS_SUB_SDCARD_COMMAND_TIMEOUT_MS`, `H1OS_SUB_AUDIO_AMP_*`), electrical cutoff and charging thresholds (`H1OS_BATTERY_CRITICAL_CUTOFF_MV = 3250U`, `H1OS_BATTERY_FULL_CHARGE_THRESHOLD_MV = 4180U`, `H1OS_BATTERY_REBOUND_GATE_TENTHS_PCT = 30U`), and peripheral loop bounds (`H1OS_RTC_ARM_RETRY_LIMIT`, `H1OS_POWER_KEY_POLL_CYCLES`).
+  * Completely eliminated actionable magic numbers in `h1os_lifecycle.c`, `sub_display.h`, `orch_display_sync.c`, `h1os_boot_hook.c`, and `orch_state.c`.
 
 ### Added & Verified (50-Hour Environmental Chamber Metrology Certification)
 

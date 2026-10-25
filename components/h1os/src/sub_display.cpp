@@ -7,6 +7,7 @@
  */
 
 #include "h1os/sub_display.h"
+#include "h1os_constants.h"
 
 #include "driver/gpio.h"
 #include "esp_check.h"
@@ -72,7 +73,7 @@ static void epd_reset_pulse(void)
 esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
 {
     /* Wait up to 15 ms for BUSY (GPIO 8) to assert HIGH after command issue */
-    for (int32_t i = 0; i < 60; i++) {
+    for (int32_t i = 0; i < (int32_t)H1OS_DISPLAY_IDLE_POLL_BOUND; i++) {
         if (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
             break;
         }

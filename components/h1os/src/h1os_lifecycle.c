@@ -7,6 +7,7 @@
  */
 
 #include "driver/gpio.h"
+#include "h1os_constants.h"
 #include "driver/rtc_io.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
@@ -115,9 +116,9 @@ static void h1os_quiesce_lvgl_pipeline(void)
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < 6000U) {
-            vTaskDelay(pdMS_TO_TICKS(20));
-            wait_ms += 20U;
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < H1OS_LVGL_DRAIN_TIMEOUT_MS) {
+            vTaskDelay(pdMS_TO_TICKS(H1OS_LVGL_DRAIN_POLL_STEP_MS));
+            wait_ms += H1OS_LVGL_DRAIN_POLL_STEP_MS;
         }
     }
     h1os_lvgl_stop();
@@ -190,7 +191,7 @@ static void debug_dump_ulp_telemetry(void)
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
     }
     if (ulp_last_wake_cause == 6) {
-        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< 3250 mV threshold)!", (unsigned long)ulp_last_vbat_mv);
+        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< %lu mV threshold)!", (unsigned long)ulp_last_vbat_mv, (unsigned long)H1OS_BATTERY_CRITICAL_CUTOFF_MV);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
@@ -445,7 +446,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
         ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
-        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", 4096, NULL, 3, (TaskHandle_t *)&s_session_task_handle, 0);
+        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", H1OS_TASK_STACK_SESSION_MONITOR, NULL, H1OS_TASK_PRIO_SESSION_MONITOR, (TaskHandle_t *)&s_session_task_handle, 0);
         if (res != pdPASS) {
             ESP_LOGE(TAG, "Failed to create h1os_sess monitor task (%ld). Entering sleep fallback.", (long)res);
             s_session_running = false;
@@ -558,7 +559,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
                                                  s_prev_bat_state == H1OS_BATTERY_CHARGED);
             if (st->initial_soc_x10 == 0 ||
                 state_transition_from_charge ||
-                current_soc_x10 >= st->initial_soc_x10 + 30) {
+                current_soc_x10 >= st->initial_soc_x10 + H1OS_BATTERY_REBOUND_GATE_TENTHS_PCT) {
                 orch_state_reset_discharge_lap(current_soc_x10);
             }
         }
@@ -642,7 +643,7 @@ static void execute_system_shutdown(bool force_clean_white)
     orch_state_save_runtimes_to_nvs();
 
     int32_t stable_high = 0;
-    for (int32_t i = 0; i < 200 && stable_high < 4; i++) {
+    for (int32_t i = 0; i < (int32_t)H1OS_POWER_KEY_POLL_CYCLES && stable_high < (int32_t)H1OS_POWER_KEY_STABLE_THRESHOLD; i++) {
         stable_high = (gpio_get_level(HAL_PIN_BUTTON_POWER) == 1) ? stable_high + 1 : 0;
         vTaskDelay(pdMS_TO_TICKS(50));
     }

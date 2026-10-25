@@ -7,6 +7,7 @@
  */
 
 #include "h1os/hal_io.h"
+#include "h1os_constants.h"
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
@@ -220,7 +221,7 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
 
 static volatile TaskHandle_t s_breath_task = NULL;
 static volatile bool s_breathing_running = false;
-static volatile uint32_t s_breath_period_ms = 2000;
+static volatile uint32_t s_breath_period_ms = H1OS_DEFAULT_BREATH_PERIOD_MS;
 
 /**
  * @brief Led breath task.
@@ -281,7 +282,7 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     }
 
     if (cycle_period_ms == 0) {
-        cycle_period_ms = 2000;
+        cycle_period_ms = H1OS_DEFAULT_BREATH_PERIOD_MS;
     }
     s_breath_period_ms = cycle_period_ms;
 
@@ -290,7 +291,7 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     }
 
     s_breathing_running = true;
-    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", 2048, NULL, 1, (TaskHandle_t *)&s_breath_task);
+    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", H1OS_TASK_STACK_LED_BREATH, NULL, H1OS_TASK_PRIO_LED_BREATH, (TaskHandle_t *)&s_breath_task);
     if (res != pdPASS) {
         s_breathing_running = false;
         s_breath_task = NULL;
