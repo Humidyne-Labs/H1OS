@@ -12,14 +12,14 @@ During low-level driver development and metrological evaluation of H1OS, several
 
 While H1OS implements software mitigations across Layers 1–3, these defects introduce parasitic power draw, restrict autonomous coprocessor operation, and induce thermal biases that require hardware correction in **Rev B**.
 
-> [!IMPORTANT] **ULP RISC-V Silicon Invariant Empirically Proven (ERR-S1):** Rigorous empirical testing on ESP32-S3 silicon (`examples/riscv_test`) confirmed that the internal ULP sleep timer (`RTC_CNTL_ULP_CP_SLP_TIMER_EN = 1`) **completely masks and suppresses external RTC GPIO comparator wakeups** from releasing ULP clock gating during deep sleep. With both bits armed (`0xA0000000`, `TIMER_EN=1, GPIO_ENA=1, CLR=0`), tactile button presses on GPIO 18 registered `0` ULP wakeups while the 15-second timer countdown was active. When `TIMER_EN=0` (`0x20000000`), the exact same pin woke the ULP instantly in 1.3 seconds. Therefore, the H1OS doctrine of **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) with periodic intervals offloaded to the external PCF85063A RTC on `GPIO 5` is an absolute silicon mandate.
+> [!IMPORTANT] **ULP RISC-V Silicon Invariant Empirically Proven (ERR-S1):** Rigorous empirical testing on ESP32-S3 silicon (`examples/riscv_test`) confirmed that the internal ULP sleep timer (`RTC_CNTL_ULP_CP_SLP_TIMER_EN = 1`) **completely masks and suppresses external RTC GPIO comparator wakeups** from releasing ULP clock gating during deep sleep. With both bits armed (`0xA0000000`, `TIMER_EN=1, GPIO_ENA=1, CLR=0`), tactile button presses on GPIO 18 registered `0` ULP wakeups while the 15-second timer countdown was active. When `TIMER_EN=0` (`0x20000000`), the exact same pin woke the ULP instantly in 1.3 seconds. Therefore, the H1OS architecture of **Pure Event Mode** (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) with periodic intervals offloaded to the external PCF85063A RTC on `GPIO 5` is an absolute silicon mandate.
 
 | ID | Hardware Subsystem | Defect Description | Rev B Proposed Solution | 
 | ----- | ----- | ----- | ----- | 
 | **E1** | SHTC3 Environmental Sensor | Inadequate thermal relief & PCB heat conduction | Deep U-slot tongue, necked traces, no copper planes | 
 | **E2** | MicroSD Storage Socket | Missing Card Detect (CD) & unswitched power rail | Mechanical CD pin on RTC; high-side P-MOSFET gate | 
 | **E3** | ULP-RISC-V Coprocessor | I2C/SPI routed to digital pins (not RTC GPIOs) | Route sensor I2C to RTC GPIOs (e.g. `GPIO 1/2`) | 
-| **E4** | Audio Codec & Amp (ES8311) | Power gating clamps I2C bus to \~0.7V via ESD diode | Dedicated I2C isolator or gate amplifier only | 
+| **E4** | Audio Codec & Amp (ES8311) | Power gating unpowered codec brings down shared I2C bus; vendor datasheet lacks ESD specs, pull-up guidance, and CSM S0-S7 state definitions | Dedicated I2C isolator or gate amplifier only | 
 | **E5** | Battery ADC Voltage Divider | Continuous \~10.5 µA bleed across 200kΩ/200kΩ divider | N-channel MOSFET switch on ground leg of divider | 
 | **E6** | System Power Latch | Fragile software latch on `GPIO 17` (`BAT_CTRL`) | Hardware push-button IC (e.g., LTC2954 / MAX16054) | 
 | **E7** | Tactile Buttons (`BOOT`/`PWR`) | External 10 kΩ pull-up resistors without RC filtering | Standard 10 kΩ pull-ups with 100 nF RC filter | 
@@ -148,60 +148,55 @@ Because `GPIO 47/48` cannot be controlled from the RTC domain:
 
 * **Enable Autonomous Telemetry:** This reassignment enables the ULP-RISC-V to utilize its built-in hardware RTC I2C controller to autonomously read SHTC3 temperature and humidity without waking the main Xtensa processor until a display refresh is required or an environmental threshold is breached.
 
-### Errata E4: Audio Codec Power Gating Clamps Shared I2C Bus to \~0.7V
+### Errata E4: Audio Codec Power Gating Disrupts Shared I2C Bus
 
-#### 1. Physical Defect Analysis & Root Cause
+#### 1. Empirical Hardware Observation & Defect Analysis
 
-The Everest Semi ES8311 audio codec and NS4168 Class-D mono speaker amplifier share the primary I2C bus (`GPIO 47/48`) with the Sensirion SHTC3 and NXP PCF85063A.
+The Everest Semi ES8311 audio codec and NS4168 Class-D mono speaker amplifier share the primary I2C bus (`GPIO 47` SDA / `GPIO 48` SCL) with the Sensirion SHTC3 environmental sensor and NXP PCF85063A real-time clock.
 
-The Waveshare board includes a dedicated power rail gate for the audio subsystem controlled by `PA_EN` (`GPIO 42`, active LOW).
+The Waveshare development board incorporates a dedicated power rail gate for the audio subsystem controlled by `PA_EN` (`GPIO 42`, active LOW: `0 = Power ON`, `1 = Power OFF`).
 
-**The Electrical Hazard:**
+**The Empirical Failure Mode:**
+* Whenever firmware de-asserts `PA_EN` (`GPIO 42 = 1`) to gate power to the audio section, **I2C communication across the entire shared bus fails completely**.
+* Peer devices on the bus (SHTC3 and PCF85063A) immediately cease responding, resulting in FreeRTOS I2C driver timeouts, device hangs, and failed wake/sleep cycles.
+* **Empirical Fact vs. Voltage Assumptions:** The actual bus voltage during this failure was **never measured** with a voltmeter or oscilloscope during hardware testing; whether the bus lines drop to ~0.7V or all the way down to GND potential is unproven. What is empirically indisputable is that gating the codec power rail brings down the shared bus.
 
-1. The ES8311 I2C inputs (`SDA`, `SCL`) include internal electrostatic discharge (ESD) protection clamp diodes connected between the IO pins and the codec's internal $V_{\text{DD}}$ supply rail:
+#### 2. Everest Semi ES8311 Documentation Gaps & Ambiguities
 
-$$
-D_{\text{clamp}}: \text{I2C Pin} \longrightarrow V_{\text{DD(audio)}}
-$$
+A thorough investigation of the vendor documentation (Everest Semiconductor ES8311 Datasheet & User Guide) reveals critical omissions that complicate hardware diagnosis:
 
-2. When firmware de-asserts `PA_EN` (`GPIO 42 = 1`) to cut power to the audio section, $V_{\text{DD(audio)}}$ collapses to $0.0\,\text{V}$.
+1. **Zero Mention of ESD Protection:**
+   * The datasheet makes **zero mention of electrostatic discharge (ESD) protection** anywhere in the document—no ESD ratings, no human-body model (HBM) tolerances, and no schematic or text referencing internal ESD clamp diodes connected between the I2C pins and the internal power rail.
+   * Prior claims that the bus disruption was caused specifically by "forward-biased ESD clamp diodes" were speculative assumptions inferred from generic CMOS topologies rather than verified silicon facts.
+2. **Missing I2C Pull-Up Specifications:**
+   * The datasheet does not recommend external pull-up resistors on the I2C lines (`SDA`, `SCL`), nor does it mention internal pull-up or pull-down resistors.
+3. **Undefined Chip/Clock State Machine (CSM):**
+   * The documentation and register map (e.g. register `0x00`) list the Chip/Clock State Machine (CSM) states as `S0` through `S7`.
+   * However, the vendor documentation **never explains what `S0`–`S7` mean**, what state transitions occur, or how to query what state the chip is currently in.
+4. **DC Operating Characteristic (Page 12):**
+   * Under *DC CHARACTERISTICS* (page 12), the only related specification is:
+     $$V_{\text{IH}} = 0.7 \times P_{\text{VDD}}\,\text{V}$$
+   * The $0.7 \times P_{\text{VDD}}$ threshold implies an internal PN junction or threshold drop. When $P_{\text{VDD}}$ collapses to $0\,\text{V}$ while external $4.7\,\text{k}\Omega$ pull-up resistors hold the bus lines towards $3.3\,\text{V}$, an unbuffered connection into the unpowered IC silicon pulls down the bus lines, extinguishing communication.
 
-3. The external $4.7\,\text{k}\Omega$ pull-up resistors on `GPIO 47` and `GPIO 48` are connected to the permanent system $3.3\,\text{V}$ rail.
-
-4. Current flows from $3.3\,\text{V} \rightarrow R_{\text{pullup}} \rightarrow D_{\text{clamp}} \rightarrow V_{\text{DD(audio)}}$ ($0\,\text{V}$).
-
-5. The forward voltage drop across the ESD diodes ($V_F \approx 0.65\dots 0.70\,\text{V}$) **clamps the entire I2C bus voltage down to** $\sim 0.7\,\text{V}$!
-
+```mermaid
+flowchart TD
+    V33["Permanent 3.3V System Rail"] --> RPU["4.7 kOhm Pull-up Resistors"]
+    RPU --> BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL)"]
+    BUS --> SHTC3["Sensirion SHTC3 (Online)"]
+    BUS --> RTC["NXP PCF85063A (Online)"]
+    BUS --> CODEC["ES8311 Codec (Unpowered when PA_EN = 1)"]
+    CODEC -.->|"Pulls bus down<br/>(Total I2C Loss)"| BUS
 ```
-graph TD;
-    V33["Permanent 3.3V System Rail"];
-    RPU["4.7 kOhm Pull-up Resistors"];
-    BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL) Clamped to 0.7V when PA_EN is 1"];
-    ESD["ES8311 Internal ESD Clamp Diode (Forward Biased)"];
-    VDD["ES8311 VDD_AUDIO at 0.0V (When PA_EN cuts rail)"];
-    V33-->RPU;
-    RPU-->BUS;
-    BUS-->ESD;
-    ESD-->VDD;
-
-```
-
-#### 2. Firmware Impact
-
-Whenever `PA_EN` was turned OFF to save power, the SHTC3 and PCF85063A could no longer communicate. The I2C bus held permanently low, resulting in FreeRTOS task timeouts, device hangs, and failed wake cycles.
 
 #### 3. Current H1OS Firmware Mitigations
 
-* **Bootloader & Runtime Rail Power Hold:** `PA_EN` is asserted LOW (`GPIO 42 = 0`) and held via pad hold in both the 2nd-stage bootloader (`h1os_boot_hook.c`) and runtime HAL (`hal_io.c`) across all active and deep sleep states.
-
-* **Register-Level Standby:** Instead of cutting rail power, the ES8311 is placed into a software deep standby register sequence (`0x0D=0xFC, 0x0E=0x6A, 0x12=0x02, 0x00=0x1E`), and the NS4168 amplifier is muted via `PA_CTRL` (`GPIO 46 = 0`). This places the audio codec into `<1.0 µA` silicon standby without forward-biasing the ESD diodes.
+* **Bootloader & Runtime Rail Power Hold:** `PA_EN` is asserted LOW (`GPIO 42 = 0`) and held via pad hold in both the 2nd-stage bootloader (`h1os_boot_hook.c`) and runtime HAL (`hal_io.c`) across all active and deep sleep states. The audio power rail is never cut during operation.
+* **Register-Level Standby:** Instead of cutting rail power, the ES8311 is placed into a software deep standby register sequence (`0x0D = 0xFC, 0x0E = 0x6A, 0x12 = 0x02, 0x00 = 0x1E`), and the NS4168 amplifier is muted via `PA_CTRL` (`GPIO 46 = 0`). This places the audio subsystem into $<1.0\,\mu\text{A}$ standby without disturbing the shared I2C bus.
 
 #### 4. Rev B Hardware Redesign Recommendations
 
 * **Option 1 (Hardware Bus Isolation):** Place a bidirectional I2C level translator / bus buffer with power-down isolation (e.g., NXP PCA9306 or TI TCA9517) between the main I2C bus and the ES8311. When the audio domain is unpowered, the buffer enters high-Z mode, completely isolating the codec from the bus.
-
 * **Option 2 (Gate Amplifier Only):** Keep the ES8311 codec permanently powered on the clean 3.3V rail (using its software standby register mode), and use `PA_EN` strictly to gate the power supply to the NS4168 Class-D amplifier.
-
 * **Option 3 (Secondary I2C Port):** Route the audio codec to a dedicated secondary I2C port or software bit-bang pins, keeping the critical sensor/RTC bus completely unencumbered.
 
 ### Errata E5: Battery ADC Divider Continuous Quiescent Bleed
@@ -305,9 +300,9 @@ The tactile buttons (`BOOT` on `GPIO 0` and `POWER` on `GPIO 18`) utilize extern
 
 #### 3. Current H1OS Firmware Mitigations
 
-* In `hal_io.c`, the SoC internal pull-ups ($\sim 45\,\text{k}\Omega$) are enabled in parallel with the external $10\,\text{k}\Omega$ pull-ups (and RTC pull-ups are enabled during deep sleep) to stiffen the line.
+* In `hal_io.c`, the SoC internal pull-ups on tactile buttons (`HAL_PIN_BUTTON_BOOT` on `GPIO 0` and `HAL_PIN_BUTTON_POWER` on `GPIO 18`) are explicitly disabled (`GPIO_PULLUP_DISABLE`), relying strictly on the external $10\,\text{k}\Omega$ pull-up resistors to maintain logic HIGH.
 
-* Hardware debouncing and glitch filtering ($\ge 30\,\text{ms}$) are handled at the ULP coprocessor monitor (in sleep) and via LVGL keypad indev debouncing (in active wake).
+* Contact bounce and electrical noise are handled via software debouncing: a bounded $\ge 30\,\text{ms}$ debounce window with wake-on-release validation in the ULP coprocessor monitor during sleep, and LVGL indev debouncing during active wake.
 
 #### 4. Rev B Hardware Redesign Recommendations
 
@@ -710,39 +705,7 @@ During codec initialization in `sub_audio.c`:
 
 2. Program Register `0x0F` to `0x80` to configure Low-Power DAC mode, which provides substantial battery power savings with imperceptible audio impact through the NS4168 amplifier.
 
-### ERR-S3 [RECLASSIFIED — NOT A SILICON ERRATUM]: `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` Register Semantics & Level-Sensitive Clear Ordering
-
-* **Component:** ESP32-S3 RTC Controller / ESP-IDF Register Macros (`RTC_CNTL_ULP_CP_TIMER_REG`)
-
-* **Classification:** **Retracted as Silicon Erratum — Reclassified as ESP-IDF / Software Register-Ordering Nuance**
-
-* **Status:** Resolved in Firmware (`ulp/main.c`, `sub_power.c`, `orch_wake_stub.c`)
-
-#### Audit Findings & Why `ERR-S3` Was Not a Silicon Bug
-
-Earlier bring-up notes attributed intermittent ULP sleep freezes and spurious re-wakes to a speculative *"Clock Domain Crossing (CDC) Wake Latch Bounce"* on the 136 kHz internal RC slow clock. Hardware register analysis confirms that **there is no CDC hardware defect in the ESP32-S3 wake latch**. Instead, the behavior stemmed from two classic software/IDF register misunderstandings:
-
-1. **Synchronous `R/W` Reset Bit vs. Self-Clearing `W1TC` Strobe:**
-
-   * Unlike `RTC_GPIO_STATUS_W1TC_REG` (which is a hardware Write-1-To-Clear strobe that self-clears in one clock cycle), `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` (Bit 30 of `RTC_CNTL_ULP_CP_TIMER_REG`) is a **standard Read/Write (`R/W`) synchronous reset bit** (`SET_PERI_REG_MASK` / `CLEAR_PERI_REG_MASK`).
-
-   * Early code treated `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` as if writing `1` were a one-shot clear, leaving Bit 30 set (`1`) when halting the ULP. Leaving Bit 30 asserted holds the ULP GPIO wake gate in permanent reset—which caused the observed *"sleep re-entry freeze"*.
-
-2. **Level-Triggered Comparator Ordering (`GPIO_INTR_LOW_LEVEL`):**
-
-   * Because RTC GPIO wakeups on ESP32-S3 use level-sensitive comparators (`GPIO_INTR_LOW_LEVEL`), clearing `RTC_GPIO_STATUS_W1TC_REG` or toggling `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` while the physical pin (`GPIO 5` `/INT` during its 15.6 ms open-drain pulse, or a held button) is still physically `LOW` causes the level comparator to immediately re-latch `RTC_GPIO_STATUS_REG`.
-
-   * Likewise, toggling `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` *before* writing `RTC_GPIO_STATUS_W1TC_REG` leaves the upstream peripheral status bit asserted, which immediately re-triggers the ULP wake request upon releasing `CLR`.
-
-#### Deterministic Software Sequence
-
-1. **Wait for Physical Input Release:** Confirm the level-low wake pin (`GPIO 5`, `GPIO 0`, or `GPIO 18`) has returned `HIGH` before clearing status flags.
-
-2. **Clear Upstream RTC IO Status First:** Write `REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M)` to clear the peripheral latch.
-
-3. **Toggle `GPIO_WAKEUP_CLR` (`1 -> 0`):** Assert `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` and explicitly de-assert it (`CLEAR_PERI_REG_MASK`) prior to halting or entering sleep.
-
-### ERR-S4: PCF85063A Open-Drain Pulse Duration Pre-Sleep Race
+### ERR-S3: PCF85063A Open-Drain Pulse Duration Pre-Sleep Race
 
 * **Component:** NXP / Nexperia PCF85063A Real-Time Clock
 
@@ -765,25 +728,3 @@ When configured in pulsed timer mode (`TI_TP = 1` in Register `0x11`), the PCF85
    * **In Main CPU (`sub_power.c`):** In `sub_power_enter_deep_sleep_mode()`, wait until `GPIO 5`, `GPIO 0`, and `GPIO 18` read HIGH before arming `GPIO_WAKEUP_ENA`.
 
 2. **Stuck-Line Fault Trap:** If `GPIO 5` fails to return HIGH within 50 ms, the ULP logs `rtc_int_stuck = 1`, bypasses `GPIO_WAKEUP_ENA` re-arming to prevent runaway infinite wake loops, and wakes the Main CPU to clear the stuck RTC flag over I2C.
-
-### ERR-S5: ADC1 Oneshot Multi-Unit Driver Collision (`ESP_ERR_NOT_FOUND`)
-
-* **Component:** ESP-IDF `adc_oneshot` Driver
-
-* **Subsystem:** ADC1 Controller (`GPIO 4` Battery ADC)
-
-* **Affects:** ESP32-S3 ESP-IDF v5.4 & v6.1
-
-* **Severity:** Medium (battery readout failure and uncalibrated LUT defaults)
-
-#### Description
-
-When the ULP coprocessor uses ADC1 for battery voltage monitoring, `ulp_riscv_adc_init()` claims the hardware unit lock in ESP-IDF (`s_adc_unit_claim(0) = true`). If the main application later attempts to initialize `adc_oneshot_new_unit()` with default settings (`.ulp_mode = ADC_ULP_MODE_DISABLE`), the driver returns `ESP_ERR_NOT_FOUND` because ADC1 is already claimed.
-
-#### Mitigation & Architecture Mandate
-
-1. **Shared ULP Mode Allocation:** `sub_power_init()` must configure `adc_oneshot_unit_init_cfg_t` with `.ulp_mode = ADC_ULP_MODE_RISCV`.
-
-2. **Initialization Sequence:** `sub_power_init()` must execute *before* `sub_power_get_ulp_cal_params()`, ensuring the eFuse calibration curve handle is valid before battery calculation parameters are passed to the ULP.
-
-3. **Eliminate Redundant Allocation:** `ulp_riscv_adc_init()` is not called separately if `sub_power_init()` has already configured ADC1 unit and channel 3 for shared operation.

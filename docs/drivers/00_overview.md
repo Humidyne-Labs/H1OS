@@ -30,9 +30,9 @@ The table below defines the exact hardware assignment, physical pins, electrical
 - **Active Level:** Active LOW (`0 = Power ON`, `1 = Power OFF`).
 - **Deep Sleep:** Held LOW (`0`) in RTC IO domain to keep the SSD1681 and SHTC3 powered in deep sleep so they maintain RAM and calibration.
 
-### Rule 3: PA_EN (GPIO 42) & ESD Diode Clamping Hazard
+### Rule 3: PA_EN (GPIO 42) & Shared I2C Bus Disruption Hazard
 - **Active Level:** Active LOW (`0 = Power ON`, `1 = Power OFF`).
-- **Critical Hardware Quirk:** Cutting `PA_EN` HIGH (`1`) while the shared I2C bus (GPIO 47/48) is pulled up to 3.3V forward-biases the ES8311 internal ESD diodes, clamping SDA/SCL to ~0.7V (see [`ERRATA.md` Errata E4](../../ERRATA.md#e4-es8311-esd-diode-i2c-bus-clamping)).
+- **Critical Hardware Quirk:** Cutting `PA_EN` HIGH (`1`) while the shared I2C bus (GPIO 47/48) is pulled up to 3.3V takes down the entire shared bus, halting communication with the SHTC3 and PCF85063 (see [`ERRATA.md` Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus)).
 - **Mandate:** `PA_EN` **MUST REMAIN ENERGIZED (LOW / 0)** during all normal and sleep operations. Audio power saving is achieved strictly via ES8311 software standby and NS4168 mute (`PA_CTRL GPIO 46 = 0`).
 
 ### Rule 4: I2S Clock Stability & Dynamic Frequency Scaling (DFS)

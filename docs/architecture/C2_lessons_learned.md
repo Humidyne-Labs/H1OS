@@ -6,10 +6,18 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 
 ## 1. What Failed & Why
 
+### 1.0 The Cardinal Rule of Engineering Metrology: Never Claim a Measurement You Did Not Take ("Don't Spec Numbers Without Proof")
+- **What Happened:** During early debugging of the audio power-rail issue and sleep dissipation, documentation and errata asserted that cutting `PA_EN` caused internal ESD diodes to forward-bias and clamp the shared I2C bus down to "~0.7V", and quoted hypothetical unmeasured sleep currents. In physical reality, no multimeter or oscilloscope had touched the bus lines during those initial tests; the tester simply observed that I2C communication failed when the codec power was cut.
+- **Root Cause:** Speculating on unverified voltages and claiming measured numbers without actual instrumented physical verification. Confusing a theoretical mental model (e.g. forward-biased silicon diode drops) with an empirical physical measurement.
+- **Why It Fails:** Fabricating or guessing numbers when you don't have proof damages engineering credibility, misleads root-cause investigations, and introduces false architectural assumptions. It sent investigators down rabbit holes searching for phantom clamping diodes in a datasheet that doesn't even mention ESD protection, rather than focusing on the verified empirical reality: gating unbuffered ICs on a shared bus pulls down the lines.
+- **H1OS Architectural Mandate:** Never spec numbers if you don't have physical proof they exist. Document exactly what was tested and observed—nothing more, nothing less. If a bus went down, state that the bus went down. If a voltage was not probed on an oscilloscope, explicitly state that it is unmeasured. Keep hypotheses clearly labeled as hypotheses, and keep empirical observations unassailable.
+
+---
+
 ### 1.1 The Scaffolding Trap (Conflating Scaffolding with Finished Architecture)
 - **What Happened:** During early migration, legacy BSP files (`bsp_common.c`, `bsp_power.c`, `bsp_button.c`, `bsp_sdcard.c`) were kept and patched in place under the assumption that they were "needed" to maintain build viability. This created confusing hybrid architectures where clean-slate HAL/subsystem designs collided with obsolete monolithic implementations.
 - **Root Cause:** Treating temporary scaffolding as permanent architecture. Labeling defunct code as "needed" falsely implied that the clean-slate architecture was flawed or missing critical peripheral solutions.
-- **H1OS Fix:** Explicit 4-stage construction doctrine ("The Bones", "Housekeeping & Purge", "The Muscle", "The Vanity"). Scaffolding is strictly recognized as disposable bring-up bracing. Once the architectural bones and HAL contracts are drafted, legacy scaffolding is purged completely. Deficiencies are solved in the clean-slate layers (`hal_*` and `sub_*`), not by clinging to legacy relics.
+- **H1OS Fix:** Explicit 4-stage construction process (Stage 1 Core Architecture & Contracts, Stage 2 Legacy Deprecation & Cleanup, Stage 3 Subsystem Integration & Drivers, Stage 4 Application & Presentation). Scaffolding is strictly recognized as disposable bring-up bracing. Once the HAL interfaces and API contracts are drafted, legacy scaffolding is removed completely. Deficiencies are solved in the clean-slate layers (`hal_*` and `sub_*`), not by clinging to legacy relics.
 
 ---
 
@@ -61,7 +69,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **What Happened:** Exploring running periodic SHTC3 acquisition via the ULP-RISC-V coprocessor in deep sleep, and cutting power to peripherals to save current.
 - **Root Cause (The Hardware Traps):**
   1. **ULP Routing:** The shared I2C bus is routed to **GPIO 47 (SDA) and GPIO 48 (SCL)**. On the ESP32-S3, the RTC IO domain is strictly limited to `RTCIO 0..21` (GPIOs 0–21). GPIO 47 and 48 are standard digital matrix pins and **cannot be accessed by the ULP or RTC-I2C controller when the digital core is power-gated in deep sleep**.
-  2. **ES8311 Bus Clamping:** Cutting power to the audio codec while keeping the I2C bus pulled up causes the unpowered ES8311's internal ESD protection diodes to forward-bias, pulling the shared SDA/SCL lines to ground and clamping the entire I2C bus!
+  2. **ES8311 Bus Clamping:** Cutting power to the audio codec while keeping the I2C bus pulled up brings down the shared SDA/SCL lines, failing all communication on the I2C bus!
   3. **EPD 3.3V Power Rail (`GPIO 6`):** Cutting the EPD power rail drops panel charge and can corrupt display RAM. Instead of cutting power to the display, placing the SSD1681 into **Deep Sleep Mode 1 (`0x10, 0x01`)** drops display quiescent current to nominal sleep levels while preserving RAM and image state without rail cycling.
 - **H1OS Fix:**
   - Keep the 3.3V peripheral rail powered and let peripherals sleep natively in low-leakage state (SHTC3 in sleep `0xB098`, ES8311 register `0x0D` power-down, SSD1681 in Deep Sleep Mode 1).

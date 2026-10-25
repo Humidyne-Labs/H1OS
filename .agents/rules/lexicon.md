@@ -24,6 +24,8 @@ Informal jargon, military slang, pop-culture metaphors, and ideological commenta
 | **neutralize** | **clear / discharge / de-energize / reset** | Clearing display RAM, resetting DC bias, or de-asserting GPIO rails. |
 | **kill / terminate (non-POSIX)** | **halt / disable / abort / power cut** | Graceful shutdown or gate de-assertion. |
 | **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic. |
+| **doctrine / dogma** | **standard / architecture / principle / specification** | Non-technical, cultish, or ideological framing. |
+| **bones / the muscle / the vanity** | **contracts / subsystems / presentation layer** | Anatomical slang / informal construction metaphors. |
 
 ---
 

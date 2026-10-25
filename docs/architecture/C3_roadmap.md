@@ -4,14 +4,14 @@ This roadmap tracks the development of **H1OS** (E-Class Environmental Telemetry
 
 Development follows the **Four Canonical Stages of Construction**:
 > *"Pants, belt, suspenders, life jacket before hair brushing."*
-1. **Stage 1: The Bones** (Architecture, Contracts, & Documentation)
-2. **Stage 2: Housekeeping & Scaffolding Purge** (Component Renaming, CMake Stripping, Stub Wiring)
-3. **Stage 3: The Muscle** (Peripheral Hardware Drivers & Silicon Verification)
-4. **Stage 4: The Vanity** (LVGL 9 UI Polish, Chimes, Screen Layouts, & Benchmarking)
+1. **Stage 1: Core Architecture & Interface Contracts** (Architecture, Contracts, & Documentation)
+2. **Stage 2: Legacy Deprecation & Cleanup** (Component Renaming, CMake Stripping, Stub Wiring)
+3. **Stage 3: Subsystem Integration & Drivers** (Peripheral Hardware Drivers & Silicon Verification)
+4. **Stage 4: Application & Presentation Layer** (LVGL 9 UI Polish, Chimes, Screen Layouts, & Benchmarking)
 
 ---
 
-## 1. Stage 1: The Bones (Architecture & Documentation)
+## 1. Stage 1: Core Architecture & Interface Contracts (Architecture & Documentation)
 
 - [x] **1.1 Establish Two-Tier Documentation System**: Author architecture specifications capturing all 4 layers.
 - [x] **1.2 Hardware Errata Call to Action**: Author and place `ERRATA.md` in repository root for PCB dev visibility.
@@ -19,7 +19,7 @@ Development follows the **Four Canonical Stages of Construction**:
 - [x] **1.4 Architectural Audit & Reconciliation**: Reconcile all architecture specifications in `docs/architecture/` with the Master Blueprint:
    - [x] `A0_system_governance.md`: Update taxonomy, errata reference, and system principles.
   - [x] `A1_master_blueprint.md`: Detail 4-layer structure, subsystems (`sub_nvs`, `sub_sdcard`), ULP monitor, and interactive session.
-  - [x] `A2_hal.md`: Document bone stubbing policy, stateless button pin readers, and bootloader latch release rules.
+  - [x] `A2_hal.md`: Document HAL interface contract policy, stateless button pin readers, and bootloader latch release rules.
   - [x] `A4_subsystems.md`: Detail `sub_nvs`, minimal `sub_sdcard`, Zero-Volt Cable Guard in `sub_power`, remove bespoke button driver.
   - [x] `A5_orchestrator.md`: Formalize interactive Flow B session, 80MHz DFS droop, ULP sleep-gating, Zero-Hour conflict avoidance, and 8-step sleep sequence.
   - [x] `A6_ulp_coprocessor.md`: Re-specify purely reactive ULP Monitor (no polling), tap/hold classification, ROM bootloader priming, zero-volt USB check.
@@ -44,14 +44,14 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] Migrate `bsp_time.c` to Layer 4 `h1os_time.c/.h`.
   - [x] Migrate `bsp_lvgl.cpp` to Layer 4 `h1os_lvgl.c/.h` with `LV_INDEV_TYPE_KEYPAD` binding.
   - [x] Implement `sub_nvs.c/.h` for non-volatile configuration storage.
-- [x] **2.3 Bone Stubbing & Header Wiring**:
+- [x] **2.3 Interface Header Definition & Contract Wiring**:
   - [x] Ensure all Layer 1 (`hal_*`) and Layer 2 (`sub_*`) headers declare clean functional contracts.
   - [x] Wire drivers with clean implementations to achieve clean compile-level verification.
   - [x] Update `examples/H1OS/main/main.c` to include `<h1os.h>` and register `h1os_app_config_t`.
 
 ---
 
-## 3. Stage 3: The Muscle (Hardware Drivers & Verification)
+## 3. Stage 3: Subsystem Integration & Drivers (Hardware Drivers & Verification)
 
 - [x] **3.1 Layer 1 HAL Concrete Implementation**:
   - [x] `hal_io.c`: GPIO latching (`BAT_CTRL` GPIO 17), EPD rail control (`GPIO 6`), stateless button readers (`GPIO 0, 18`), pad hold management.
@@ -79,7 +79,7 @@ Development follows the **Four Canonical Stages of Construction**:
 
 ---
 
-## 4. Stage 4: The Vanity (LVGL 9 UI Polish & Benchmarking)
+## 4. Stage 4: Application & Presentation Layer (LVGL 9 UI Polish & Benchmarking)
 
 - [x] **4.1 LVGL 9 UI Integration**:
   - [x] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).

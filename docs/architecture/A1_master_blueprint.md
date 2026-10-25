@@ -45,7 +45,7 @@ Self-contained peripheral drivers ("Does the thing"). Expose clean APIs with sta
 - **`sub_display.cpp/.h`**: SSD1681 200x200 1-bit driver (non-touch), Ping-Pong buffer RAM management (`0x24`/`0x26`), partial waveform LUT, panel busy synchronization, pre-display on-glass temperature acquisition (`0x1B`), Deep Sleep Mode 1 (`0x10, 0x01`).
 - **`sub_rtc.c/.h`**: PCF85063A POSIX timekeeping, countdown timer, hardware alarms, interrupt clearing (`GPIO 5`), parasitic CLKOUT disabled (`COF=111`).
 - **`sub_power.c/.h`**: Exclusive ULP quiet-state battery voltage retrieval (`ulp_vbat_ring[8]`), 13-point LiPo OCV lookup curve in tenths of a percent (`0..1000`), Elapsed Runtime Empirical Autonomy Engine (`sub_power_calc_autonomy`), Zero-Volt Cable Guard, Dynamic Frequency Scaling (`sub_power_init_dfs`), and Pure Event Mode deep sleep execution.
-- **`sub_audio.c/.h`**: ES8311 software standby register sequence (`0x00=0x1E`, `0x0D=0xFC`) to prevent I2C ESD clamping, synthesized acoustic chime/tone generator, and asynchronous PCM playback via `sub_audio_play()`.
+- **`sub_audio.c/.h`**: ES8311 software standby register sequence (`0x00=0x1E`, `0x0D=0xFC`) to prevent pulling down the shared I2C bus, synthesized acoustic chime/tone generator, and asynchronous PCM playback via `sub_audio_play()`.
 - **`sub_nvs.c/.h`**: Persistent key-value configuration storage for autonomy runtimes and user preferences.
 - **`sub_sdcard.c/.h`**: Asynchronous and synchronous 1-bit SDMMC FATFS manager: mount, unmount, format, and capacity checking.
 

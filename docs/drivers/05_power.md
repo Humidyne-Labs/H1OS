@@ -88,7 +88,7 @@ When the system enters deep sleep (`hal_io_isolate_sleep_pads()` and `sub_power_
 |---|---|---|---|---|---|
 | `GPIO 17` | `BAT_CTRL` | Output | **HIGH (1)** | `RTC_CNTL_PAD_HOLD_REG` (Bootloader) | Keeps battery LDO gate energized |
 | `GPIO 6` | `EPD_3V3_EN` | Output | **LOW (0)** | `RTC_CNTL_PAD_HOLD_REG` (Bootloader) | Keeps display & sensors powered in deep sleep |
-| `GPIO 42` | `PA_EN` | Output | **LOW (0)** | `gpio_hold_en` (Bootloader) | Keeps ES8311 powered to prevent I2C ESD clamping |
+| `GPIO 42` | `PA_EN` | Output | **LOW (0)** | `gpio_hold_en` (Bootloader) | Keeps ES8311 powered to prevent pulling down shared I2C bus |
 | `GPIO 11` | `EPD_CS` | Output | **HIGH (1)** | `gpio_hold_en` | Deselects SSD1681 SPI interface |
 | `GPIO 9` | `EPD_RST` | Output | **HIGH (1)** | `gpio_hold_en` | Prevents display controller hardware reset |
 | `GPIO 10` | `EPD_DC` | Output | **HIGH (1)** | `gpio_hold_en` | Prevents floating D/C line oscillation |

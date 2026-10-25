@@ -83,7 +83,7 @@ Defines all hardware fixed constants and base enums for the Waveshare ESP32-S3 e
   - `hal_io` never decides when to power on. Its sole responsibility regarding power latching is providing `hal_io_release_power_latch()` when an orderly shutdown is executed.
 - **Power Rail Policy (Keep Gates Open - Zero Glitch Strategy):**
   - Both `GPIO 17` (`BAT_CTRL` = 1) and `GPIO 6` (`EPD_3V3_EN` = 0, Active LOW = rail ON) remain permanently asserted and latched with RTC pad holds during deep sleep.
-  - `GPIO 42` (`PA_EN` = 0, rail ON) remains energized across runtime and deep sleep to prevent ES8311 ESD diode clamping on the shared I2C bus.
+  - `GPIO 42` (`PA_EN` = 0, rail ON) remains energized across runtime and deep sleep to prevent unpowered ES8311 from pulling down the shared I2C bus.
 - **Stateless Button Reading & USB Detection:**
   - `hal_io` provides raw register level checks without event queues or callback tables, plus SOF-based USB host detection (`hal_check_usb_ll`).
 

@@ -45,7 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **Zero-Calibration Steady-State SHTC3 Trust & Tri-Node Range Verification** (`orch_flow.c`, `orch_wake_stub.c`, `orch_math.h/.c`, `orch_state.h/.c`, `h1os.h`, `h1os_lifecycle.c`):
 
-  * Enforced the **Zero-Calibration Hardware Doctrine**: removed all synthetic temperature offsets, ambient RH reconstitutions (`orch_math_reconstruct_ambient_rh`), slice trimming, fallback sensor substitutions (`orch_flow_evaluate_ambient_selection`), and MCU die taring (`die_tare_centi_c`).
+  * Enforced the **Zero-Calibration Hardware Principle**: removed all synthetic temperature offsets, ambient RH reconstitutions (`orch_math_reconstruct_ambient_rh`), slice trimming, fallback sensor substitutions (`orch_flow_evaluate_ambient_selection`), and MCU die taring (`die_tare_centi_c`).
 
   * Trusted the factory-calibrated Sensirion SHTC3 (`±0.2°C`, `±2% RH`) directly once consecutive Flow A deep-sleep samples satisfy the steady-state plateau gate (`|temp2 - temp1| <= SAMPLE_DELTA_GATE_CENTI_C` / `0.20°C` in `orch_math_is_plateau_settled()`), feeding the settled SHTC3 temperature and relative humidity directly into `orch_math_calc_psychrometrics(t_valid, rh_valid, &vp, &dew)`.
 

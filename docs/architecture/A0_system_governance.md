@@ -48,6 +48,7 @@ h1os/ (Repository Root)
         ├── C2_lessons_learned.md      <-- Post-Mortem & Architectural Rationale
         ├── C3_roadmap.md              <-- Canonical Phased Construction Plan & Milestones
         └── C4_changelog_policy.md     <-- Release Policy & SemVer Management
+		└── D0_std_audit_framework.md  <-- Formal Audit Framework for Code Audits
 ```
 
 ---

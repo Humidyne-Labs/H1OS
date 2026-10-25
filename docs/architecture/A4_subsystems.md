@@ -100,7 +100,7 @@ esp_err_t sub_power_cpu_max_release(void);
 ---
 
 ### 3.4 `sub_audio.c/.h` (Audio Codec & Amplifier Subsystem)
-- **Software Standby**: Keeps `PA_EN` (`GPIO 42`) held LOW and writes the ES8311 software standby register sequence (`0x0D = 0xFC`, `0x00 = 0x1E` with `RST_REG = 0`) to avoid ESD diode I2C clamping while keeping standby draw $<1.0\ \mu\text{A}$ (see [Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-clamps-shared-i2c-bus-to-07v)).
+- **Software Standby**: Keeps `PA_EN` (`GPIO 42`) held LOW (I2C latching potential, see [Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus)) and puts ES8311 into software standby (`0x0D = 0xFC`, `0x00 = 0x1E`) for $<1.0\ \mu\text{A}$ draw.
 - **Unified Asynchronous Dispatcher**: Dispatches synthesized tones (`SUB_AUDIO_TONE`), chimes (`SUB_AUDIO_CHIME`), and raw 16-bit PCM streams (`SUB_AUDIO_PCM`) to `h1os_audio_worker` via `sub_audio_play()`, flushing a silent DMA frame upon queue completion so trailing notes never clip.
 - **I2S Playback Clock Lock Invariant**: Holds a dedicated `ESP_PM_CPU_FREQ_MAX` lock during I2S initialization and playback to prevent APB frequency droop from shifting sample pitch or underrunning DMA buffers.
 
