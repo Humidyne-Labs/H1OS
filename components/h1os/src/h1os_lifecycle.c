@@ -7,7 +7,6 @@
  */
 
 #include "driver/gpio.h"
-#include "h1os_constants.h"
 #include "driver/rtc_io.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
@@ -36,6 +35,15 @@
 #include <string.h>
 
 static const char *TAG = "h1os_lifecycle";
+
+#define LIFECYCLE_TASK_STACK_SESSION_MONITOR  4096U /**< Session monitor task stack floor (4 KB). */
+#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR   3     /**< Session monitor FreeRTOS priority.      */
+#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).  */
+#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS     20U   /**< LVGL drain poll step interval (20 ms).  */
+#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V).*/
+#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.  */
+#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.     */
+#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.     */
 
 static h1os_lifecycle_t s_app_lifecycle = {0};
 static volatile int64_t s_session_expiry_us = 0;
@@ -116,9 +124,9 @@ static void h1os_quiesce_lvgl_pipeline(void)
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < H1OS_LVGL_DRAIN_TIMEOUT_MS) {
-            vTaskDelay(pdMS_TO_TICKS(H1OS_LVGL_DRAIN_POLL_STEP_MS));
-            wait_ms += H1OS_LVGL_DRAIN_POLL_STEP_MS;
+        while (h1os_lvgl_has_pending_tasks() && wait_ms < LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS) {
+            vTaskDelay(pdMS_TO_TICKS(LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS));
+            wait_ms += LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS;
         }
     }
     h1os_lvgl_stop();
@@ -191,7 +199,7 @@ static void debug_dump_ulp_telemetry(void)
         ESP_LOGE(TAG, "[ULP FAULT] External PCF85063A /INT pin (GPIO 5) remained stuck LOW >50ms! Re-arm suppressed.");
     }
     if (ulp_last_wake_cause == 6) {
-        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< %lu mV threshold)!", (unsigned long)ulp_last_vbat_mv, (unsigned long)H1OS_BATTERY_CRITICAL_CUTOFF_MV);
+        ESP_LOGE(TAG, "[ULP FAULT] Battery critically low: %lu mV (< %lu mV threshold)!", (unsigned long)ulp_last_vbat_mv, (unsigned long)LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV);
     }
     ESP_LOGI(TAG, "--------------------------------------------------------------------------------");
 }
@@ -446,7 +454,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
         ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
-        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", H1OS_TASK_STACK_SESSION_MONITOR, NULL, H1OS_TASK_PRIO_SESSION_MONITOR, (TaskHandle_t *)&s_session_task_handle, 0);
+        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", LIFECYCLE_TASK_STACK_SESSION_MONITOR, NULL, LIFECYCLE_TASK_PRIO_SESSION_MONITOR, (TaskHandle_t *)&s_session_task_handle, 0);
         if (res != pdPASS) {
             ESP_LOGE(TAG, "Failed to create h1os_sess monitor task (%ld). Entering sleep fallback.", (long)res);
             s_session_running = false;
@@ -559,7 +567,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
                                                  s_prev_bat_state == H1OS_BATTERY_CHARGED);
             if (st->initial_soc_x10 == 0 ||
                 state_transition_from_charge ||
-                current_soc_x10 >= st->initial_soc_x10 + H1OS_BATTERY_REBOUND_GATE_TENTHS_PCT) {
+                current_soc_x10 >= st->initial_soc_x10 + LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS) {
                 orch_state_reset_discharge_lap(current_soc_x10);
             }
         }
@@ -643,7 +651,7 @@ static void execute_system_shutdown(bool force_clean_white)
     orch_state_save_runtimes_to_nvs();
 
     int32_t stable_high = 0;
-    for (int32_t i = 0; i < (int32_t)H1OS_POWER_KEY_POLL_CYCLES && stable_high < (int32_t)H1OS_POWER_KEY_STABLE_THRESHOLD; i++) {
+    for (int32_t i = 0; i < (int32_t)LIFECYCLE_POWER_KEY_POLL_CYCLES && stable_high < (int32_t)LIFECYCLE_POWER_KEY_STABLE_THRESHOLD; i++) {
         stable_high = (gpio_get_level(HAL_PIN_BUTTON_POWER) == 1) ? stable_high + 1 : 0;
         vTaskDelay(pdMS_TO_TICKS(50));
     }

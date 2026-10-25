@@ -50,7 +50,7 @@ The following table isolates true 3rd degree operational magic numbers (timeouts
 
 | File | Line | Token | Category | Code Context | Rationale / Recommended Abstraction |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| `h1os_lvgl.cpp` | 233 | `(8` | **Magic Integer Constant** | `uint8_t val = (carry << (8 - shift)) \| (*s >> shift);` | Literal integer without named macro abstraction. |
+| `h1os_lvgl.cpp` | 239 | `(8` | **Magic Integer Constant** | `uint8_t val = (carry << (8 - shift)) \| (*s >> shift);` | Literal integer without named macro abstraction. |
 | `h1os_time.c` | 34 | `64)` | **Magic Integer Constant** | `if (tz_str == NULL \|\| strlen(tz_str) == 0 \|\| strlen(tz_str) > 64) {` | Literal integer without named macro abstraction. |
 | `h1os_time.c` | 73 | `1900,` | **Magic Integer Constant** | `timeinfo.tm_year + 1900,` | Literal integer without named macro abstraction. |
 | `h1os_time.c` | 108 | `1900,` | **Magic Integer Constant** | `tm_target.tm_year + 1900,` | Literal integer without named macro abstraction. |
@@ -58,19 +58,19 @@ The following table isolates true 3rd degree operational magic numbers (timeouts
 | `hal_flash.c` | 89 | `~4095;` | **Magic Integer Constant** | `size_t erase_size = (len + 4095) & ~4095;` | Literal integer without named macro abstraction. |
 | `hal_i2c.c` | 92 | `7,` | **Magic Integer Constant** | `.glitch_ignore_cnt = 7,` | Literal integer without named macro abstraction. |
 | `hal_i2c.c` | 298 | `50);` | **Magic Integer Constant** | `esp_err_t ret = i2c_master_probe(s_bus_handle, dev_addr, 50);` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 187 | `100)` | **Magic Integer Constant** | `if (brightness_pct > 100) {` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 188 | `100;` | **Magic Integer Constant** | `brightness_pct = 100;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 190 | `1023U)` | **Magic Integer Constant** | `uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 190 | `100U;` | **Magic Integer Constant** | `uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 214 | `100)` | **Magic Integer Constant** | `if (target_pct > 100) {` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 215 | `100;` | **Magic Integer Constant** | `target_pct = 100;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 217 | `1023U)` | **Magic Integer Constant** | `uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 217 | `100U;` | **Magic Integer Constant** | `uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 237 | `2U;` | **Magic Integer Constant** | `uint32_t half = s_breath_period_ms / 2U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 238 | `100U)` | **Magic Integer Constant** | `if (half < 100U) {` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 239 | `100U;` | **Magic Integer Constant** | `half = 100U;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 314 | `15;` | **Magic Integer Constant** | `int32_t wait_cycles = 15;` | Literal integer without named macro abstraction. |
-| `hal_io.c` | 382 | `100` | **Magic Integer Constant** | `return hal_led_set_brightness(on ? 100 : 0);` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 190 | `100)` | **Magic Integer Constant** | `if (brightness_pct > 100) {` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 191 | `100;` | **Magic Integer Constant** | `brightness_pct = 100;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 193 | `1023U)` | **Magic Integer Constant** | `uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 193 | `100U;` | **Magic Integer Constant** | `uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 217 | `100)` | **Magic Integer Constant** | `if (target_pct > 100) {` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 218 | `100;` | **Magic Integer Constant** | `target_pct = 100;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 220 | `1023U)` | **Magic Integer Constant** | `uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 220 | `100U;` | **Magic Integer Constant** | `uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 240 | `2U;` | **Magic Integer Constant** | `uint32_t half = s_breath_period_ms / 2U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 241 | `100U)` | **Magic Integer Constant** | `if (half < 100U) {` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 242 | `100U;` | **Magic Integer Constant** | `half = 100U;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 317 | `15;` | **Magic Integer Constant** | `int32_t wait_cycles = 15;` | Literal integer without named macro abstraction. |
+| `hal_io.c` | 385 | `100` | **Magic Integer Constant** | `return hal_led_set_brightness(on ? 100 : 0);` | Literal integer without named macro abstraction. |
 | `hal_spi.c` | 98 | `7,` | **Magic Integer Constant** | `.queue_size = 7,` | Literal integer without named macro abstraction. |
 | `hal_spi.c` | 123 | `(20` | **Magic Integer Constant** | `"SPI2 bus initialized with DMA (20 MHz write, 2 MHz half-duplex read) on CS=%d, "` | Literal integer without named macro abstraction. |
 | `hal_spi.c` | 123 | `2` | **Magic Integer Constant** | `"SPI2 bus initialized with DMA (20 MHz write, 2 MHz half-duplex read) on CS=%d, "` | Literal integer without named macro abstraction. |
@@ -79,67 +79,67 @@ The following table isolates true 3rd degree operational magic numbers (timeouts
 | `hal_spi.c` | 259 | `8;` | **Magic Integer Constant** | `t_cmd.length = 8;` | Literal integer without named macro abstraction. |
 | `hal_spi.c` | 274 | `8;` | **Magic Integer Constant** | `t_read.rxlength = len * 8;` | Literal integer without named macro abstraction. |
 | `orch_flow.c` | 65 | `10);` | **Magic Integer Constant** | `st->tsens_cal_centi_c = (int16_t)(cal_deci_c * 10);` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 111 | `7;` | **Magic Integer Constant** | `for (int32_t i = 7; i >= 0; i--) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 139 | `7;` | **Magic Integer Constant** | `for (int32_t i = 7; i >= 0; i--) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 169 | `8;` | **Magic Integer Constant** | `for (uint8_t bit = 8; bit > 0; --bit) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 193 | `6);` | **Magic Integer Constant** | `REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 194 | `3);` | **Magic Integer Constant** | `REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 228 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
-| `orch_wake_stub.c` | 259 | `255)` | **Magic Integer Constant** | `if (seconds <= 255) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 264 | `59)` | **Magic Integer Constant** | `timer_val = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 264 | `60);` | **Magic Integer Constant** | `timer_val = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 291 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
-| `orch_wake_stub.c` | 384 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
-| `orch_wake_stub.c` | 384 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 256 | `100;` | **Magic Integer Constant** | `pct = 100;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 355 | `5;` | **Magic Integer Constant** | `const uint32_t step_ms = 5;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 470 | `4;` | **Magic Integer Constant** | `chan_cfg.dma_desc_num      = 4;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 639 | `16000;` | **Magic Integer Constant** | `const uint32_t sample_rate   = 16000;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 641 | `64)` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 641 | `32` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 641 | `4);` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 811 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(523, 70);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 813 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 70);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 815 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 70);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 817 | `150);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1046, 150);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 821 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1046, 80);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 823 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 80);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 825 | `140);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 140);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 829 | `90);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 90);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 831 | `90);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 90);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 833 | `180);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(523, 180);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 838 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1760, 80);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 840 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(880, 80);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 1005 | `16000;` | **Magic Integer Constant** | `cmd.params.pcm.sample_rate_hz = 16000;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 1012 | `50);` | **Magic Integer Constant** | `return sub_audio_send_command(&cmd, false, 50);` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 1045 | `10;` | **Magic Integer Constant** | `elapsed += 10;` | Literal integer without named macro abstraction. |
-| `sub_audio.c` | 1101 | `100;` | **Magic Integer Constant** | `volume_pct = 100;` | Literal integer without named macro abstraction. |
-| `sub_display.cpp` | 165 | `50;` | **Magic Integer Constant** | `static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;` | Literal integer without named macro abstraction. |
-| `sub_display.cpp` | 183 | `100` | **Magic Integer Constant** | `int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);` | Literal integer without named macro abstraction. |
-| `sub_display.cpp` | 350 | `153),` | **Magic Integer Constant** | `ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[0], 153), TAG, "SPI data 0x32 failed");` | Literal integer without named macro abstraction. |
-| `sub_display.cpp` | 359 | `3),` | **Magic Integer Constant** | `ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[155], 3), TAG, "SPI data 0x04 failed");` | Literal integer without named macro abstraction. |
-| `sub_display.cpp` | 400 | `~300` | **Magic Integer Constant** | `ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", (long long)t_elapsed_ms);` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 93 | `5U)` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
-| `sub_power.c` | 93 | `10U);` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
-| `sub_power.c` | 185 | `8U;` | **Battery / Voltage Threshold** | `uint32_t head  = ulp_vbat_ring_head % 8U;` | Critical electrical or state-of-charge threshold limit. |
-| `sub_power.c` | 209 | `2U)` | **Magic Integer Constant** | `} else if (count >= 2U) {` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 210 | `7U` | **Magic Integer Constant** | `uint32_t newest_idx = (head == 0U) ? 7U : (head - 1U);` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 212 | `3U)` | **Magic Integer Constant** | `uint32_t lookback   = (count >= 3U) ? 2U : 1U;` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 212 | `2U` | **Magic Integer Constant** | `uint32_t lookback   = (count >= 3U) ? 2U : 1U;` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 213 | `8U` | **Magic Integer Constant** | `uint32_t prev_idx   = (newest_idx + 8U - lookback) % 8U;` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 213 | `8U;` | **Magic Integer Constant** | `uint32_t prev_idx   = (newest_idx + 8U - lookback) % 8U;` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 265 | `10)` | **Magic Integer Constant** | `if (delta_x10 < 10) {` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 300 | `2000,` | **Magic Integer Constant** | `adc_cali_raw_to_voltage(s_cali_handle, 2000, &v_2000);` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 301 | `3000,` | **Magic Integer Constant** | `adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_3000);` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 308 | `2000LL)` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 308 | `4096LL));` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 344 | `4000;` | **Battery / Voltage Threshold** | `ulp_last_vbat_mv    = 4000;` | Critical electrical or state-of-charge threshold limit. |
-| `sub_power.c` | 488 | `2U)` | **Magic Integer Constant** | `btn_drain_us < H1OS_SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US * 2U) {` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 499 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 500 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 500 | `5)),` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 501 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
-| `sub_power.c` | 501 | `18)));` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 112 | `7;` | **Magic Integer Constant** | `for (int32_t i = 7; i >= 0; i--) {` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 140 | `7;` | **Magic Integer Constant** | `for (int32_t i = 7; i >= 0; i--) {` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 170 | `8;` | **Magic Integer Constant** | `for (uint8_t bit = 8; bit > 0; --bit) {` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 194 | `6);` | **Magic Integer Constant** | `REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 195 | `3);` | **Magic Integer Constant** | `REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 229 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
+| `orch_wake_stub.c` | 260 | `255)` | **Magic Integer Constant** | `if (seconds <= 255) {` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 265 | `59)` | **Magic Integer Constant** | `timer_val = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 265 | `60);` | **Magic Integer Constant** | `timer_val = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 292 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t attempt = 0; attempt < 3; attempt++) {` | Arbitrary loop retry limit or debounce counter. |
+| `orch_wake_stub.c` | 385 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
+| `orch_wake_stub.c` | 385 | `2)` | **Magic Integer Constant** | `if (sample_ok && shtc3_crc8(&rx[0], 2) == rx[2] && shtc3_crc8(&rx[3], 2) == rx[5]) {` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 261 | `100;` | **Magic Integer Constant** | `pct = 100;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 360 | `5;` | **Magic Integer Constant** | `const uint32_t step_ms = 5;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 475 | `4;` | **Magic Integer Constant** | `chan_cfg.dma_desc_num      = 4;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 644 | `16000;` | **Magic Integer Constant** | `const uint32_t sample_rate   = 16000;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 646 | `64)` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 646 | `32` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 646 | `4);` | **Magic Integer Constant** | `const uint32_t ramp_samples  = (total_samples > 64) ? 32 : (total_samples / 4);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 816 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(523, 70);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 818 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 70);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 820 | `70);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 70);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 822 | `150);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1046, 150);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 826 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1046, 80);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 828 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 80);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 830 | `140);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 140);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 834 | `90);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(784, 90);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 836 | `90);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(659, 90);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 838 | `180);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(523, 180);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 843 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(1760, 80);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 845 | `80);` | **Magic Integer Constant** | `sub_audio_render_tone_samples(880, 80);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 1010 | `16000;` | **Magic Integer Constant** | `cmd.params.pcm.sample_rate_hz = 16000;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 1017 | `50);` | **Magic Integer Constant** | `return sub_audio_send_command(&cmd, false, 50);` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 1050 | `10;` | **Magic Integer Constant** | `elapsed += 10;` | Literal integer without named macro abstraction. |
+| `sub_audio.c` | 1106 | `100;` | **Magic Integer Constant** | `volume_pct = 100;` | Literal integer without named macro abstraction. |
+| `sub_display.cpp` | 166 | `50;` | **Magic Integer Constant** | `static constexpr int16_t SSD1681_TEMP_HALF_DEG_CENTI_C = 50;` | Literal integer without named macro abstraction. |
+| `sub_display.cpp` | 184 | `100` | **Magic Integer Constant** | `int16_t glass_cc = (int16_t)temp_int * 100 + ((temp_int >= 0) ? frac_c : -frac_c);` | Literal integer without named macro abstraction. |
+| `sub_display.cpp` | 351 | `153),` | **Magic Integer Constant** | `ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[0], 153), TAG, "SPI data 0x32 failed");` | Literal integer without named macro abstraction. |
+| `sub_display.cpp` | 360 | `3),` | **Magic Integer Constant** | `ESP_RETURN_ON_ERROR(hal_spi_write_data(&lut_buffer[155], 3), TAG, "SPI data 0x04 failed");` | Literal integer without named macro abstraction. |
+| `sub_display.cpp` | 401 | `~300` | **Magic Integer Constant** | `ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", (long long)t_elapsed_ms);` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 101 | `5U)` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
+| `sub_power.c` | 101 | `10U);` | **Battery / Voltage Threshold** | `return (uint8_t)((sub_power_mv_to_soc_tenths(mv) + 5U) / 10U);` | Critical electrical or state-of-charge threshold limit. |
+| `sub_power.c` | 193 | `8U;` | **Battery / Voltage Threshold** | `uint32_t head  = ulp_vbat_ring_head % 8U;` | Critical electrical or state-of-charge threshold limit. |
+| `sub_power.c` | 217 | `2U)` | **Magic Integer Constant** | `} else if (count >= 2U) {` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 218 | `7U` | **Magic Integer Constant** | `uint32_t newest_idx = (head == 0U) ? 7U : (head - 1U);` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 220 | `3U)` | **Magic Integer Constant** | `uint32_t lookback   = (count >= 3U) ? 2U : 1U;` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 220 | `2U` | **Magic Integer Constant** | `uint32_t lookback   = (count >= 3U) ? 2U : 1U;` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 221 | `8U` | **Magic Integer Constant** | `uint32_t prev_idx   = (newest_idx + 8U - lookback) % 8U;` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 221 | `8U;` | **Magic Integer Constant** | `uint32_t prev_idx   = (newest_idx + 8U - lookback) % 8U;` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 273 | `10)` | **Magic Integer Constant** | `if (delta_x10 < 10) {` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 308 | `2000,` | **Magic Integer Constant** | `adc_cali_raw_to_voltage(s_cali_handle, 2000, &v_2000);` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 309 | `3000,` | **Magic Integer Constant** | `adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_3000);` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 316 | `2000LL)` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 316 | `4096LL));` | **Magic Integer Constant** | `int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 352 | `4000;` | **Battery / Voltage Threshold** | `ulp_last_vbat_mv    = 4000;` | Critical electrical or state-of-charge threshold limit. |
+| `sub_power.c` | 496 | `2U)` | **Magic Integer Constant** | `btn_drain_us < SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US * 2U) {` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 507 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 0)),` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 508 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 508 | `5)),` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 509 | `(4` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
+| `sub_power.c` | 509 | `18)));` | **Magic Integer Constant** | `(unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 64 | `10)` | **Magic Integer Constant** | `return (uint8_t)(((val >> 4) * 10) + (val & 0x0F));` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 76 | `10)` | **Magic Integer Constant** | `return (uint8_t)(((val / 10) << 4) \| (val % 10));` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 76 | `10));` | **Magic Integer Constant** | `return (uint8_t)(((val / 10) << 4) \| (val % 10));` | Literal integer without named macro abstraction. |
@@ -151,7 +151,7 @@ The following table isolates true 3rd degree operational magic numbers (timeouts
 | `sub_rtc.c` | 266 | `59)` | **Magic Integer Constant** | `timer_value = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 266 | `60);` | **Magic Integer Constant** | `timer_value = (uint8_t)((seconds + 59) / 60);` | Literal integer without named macro abstraction. |
 | `sub_rtc.c` | 293 | `3;` | **Loop Bound / Retry Limit** | `for (int32_t retry = 0; retry < 3; retry++) {` | Arbitrary loop retry limit or debounce counter. |
-| `sub_sdcard.c` | 102 | `5,` | **Magic Integer Constant** | `.max_files = 5,` | Literal integer without named macro abstraction. |
+| `sub_sdcard.c` | 106 | `5,` | **Magic Integer Constant** | `.max_files = 5,` | Literal integer without named macro abstraction. |
 | `main.c` | 26 | `5;` | **Magic Integer Constant** | `volatile uint32_t overflow_limit  = 5;` | Literal integer without named macro abstraction. |
 | `main.c` | 32 | `8601;` | **Magic Integer Constant** | `volatile uint32_t cal_scale       = 8601;` | Literal integer without named macro abstraction. |
 | `main.c` | 34 | `4000;` | **Battery / Voltage Threshold** | `volatile uint32_t last_vbat_mv    = 4000;` | Critical electrical or state-of-charge threshold limit. |

@@ -7,7 +7,6 @@
  */
 
 #include "h1os/orch_wake_stub.h"
-#include "h1os_constants.h"
 
 #include "esp32s3/rom/rtc.h"
 #include "esp_attr.h"
@@ -33,6 +32,8 @@
 #endif
 
 // clang-format off
+#define ORCH_I2C_RECOVERY_TIMEOUT_US 20000U /**< I2C bus recovery timeout (20 ms). */
+#define ORCH_I2C_RECOVERY_STEP_US    500U   /**< I2C recovery polling step (500 µs).*/
 #define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32))
 #define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32))
 
@@ -439,13 +440,13 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     }
 
     /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
-    uint32_t timeout_us = H1OS_ORCH_I2C_RECOVERY_TIMEOUT_US;
+    uint32_t timeout_us = ORCH_I2C_RECOVERY_TIMEOUT_US;
     while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-        esp_rom_delay_us(H1OS_ORCH_I2C_RECOVERY_STEP_US);
-        if (timeout_us <= H1OS_ORCH_I2C_RECOVERY_STEP_US) {
+        esp_rom_delay_us(ORCH_I2C_RECOVERY_STEP_US);
+        if (timeout_us <= ORCH_I2C_RECOVERY_STEP_US) {
             break;
         }
-        timeout_us -= H1OS_ORCH_I2C_RECOVERY_STEP_US;
+        timeout_us -= ORCH_I2C_RECOVERY_STEP_US;
     }
 
     /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */

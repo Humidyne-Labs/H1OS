@@ -15,13 +15,11 @@
 extern "C" {
 #endif
 
-#include "h1os_constants.h"
-
 // clang-format off
-#define ORCH_RTC_MAGIC                        H1OS_RTC_STATE_MAGIC                  /**< RTC state validation magic word ('SLAT').                  */
-#define ORCH_RING_CAPACITY                    H1OS_TELEMETRY_RING_CAPACITY          /**< Fixed capacity of historical telemetry sample ring buffer. */
-#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C  /**< Layer 3 alias for TSENS Q12 fixed-point intercept.        */
-#define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC /**< Layer 3 alias for unattended NVS commit interval.         */
+#define ORCH_RTC_MAGIC                        0x534C4154U /**< RTC state validation magic word ('SLAT').                  */
+#define ORCH_RING_CAPACITY                    32          /**< Fixed capacity of historical telemetry sample ring buffer. */
+#define ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C  2052        /**< Default TSENS Q12 fixed-point intercept in centi-°C (20.52°C).     */
+#define ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC 3600U       /**< Minimum elapsed deep sleep interval between unattended NVS commits (1 hour). */
 
 /**
  * @brief ULP coprocessor dispatch wakeup reasons.

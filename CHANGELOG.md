@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
 
+* **Macro Scope Partitioning & Single-File Constant Dissolution** (`h1os_constants.h`, `tools/analyze_macro_scope.py`, `orch_state.h`, `orch_wake_stub.h`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `hal_io.c`, `orch_flow.c`, `orch_wake_stub.c`, `sub_audio.c`, `sub_display.cpp`, `sub_power.c`, `sub_sdcard.c`):
+  * Created automated macro scope analyzer (`tools/analyze_macro_scope.py`) mapping repository macro usage across translation units.
+  * Refactored `h1os_constants.h` to strictly encapsulate public, multi-file configuration contracts (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC`).
+  * Dissolved single-file operational constants out of `h1os_constants.h` back into their respective translation units as private local definitions (`LIFECYCLE_*`, `LVGL_*`, `HAL_IO_*`, `ORCH_*`, `SUB_POWER_*`, `SUB_SDCARD_*`, `SUB_AUDIO_*`, `SUB_DISPLAY_*`), preventing global namespace pollution and unneeded cross-component compilation dependencies.
+  * Restored self-contained RTC memory and wake stub parameters directly in `orch_state.h` and `orch_wake_stub.h`.
+
 * **Architectural Constants Abstraction (`h1os_constants.h`)** (`h1os_constants.h`, `h1os.h`, `orch_state.h`, `orch_wake_stub.h`):
   * Created centralized `h1os_constants.h` header defining traceable system-wide timing budgets (`H1OS_TSENS_SETTLING_DELAY_US = 400U`, `H1OS_TSENS_READY_POLL_INTERVAL_US = 5U`, `H1OS_TSENS_READY_TIMEOUT_CYCLES = 100U`, `H1OS_SHTC3_CONVERSION_TOTAL_US = 14500U`, `H1OS_TSENS_ESTIMATED_SAMPLE_US = 450U`, `H1OS_SHTC3_POST_TSENS_DELAY_US = 14050U`), autonomy wear-level intervals (`H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600U`), ring buffer capacity (`H1OS_TELEMETRY_RING_CAPACITY = 32U`), default TSENS intercept (`H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C = 2052`), and application lifecycle configuration defaults (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC = 30U`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC = 60U`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC = 300U`).
   * Added `H1OS_LIFECYCLE_DEFAULT_CONFIG()` convenience macro for clean compound-literal lifecycle initialization in `h1os.h`.

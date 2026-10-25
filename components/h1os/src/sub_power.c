@@ -7,7 +7,6 @@
  */
 
 #include "h1os/sub_power.h"
-#include "h1os_constants.h"
 #include "h1os/orch_state.h"
 
 #include "driver/gpio.h"
@@ -36,6 +35,15 @@ extern const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start");
 extern const uint8_t ulp_h1os_bin_end[]   asm("_binary_ulp_h1os_bin_end");
 
 static const char *TAG = "sub_power";
+
+#define SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US      50000U /**< Timeout awaiting PCF85063A INT release (50 ms). */
+#define SUB_POWER_RTC_INT_DRAIN_STEP_US         500U   /**< Step delay polling PCF85063A INT pin (500 µs).   */
+#define SUB_POWER_VBAT_ZERO_VOLT_GUARD_MV       3300U  /**< Lower floor below which USB assumes charged.     */
+#define SUB_POWER_VBAT_ASSUMED_CHARGED_MV       4200U  /**< Assumed full cell potential on bench power.      */
+#define SUB_POWER_VBAT_NOMINAL_FALLBACK_MV      4000U  /**< Default nominal potential when out of range.     */
+#define SUB_POWER_VBAT_FULL_CHARGE_THRESHOLD_MV 4180U  /**< Full charge detection voltage (4.18V).           */
+#define SUB_POWER_CHARGING_RAMP_DELTA_MV        15U    /**< Voltage rise confirming active charging (15 mV). */
+#define SUB_POWER_CHARGING_FLOAT_DELTA_MV       5U     /**< Maximum float delta at CV confirming charged.    */
 
 static adc_oneshot_unit_handle_t s_adc_handle = NULL;
 static adc_cali_handle_t s_cali_handle        = NULL;
@@ -189,10 +197,10 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
 
     /* Zero-Volt Cable Guard: When running on USB bench power without a LiPo cell attached,
      * the 200k/200k divider floats or reads <100 mV. Force 4200 mV (100% CHARGED). */
-    if (usb_conn && vbat < H1OS_BATTERY_ZERO_VOLT_GUARD_MV) {
-        vbat = H1OS_BATTERY_ASSUMED_CHARGED_MV;
+    if (usb_conn && vbat < SUB_POWER_VBAT_ZERO_VOLT_GUARD_MV) {
+        vbat = SUB_POWER_VBAT_ASSUMED_CHARGED_MV;
     } else if (vbat == 0U || vbat > 4500U) {
-        vbat = H1OS_BATTERY_NOMINAL_FALLBACK_MV;
+        vbat = SUB_POWER_VBAT_NOMINAL_FALLBACK_MV;
     }
 
     uint16_t vbat_mv = (uint16_t)vbat;
@@ -205,7 +213,7 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
 
     h1os_battery_state_t state = H1OS_BATTERY_DISCHARGING;
     if (usb_conn) {
-        state = (vbat_mv >= H1OS_BATTERY_FULL_CHARGE_THRESHOLD_MV) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
+        state = (vbat_mv >= SUB_POWER_VBAT_FULL_CHARGE_THRESHOLD_MV) ? H1OS_BATTERY_CHARGED : H1OS_BATTERY_CHARGING;
     } else if (count >= 2U) {
         uint32_t newest_idx = (head == 0U) ? 7U : (head - 1U);
         /* Compare newest sample against sample from 2 cycles prior (or 1 cycle prior if count == 2) */
@@ -214,9 +222,9 @@ esp_err_t sub_power_get_battery_status(uint16_t *out_mv,
         uint32_t v_new      = ring[newest_idx];
         uint32_t v_prev     = ring[prev_idx];
 
-        if (v_new >= v_prev + H1OS_BATTERY_CHARGING_RAMP_DELTA_MV) {
+        if (v_new >= v_prev + SUB_POWER_CHARGING_RAMP_DELTA_MV) {
             state = H1OS_BATTERY_CHARGING;
-        } else if (v_new >= H1OS_BATTERY_FULL_CHARGE_THRESHOLD_MV && (v_new > v_prev ? (v_new - v_prev) : (v_prev - v_new)) <= H1OS_BATTERY_CHARGING_FLOAT_DELTA_MV) {
+        } else if (v_new >= SUB_POWER_VBAT_FULL_CHARGE_THRESHOLD_MV && (v_new > v_prev ? (v_new - v_prev) : (v_prev - v_new)) <= SUB_POWER_CHARGING_FLOAT_DELTA_MV) {
             state = H1OS_BATTERY_CHARGED;
         } else {
             state = H1OS_BATTERY_DISCHARGING;
@@ -477,15 +485,15 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
     esp_sleep_enable_ulp_wakeup();
 
     uint32_t drain_wait_us = 0;
-    while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < H1OS_SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US) {
-        esp_rom_delay_us(H1OS_SUB_POWER_RTC_INT_DRAIN_STEP_US);
-        drain_wait_us += H1OS_SUB_POWER_RTC_INT_DRAIN_STEP_US;
+    while (rtc_gpio_get_level(HAL_PIN_RTC_INT) == 0 && drain_wait_us < SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US) {
+        esp_rom_delay_us(SUB_POWER_RTC_INT_DRAIN_STEP_US);
+        drain_wait_us += SUB_POWER_RTC_INT_DRAIN_STEP_US;
     }
 
     /* Wait up to 100 ms for any lingering button press on BOOT or POWER to release HIGH */
     uint32_t btn_drain_us = 0;
     while ((rtc_gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0 || rtc_gpio_get_level(HAL_PIN_BUTTON_POWER) == 0) &&
-           btn_drain_us < H1OS_SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US * 2U) {
+           btn_drain_us < SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US * 2U) {
         esp_rom_delay_us(1000);
         btn_drain_us += 1000U;
     }
