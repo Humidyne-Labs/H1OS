@@ -17,12 +17,14 @@
 extern "C" {
 #endif
 
-#define ORCH_TSENS_SETTLING_DELAY_US          400U   /**< Minimum analog settling delay following TSENS power-up (400 µs). */
-#define ORCH_TSENS_READY_POLL_INTERVAL_US     5U     /**< Polling step interval while awaiting TSENS ready bit (5 µs).    */
-#define ORCH_TSENS_READY_TIMEOUT_CYCLES       100U   /**< Maximum polling loop iterations (100 * 5 µs = 500 µs bound).     */
-#define ORCH_SHTC3_CONVERSION_TOTAL_US        14500U /**< Sensirion SHTC3 maximum measurement duration (14.5 ms).        */
-#define ORCH_TSENS_ESTIMATED_SAMPLE_US         450U   /**< Nominal TSENS acquisition duration (settling + ready poll).    */
-#define ORCH_SHTC3_POST_TSENS_DELAY_US        (ORCH_SHTC3_CONVERSION_TOTAL_US - ORCH_TSENS_ESTIMATED_SAMPLE_US) /**< Remainder wait: 14,050 µs */
+#include "h1os_constants.h"
+
+#define ORCH_TSENS_SETTLING_DELAY_US          H1OS_TSENS_SETTLING_DELAY_US          /**< Layer 3 alias: analog settling delay (400 µs). */
+#define ORCH_TSENS_READY_POLL_INTERVAL_US     H1OS_TSENS_READY_POLL_INTERVAL_US     /**< Layer 3 alias: ready polling interval (5 µs).    */
+#define ORCH_TSENS_READY_TIMEOUT_CYCLES       H1OS_TSENS_READY_TIMEOUT_CYCLES       /**< Layer 3 alias: polling loop bound (100 cycles).   */
+#define ORCH_SHTC3_CONVERSION_TOTAL_US        H1OS_SHTC3_CONVERSION_TOTAL_US        /**< Layer 3 alias: max measurement duration (14.5 ms).*/
+#define ORCH_TSENS_ESTIMATED_SAMPLE_US        H1OS_TSENS_ESTIMATED_SAMPLE_US        /**< Layer 3 alias: TSENS sample duration (450 µs).    */
+#define ORCH_SHTC3_POST_TSENS_DELAY_US        H1OS_SHTC3_POST_TSENS_DELAY_US        /**< Layer 3 alias: remainder wait (14,050 µs).        */
 
 /**
  * @brief Install the deep sleep wake stub into RTC Fast Memory.

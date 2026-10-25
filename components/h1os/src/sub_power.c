@@ -41,9 +41,9 @@ static adc_cali_handle_t s_cali_handle        = NULL;
 
 static bool s_cali_valid = false;
 
-static uint32_t s_flow_a_sec     = ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
-static uint32_t s_flow_b_sec     = ORCH_DEFAULT_FLOW_B_PERIOD_SEC;
-static uint32_t s_overflow_limit = 5;
+static uint32_t s_flow_a_sec     = 0;
+static uint32_t s_flow_b_sec     = 0;
+static uint32_t s_overflow_limit = 0;
 static uint32_t s_remainder_sec  = 0;
 
 static const struct {
@@ -342,8 +342,11 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         ulp_last_wake_btn   = 0;
         ulp_last_vbat_mv    = 4000;
 
-        uint32_t period_sec = (flow_a_period_sec > 0) ? flow_a_period_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
-        ulp_set_wakeup_period(0, (uint64_t)period_sec * 1000000ULL);
+        if (flow_a_period_sec == 0) {
+            ESP_LOGE(TAG, "Cannot initialize ULP: flow_a_period_sec is 0");
+            return ESP_ERR_INVALID_ARG;
+        }
+        ulp_set_wakeup_period(0, (uint64_t)flow_a_period_sec * 1000000ULL);
 
         ulp_riscv_cfg_t cfg = {
             .wakeup_source = ULP_RISCV_WAKEUP_SOURCE_GPIO,
@@ -365,11 +368,13 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
     } else if (ulp_last_wake_cause == 3) {
         /* Account for the final Flow B sleep slice when woken by the RTC countdown timer */
         volatile orch_persisted_state_t *st = orch_state_get();
-        uint32_t flow_a = (st->sample_interval_sec > 0) ? st->sample_interval_sec : 60U;
-        uint32_t flow_b = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : 300U;
-        uint32_t rem    = flow_b % flow_a;
-        uint32_t final_slice = (rem > 0) ? rem : flow_a;
-        st->total_sleep_sec += final_slice;
+        if (st->sample_interval_sec > 0) {
+            uint32_t flow_a = st->sample_interval_sec;
+            uint32_t flow_b = st->flow_b_period_sec;
+            uint32_t rem    = (flow_b > 0) ? (flow_b % flow_a) : 0;
+            uint32_t final_slice = (rem > 0) ? rem : flow_a;
+            st->total_sleep_sec += final_slice;
+        }
     }
     return ESP_OK;
 }
@@ -384,9 +389,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
  */
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 {
-    s_flow_a_sec     = (flow_a_sec > 0) ? flow_a_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
-    s_flow_b_sec     = (flow_b_sec > 0) ? flow_b_sec : ORCH_DEFAULT_FLOW_B_PERIOD_SEC;
-    s_overflow_limit = (overflow > 0) ? overflow : 1;
+    s_flow_a_sec     = flow_a_sec;
+    s_flow_b_sec     = flow_b_sec;
+    s_overflow_limit = overflow;
     s_remainder_sec  = remainder_sec;
 }
 

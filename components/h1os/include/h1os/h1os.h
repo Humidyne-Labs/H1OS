@@ -21,11 +21,21 @@
 extern "C" {
 #endif
 
+#include "h1os_constants.h"
 #include "h1os_version.h"
 
-#define H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC  30U   /**< Default interactive session inactivity sleep timeout in seconds. */
-#define H1OS_DEFAULT_FLOW_A_PERIOD_SEC       60U   /**< Default Flow A headless sensor sample burst period in seconds.    */
-#define H1OS_DEFAULT_FLOW_B_PERIOD_SEC       300U  /**< Default Flow B unattended presentation refresh period in seconds. */
+/**
+ * @brief Default compound literal macro for standard lifecycle session configuration.
+ */
+#define H1OS_LIFECYCLE_DEFAULT_CONFIG() { \
+    .session = { \
+        .inactivity_timeout_sec = H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC, \
+        .clk_mode               = SYS_CLK_MODE_DYNAMIC, \
+        .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC, \
+        .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC, \
+    }, \
+    .presentation = { 0 } \
+}
 
 /**
  * @brief Platform wakeup context descriptor.

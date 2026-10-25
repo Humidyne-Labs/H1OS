@@ -373,8 +373,14 @@ static void orch_flow_quiesce_peripherals(void)
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
     volatile orch_persisted_state_t *st = orch_state_get();
-    uint32_t flow_a_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
-    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : ((st->flow_b_period_sec > 0) ? st->flow_b_period_sec : ORCH_DEFAULT_FLOW_B_PERIOD_SEC);
+    uint32_t flow_a_sec = st->sample_interval_sec;
+    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : st->flow_b_period_sec;
+
+    if (flow_a_sec == 0 || flow_b_sec == 0) {
+        ESP_LOGE(TAG, "Cannot execute sleep: unconfigured flow periods (flow_a=%lu, flow_b=%lu)",
+                 (unsigned long)flow_a_sec, (unsigned long)flow_b_sec);
+        return ESP_ERR_INVALID_STATE;
+    }
 
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder   = flow_b_sec % flow_a_sec;

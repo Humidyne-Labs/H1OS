@@ -36,18 +36,8 @@ void RTC_IRAM_ATTR orch_state_reset(void)
         p[i] = 0;
     }
 
-    s_persisted_state.magic                    = ORCH_RTC_MAGIC;
-    s_persisted_state.sample_interval_sec      = 0;
-    s_persisted_state.flow_b_period_sec        = 0;
-    s_persisted_state.window_low_temp_centi_c  = 0;
-    s_persisted_state.window_high_temp_centi_c = 0;
-    s_persisted_state.last_glass_temp_centi_c  = 0;
-    s_persisted_state.trinode_confidence_pct   = 0;
-    s_persisted_state.tsens_offset_centi_c     = ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C;
-    s_persisted_state.last_nvs_commit_sec      = 0;
-    s_persisted_state.total_sleep_sec          = 0;
-    s_persisted_state.total_app_run_ms         = 0;
-    s_persisted_state.initial_soc_x10          = 0;
+    s_persisted_state.magic                = ORCH_RTC_MAGIC;
+    s_persisted_state.tsens_offset_centi_c = ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C;
 }
 
 void orch_state_save_runtimes_to_nvs(void)

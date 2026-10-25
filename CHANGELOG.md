@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [2.4.1-dev] - 2026-10-24
 
+### 🔄 Changed & Refactored (Header Abstraction, Zero-Init & Fail-Fast Validation)
+
+* **Architectural Constants Abstraction (`h1os_constants.h`)** (`h1os_constants.h`, `h1os.h`, `orch_state.h`, `orch_wake_stub.h`):
+  * Created centralized `h1os_constants.h` header defining traceable system-wide timing budgets (`H1OS_TSENS_SETTLING_DELAY_US = 400U`, `H1OS_TSENS_READY_POLL_INTERVAL_US = 5U`, `H1OS_TSENS_READY_TIMEOUT_CYCLES = 100U`, `H1OS_SHTC3_CONVERSION_TOTAL_US = 14500U`, `H1OS_TSENS_ESTIMATED_SAMPLE_US = 450U`, `H1OS_SHTC3_POST_TSENS_DELAY_US = 14050U`), autonomy wear-level intervals (`H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600U`), ring buffer capacity (`H1OS_TELEMETRY_RING_CAPACITY = 32U`), default TSENS intercept (`H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C = 2052`), and application lifecycle configuration defaults (`H1OS_DEFAULT_INACTIVITY_TIMEOUT_SEC = 30U`, `H1OS_DEFAULT_FLOW_A_PERIOD_SEC = 60U`, `H1OS_DEFAULT_FLOW_B_PERIOD_SEC = 300U`).
+  * Added `H1OS_LIFECYCLE_DEFAULT_CONFIG()` convenience macro for clean compound-literal lifecycle initialization in `h1os.h`.
+* **Zero-Initialization Architecture & Fail-Fast Input Validation** (`orch_wake_stub.c`, `orch_flow.c`, `orch_state.c`, `sub_power.c`, `h1os_lifecycle.c`):
+  * Eliminated runtime ternary fallback operators (`(val > 0) ? val : DEFAULT`) across `orch_wake_stub.c`, `orch_flow.c`, `sub_power.c`, and `h1os_lifecycle.c`. Telemetry getters (`h1os_get_telemetry()`) now truthfully report the configured flow periods without masking unconfigured (zero) values.
+  * Replaced defensive ternary fallbacks in `orch_flow_execute_sleep()` and `sub_power_init_ulp()` with strict boundary validation that logs errors and fails fast (`ESP_ERR_INVALID_STATE` / `ESP_ERR_INVALID_ARG`) if unconfigured (`0`) flow intervals are passed.
+  * Simplified `orch_state_reset()` to strict memory zeroing retaining only the `ORCH_RTC_MAGIC` word and `H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C`.
+* **Elapsed-Time Autonomy NVS Wear Gating** (`sub_power.c`, `orch_state.h`):
+  * Replaced cycle-modulo NVS commits (`wake_count % 12`) with monotonic elapsed deep-sleep tracking via `st->last_nvs_commit_sec`. Commits to NVS only execute after at least `H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` (3600 seconds) of sleep have elapsed, rendering wear-leveling independent of custom user flow cadences.
+
 ### Added & Verified (50-Hour Environmental Chamber Metrology Certification)
 
 * **50.2-Hour Hermetic Chamber Soak & Zero-Calibration SHTC3 Verification** (`orch_wake_stub.c`, `orch_flow.c`, `orch_math.c`, `docs/architecture/A7_sensor_psychrometrics.md`):

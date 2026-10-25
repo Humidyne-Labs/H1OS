@@ -534,8 +534,8 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
     out_telemetry->sample_count      = st->total_samples;
-    out_telemetry->flow_a_period_sec = (st->sample_interval_sec > 0) ? st->sample_interval_sec : H1OS_DEFAULT_FLOW_A_PERIOD_SEC;
-    out_telemetry->flow_b_period_sec = (st->flow_b_period_sec > 0) ? st->flow_b_period_sec : H1OS_DEFAULT_FLOW_B_PERIOD_SEC;
+    out_telemetry->flow_a_period_sec = st->sample_interval_sec;
+    out_telemetry->flow_b_period_sec = st->flow_b_period_sec;
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;

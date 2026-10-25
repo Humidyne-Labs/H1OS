@@ -324,7 +324,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     volatile orch_persisted_state_t *st = orch_state_get();
 
     /* Account for the elapsed Flow A deep sleep slice */
-    st->total_sleep_sec += (st->sample_interval_sec > 0) ? st->sample_interval_sec : ORCH_DEFAULT_FLOW_A_PERIOD_SEC;
+    st->total_sleep_sec += st->sample_interval_sec;
 
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
