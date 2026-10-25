@@ -391,10 +391,13 @@ echo "[SUCCESS] Flash completed successfully!"
 
 def main():
     parser = argparse.ArgumentParser(description=f"H1OS Production Release Packager v{VERSION}")
-    parser.add_argument("--build-dir", "-b", help="Specific build directory containing binaries")
+    parser.add_argument("--build-dir", "-b", "-B", help="Specific build directory containing binaries (e.g. -B build_prod)")
+    parser.add_argument("positional_build_dir", nargs="?", default=None, help="Optional positional build directory (e.g. build_prod)")
     parser.add_argument("--out-dir", "-o", help="Custom output directory for release artifacts")
     parser.add_argument("--no-zip", action="store_true", help="Skip zip bundle generation")
     args = parser.parse_args()
+
+    target_build_dir = args.build_dir or args.positional_build_dir
 
     script_dir = Path(__file__).resolve().parent
     repo_root = find_project_root(script_dir)
@@ -409,7 +412,7 @@ def main():
 
     # Locate build directory
     search_dirs = [repo_root / "examples" / "H1OS", repo_root, script_dir]
-    build_dir = find_build_dir(search_dirs, preferred=args.build_dir)
+    build_dir = find_build_dir(search_dirs, preferred=target_build_dir)
 
     if not build_dir:
         print("[ERROR] Could not find a valid build directory containing 'h1os.bin'.")
