@@ -19,8 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Replaced cycle-modulo NVS commits (`wake_count % 12`) with monotonic elapsed deep-sleep tracking via `st->last_nvs_commit_sec`. Commits to NVS only execute after at least `H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` (3600 seconds) of sleep have elapsed, rendering wear-leveling independent of custom user flow cadences.
 * **Dead Macro Elimination & Constant Linting** (`orch_state.h`):
   * Removed unreferenced legacy macros `ORCH_DEFAULT_FLOW_A_PERIOD_SEC` and `ORCH_DEFAULT_FLOW_B_PERIOD_SEC` following the elimination of runtime ternary fallbacks.
-* **Codebase Literal Integer Extraction Tool** (`tools/scan_hardcoded_integers.py`, `docs/agent_notes/audits/hardcoded_integers_audit.md`):
-  * Added recursive integer scanner utility that tokenizes space-delimited C/C++ tokens, parses numeric decimal and hex literals, and logs line context to generate formal markdown audit reports.
+* **Codebase Literal Integer Extraction & 3-Degree Risk Classifier** (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `docs/agent_notes/audits/literal_integers_degree_audit.md`):
+  * Added recursive integer scanner utilities that tokenize space-delimited C/C++ tokens, parse numeric decimal and hex literals, and categorize findings into 1st Degree (structural/bitmasks/pins: 53.5%), 2nd Degree (metrological/polynomial math: 6.8%), and 3rd Degree (operational magic numbers/timeouts: 39.6%) with actionable markdown review ledgers.
 
 ### Added & Verified (50-Hour Environmental Chamber Metrology Certification)
 
