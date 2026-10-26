@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # H1OS Tools: term_usb_toolbox.ps1
 # USB Recovery Terminal, Win32 SE0 Hardware Port Cycler & Serial Monitor
 # ==============================================================================
@@ -20,14 +20,16 @@ using Microsoft.Win32.SafeHandles;
 
 public class UsbHubPortCycler {
     private const uint GENERIC_WRITE = 0x40000000;
+    private const uint FILE_SHARE_READ = 0x00000001;
     private const uint FILE_SHARE_WRITE = 0x00000002;
     private const uint OPEN_EXISTING = 3;
-    private const uint IOCTL_USB_HUB_CYCLE_PORT = 0x220414;
+    /* IOCTL_USB_HUB_CYCLE_PORT = CTL_CODE(FILE_DEVICE_USB, 273, METHOD_BUFFERED, FILE_ANY_ACCESS) = 0x220444 */
+    private const uint IOCTL_USB_HUB_CYCLE_PORT = 0x220444;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct USB_CYCLE_PORT_PARAMS {
         public uint ConnectionIndex;
-        public uint StatusResetPort;
+        public uint StatusReturned;
     }
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -45,12 +47,14 @@ public class UsbHubPortCycler {
         out uint lpBytesReturned, IntPtr lpOverlapped
     );
 
-    public static bool CyclePort(string hubPath, uint portIndex) {
-        using (SafeFileHandle h = CreateFile(hubPath, GENERIC_WRITE, FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero)) {
-            if (h.IsInvalid) return false;
-            USB_CYCLE_PORT_PARAMS p = new USB_CYCLE_PORT_PARAMS { ConnectionIndex = portIndex, StatusResetPort = 0 };
+    public static int CyclePort(string hubPath, uint portIndex) {
+        using (SafeFileHandle h = CreateFile(hubPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero)) {
+            if (h.IsInvalid) return Marshal.GetLastWin32Error();
+            USB_CYCLE_PORT_PARAMS p = new USB_CYCLE_PORT_PARAMS { ConnectionIndex = portIndex, StatusReturned = 0 };
             uint ret;
-            return DeviceIoControl(h, IOCTL_USB_HUB_CYCLE_PORT, ref p, (uint)Marshal.SizeOf(p), ref p, (uint)Marshal.SizeOf(p), out ret, IntPtr.Zero);
+            bool ok = DeviceIoControl(h, IOCTL_USB_HUB_CYCLE_PORT, ref p, (uint)Marshal.SizeOf(p), ref p, (uint)Marshal.SizeOf(p), out ret, IntPtr.Zero);
+            if (!ok) return Marshal.GetLastWin32Error();
+            return 0;
         }
     }
 }
@@ -128,24 +132,62 @@ function Get-TargetDevices {
 
 function Cycle-TargetPort([string]$InstanceId) {
     try {
-        $paths = (Get-PnpDeviceProperty -InstanceId$InstanceId -KeyName "DEVPKEY_Device_LocationPaths" -ErrorAction SilentlyContinue).Data;
-        $parent = (Get-PnpDeviceProperty -InstanceId$InstanceId -KeyName "DEVPKEY_Device_Parent" -ErrorAction SilentlyContinue).Data;
-        $portIndex = 0;
-        if ($paths) {$paths | ForEach-Object {
-                if ($_ -match 'USB\([0-9]+\)#.*\.USB\(([0-9]+)\)' -or $_ -match '#USB\(([0-9]+)\)') {
-                    $portIndex = [uint32]$Matches[1];
-                }
-            };
-        }
-        if ($parent -and$portIndex -gt 0) {
-            $hubPath = "\\.\$($parent.Replace('\', '#'))";
-            $ok = [UsbHubPortCycler]::CyclePort($hubPath,$portIndex);
-            if (-not $ok) {
-                $ok = [UsbHubPortCycler]::CyclePort("\\.\$parent", $portIndex);
+        $parent = (Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName "DEVPKEY_Device_Parent" -ErrorAction SilentlyContinue).Data;
+        
+        # 1. Obtain 1-based port index (Address is canonical for USB leaf devices)
+        $portIndex = (Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName "DEVPKEY_Device_Address" -ErrorAction SilentlyContinue).Data;
+        if (-not $portIndex -or $portIndex -eq 0) {
+            $loc = (Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName "DEVPKEY_Device_LocationInfo" -ErrorAction SilentlyContinue).Data;
+            if ($loc -match 'Port_#0*([0-9]+)') {
+                $portIndex = [uint32]$Matches[1];
             }
-            return $ok;
+        }
+        if (-not $portIndex -or $portIndex -eq 0) {
+            $paths = (Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName "DEVPKEY_Device_LocationPaths" -ErrorAction SilentlyContinue).Data;
+            if ($paths) {
+                $paths | ForEach-Object {
+                    if ($_ -match 'USB\([0-9]+\)#.*\.USB\(([0-9]+)\)' -or $_ -match '#USB\(([0-9]+)\)') {
+                        $portIndex = [uint32]$Matches[1];
+                    }
+                };
+            }
+        }
+
+        if ($parent -and $portIndex -gt 0) {
+            # 2. Formulate proper Win32 Hub Device Interface symbolic links
+            $guid = "{f18a0e88-c30c-11d0-8815-00a0c906bed8}";
+            $pHash = $parent.Replace('\', '#');
+            $hubPaths = @(
+                "\\?\$pHash#$guid",
+                "\\.\$pHash#$guid",
+                "\\.\$pHash",
+                "\\.\$parent"
+            );
+            
+            $err = -1;
+            foreach ($hubPath in $hubPaths) {
+                $res = [UsbHubPortCycler]::CyclePort($hubPath, [uint32]$portIndex);
+                if ($res -eq 0) {
+                    Write-Term "IOCTL_USB_HUB_CYCLE_PORT ACK on Port #$portIndex ($hubPath)" "HW";
+                    return $true;
+                }
+                $err = $res;
+            }
+            
+            # 3. Fallback: If hardware port power-cycling is not supported by passive hub, restart PnP node
+            Write-Term "IOCTL port cycle rejected by hub hardware (Win32 Err $err); falling back to PnP DevNode reset..." "WARN";
+            pnputil /restart-device "$InstanceId" 2>&1 | Out-Null;
+            if ($LASTEXITCODE -eq 0) {
+                Write-Term "PnP DevNode successfully restarted via pnputil." "PNP";
+                return $true;
+            } else {
+                pnputil /remove-device "$InstanceId" 2>&1 | Out-Null;
+                Write-Term "PnP DevNode removed; rescan will renegotiate descriptor." "PNP";
+                return $true;
+            }
         }
     } catch {
+        Write-Term "Cycle-TargetPort exception: $($_.Exception.Message)" "ERR";
         return $false;
     }
     return $false;
@@ -241,10 +283,10 @@ function Create-HwButton($text, $x,$y, $w,$h, $color) {$btn = New-Object System.
     return $btn;
 }
 
-$btnPortCycle = Create-HwButton ">> [1] IOCTL PORT CYCLE (SE0)" 12 400 335 38 $clWarn;
-$btnPnpDev    = Create-HwButton ">> [2] TOGGLE PNP DEVNODE"     367 400 335 38 $clGreen;
-$btnPurge     = Create-HwButton ">> [3] PURGE FAULT NODES"      12 445 335 38 $clAlert;
-$btnBusScan   = Create-HwButton ">> [4] BUS RESCAN (PNPUTIL)"   367 445 335 38 $clDimGreen;
+$btnPortCycle = Create-HwButton ">> [1] POWER CYCLE PORT (REPLUG)"       12 400 335 38 $clWarn;
+$btnPnpDev    = Create-HwButton ">> [2] RESTART DRIVER (DISABLE/ENABLE)"  367 400 335 38 $clGreen;
+$btnPurge     = Create-HwButton ">> [3] UNINSTALL FAULTED DEVICE (CODE 43)" 12 445 335 38 $clAlert;
+$btnBusScan   = Create-HwButton ">> [4] SCAN FOR HARDWARE CHANGES"        367 445 335 38 $clDimGreen;
 
 $chkTop = New-Object System.Windows.Forms.CheckBox;
 $chkTop.Location = New-Object System.Drawing.Point(15, 495);

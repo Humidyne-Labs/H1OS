@@ -303,11 +303,13 @@ esp_err_t orch_flow_query_telemetry(float *out_temp_c, float *out_rh_pct, float 
     if (is_new_sample) {
         const char *state_str = (st->flags & ORCH_FLAG_THERMAL_LOCKOUT) ? "SETTLING" : "SETTLED(SHTC3_DIRECT)";
         ESP_LOGI(TAG,
-                 "Flow A Ring: samples=%lu head=%u trend=%u | "
+                 "Flow A Ring: samples=%lu head=%u trend=%u fails=%lu err=%u | "
                  "Latest[SHTC3=%.2fC/%.1f%% Die=%.2fC flags=0x%02X]",
                     (unsigned long)st->total_samples,
                     st->ring_head,
                     st->valid_trend,
+                    (unsigned long)st->sensor_fail_count,
+                    st->last_sensor_error,
                     (double)((float)latest_raw.shtc3_temp_centi_c / 100.0f),
                     (double)((float)latest_raw.shtc3_rh_centi_pct / 100.0f),
                     (double)t_die,
