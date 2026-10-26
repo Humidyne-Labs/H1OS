@@ -728,3 +728,101 @@ When configured in pulsed timer mode (`TI_TP = 1` in Register `0x11`), the PCF85
    * **In Main CPU (`sub_power.c`):** In `sub_power_enter_deep_sleep_mode()`, wait until `GPIO 5`, `GPIO 0`, and `GPIO 18` read HIGH before arming `GPIO_WAKEUP_ENA`.
 
 2. **Stuck-Line Fault Trap:** If `GPIO 5` fails to return HIGH within 50 ms, the ULP logs `rtc_int_stuck = 1`, bypasses `GPIO_WAKEUP_ENA` re-arming to prevent runaway infinite wake loops, and wakes the Main CPU to clear the stuck RTC flag over I2C.
+
+
+### ERR-S4: Compile-Time Optimization Level (-O2) Bit-Bang I2C Timing & Pipeline Collapse
+
+* **Component:** Xtensa LX7 Core 0 RTC Wake Stub (`orch_wake_stub.c`)
+* **Subsystem:** Flow A Sensor Ingestion & SHTC3 Bit-Bang Interface
+* **Severity:** Critical (complete telemetry loss under `-O2` production release profile; zero ring samples ingested, `Ring: 0/32`)
+
+#### Description & Root Cause Analysis
+
+During environmental chamber qualification soak **Run #2** (`TST_002`), the firmware compiled under the production profile (`profiles/sdkconfig.defaults.prod`: `-O2`, assertions disabled, `LOG_LEVEL_WARN`) experienced complete SHTC3 telemetry loss. Across 625 deep sleep wake events (10.4 hours), the ring buffer head remained trapped at zero (`st->ring_head = 0`, `st->total_samples = 0`). In contrast, identical code compiled under the development profile (`profiles/sdkconfig.defaults.dev`: `-Og`, debug symbols, `LOG_LEVEL_INFO`) functioned with 100% sample acquisition reliability.
+
+**The Compiler Optimization Mechanism:**
+1. **Instruction Inlining & Delay Erasure:** Under `-Og`, function calls to `sda_high()`, `scl_high()`, and `i2c_delay()` generated full Xtensa stack frames (`entry`, `retw`) and discrete calls. This calling overhead inserted unintentional but crucial microsecond delays that allowed open-drain lines (with external $4.7\text{ k}\Omega$ pull-up resistors and trace capacitance) to rise above the $V_{IH}$ logic threshold before being sampled. Under `-O2`, GCC aggressively inlined all helper functions and scheduled GPIO writes back-to-back, reducing pin hold times to raw single-cycle operations.
+2. **ROM Delay Variance:** The generic `esp_rom_delay_us()` routine relies on software spin loops calibrated against assumed core clock configurations. At 80 MHz in RTC Fast Memory before the main PLL is active, ROM delay loops can execute faster than nominal, shrinking the razor-thin SHTC3 wake duration ($t_{\text{Wake}} = 240\ \mu\text{s}$ datasheet maximum) below the sensor's physical readiness threshold.
+3. **Out-of-Order Bus Pipeline Hazards:** The Xtensa LX7 pipeline can reorder memory-mapped register reads (`REG_READ(GPIO_IN1_REG)`) before preceding GPIO direction and output register writes (`REG_WRITE(GPIO_ENABLE1_W1TS_REG)`) have fully drained across the internal peripheral bus.
+
+#### Reference: Original C Code vs. Inline Assembly Replacement
+
+##### 1. GPIO Pin Toggling and Bus Memory Barriers
+
+* **Original Vulnerable C Implementation:**
+  ```c
+  static inline void RTC_IRAM_ATTR sda_high(void)
+  {
+      REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
+  }
+
+  static inline void RTC_IRAM_ATTR sda_low(void)
+  {
+      REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
+      REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
+  }
+
+  static inline uint8_t RTC_IRAM_ATTR sda_read(void)
+  {
+      return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
+  }
+  ```
+
+* **Inline Assembly Hardened Implementation:**
+  ```c
+  static inline void RTC_IRAM_ATTR sda_high(void)
+  {
+      REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
+      asm volatile("memw" ::: "memory");
+  }
+
+  static inline void RTC_IRAM_ATTR sda_low(void)
+  {
+      REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
+      REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
+      asm volatile("memw" ::: "memory");
+  }
+
+  static inline uint8_t RTC_IRAM_ATTR sda_read(void)
+  {
+      asm volatile("memw" ::: "memory");
+      return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
+  }
+  ```
+  *Technical Improvement:* The `memw` (Memory Wait) instruction forces the CPU execution pipeline to stall until all prior memory and peripheral bus store transactions are committed to hardware before subsequent instructions or reads execute.
+
+##### 2. Cycle-Accurate Microsecond Timing Engine
+
+* **Original Vulnerable C Implementation:**
+  ```c
+  static inline void RTC_IRAM_ATTR i2c_delay(void)
+  {
+      esp_rom_delay_us(5);
+  }
+  ```
+
+* **Inline Assembly Hardened Implementation:**
+  ```c
+  /**
+   * @brief Cycle-accurate hardware microsecond delay via Xtensa CCOUNT register.
+   *
+   * @details Core 0 executes at 80 MHz in RTC Wake Stub (80 CPU clock cycles per microsecond).
+   * Reading the hardware CCOUNT register ensures cycle-accurate timing that cannot be
+   * optimized away or shortened by compiler optimization flags (-O2, -O3, -Os).
+   */
+  static inline void RTC_IRAM_ATTR rtc_delay_us_exact(uint32_t us)
+  {
+      const uint32_t cycles_to_wait = us * 80U;
+      uint32_t start, current;
+      asm volatile("rsr %0, ccount" : "=r"(start));
+      do {
+          asm volatile("rsr %0, ccount" : "=r"(current));
+      } while ((current - start) < cycles_to_wait);
+  }
+
+  static inline void RTC_IRAM_ATTR i2c_delay(void)
+  {
+      rtc_delay_us_exact(5);
+  }
+  ```
+  *Technical Improvement:* Directly queries the 32-bit hardware cycle counter register (`rsr %0, ccount`). At 80 MHz, each microsecond corresponds to exactly 80 clock cycles. Because the termination condition evaluates a monotonically increasing silicon counter, compiler optimizations cannot compress, unroll, or eliminate the delay. All wake stub delays (`i2c_delay(5)`, SHTC3 wake `250`, post-TSENS `14050`, and peripheral settling delays) are unified under `rtc_delay_us_exact()`.

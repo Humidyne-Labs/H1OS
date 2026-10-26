@@ -55,35 +55,57 @@
 #define RTC_CTRL2_COF_OFF     0x07
 // clang-format on
 
+/**
+ * @brief Cycle-accurate hardware microsecond delay via Xtensa CCOUNT register.
+ *
+ * @details Core 0 executes at 80 MHz in RTC Wake Stub (80 CPU clock cycles per microsecond).
+ * Reading the hardware CCOUNT register ensures cycle-accurate timing that cannot be
+ * optimized away or shortened by compiler optimization flags (-O2, -O3, -Os).
+ */
+static inline void RTC_IRAM_ATTR rtc_delay_us_exact(uint32_t us)
+{
+    const uint32_t cycles_to_wait = us * 80U;
+    uint32_t start, current;
+    asm volatile("rsr %0, ccount" : "=r"(start));
+    do {
+        asm volatile("rsr %0, ccount" : "=r"(current));
+    } while ((current - start) < cycles_to_wait);
+}
+
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
-    esp_rom_delay_us(5);
+    rtc_delay_us_exact(5);
 }
 
 static inline void RTC_IRAM_ATTR sda_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
+    asm volatile("memw" ::: "memory");
 }
 
 static inline void RTC_IRAM_ATTR sda_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
+    asm volatile("memw" ::: "memory");
 }
 
 static inline void RTC_IRAM_ATTR scl_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
+    asm volatile("memw" ::: "memory");
 }
 
 static inline void RTC_IRAM_ATTR scl_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SCL_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SCL_BIT_MASK);
+    asm volatile("memw" ::: "memory");
 }
 
 static inline uint8_t RTC_IRAM_ATTR sda_read(void)
 {
+    asm volatile("memw" ::: "memory");
     return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
 }
 
@@ -196,13 +218,13 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
-    esp_rom_delay_us(ORCH_TSENS_SETTLING_DELAY_US);
+    rtc_delay_us_exact(ORCH_TSENS_SETTLING_DELAY_US);
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     int32_t timeout = (int32_t)ORCH_TSENS_READY_TIMEOUT_CYCLES;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
-        esp_rom_delay_us(ORCH_TSENS_READY_POLL_INTERVAL_US);
+        rtc_delay_us_exact(ORCH_TSENS_READY_POLL_INTERVAL_US);
     }
     uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
 
@@ -239,7 +261,7 @@ static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
         if (ok) {
             return true;
         }
-        esp_rom_delay_us(20);
+        rtc_delay_us_exact(20);
     }
     return false;
 }
@@ -301,7 +323,7 @@ static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
         if (ok) {
             break;
         }
-        esp_rom_delay_us(50);
+        rtc_delay_us_exact(50);
     }
     return ok;
 }
@@ -319,7 +341,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
     if (ulp_dispatch_reason != ULP_DISPATCH_SENSOR_SAMPLE && cause != TIMER_EXPIRE) {
-        esp_rom_delay_us(5);
+        rtc_delay_us_exact(5);
         esp_default_wake_deep_sleep();
         return;
     }
@@ -353,7 +375,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             i2c_write_byte(0x35);
             i2c_write_byte(0x17);
             i2c_stop();
-            esp_rom_delay_us(250);
+            rtc_delay_us_exact(250);
         }
     }
 
@@ -372,7 +394,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
             /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
             die_centi_c = wake_stub_read_die_temp_centi_c(st->tsens_offset_centi_c, 0);
-            esp_rom_delay_us(ORCH_SHTC3_POST_TSENS_DELAY_US);
+            rtc_delay_us_exact(ORCH_SHTC3_POST_TSENS_DELAY_US);
         }
     }
 
@@ -456,7 +478,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     st->ulp_dispatch_reason = ULP_DISPATCH_SENSOR_SAMPLE;
 
     /* 1. Clear TF & AF in PCF85063A Control_2 (or rearm remainder) FIRST so /INT can release */
-    esp_rom_delay_us(20);
+    rtc_delay_us_exact(20);
     if (ulp_slice_counter == (ulp_overflow_limit - 1) && ulp_remainder_sec > 0) {
         rtc_rearm_countdown_stub(ulp_remainder_sec);
     } else {
@@ -467,7 +489,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* 2. Wait for the PCF85063A open-drain /INT line to release back HIGH before clearing status */
     uint32_t timeout_us = ORCH_I2C_RECOVERY_TIMEOUT_US;
     while (((REG_READ(RTC_GPIO_IN_REG) >> (RTC_GPIO_IN_NEXT_S + HAL_PIN_RTC_INT)) & 1U) == 0) {
-        esp_rom_delay_us(ORCH_I2C_RECOVERY_STEP_US);
+        rtc_delay_us_exact(ORCH_I2C_RECOVERY_STEP_US);
         if (timeout_us <= ORCH_I2C_RECOVERY_STEP_US) {
             break;
         }
@@ -487,7 +509,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     /* Re-arm ULP GPIO wakeup */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
-    esp_rom_delay_us(120);
+    rtc_delay_us_exact(120);
 
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);

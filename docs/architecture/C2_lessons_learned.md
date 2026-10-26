@@ -204,3 +204,14 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 - **The Issue:** When operating on the bench without a physical LiPo battery installed, the unit continually entered `[CRITICAL LOW POWER SHUTDOWN]` upon boot.
 - **Root Cause:** The 200kΩ/200kΩ battery voltage divider on `GPIO 4` floats to $\approx 1.97\text{ V}$ when unpowered by a battery. The ULP brownout detector interpreted $1972\text{ mV}$ as an emergency depleted battery (falling between $100\text{ mV}$ and $3250\text{ mV}$) and commanded immediate shutdown.
 - **The Solution:** Implement the **Zero-Volt Cable Guard**: when the power latch is held HIGH and the USB VBUS line is active (`hal_check_usb_ll() == true`), the battery is forced to 4200 mV (100%), and the ULP brownout trip is suppressed.
+
+
+### 4.11 The Optimization Level (-O2) Timing Collapse Trap (Debug vs. Release Invariants)
+- **The Issue:** Bit-bang I2C sensor acquisition in the Flow A wake stub operated with 100% reliability under `-Og` (Debug), but completely failed to ingest samples under `-O2` (Release), leaving the ring buffer empty (`Ring: 0/32`) and telemetry trapped at zero across 625 cycles in chamber test `TST_002`.
+- **Root Cause:**
+  1. Under `-Og`, function calling overhead, un-inlined helpers (`sda_high()`, `scl_low()`), and stack frame manipulation inadvertently provided the necessary $\approx 1\text{–}2\ \mu\text{s}$ settling times required by physical pull-up resistors and bus trace capacitance.
+  2. Under `-O2`, aggressive compiler inlining and loop scheduling flattened the I2C routines into consecutive machine cycles without adequate line-settling margins. Furthermore, `esp_rom_delay_us()` relies on software loops that can execute faster than nominal at 80 MHz in RTC memory.
+- **The Solution:**
+  1. **Hardware Cycle Counter Delay (`rsr.ccount`):** Replaced all software delay loops with `rtc_delay_us_exact()`, reading the Xtensa hardware `ccount` register. Each microsecond is evaluated against exactly 80 clock cycles at 80 MHz, making delay loops physically immune to compiler optimization flags.
+  2. **Pipeline Memory Barriers (`memw`):** Inserted `memw` instructions after all GPIO direction and level manipulations, ensuring hardware bus transactions are committed to the peripheral registers before the pipeline evaluates bus state.
+  3. **Passive Error Visibility:** Telemetry structures were updated to persist `sensor_fail_count` and `last_sensor_error` to RTC Slow Memory and display them on Screen 4 (`Wakes: <wakes> (Fail: <fails>)` and `SHT: OK / ERR_<n>`), eliminating silent telemetry dropouts.

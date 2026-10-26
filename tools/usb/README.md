@@ -60,10 +60,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\term_usb_toolbox.ps1"
 | --- | --- |
 | `[ OPEN MONITOR ]` | Connects to the selected COM port and streams bootloader/runtime serial telemetry. |
 | `[ EXPORT LOG ]` | Opens a file dialog pre-filled with a timestamped filename (`esp32_boot_log_*.log`) to export the text buffer. |
-| `>> [1] IOCTL PORT CYCLE (SE0)` | Sends an upstream hub port cycle command to simulate a physical cable disconnect/reconnect. |
-| `>> [2] TOGGLE PNP DEVNODE` | Toggles the PnP device state (`Disable-PnpDevice` followed by `Enable-PnpDevice`). |
-| `>> [3] PURGE FAULT NODES` | Uninstalls un-enumerated/broken DevNodes via `pnputil /remove-device`. |
-| `>> [4] BUS RESCAN` | Triggers a PnP subsystem scan (`pnputil /scan-devices`) to re-enumerate hardware. |
+| `>> [1] POWER CYCLE PORT (REPLUG)` | Sends an upstream hub port cycle command to simulate a physical cable disconnect/reconnect. |
+| `>> [2] RESTART DRIVER (DISABLE/ENABLE)` | Toggles the PnP device state (`Disable-PnpDevice` followed by `Enable-PnpDevice`). |
+| `>> [3] UNINSTALL FAULTED DEVICE (CODE 43)` | Uninstalls un-enumerated/broken DevNodes via `pnputil /remove-device`. |
+| `>> [4] SCAN FOR HARDWARE CHANGES` | Triggers a PnP subsystem scan (`pnputil /scan-devices`) to re-enumerate hardware. |
 | `ALWAYS ON TOP` | Pins the terminal console above IDEs, debuggers, and schematics. |
 
 ---
@@ -79,7 +79,7 @@ PORTS: [NONE] // FAULTED NODES: 1 (RESET REQUIRED)
 ```
 
 
-2. **Execute Hardware Reset:** Click **`>> [1] IOCTL PORT CYCLE (SE0)`**.
+2. **Execute Hardware Reset:** Click **`>> [1] POWER CYCLE PORT (REPLUG)`**.
 * The tool automatically closes any active COM handles.
 * Upstream hub hardware drops power/SE0 lines momentarily.
 

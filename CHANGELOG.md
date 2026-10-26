@@ -4,6 +4,32 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2-dev] - 2026-10-25
+
+### 🛡️ Fixed & Hardened (Cycle-Accurate Wake Stub Assembly & USB Recovery Tool Hardening)
+
+* **Cycle-Accurate Xtensa Assembly Timing Engine & Memory Barriers** (`orch_wake_stub.c`, `ERRATA.md`, `C2_lessons_learned.md`):
+  * Resolved critical `-O2` compiler optimization timing collapse in Flow A wake stub (`ERR-S4`). Replaced software loop calls (`esp_rom_delay_us`) with hardware-cycle-counter based delay (`rtc_delay_us_exact`) querying Xtensa LX7 `rsr.ccount` at 80 MHz, rendering bit-bang timing 100% immune to compiler optimization flags.
+  * Preserved all existing hardware timing budgets (5 µs I2C bit clock = 400 cycles, 250 µs SHTC3 wake pulse = 20,000 cycles, 14,050 µs post-TSENS remainder = 1,124,000 cycles).
+  * Inserted Xtensa `memw` (Memory Wait) pipeline memory barriers across `sda_high()`, `sda_low()`, `scl_high()`, `scl_low()`, and `sda_read()` to guarantee peripheral bus store completion before subsequent instruction scheduling.
+  * Formally documented root cause and side-by-side C vs. Assembly code comparisons in `ERRATA.md` (`ERR-S4`) and `docs/architecture/C2_lessons_learned.md` (Section 4.11).
+* **Sensor Error Telemetry Console Propagation** (`orch_flow.c`):
+  * Updated `Flow A Ring:` informational console logging in `orch_flow.c` to format `fails=%lu err=%u`, exposing `sensor_fail_count` and `last_sensor_error` over serial during wake and interactive telemetry queries.
+* **USB Recovery Terminal & Port Cycler Hardening** (`tools/usb/term_usb_toolbox.ps1`, `tools/usb/README.md`):
+  * Corrected Win32 kernel control code from invalid `0x220414` to canonical `IOCTL_USB_HUB_CYCLE_PORT` (`0x220444`), eliminating `ERROR_INSUFFICIENT_BUFFER` (122).
+  * Formulated valid Win32 device interface class links (`\\?\$pHash#{f18a0e88-c30c-11d0-8815-00a0c906bed8}`), resolving `ERROR_FILE_NOT_FOUND` (2) when opening handles to upstream parent hubs.
+  * Implemented canonical 1-based port index resolution via `DEVPKEY_Device_Address`, with multi-tiered fallbacks to `DEVPKEY_Device_LocationInfo` and `DEVPKEY_Device_LocationPaths`.
+  * Added UsbTreeView-style graceful fallback to elevated PnP DevNode reset and removal upon hardware port cycle failure on passive hubs.
+  * Renamed UI action controls to clear, self-explanatory operator labels: `POWER CYCLE PORT (REPLUG)`, `RESTART DRIVER (DISABLE/ENABLE)`, `UNINSTALL FAULTED DEVICE (CODE 43)`, and `SCAN FOR HARDWARE CHANGES`.
+
+### 🔄 Changed & Removed
+
+* **Removed Legacy Utility** (`tools/usb/reset_coms.ps1`):
+  * Removed obsolete stand-alone script `reset_coms.ps1`, fully superseded by the hardened GUI recovery terminal.
+* **Semantic Version Bump (`2.4.2-dev`)** (`h1os_version.h`, `idf_component.yml`, `README.md`, `CHANGELOG.md`):
+  * Synchronized semantic version strings across all core locations to `2.4.2-dev`.
+  * Regenerated markdown API reference (`docs/api.md`) via Doxygen and Moxygen.
+
 ## [2.4.1-dev] - 2026-10-25
 
 ### 🛡️ Fixed & Hardened (Chamber Post-Mortem, Typography Suite & Display Bounds Verification)

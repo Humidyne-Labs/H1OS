@@ -1958,7 +1958,7 @@ Minor version number (backward-compatible features).
 ### H1OS_VERSION_PATCH
 
 ```cpp
-#define H1OS_VERSION_PATCH 1
+#define H1OS_VERSION_PATCH 2
 ```
 
 Defined in h1os/h1os_version.h:19
@@ -1986,7 +1986,7 @@ Pre-release release track tag.
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.4.1-dev"
+#define H1OS_VERSION_STRING "2.4.2-dev"
 ```
 
 Defined in h1os/h1os_version.h:21
@@ -7740,7 +7740,7 @@ ESP_OK on success, or ESP_ERR_INVALID_ARG if any pointer is NULL.
 static void orch_flow_quiesce_peripherals(void)
 ```
 
-Defined in orch_flow.c:351
+Defined in orch_flow.c:353
 
 Orch flow quiesce peripherals.
 
@@ -7759,7 +7759,7 @@ Return value of type static void.
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 ```
 
-Defined in orch_flow.c:374
+Defined in orch_flow.c:376
 
 Orch flow execute sleep.
 
@@ -7782,7 +7782,7 @@ ESP_OK on success, or an error code.
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 ```
 
-Defined in orch_flow.c:430
+Defined in orch_flow.c:432
 
 Execute coordinated sleep transition sequence to deep sleep.
 
@@ -11573,6 +11573,24 @@ Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
 
 ---
 
+{#rtc_delay_us_exact}
+
+### rtc_delay_us_exact
+
+`static` `inline`
+
+```cpp
+static inline void RTC_IRAM_ATTR rtc_delay_us_exact(uint32_t us)
+```
+
+Defined in orch_wake_stub.c:65
+
+Cycle-accurate hardware microsecond delay via Xtensa CCOUNT register.
+
+Core 0 executes at 80 MHz in RTC Wake Stub (80 CPU clock cycles per microsecond). Reading the hardware CCOUNT register ensures cycle-accurate timing that cannot be optimized away or shortened by compiler optimization flags (-O2, -O3, -Os).
+
+---
+
 {#i2c_delay}
 
 ### i2c_delay
@@ -11583,7 +11601,7 @@ Marked with RTC_IRAM_ATTR to reside in RTC Fast Memory.
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 ```
 
-Defined in orch_wake_stub.c:58
+Defined in orch_wake_stub.c:75
 
 ---
 
@@ -11597,7 +11615,7 @@ Defined in orch_wake_stub.c:58
 static inline void RTC_IRAM_ATTR sda_high(void)
 ```
 
-Defined in orch_wake_stub.c:63
+Defined in orch_wake_stub.c:80
 
 ---
 
@@ -11611,7 +11629,7 @@ Defined in orch_wake_stub.c:63
 static inline void RTC_IRAM_ATTR sda_low(void)
 ```
 
-Defined in orch_wake_stub.c:68
+Defined in orch_wake_stub.c:86
 
 ---
 
@@ -11625,7 +11643,7 @@ Defined in orch_wake_stub.c:68
 static inline void RTC_IRAM_ATTR scl_high(void)
 ```
 
-Defined in orch_wake_stub.c:74
+Defined in orch_wake_stub.c:93
 
 ---
 
@@ -11639,7 +11657,7 @@ Defined in orch_wake_stub.c:74
 static inline void RTC_IRAM_ATTR scl_low(void)
 ```
 
-Defined in orch_wake_stub.c:79
+Defined in orch_wake_stub.c:99
 
 ---
 
@@ -11653,7 +11671,7 @@ Defined in orch_wake_stub.c:79
 static inline uint8_t RTC_IRAM_ATTR sda_read(void)
 ```
 
-Defined in orch_wake_stub.c:85
+Defined in orch_wake_stub.c:106
 
 ---
 
@@ -11667,7 +11685,7 @@ Defined in orch_wake_stub.c:85
 static void RTC_IRAM_ATTR i2c_start(void)
 ```
 
-Defined in orch_wake_stub.c:90
+Defined in orch_wake_stub.c:112
 
 ---
 
@@ -11681,7 +11699,7 @@ Defined in orch_wake_stub.c:90
 static void RTC_IRAM_ATTR i2c_stop(void)
 ```
 
-Defined in orch_wake_stub.c:101
+Defined in orch_wake_stub.c:123
 
 ---
 
@@ -11695,7 +11713,7 @@ Defined in orch_wake_stub.c:101
 static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
 ```
 
-Defined in orch_wake_stub.c:111
+Defined in orch_wake_stub.c:133
 
 ---
 
@@ -11709,7 +11727,7 @@ Defined in orch_wake_stub.c:111
 static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
 ```
 
-Defined in orch_wake_stub.c:136
+Defined in orch_wake_stub.c:158
 
 ---
 
@@ -11723,7 +11741,7 @@ Defined in orch_wake_stub.c:136
 static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t * data, size_t len)
 ```
 
-Defined in orch_wake_stub.c:166
+Defined in orch_wake_stub.c:188
 
 ---
 
@@ -11737,7 +11755,7 @@ Defined in orch_wake_stub.c:166
 static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
 ```
 
-Defined in orch_wake_stub.c:190
+Defined in orch_wake_stub.c:212
 
 Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
 
@@ -11763,7 +11781,7 @@ Sampled die temperature in centi-°C.
 static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
 ```
 
-Defined in orch_wake_stub.c:228
+Defined in orch_wake_stub.c:250
 
 Write a register to PCF85063A over bit-banged I2C with up to 3 attempts.
 
@@ -11779,7 +11797,7 @@ Write a register to PCF85063A over bit-banged I2C with up to 3 attempts.
 static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
 ```
 
-Defined in orch_wake_stub.c:252
+Defined in orch_wake_stub.c:274
 
 Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
 
@@ -11801,7 +11819,7 @@ Re-arm PCF85063A countdown timer in RTC Fast IRAM for remainder interval.
 static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 ```
 
-Defined in orch_wake_stub.c:290
+Defined in orch_wake_stub.c:312
 
 Reliable SHTC3 sleep dispatch with ACK verification.
 
@@ -11818,7 +11836,7 @@ True if sleep command was acknowledged, false otherwise.
 void RTC_IRAM_ATTR bsp_wake_stub(void)
 ```
 
-Defined in orch_wake_stub.c:314
+Defined in orch_wake_stub.c:336
 
 Master RTC Wake Stub entry function.
 
@@ -11840,7 +11858,7 @@ Executes fast sub-3ms Flow A sensor bursts using bitbanged I2C without booting t
 void orch_wake_stub_install(void)
 ```
 
-Defined in orch_wake_stub.c:512
+Defined in orch_wake_stub.c:534
 
 Install the RTC deep sleep wake stub.
 
