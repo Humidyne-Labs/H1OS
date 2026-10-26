@@ -403,20 +403,17 @@ def main():
     parser.add_argument("positional_build_dir", nargs="?", default=None, help="Optional positional build directory (e.g. build_prod)")
     parser.add_argument("--out-dir", "-o", help="Custom output directory for release artifacts")
     parser.add_argument("--no-zip", action="store_true", help="Skip zip bundle generation")
+    parser.add_argument("--version", "-V", help="Explicit version string override (e.g. 2.4.3)")
+    parser.add_argument("--prod", action="store_true", help="Force production naming (strip -dev tag)")
+    parser.add_argument("--dev", action="store_true", help="Force dev naming (keep -dev tag)")
     args = parser.parse_args()
 
     target_build_dir = args.build_dir or args.positional_build_dir
 
     script_dir = Path(__file__).resolve().parent
     repo_root = find_project_root(script_dir)
-    version = resolve_h1os_version(repo_root)
     git_commit = get_git_commit(repo_root)
     py_exe = get_idf_python_exe()
-
-    print(f"\n{'='*72}")
-    print(f"  H1OS Production Firmware Packager v{VERSION}")
-    print(f"  Target Release: v{version} (Commit: {git_commit})")
-    print(f"{'='*72}\n")
 
     # Locate build directory
     search_dirs = [repo_root / "examples" / "H1OS", repo_root, script_dir]
@@ -428,7 +425,25 @@ def main():
         print("Please compile first with: idf.py -B build_prod build (or build_dev)")
         sys.exit(1)
 
-    print(f"[*] Discovered Build Directory : {build_dir}")
+    raw_version = resolve_h1os_version(repo_root)
+    is_prod_build = "prod" in build_dir.name.lower()
+
+    if args.version:
+        version = args.version.lstrip("v")
+    elif args.prod or (is_prod_build and not args.dev):
+        # When packaging from a production build directory (build_prod), strip any -dev/-alpha/-beta pre-release suffix
+        version = re.sub(r"-(dev|alpha|beta|rc\d*)$", "", raw_version, flags=re.IGNORECASE)
+    else:
+        version = raw_version
+
+    build_flavor = "Production" if is_prod_build else "Development"
+
+    print(f"\n{'='*72}")
+    print(f"  H1OS {build_flavor} Firmware Packager v{VERSION}")
+    print(f"  Target Release: v{version} (Commit: {git_commit})")
+    print(f"{'='*72}\n")
+
+    print(f"[*] Discovered Build Directory : {build_dir} [{build_flavor}]")
     flash_info = parse_flash_args(build_dir)
     print(f"[*] Flash Configuration       : Mode={flash_info['flash_mode']}, Freq={flash_info['flash_freq']}, Size={flash_info['flash_size']}")
     print(f"[*] Target Binaries Found      : {len(flash_info['binaries'])} parts")
@@ -571,7 +586,7 @@ python -m esptool --chip esp32s3 -b 460800 write-flash 0x0 {factory_bin_name}
         print(f"    [+] Created Release Zip: {zip_path.name} ({zip_sz_mb:.2f} MB)")
 
     print(f"\n{'='*72}")
-    print(f"  [SUCCESS] H1OS Production Release v{version} Packaged Successfully!")
+    print(f"  [SUCCESS] H1OS {build_flavor} Release v{version} Packaged Successfully!")
     print(f"  Distribution Directory : {dist_root}")
     if not args.no_zip:
         print(f"  Release Archive (.zip) : {zip_path}")
