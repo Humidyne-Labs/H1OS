@@ -64,7 +64,8 @@ typedef enum {
     ORCH_SENSOR_ERR_NACK_MEASURE = 2, /**< SHTC3 measurement command (0x7866) NACKed.            */
     ORCH_SENSOR_ERR_NACK_ADDR_RD = 3, /**< SHTC3 read address (0x71) NACKed.                     */
     ORCH_SENSOR_ERR_CRC_FAIL     = 4, /**< CRC-8 checksum verification failed on received bytes.  */
-    ORCH_SENSOR_ERR_BUS_STUCK    = 5  /**< SDA or SCL line held low prior to starting transfer.  */
+    ORCH_SENSOR_ERR_BUS_STUCK    = 5, /**< SDA or SCL line held low prior to starting transfer.  */
+    ORCH_SENSOR_ERR_NACK_SLEEP   = 6  /**< SHTC3 sleep command (0xB098) NACKed.                  */
 } orch_sensor_err_t;
 
 #define SAMPLE_FLAG_VALID_COLD      0x01 /**< Steady-state sample captured during quiescent sleep.   */
@@ -149,7 +150,7 @@ typedef struct {
     uint8_t _pad_soc[2]; /**< Alignment padding to 32-bit boundary.                                  */
     uint32_t sensor_fail_count; /**< Monotonic count of failed wake-stub sensor reads.                     */
     uint8_t last_sensor_error; /**< Last error code (orch_sensor_err_t).                                  */
-    uint8_t _pad_sensor[3]; /**< Alignment padding to 32-bit boundary.                                 */
+    uint8_t _pad_sensor[3];    /**< Alignment padding to 32-bit boundary.                                 */
 } orch_persisted_state_t;
 
 // clang-format off

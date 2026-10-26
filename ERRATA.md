@@ -826,3 +826,46 @@ During environmental chamber qualification soak **Run #2** (`TST_002`), the firm
   }
   ```
   *Technical Improvement:* Directly queries the 32-bit hardware cycle counter register (`rsr %0, ccount`). At 80 MHz, each microsecond corresponds to exactly 80 clock cycles. Because the termination condition evaluates a monotonically increasing silicon counter, compiler optimizations cannot compress, unroll, or eliminate the delay. All wake stub delays (`i2c_delay(5)`, SHTC3 wake `250`, post-TSENS `14050`, and peripheral settling delays) are unified under `rtc_delay_us_exact()`.
+
+##### 3. Compiler Flash Lookup Table Synthesis in RTC Wake Stub (`ERR-SW1`)
+
+* **Defect Description:** Under GCC Release optimization (`-O2`), the loop optimizer recognized the fixed-polynomial bit-shift calculation in `shtc3_crc8()` (polynomial `0x31`) and automatically synthesized an unrolled 256-byte precomputed lookup table.
+* **Silicon Failure Mechanism:** Constants default to the `.rodata` section in external SPI NOR Flash (address `0x3C0A379C`). During deep sleep, SPI Flash is powered down and the Flash MMU cache controller is offline. Executing `l32r a10, (0x3c0a379c)` followed by `l8ui a8, a8, 0` loaded floating bus noise / `0xFF` from unpowered Flash. Every computed CRC was corrupted, producing a 100% failure rate (`E4` / `ORCH_SENSOR_ERR_CRC_FAIL`) across every wake. Under `-Og`, loop optimization was disabled, running bitwise shifts in CPU registers inside RTC RAM and masking the defect.
+* **Firmware Mitigation:**
+  ```c
+  static uint8_t RTC_IRAM_ATTR __attribute__((noinline)) shtc3_crc8(const uint8_t *data, size_t len)
+  {
+      uint8_t crc = 0xFF;
+      for (size_t i = 0; i < len; i++) {
+          crc ^= data[i];
+          for (uint8_t bit = 8; bit > 0; --bit) {
+              if (crc & 0x80) {
+                  crc = (uint8_t)((crc << 1) ^ 0x31);
+              } else {
+                  crc = (uint8_t)(crc << 1);
+              }
+              asm volatile("" : "+r"(crc));
+          }
+      }
+      return crc;
+  }
+  ```
+  The empty register barrier `asm volatile("" : "+r"(crc));` forces GCC to keep `crc` in a physical CPU register and strictly prevents the optimizer from synthesizing a lookup table in external `.rodata`. Disassembly verifies execution strictly from `.rtc.text` (`0x600feb6c`) with zero Flash addresses (`0x3C...`).
+
+##### 4. Internal MCU Die TSENS Register Mismatch & Force Power-Down Trap (`ERR-SW2`)
+
+* **Defect Description:** The internal ESP32-S3 TSENS temperature sensor consistently returned default 0 centi-°C in Release (`-O2`).
+* **Silicon Failure Mechanism:**
+  1. *Reset Target:* `SENS_TSENS_RESET` (Bit 29) was written to `SENS_SAR_TSENS_CTRL2_REG` (`0x60008854`), where Bit 29 is unmapped. The true reset line is in `SENS_SAR_PERI_RESET_CONF_REG` (`0x60008908`), leaving the analog oscillator un-reset.
+  2. *Force Power Down:* Per ESP32-S3 TRM (Table *TSENS_CTRL2_REG*), `tsens_xpd_force[1:0]` is:
+     - `0`: Disable force power up function
+     - `1`: Disable force power down function
+     - `2`: Enable force power up
+     - `3`: **Enable force power down**
+     Writing `3` commanded the analog sensor into hardware power down. The canonical setting is `1` (disable force power down, allowing `tsens_power_up = 1` to energize the sensor) followed by `0` on sleep.
+  3. *Latch Sequence:* In ESP-IDF hardware logic, `tsens_dump_out` must be asserted to start conversion, polled until `tsens_ready` asserts, and then **de-asserted to latch the result** prior to reading `tsens_out`. Under `-O2`, a 100-cycle loop timed out before `ready` asserted.
+* **Firmware Mitigation:**
+  - Directed reset pulse to `SENS_SAR_PERI_RESET_CONF_REG`.
+  - Configured `SENS_TSENS_XPD_FORCE = 1` during sample and `0` on sleep.
+  - Implemented the de-assert latch step (`DUMP_OUT = 1` $\rightarrow$ poll `READY` $\rightarrow$ `DUMP_OUT = 0` $\rightarrow$ read `OUT`).
+  - Increased timeout to 1000 cycles (5 ms ceiling).

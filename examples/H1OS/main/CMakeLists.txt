@@ -3,8 +3,9 @@ idf_component_register(
         "main.c"
         "humid1_cyber_wave.c"
         "screens/screen_base.c"
-        "screens/screen_env_hero.c"
+        "screens/screen_env_dash.c"
         "screens/screen_psychrometrics.c"
+        "screens/screen_thermal_nodes.c"
         "screens/screen_system_health.c"
         "screens/screen_diagnostics.c"
     INCLUDE_DIRS
