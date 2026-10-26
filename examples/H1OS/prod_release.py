@@ -50,12 +50,12 @@ def get_idf_python_exe() -> str:
 
 
 def find_project_root(start_dir: Path) -> Path:
-    """Climb up directories until components/h1os or examples/H1OS is found."""
+    """Climb up directories until components/h1os is found."""
     current = start_dir.resolve()
-    for _ in range(5):
-        if (current / "components" / "h1os").exists() or (current / "main" / "main.c").exists():
+    for _ in range(6):
+        if (current / "components" / "h1os").exists():
             return current
-        if (current / "examples" / "H1OS").exists():
+        if (current / ".git").exists():
             return current
         if current.parent == current:
             break
@@ -67,7 +67,8 @@ def resolve_h1os_version(repo_root: Path) -> str:
     """Extract semantic version string from h1os_version.h."""
     header_candidates = [
         repo_root / "components" / "h1os" / "include" / "h1os" / "h1os_version.h",
-        repo_root / ".." / "components" / "h1os" / "include" / "h1os" / "h1os_version.h",
+        repo_root.parent / "components" / "h1os" / "include" / "h1os" / "h1os_version.h",
+        repo_root.parent.parent / "components" / "h1os" / "include" / "h1os" / "h1os_version.h",
     ]
     for h in header_candidates:
         if h.exists():
@@ -78,7 +79,14 @@ def resolve_h1os_version(repo_root: Path) -> str:
                     return m.group(1).strip()
             except Exception:
                 pass
-    return "2.4.1-dev"
+    try:
+        res = subprocess.run(["git", "describe", "--tags", "--always"], cwd=repo_root, capture_output=True, text=True, check=True)
+        tag = res.stdout.strip().lstrip("v")
+        if tag:
+            return tag
+    except Exception:
+        pass
+    raise RuntimeError(f"Could not locate h1os_version.h from root {repo_root}")
 
 
 def get_git_commit(repo_root: Path) -> str:
