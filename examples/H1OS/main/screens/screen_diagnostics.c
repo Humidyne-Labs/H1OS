@@ -1,6 +1,6 @@
 /**
  * @file screen_diagnostics.c
- * @brief Screen 4: Verbose system diagnostics page
+ * @brief Screen 5: Verbose system diagnostics and silicon telemetry page
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -28,11 +28,11 @@ static const char *get_reset_reason_str(esp_reset_reason_t reason)
     case ESP_RST_SW:
         return "SW_RESTART";
     case ESP_RST_PANIC:
-        return "EXCEPTION_PANIC";
+        return "PANIC";
     case ESP_RST_INT_WDT:
-        return "INT_WATCHDOG";
+        return "INT_WDT";
     case ESP_RST_TASK_WDT:
-        return "TASK_WATCHDOG";
+        return "TASK_WDT";
     case ESP_RST_DEEPSLEEP:
         return "DEEP_SLEEP";
     case ESP_RST_BROWNOUT:
@@ -47,7 +47,7 @@ static const char *get_wake_causes_str(uint32_t causes)
     if (causes & BIT(ESP_SLEEP_WAKEUP_UNDEFINED))
         return "BOOT";
     if (causes & BIT(ESP_SLEEP_WAKEUP_EXT1))
-        return "EXT1_BUTTON_RTC";
+        return "EXT1_BUTTON";
     if (causes & BIT(ESP_SLEEP_WAKEUP_TIMER))
         return "HW_TIMER";
     if (causes & BIT(ESP_SLEEP_WAKEUP_ULP))
@@ -56,7 +56,7 @@ static const char *get_wake_causes_str(uint32_t causes)
 }
 
 /**
- * @brief Renders Screen 4: Verbose hardware register and memory diagnostics page.
+ * @brief Renders Screen 5: Verbose hardware register and memory diagnostics page.
  *
  * @param[in]    telem           Pointer to validated environmental telemetry snapshot.
  * @param[in]    event_cb        Keypad navigation callback.
@@ -66,21 +66,34 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     (void)telem;
     uint32_t base_cpu_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
     h1os_lvgl_lock(100);
-    lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "4/4", event_cb);
+    lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "5/5", event_cb);
 
     volatile orch_persisted_state_t *st = orch_state_get();
 
-    lv_obj_t *lbl_rst = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_rst, "Reset:  %s", get_reset_reason_str(esp_reset_reason()));
-    lv_obj_set_style_text_font(lbl_rst, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_rst, LV_ALIGN_TOP_LEFT, 6, 28);
+    /* Row 1: System Reset Reason */
+    lv_obj_t *lbl_k1 = lv_label_create(scr);
+    lv_label_set_text(lbl_k1, "Reset");
+    lv_obj_set_style_text_font(lbl_k1, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k1, LV_ALIGN_TOP_LEFT, 6, 28);
 
+    lv_obj_t *lbl_v1 = lv_label_create(scr);
+    lv_label_set_text(lbl_v1, get_reset_reason_str(esp_reset_reason()));
+    lv_obj_set_style_text_font(lbl_v1, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v1, LV_ALIGN_TOP_RIGHT, -6, 28);
+
+    /* Row 2: Deep Sleep Wake Event Cause */
     uint32_t causes = esp_sleep_get_wakeup_causes();
-    lv_obj_t *lbl_wake = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_wake, "Wake:   %s", get_wake_causes_str(causes));
-    lv_obj_set_style_text_font(lbl_wake, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_wake, LV_ALIGN_TOP_LEFT, 6, 48);
+    lv_obj_t *lbl_k2 = lv_label_create(scr);
+    lv_label_set_text(lbl_k2, "Wake");
+    lv_obj_set_style_text_font(lbl_k2, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k2, LV_ALIGN_TOP_LEFT, 6, 48);
 
+    lv_obj_t *lbl_v2 = lv_label_create(scr);
+    lv_label_set_text(lbl_v2, get_wake_causes_str(causes));
+    lv_obj_set_style_text_font(lbl_v2, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v2, LV_ALIGN_TOP_RIGHT, -6, 48);
+
+    /* Row 3: ULP Coprocessor Dispatch Mode */
     const char *ulp_str = "NONE";
     switch (st->ulp_dispatch_reason) {
     case ULP_DISPATCH_SENSOR_SAMPLE:
@@ -103,55 +116,83 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
         break;
     }
 
-    lv_obj_t *lbl_ulp = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_ulp, "ULP:    %s", ulp_str);
-    lv_obj_set_style_text_font(lbl_ulp, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_ulp, LV_ALIGN_TOP_LEFT, 6, 68);
+    lv_obj_t *lbl_k3 = lv_label_create(scr);
+    lv_label_set_text(lbl_k3, "RISC-V");
+    lv_obj_set_style_text_font(lbl_k3, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k3, LV_ALIGN_TOP_LEFT, 6, 68);
 
-    lv_obj_t *lbl_heap = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_heap, "Heap:   %luK / %luK Min",
+    lv_obj_t *lbl_v3 = lv_label_create(scr);
+    lv_label_set_text(lbl_v3, ulp_str);
+    lv_obj_set_style_text_font(lbl_v3, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v3, LV_ALIGN_TOP_RIGHT, -6, 68);
+
+    /* Row 4: Heap Memory (Current Free & Minimum Watermark) */
+    lv_obj_t *lbl_k4 = lv_label_create(scr);
+    lv_label_set_text(lbl_k4, "Heap");
+    lv_obj_set_style_text_font(lbl_k4, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k4, LV_ALIGN_TOP_LEFT, 6, 88);
+
+    lv_obj_t *lbl_v4 = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_v4, "%luK (Min %luK)",
                           (unsigned long)(esp_get_free_heap_size() / 1024),
                           (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
-    lv_obj_set_style_text_font(lbl_heap, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_heap, LV_ALIGN_TOP_LEFT, 6, 94);
+    lv_obj_set_style_text_font(lbl_v4, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v4, LV_ALIGN_TOP_RIGHT, -6, 88);
 
+    /* Row 5: FreeRTOS Presentation Task Stack High-Water Mark */
     UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-    lv_obj_t *lbl_stack = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_stack, "Stack:  %u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
-    lv_obj_set_style_text_font(lbl_stack, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_stack, LV_ALIGN_TOP_LEFT, 6, 114);
+    lv_obj_t *lbl_k5 = lv_label_create(scr);
+    lv_label_set_text(lbl_k5, "Stack");
+    lv_obj_set_style_text_font(lbl_k5, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k5, LV_ALIGN_TOP_LEFT, 6, 108);
 
-    lv_obj_t *lbl_wakes = lv_label_create(scr);
+    lv_obj_t *lbl_v5 = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_v5, "%u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
+    lv_obj_set_style_text_font(lbl_v5, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v5, LV_ALIGN_TOP_RIGHT, -6, 108);
+
+    /* Row 6: Total Wake Cycles & Sensor Ingestion Failures */
+    lv_obj_t *lbl_k6 = lv_label_create(scr);
+    lv_label_set_text(lbl_k6, "Wakes");
+    lv_obj_set_style_text_font(lbl_k6, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k6, LV_ALIGN_TOP_LEFT, 6, 128);
+
+    lv_obj_t *lbl_v6 = lv_label_create(scr);
     if (st->sensor_fail_count > 0) {
-        lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Fail: %lu)",
+        lv_label_set_text_fmt(lbl_v6, "%lu (Fail %lu)",
                               (unsigned long)st->wake_count,
                               (unsigned long)st->sensor_fail_count);
     } else {
-        lv_label_set_text_fmt(lbl_wakes, "Wakes:  %lu (Ring: %u/32)",
+        lv_label_set_text_fmt(lbl_v6, "%lu (Ring %u/32)",
                               (unsigned long)st->wake_count,
                               st->ring_head);
     }
-    lv_obj_set_style_text_font(lbl_wakes, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_wakes, LV_ALIGN_TOP_LEFT, 6, 134);
+    lv_obj_set_style_text_font(lbl_v6, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v6, LV_ALIGN_TOP_RIGHT, -6, 128);
 
-    lv_obj_t *lbl_dfs = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_dfs, "CPU: %3luMHz", (unsigned long)base_cpu_mhz);
-    lv_obj_set_style_text_font(lbl_dfs, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_dfs, LV_ALIGN_TOP_LEFT, 6, 154);
+    /* Row 7: Core Clock & SHTC3 Silicon Telemetry State */
+    lv_obj_t *lbl_k7 = lv_label_create(scr);
+    lv_label_set_text(lbl_k7, "CPU");
+    lv_obj_set_style_text_font(lbl_k7, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_k7, LV_ALIGN_TOP_LEFT, 6, 148);
 
-    lv_obj_t *lbl_sensor_err = lv_label_create(scr);
+    lv_obj_t *lbl_v7 = lv_label_create(scr);
     if (st->last_sensor_error == ORCH_SENSOR_ERR_NONE) {
-        lv_label_set_text(lbl_sensor_err, "SHT: OK");
+        lv_label_set_text_fmt(lbl_v7, "%luMHz • SHT:OK", (unsigned long)base_cpu_mhz);
     } else {
-        lv_label_set_text_fmt(lbl_sensor_err, "SHT: ERR_%u", (unsigned int)st->last_sensor_error);
+        lv_label_set_text_fmt(lbl_v7, "%luMHz • ERR_%u",
+                              (unsigned long)base_cpu_mhz,
+                              (unsigned int)st->last_sensor_error);
     }
-    lv_obj_set_style_text_font(lbl_sensor_err, H1OS_FONT_14, 0);
-    lv_obj_align(lbl_sensor_err, LV_ALIGN_TOP_RIGHT, -6, 154);
+    lv_obj_set_style_text_font(lbl_v7, H1OS_FONT_14, 0);
+    lv_obj_align(lbl_v7, LV_ALIGN_TOP_RIGHT, -6, 148);
 
+    /* Footer: H1OS Architecture Release & ESP-IDF Runtime */
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32,
+    lv_label_set_text_fmt(lbl_foot_l, "H1OS v%" PRIu32 ".%" PRIu32 ".%" PRIu32,
                           h1os_version_get_major(),
-                          h1os_version_get_minor());
+                          h1os_version_get_minor(),
+                          h1os_version_get_patch());
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 

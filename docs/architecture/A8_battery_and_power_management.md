@@ -181,6 +181,50 @@ If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_s
 * `avg_draw_ma = -1.0f`
 * Screen 3 displays: `"Autonomy: ~CALIBRATING..."` until $\ge 1.0\%$ SoC has been empirically discharged.
 
+### 6.4 Flash Wear-Leveling & Non-Volatile Persistence Strategy
+
+Mirroring battery telemetry and operational metrics into non-volatile storage (SPI NOR Flash via `sub_nvs`) ensures that cumulative autonomy calculations survive battery replacements, accidental power interruptions, and firmware reflashing. However, committing to Flash on every periodic wake cycle represents a serious hardware reliability hazard:
+
+1. **Flash Endurance Limit:** Standard SPI NOR Flash (such as the Winbond W25Q series commonly paired with ESP32-S3 modules) is physically rated for approximately $100{,}000$ Program/Erase (P/E) cycles per sector.
+2. **Headless Cadence Flash Churn:** In headless Flow A monitoring, the device awakens every $60\text{ s}$ to sample sensors:
+   $$\text{Unthrottled Writes} = \frac{86{,}400\text{ s/day}}{60\text{ s/wake}} = 1{,}440\text{ commits/day} \implies 525{,}600\text{ commits/year}$$
+   Unthrottled NVS commits would exhaust the Flash sector P/E endurance budget within approximately two to three months of continuous deployment.
+3. **Power Budget Impact:** Initiating SPI Flash write operations draws $15\text{--}25\text{ mA}$ across several milliseconds, substantially degrading the battery energy profile of an otherwise $<10\text{ ms}$ headless wake pass.
+
+To preserve Flash longevity and maintain the low-power envelope, H1OS implements a two-tier persistence architecture:
+
+#### Dual-Storage Tiering
+* **Fast In-Memory Layer (RTC Slow SRAM):** Runtime counters (`total_sleep_sec`, `total_app_run_ms`, `initial_soc_x10`) update continuously in `orch_persisted_state_t`. RTC Slow SRAM retains data across all deep sleep cycles at negligible leakage current ($\approx 0.8\ \mu\text{A}$) with zero silicon wear.
+* **Non-Volatile Mirror (Flash NVS):** Synchronized on a strict throttling policy governed by `ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` ($3600\text{ s}$ = 1 hour).
+
+#### Commit Arbitration Rules (`sub_power_enter_deep_sleep_mode()`)
+An NVS write occurs if and only if one of the following conditions is satisfied:
+1. **Interactive Session Exit:** A user session (Flow B) was active (`h1os_is_session_active() == true`). Interactive sessions inherently warrant committing UI and power state changes immediately.
+2. **Periodic Interval Expiration:** The elapsed sleep time since the last commit exceeds the throttle threshold:
+   $$(T_{\text{sleep\_sec}} - T_{\text{last\_nvs\_commit\_sec}}) \ge 3600\text{ s}$$
+   This caps headless unattended Flash commits to exactly 24 writes per day ($8{,}760\text{ commits/year}$), reducing Flash write churn by **98.3%** and extending SPI NOR Flash lifetime to $>11\text{ years}$.
+3. **Deterministic System Shutdown:** Clean shutdown via `execute_system_shutdown()` performs an explicit flush before de-asserting the `BAT_CTRL` power latch (GPIO 17).
+4. **Discharge Lap Reset:** Explicit charger unplug transitions (`orch_state_reset_discharge_lap()`) reset metrics and commit immediately.
+
+#### Single-Transaction Atomic Binary Blob
+Previously, runtime metrics were written as three independent 32-bit keys (`pwr_sleep_s`, `pwr_app_ms`, `pwr_init_s10`), incurring three separate open, search, page modify, and commit transactions. This multiplied Flash overhead by 3x and introduced vulnerability to torn records if power was severed between key writes.
+
+H1OS consolidates these metrics into a single 12-byte packed struct (`orch_nvs_runtime_blob_t`) written under the key `"pwr_lap_st"`:
+
+```c
+typedef struct __attribute__((packed)) {
+    uint32_t total_sleep_sec;   /**< Total elapsed deep sleep seconds since lap reset */
+    uint32_t total_app_run_ms;  /**< Total active CPU run milliseconds since lap reset */
+    uint16_t initial_soc_x10;   /**< Starting battery SoC x 10 (e.g. 1000 = 100.0%) */
+    uint16_t reserved;          /**< 32-bit alignment padding */
+} orch_nvs_runtime_blob_t;
+```
+
+A single atomic blob call guarantees:
+* **All-or-Nothing Consistency:** Eliminates torn state desynchronization across brownouts.
+* **Minimum Flash Wear:** Consumes a single NVS entry header and payload per commit pass.
+* **Backward Compatibility:** `orch_state_load_runtimes_from_nvs()` seamlessly falls back to legacy individual keys if `"pwr_lap_st"` is not yet initialized.
+
 ---
 
 ## 7. Data Structures & Architectural Cross-Reference

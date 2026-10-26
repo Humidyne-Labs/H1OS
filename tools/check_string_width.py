@@ -151,6 +151,44 @@ class LVGLFontMetrics:
         print(f"Exported {len(self.kern_pairs)} kerning pairs to {out_path}")
 
 
+LVGL_SYMBOL_MAP = {
+    "LV_SYMBOL_AUDIO": "\uf001",
+    "LV_SYMBOL_VIDEO": "\uf008",
+    "LV_SYMBOL_LIST": "\uf00b",
+    "LV_SYMBOL_OK": "\uf00c",
+    "LV_SYMBOL_CLOSE": "\uf00d",
+    "LV_SYMBOL_POWER": "\uf011",
+    "LV_SYMBOL_SETTINGS": "\uf013",
+    "LV_SYMBOL_HOME": "\uf015",
+    "LV_SYMBOL_DOWNLOAD": "\uf019",
+    "LV_SYMBOL_DRIVE": "\uf01c",
+    "LV_SYMBOL_REFRESH": "\uf021",
+    "LV_SYMBOL_MUTE": "\uf026",
+    "LV_SYMBOL_VOLUME_MID": "\uf027",
+    "LV_SYMBOL_VOLUME_MAX": "\uf028",
+    "LV_SYMBOL_IMAGE": "\uf03e",
+    "LV_SYMBOL_TINT": "\uf043",
+    "LV_SYMBOL_PREV": "\uf048",
+    "LV_SYMBOL_PLAY": "\uf04b",
+    "LV_SYMBOL_PAUSE": "\uf04c",
+    "LV_SYMBOL_STOP": "\uf04d",
+    "LV_SYMBOL_NEXT": "\uf051",
+    "LV_SYMBOL_PLUS": "\uf067",
+    "LV_SYMBOL_MINUS": "\uf068",
+    "LV_SYMBOL_WARNING": "\uf071",
+    "LV_SYMBOL_CHARGE": "\uf0e7",
+    "LV_SYMBOL_BELL": "\uf0f3",
+    "LV_SYMBOL_WIFI": "\uf1eb",
+    "LV_SYMBOL_BATTERY_FULL": "\uf240",
+    "LV_SYMBOL_BATTERY_3": "\uf241",
+    "LV_SYMBOL_BATTERY_2": "\uf242",
+    "LV_SYMBOL_BATTERY_1": "\uf243",
+    "LV_SYMBOL_BATTERY_EMPTY": "\uf244",
+    "LV_SYMBOL_USB": "\uf287",
+    "LV_SYMBOL_BLUETOOTH": "\uf293",
+    "LV_SYMBOL_SD_CARD": "\uf7c2",
+}
+
 def audit_screen_files(font14: LVGLFontMetrics):
     print("\n" + "=" * 78)
     print("SCREEN SOURCE FILE AUTOMATED STRING WIDTH AUDIT (Threshold: <= 188.0 px)")
@@ -166,6 +204,12 @@ def audit_screen_files(font14: LVGLFontMetrics):
         with open(c_file, "r", encoding="utf-8") as f:
             code = f.read()
 
+        # Handle LVGL symbol concatenation (e.g. LV_SYMBOL_TINT " text" -> "\uf043 text")
+        for sym_name, sym_char in LVGL_SYMBOL_MAP.items():
+            code = re.sub(rf'\b{sym_name}\s*"', f'"{sym_char}', code)
+            code = re.sub(rf'"\s*{sym_name}\b', f'{sym_char}"', code)
+            code = re.sub(rf'\b{sym_name}\b', f'"{sym_char}"', code)
+
         matches = str_pat.findall(code)
         for raw_str in matches:
             # Replace format specifiers with worst-case realistic text
@@ -173,7 +217,7 @@ def audit_screen_files(font14: LVGLFontMetrics):
             sim_str = sim_str.replace("%lu", "625").replace("%u", "100").replace("%d", "100")
             sim_str = sim_str.replace("%.2f", "4.00").replace("%.1f", "72.5").replace("%.0f", "120")
             sim_str = sim_str.replace("%+.1f", "+0.0").replace("%3lu", "240")
-            sim_str = sim_str.replace("%%", "%")
+            sim_str = sim_str.replace("%02X", "00").replace("%X", "00").replace("%%", "%")
             sim_str = sim_str.replace("%s", "CHARGED")
 
             # Clean escape sequences

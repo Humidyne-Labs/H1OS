@@ -4,6 +4,32 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.4.3-dev] - 2026-10-26
+
+### 🛡️ Fixed & Hardened (Compiler Flash Table Synthesis Resolution & TSENS Silicon Hardening)
+
+* **Compiler Flash Lookup Table Synthesis Elimination in RTC Wake Stub** (`orch_wake_stub.c`, `ERRATA.md`, `C2_lessons_learned.md`):
+  * Resolved critical `-O2` compiler optimization defect (`ERR-SW1`) where GCC's loop optimizer auto-synthesized an unrolled 256-byte CRC-8 lookup table into unpowered SPI NOR Flash (`.rodata` at `0x3C0A379C`). During deep sleep wake stub execution, SPI Flash is unpowered and the Flash cache MMU is offline, loading floating bus noise / `0xFF` and triggering 100% CRC failure (`ORCH_SENSOR_ERR_CRC_FAIL` / `E4`).
+  * Guarded `shtc3_crc8()` with `__attribute__((noinline))` and an empty inline assembly register clobber `asm volatile("" : "+r"(crc));` to force in-register bitwise execution within `.rtc.text` (`0x600feb6c`), eliminating all Flash MMU accesses and restoring pristine CRC verification under `-O2`.
+* **Internal MCU Die Temperature Sensor (TSENS) Silicon Hardening** (`orch_wake_stub.c`, `orch_wake_stub.h`, `ERRATA.md`, `C2_lessons_learned.md`):
+  * Corrected TSENS reset target register from `SENS_SAR_TSENS_CTRL2_REG` (where bit 29 is unmapped) to the authoritative `SENS_SAR_PERI_RESET_CONF_REG` (`0x60008908`), ensuring proper hardware reset before analog sampling (`ERR-SW2`).
+  * Corrected `SENS_TSENS_XPD_FORCE` from `3` (which commanded hardware forced power-down per ESP32-S3 TRM) to canonical `1` (which disables force power-down, allowing `tsens_power_up = 1` to energize analog bias), clearing to `0` on sleep.
+  * Implemented hardware latch sequence: assert `tsens_dump_out`, poll `tsens_ready` with expanded 1000-cycle (5 ms) ceiling, de-assert `tsens_dump_out` to latch result, and read `tsens_out`.
+* **I2C Protocol & ULP Pipeline Hardening** (`orch_state.h`, `orch_wake_stub.c`):
+  * Added `ORCH_SENSOR_ERR_NACK_SLEEP = 6` to `orch_sensor_err_t` and verified SHTC3 sleep command (`0xB098`) return status in `bsp_wake_stub()`.
+  * Added trailing `asm volatile("memw" ::: "memory");` pipeline memory barrier after `CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA)` to prevent write buffer latency from allowing concurrent ULP wakeups during wake stub execution.
+  * Added trailing `memw` barrier before `esp_wake_stub_sleep(&bsp_wake_stub)`.
+* **NVS Wear-Leveling Documentation & Throttle** (`A4_subsystems.md`, `A8_battery_and_power_management.md`):
+  * Documented 1-hour unattended sleep throttle (`ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600U`) reducing flash wear cycles by 98.3%, and detailed the 12-byte packed struct layout (`orch_nvs_runtime_blob_t` under key `"pwr_lap_st"`).
+* **Display Bounds Verification** (`tools/check_string_width.py`, main screens):
+  * Audited all 63 UI layout strings via `check_string_width.py --audit-screens`; 100% pass rate with zero $W \le 188.0\text{ px}$ breaches.
+
+### 🔄 Changed
+* **Semantic Version Bump (`2.4.3-dev`)** (`h1os_version.h`, `idf_component.yml`, `README.md`, `CHANGELOG.md`):
+  * Synchronized semantic version strings across all 4 authoritative project files to `2.4.3-dev`.
+
 ## [2.4.2-dev] - 2026-10-25
 
 ### 🛡️ Fixed & Hardened (Cycle-Accurate Wake Stub Assembly & USB Recovery Tool Hardening)

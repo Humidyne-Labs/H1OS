@@ -49,11 +49,14 @@ static void update_active_display(void)
     h1os_get_telemetry(&telem);
 
     switch (s_app_state.active_page) {
-    case H1OS_SCREEN_ENV_HERO:
-        screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
+    case H1OS_SCREEN_ENV_DASH:
+        screen_env_dash_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
         break;
     case H1OS_SCREEN_PSYCHROMETRICS:
         screen_psychrometrics_render(&telem, keypad_event_cb);
+        break;
+    case H1OS_SCREEN_THERMAL_NODES:
+        screen_thermal_nodes_render(&telem, keypad_event_cb);
         break;
     case H1OS_SCREEN_SYSTEM_HEALTH:
         screen_system_health_render(&telem, keypad_event_cb);
@@ -62,8 +65,8 @@ static void update_active_display(void)
         screen_diagnostics_render(&telem, keypad_event_cb);
         break;
     default:
-        s_app_state.active_page = H1OS_SCREEN_ENV_HERO;
-        screen_env_hero_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
+        s_app_state.active_page = H1OS_SCREEN_ENV_DASH;
+        screen_env_dash_render(&telem, s_app_state.cycle_counter, keypad_event_cb);
         break;
     }
 }

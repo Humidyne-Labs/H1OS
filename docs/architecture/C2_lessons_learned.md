@@ -215,3 +215,33 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
   1. **Hardware Cycle Counter Delay (`rsr.ccount`):** Replaced all software delay loops with `rtc_delay_us_exact()`, reading the Xtensa hardware `ccount` register. Each microsecond is evaluated against exactly 80 clock cycles at 80 MHz, making delay loops physically immune to compiler optimization flags.
   2. **Pipeline Memory Barriers (`memw`):** Inserted `memw` instructions after all GPIO direction and level manipulations, ensuring hardware bus transactions are committed to the peripheral registers before the pipeline evaluates bus state.
   3. **Passive Error Visibility:** Telemetry structures were updated to persist `sensor_fail_count` and `last_sensor_error` to RTC Slow Memory and display them on Screen 4 (`Wakes: <wakes> (Fail: <fails>)` and `SHT: OK / ERR_<n>`), eliminating silent telemetry dropouts.
+
+### 4.12 The Compiler Flash Table Synthesis Trap in RTC Wake Stubs (-O2 Release Failure)
+- **The Issue:** SHTC3 sensor acquisition consistently succeeded in Debug (`-Og`), but failed 100% of cyclic deep sleep wake-stub executions in Release (`-O2`), returning error code `E4` (`ORCH_SENSOR_ERR_CRC_FAIL`) across every wake.
+- **Root Cause (Binary Disassembly Discovery):**
+  1. In GCC under `-O2`, the compiler's loop optimizer analyzed the fixed-polynomial bitwise calculation inside `shtc3_crc8()` (polynomial `0x31`) and automatically synthesized a 256-byte precomputed lookup table.
+  2. Because constant data without explicit RTC attributes defaults to the `.rodata` section, the linker placed the synthesized table in external SPI NOR Flash at MMU address `0x3C0A379C`.
+  3. **The Silicon Invariant:** During deep sleep, the ESP32-S3 powers down external SPI Flash, and the Flash MMU cache controller is offline. When `bsp_wake_stub()` invoked `shtc3_crc8()`, the CPU executed `l32r a10, (0x3c0a379c)` followed by `l8ui a8, a8, 0`, attempting to load bytes from unpowered Flash.
+  4. Reading unpowered Flash returned floating bus noise / `0xFF`, corrupting the computed CRC and triggering `ORCH_SENSOR_ERR_CRC_FAIL` on 100% of wake cycles.
+  5. In Debug (`-Og`), loop optimization was disabled; GCC executed the bitwise shift/XOR operations directly in CPU registers inside RTC Fast Memory (`.rtc.text`), masking the defect during development.
+- **The Solution:**
+  1. Guarded `shtc3_crc8()` with `__attribute__((noinline))` and an empty inline assembly register clobber `asm volatile("" : "+r"(crc));`.
+  2. This clobber forces GCC to keep `crc` in a physical CPU register and strictly prevents the optimizer from synthesizing a lookup table in external `.rodata`.
+  3. Disassembly of `h1os.elf` verified that `shtc3_crc8$constprop$0` executes 100% bitwise operations from `.rtc.text` (`0x600feb6c`), eliminating all Flash MMU references (`0x3C...`) from the RTC wake stub.
+
+### 4.13 Internal MCU Die TSENS Power-Down & Reset Register Traps
+- **The Issue:** The internal ESP32-S3 die temperature sensor (`wake_stub_read_die_temp_centi_c`) consistently returned default 0 centi-°C in Release (`-O2`).
+- **Root Cause:**
+  1. **Reset Register Mismatch:** The code attempted to assert `SENS_TSENS_RESET` (Bit 29) into `SENS_SAR_TSENS_CTRL2_REG` (`0x60008854`). In ESP32-S3 silicon, `CTRL2` does not contain a reset bit at Bit 29; the actual temperature sensor reset line is mapped to `SENS_SAR_PERI_RESET_CONF_REG` (`0x60008908`). The analog sensor was never reset.
+  2. **Force Power-Down Misconfiguration (`SENS_TSENS_XPD_FORCE`):** Per the ESP32-S3 Technical Reference Manual (Table *TSENS_CTRL2_REG*), `tsens_xpd_force[1:0]` is a 2-bit power control field:
+     - `0`: Disable force power up function
+     - `1`: Disable force power down function
+     - `2`: Enable force power up
+     - `3`: **Enable force power down**
+     Writing `3` explicitly commanded the silicon to force power-down the analog sensor! The correct operational value is `1` (disabling force power-down to allow `tsens_power_up = 1` to energize the sensor) followed by `0` on sleep.
+  3. **Missing Latch Sequence & Polling Bound:** In ESP-IDF hardware logic, `tsens_dump_out` must be asserted to start measurement, polled until `tsens_ready` asserts, and then **de-asserted to latch the result** before reading `tsens_out`. Under `-O2`, the 100-cycle loop timed out before the analog clock divider asserted `ready`.
+- **The Solution:**
+  - Directed `SENS_TSENS_RESET` to `SENS_SAR_PERI_RESET_CONF_REG`.
+  - Configured `SENS_TSENS_XPD_FORCE = 1` during sample and `0` on sleep.
+  - Implemented the de-assert latch step (`DUMP_OUT = 1` $\rightarrow$ poll `READY` $\rightarrow$ `DUMP_OUT = 0` $\rightarrow$ read `OUT`).
+  - Increased `ORCH_TSENS_READY_TIMEOUT_CYCLES` to `1000U` (5 ms ceiling).

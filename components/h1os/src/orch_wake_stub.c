@@ -74,7 +74,8 @@ static inline void RTC_IRAM_ATTR rtc_delay_us_exact(uint32_t us)
 
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
-    rtc_delay_us_exact(5);
+    //rtc_delay_us_exact(5); //5us,  100khz
+    rtc_delay_us_exact(10);  //10us, 50khz
 }
 
 static inline void RTC_IRAM_ATTR sda_high(void)
@@ -168,6 +169,7 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
             byte |= (uint8_t)(1U << i);
         }
         scl_low();
+        i2c_delay();
     }
 
     if (ack) {
@@ -181,11 +183,12 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
     scl_low();
     i2c_delay();
     sda_high();
+    i2c_delay();
 
     return byte;
 }
 
-static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
+static uint8_t RTC_IRAM_ATTR __attribute__((noinline)) shtc3_crc8(const uint8_t *data, size_t len)
 {
     uint8_t crc = 0xFF;
     for (size_t i = 0; i < len; i++) {
@@ -196,6 +199,7 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
             } else {
                 crc = (uint8_t)(crc << 1);
             }
+            asm volatile("" : "+r"(crc));
         }
     }
     return crc;
@@ -212,23 +216,25 @@ static uint8_t RTC_IRAM_ATTR shtc3_crc8(const uint8_t *data, size_t len)
 static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
-    REG_SET_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
-    REG_CLR_BIT(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_RESET);
+    REG_SET_BIT(SENS_SAR_PERI_RESET_CONF_REG, SENS_TSENS_RESET);
+    rtc_delay_us_exact(5);
+    REG_CLR_BIT(SENS_SAR_PERI_RESET_CONF_REG, SENS_TSENS_RESET);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);
-    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 3);
+    REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
 
     rtc_delay_us_exact(ORCH_TSENS_SETTLING_DELAY_US);
 
-    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
     int32_t timeout = (int32_t)ORCH_TSENS_READY_TIMEOUT_CYCLES;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
         rtc_delay_us_exact(ORCH_TSENS_READY_POLL_INTERVAL_US);
     }
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
+    asm volatile("memw" ::: "memory");
     uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
 
-    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT | SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 0);
     REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
 
@@ -311,20 +317,11 @@ static void RTC_IRAM_ATTR rtc_rearm_countdown_stub(uint32_t seconds)
  */
 static bool RTC_IRAM_ATTR shtc3_send_sleep(void)
 {
-    bool ok = false;
-    for (int32_t attempt = 0; attempt < 3; attempt++) {
-        i2c_start();
-        if (i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
-            if (i2c_write_byte(0xB0) && i2c_write_byte(0x98)) {
-                ok = true;
-            }
-        }
-        i2c_stop();
-        if (ok) {
-            break;
-        }
-        rtc_delay_us_exact(50);
-    }
+    i2c_start();
+    bool ok = (i2c_write_byte(I2C_ADDR_SHTC3 << 1) &&
+               i2c_write_byte(0xB0) &&
+               i2c_write_byte(0x98));
+    i2c_stop();
     return ok;
 }
 
@@ -337,6 +334,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
     /* Suppress ULP GPIO wakeups while wake stub executes */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    asm volatile("memw" ::: "memory");
 
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
@@ -357,6 +355,9 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_FUNC_SELECT(IO_MUX_GPIO48_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG); /* I2C SCL */
 
+    asm volatile("memw" ::: "memory");
+    i2c_delay();
+
     uint8_t err_code = ORCH_SENSOR_ERR_NONE;
     bool sample_ok = true;
 
@@ -367,29 +368,29 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 
     if (sample_ok) {
         i2c_start();
-        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1) ||
+            !i2c_write_byte(0x35) ||
+            !i2c_write_byte(0x17)) {
             i2c_stop();
             err_code = ORCH_SENSOR_ERR_NACK_WAKE;
             sample_ok = false;
         } else {
-            i2c_write_byte(0x35);
-            i2c_write_byte(0x17);
             i2c_stop();
-            rtc_delay_us_exact(250);
+            rtc_delay_us_exact(500);
         }
     }
 
     int16_t die_centi_c = 0;
     if (sample_ok) {
         i2c_start();
-        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1)) {
+        if (!i2c_write_byte(I2C_ADDR_SHTC3 << 1) ||
+            !i2c_write_byte(0x78) ||
+            !i2c_write_byte(0x66)) {
             i2c_stop();
             shtc3_send_sleep();
             err_code = ORCH_SENSOR_ERR_NACK_MEASURE;
             sample_ok = false;
         } else {
-            i2c_write_byte(0x78);
-            i2c_write_byte(0x66);
             i2c_stop();
 
             /* Sample MCU Die TSENS (~450 us) immediately at start of SHTC3 conversion before CPU spin-heats die */
@@ -411,27 +412,31 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             rx[2] = i2c_read_byte(true);
             rx[3] = i2c_read_byte(true);
             rx[4] = i2c_read_byte(true);
-            rx[5] = i2c_read_byte(false);
+            rx[5] = i2c_read_byte(true);
             i2c_stop();
         }
 
-        shtc3_send_sleep();
+        bool sleep_ok = shtc3_send_sleep();
+        if (!sleep_ok && sample_ok) {
+            err_code = ORCH_SENSOR_ERR_NACK_SLEEP;
+            sample_ok = false;
+        }
     }
 
     if (sample_ok) {
         if (shtc3_crc8(&rx[0], 2) != rx[2] || shtc3_crc8(&rx[3], 2) != rx[5]) {
-            err_code = ORCH_SENSOR_ERR_CRC_FAIL;
+            err_code  = ORCH_SENSOR_ERR_CRC_FAIL;
             sample_ok = false;
         }
     }
 
     if (sample_ok) {
         st->last_sensor_error = ORCH_SENSOR_ERR_NONE;
-        uint16_t raw_t = ((uint16_t)rx[0] << 8) | rx[1];
+        uint16_t raw_t  = ((uint16_t)rx[0] << 8) | rx[1];
         uint16_t raw_rh = ((uint16_t)rx[3] << 8) | rx[4];
 
         /* Factory-calibrated SHTC3 transfer equations using 32-bit unsigned hardware division (quou) */
-        int16_t temp_centi_c = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
+        int16_t temp_centi_c  = (int16_t)(-4500 + (int32_t)((17500U * (uint32_t)raw_t) / 65535U));
         uint16_t rh_centi_pct = (uint16_t)((10000U * (uint32_t)raw_rh) / 65535U);
         if (die_centi_c == 0) {
             die_centi_c = temp_centi_c;
@@ -522,6 +527,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     PIN_INPUT_DISABLE(IO_MUX_GPIO48_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO48_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
+    asm volatile("memw" ::: "memory");
 
     esp_wake_stub_sleep(&bsp_wake_stub);
 }

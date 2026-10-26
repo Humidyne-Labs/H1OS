@@ -122,7 +122,13 @@ bool      sub_audio_get_low_power_mode(void);
 ---
 
 ### 3.5 `sub_nvs.c/.h` (Persistent Configuration Subsystem)
-Lightweight wrapper around ESP-IDF NVS flash (`SUB_NVS_NAMESPACE = "h1os"`) for cumulative battery runtimes and user settings.
+Lightweight wrapper around ESP-IDF NVS flash (`SUB_NVS_NAMESPACE = "h1os"`) providing atomic key-value and binary blob storage for cumulative battery runtimes, user configuration, and hardware telemetry calibration.
+
+#### Wear-Leveling & Write Throttling Architecture
+To prevent premature exhaustion of SPI NOR Flash sector endurance ($100{,}000$ P/E cycles) during periodic $60\text{ s}$ headless Flow A monitoring, `sub_nvs` transactions are strictly governed:
+* **Periodic Unattended Sleep:** Throttled to 1-hour intervals via `ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` ($3600\text{ s}$), bounding unattended writes to 24 cycles/day ($8{,}760$ cycles/year).
+* **Interactive & Shutdown Flush:** Immediate commit triggered upon interactive user session termination (Flow B) and clean system shutdown.
+* **Atomic State Blob:** Cumulative battery discharge lap tracking is committed as a single 12-byte packed struct (`orch_nvs_runtime_blob_t`) under key `"pwr_lap_st"` rather than fragmented individual keys, eliminating multi-transaction write amplification and preventing torn records on brownout.
 
 ```c
 esp_err_t sub_nvs_init(void);

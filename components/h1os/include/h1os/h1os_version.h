@@ -16,9 +16,9 @@ extern "C" {
 
 #define H1OS_VERSION_MAJOR   2             /**< Major version number (breaking API changes).          */
 #define H1OS_VERSION_MINOR   4             /**< Minor version number (backward-compatible features).  */
-#define H1OS_VERSION_PATCH   2             /**< Patch version number (backward-compatible bug fixes). */
+#define H1OS_VERSION_PATCH   3             /**< Patch version number (backward-compatible bug fixes). */
 #define H1OS_VERSION_TAG     "dev"         /**< Pre-release release track tag.                        */
-#define H1OS_VERSION_STRING  "2.4.2-dev"   /**< Full human-readable semantic version string.          */
+#define H1OS_VERSION_STRING  "2.4.3-dev"   /**< Full human-readable semantic version string.          */
 
 #define H1OS_NAME            "H1OS"                                   /**< Primary operating system designation. */
 #define H1OS_SUBTITLE        "E-Class Environmental Operating System" /**< System commercial subtitle.           */
