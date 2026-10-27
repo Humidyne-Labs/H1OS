@@ -109,8 +109,7 @@ Before committing or merging:
 ## 7. Invariant 6: Asset Optimization & Shrink Gate (/shrink)
 
 Before staging, committing, or merging to `main`:
-1. Ensure uncompressed original PDFs are backed up to gitignored `docs/hardware_docs/original_pdfs/`.
-2. Run `/shrink` (or `python tools/agent/optimize_images.py docs/logs/` and `python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets --dpi 300`) to guarantee all images have `HUMIDITRON/HUMADYNE_LABS` EXIF attribution and PDFs are quantized to 300 DPI without repo bloat.
+1. Run `/shrink` (or `python tools/agent/optimize_images.py docs/logs/` and `python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets`) to guarantee all images have `HUMIDITRON/HUMADYNE_LABS` EXIF attribution and PDF metadata is losslessly harmonized without modifying compressed streams.
 
 ---
 
