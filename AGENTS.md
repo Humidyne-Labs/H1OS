@@ -130,12 +130,13 @@ All UI code targets the Waveshare ESP32-S3 ePaper 1.54" V2 panel (SSD1681 driver
 
 Direct commits to `main` are strictly prohibited. Before merging any branch into `main`:
 1. **Identity & Name Sanitization Audit:** Run `python tools/agent/sanitize.py --check` (or `--fix`) to verify zero personal identities, workstation usernames, or local filesystem paths leak into committed repository files or release archives.
-2. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via `idf.py -B build_dev build`. You must build the examples `in` the examples home directory, to avoid polluting root.
-3. **Mandatory `sdkconfig` Removal Invariant:** Always remove root `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
-4. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
-5. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
-6. **Touch Changelog:** Record changes in `CHANGELOG.md` under Keep a Changelog categories (`Added`, `Changed`, `Fixed & Hardened`, `Removed`).
-7. **Tag Release:** Push annotated tag `vX.Y.Z-tag` to remote.
+2. **Asset Optimization & Shrink Invariant (`/shrink` or `/quant`):** Execute the repository asset shrink pipeline (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py --dpi 300`) prior to staging or committing changes. All photographic evidence must be stamped with all-caps EXIF attribution (`HUMIDITRON/HUMADYNE_LABS`) and progressive JPEG quantization. All datasheets must be quantized to 300 DPI, with uncompressed original vendor PDFs securely backed up to the gitignored directory `docs/hardware_docs/original_pdfs/`.
+3. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via `idf.py -B build_dev build`. You must build the examples `in` the examples home directory, to avoid polluting root.
+4. **Mandatory `sdkconfig` Removal Invariant:** Always remove root `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
+5. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
+6. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
+7. **Touch Changelog:** Record changes in `CHANGELOG.md` under Keep a Changelog categories (`Added`, `Changed`, `Fixed & Hardened`, `Removed`).
+8. **Tag Release:** Push annotated tag `vX.Y.Z-tag` to remote.
 
 
 ---
@@ -234,6 +235,8 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
    - Keep `RTC_SLOW_MEM` structures compact (`orch_persisted_state_t` is 640 bytes) and allocate synchronization primitives statically (`StaticSemaphore_t`) with zero runtime heap churn (`PIT-04-C`). Throttle periodic NVS Flash commits to hourly Flow B piggyback intervals (`ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600`) paired with immediate commits on clean shutdown or state transitions.
 5. **Measure Twice, Cut Once (Craftsmanship & Humility):**
    - Read the target header, trace every caller, check the hardware errata (`ERRATA.md`), and verify numeric bounds in 64-bit arithmetic before writing code. Leave every module cleaner, leaner, and more deterministic than you found it.
+6. **Never Bloat Git History (Asset Hygiene & The `/shrink` Directive):**
+   - Git is an immutable distributed ledger; checking in 15 MB uncompressed Chinese font files, multi-megabyte digital camera photos, or redundant GIMP archives penalizes every developer who clones the repo forever. Always run `/shrink` (or `python tools/agent/optimize_images.py` and `python tools/agent/optimize_pdf.py --dpi 300`) before commits. Guarantee that all original vendor reference PDFs are mirrored into the gitignored `docs/hardware_docs/original_pdfs/` directory, all EXIF metadata is stamped `HUMIDITRON/HUMADYNE_LABS`, and vector schematics are never degraded.
 
 ---
 
