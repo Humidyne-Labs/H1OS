@@ -12,6 +12,7 @@ Before executing a merge into `main`, the developer or autonomous agent **MUST**
 
 ```mermaid
 flowchart TD
+    A0["0. Identity & Name Audit\n(python tools/agent/sanitize.py --check)"] --> A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"]
     A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"] --> B["2. Rev Semantic Version Strings\n(h1os_version.h, idf_component.yml, README.md)"]
     B --> C["3. Regenerate docs/api.md\n(doxygen Doxyfile + moxygen)"]
     C --> D["4. Touch & Update CHANGELOG.md\n(Keep a Changelog format with timestamp)"]
@@ -92,7 +93,19 @@ Before merging:
 
 ---
 
-## 6. Git Branching & Tagging Lifecycle
+## 6. Invariant 5: Identity & Workstation Hygiene Audit
+
+Before committing or merging:
+1. Run the identity & name sanitizer:
+   ```powershell
+   python tools/agent/sanitize.py --check
+   ```
+2. The audit must exit with code 0 (ZERO personal names, workstation paths, or archive ownership leaks).
+3. If leaks are detected, resolve with `python tools/agent/sanitize.py --fix` and re-verify.
+
+---
+
+## 7. Git Branching & Tagging Lifecycle
 
 1. **Commit to Feature Branch:** Commit all staged code, updated version strings, regenerated `docs/api.md`, and `CHANGELOG.md`.
 2. **Push Feature Branch:** Push to `origin/<branch_name>`.

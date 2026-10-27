@@ -75,9 +75,9 @@ void app_main(void)
         .on_shutdown = NULL,
         .session = {
             .inactivity_timeout_sec = 30, // Developer-configured inactivity sleep timeout
-            .enable_dfs_80mhz       = true,
+            .clk_mode               = SYS_CLK_MODE_DYNAMIC,
             .flow_a_period_sec      = 60, // Developer-configured sensor sample burst interval
-            .flow_b_period_sec      = 120,// Developer-configured display refresh interval
+            .flow_b_period_sec      = 300,// Developer-configured display refresh interval
         },
     };
 
@@ -139,10 +139,10 @@ $$
 T_{\text{dew}} = \frac{243.04 \cdot \ln(e / 6.112)}{17.625 - \ln(e / 6.112)} \quad [^\circ\text{C}]
 $$
 
-- **Ambient RH Reconstruction:**
+- **Absolute Humidity ($d_v$):**
 
 $$
-RH_{\text{ambient}} = 100 \cdot \frac{e}{e_s(T_{\text{floor}})}
+d_v = 216.7 \cdot \frac{e}{273.15 + T} \quad [\text{g/m}^3]
 $$
 
 ---
@@ -153,7 +153,7 @@ $$
 - **Format:** `LV_COLOR_FORMAT_I1` with 1-bit packed binary typography (`H1OS_FONT_14`, `H1OS_FONT_20`, `H1OS_FONT_32`).
 - **Full-Suite Bold Typography:** Build-time synthesized `Montserrat-Bold` with `--autohint-strong` bilevel rasterization, ensuring 2-to-3-pixel solid stems that eliminate hairline stroke erosion on 188 DPI glass.
 - **Keypad Indev:** Hardware tactile buttons are exposed as `LV_INDEV_TYPE_KEYPAD`:
-  - `BOOT` (GPIO 0): `LV_KEY_NEXT` (toggles screens / focuses objects).
+  - `BOOT` (GPIO 0): `LV_KEY_RIGHT` (forward carousel navigation).
   - `POWER` (GPIO 18): `LV_KEY_ENTER`.
 - **Differential Partial Refresh:** Custom 159-byte partial LUT performs differential screen updates without full-screen flashing.
 - **Anti-Ghosting Threshold (6-Cycle Quota):** Automatically triggers a full OTP refresh after every 6 partial updates (`CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT`, default 6) to reset residual DC bias and restore peak pigment contrast.
@@ -163,7 +163,7 @@ $$
 
 ## 7. Persistent State & Flash Frame Synchronization
 
-- **RTC Slow Memory:** State is preserved across deep sleep in `< 512 bytes` (`orch_persisted_state_t`), leaving 7.5 KB free for the ULP coprocessor.
+- **RTC Slow Memory:** State is preserved across deep sleep in `640 bytes` (`orch_persisted_state_t`, including the 512-byte 32-slot Tri-Node ring buffer), leaving >7.3 KB free for the ULP coprocessor.
 - **Flash Frame Sync:** When the display is marked dirty, `orch_display_sync_save_if_dirty()` writes the 5000-byte frame to the raw `epd_frame` partition. On wake, `orch_display_sync_restore_to_framebuffer()` restores the prior frame for differential updates.
 
 ---

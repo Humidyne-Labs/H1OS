@@ -154,9 +154,14 @@ typedef struct {
     bool                    is_usb_powered;
     h1os_battery_state_t    battery_state;
     h1os_autonomy_metrics_t autonomy;
+    uint32_t                sensor_fail_count;
+    uint8_t                 last_sensor_error;
+    bool                    is_rh_alert_active;
 } h1os_telemetry_t;
 
 esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry);
+esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count);
+esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct);
 ```
 
 ---

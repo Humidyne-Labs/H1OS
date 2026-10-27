@@ -44,9 +44,9 @@ flowchart TD
 ### Recommendation: The Hybrid "Firmware Mirror" Architecture
 The optimal architecture uses **modular action scripts referenced by a master scenario**:
 1. **Action Scripts (`tools/thermal_sim/actions/`)**:
-   - [`flow_a.json`](file:///c:/Users/Matt/Documents/GitHub/H1OS/tools/thermal_sim/actions/flow_a.json) $\to$ Mirrors [`orch_wake_stub.c`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/src/orch_wake_stub.c). Describes single burst: Core 0 80 MHz for 10 ms, SHTC3 read for 8 ms, buck losses.
-   - [`flow_b.json`](file:///c:/Users/Matt/Documents/GitHub/H1OS/tools/thermal_sim/actions/flow_b.json) $\to$ Mirrors [`h1os_start()`](file:///c:/Users/Matt/Documents/GitHub/H1OS/components/h1os/src/h1os_lifecycle.c) and Core 1 LVGL task. Describes active UI: 240 MHz Turbo for 18s, SSD1681 booster active for 2.5s.
-   - [`audio_chime.json`](file:///c:/Users/Matt/Documents/GitHub/H1OS/tools/thermal_sim/actions/audio_chime.json) $\to$ Mirrors chime playback: ES8311 codec + NS4150B amplifier active for 3s.
+   - [`flow_a.json`](file:///tools/thermal_sim/actions/flow_a.json) $\to$ Mirrors [`orch_wake_stub.c`](file:///components/h1os/src/orch_wake_stub.c). Describes single burst: Core 0 80 MHz for 10 ms, SHTC3 read for 8 ms, buck losses.
+   - [`flow_b.json`](file:///tools/thermal_sim/actions/flow_b.json) $\to$ Mirrors [`h1os_start()`](file:///components/h1os/src/h1os_lifecycle.c) and Core 1 LVGL task. Describes active UI: 240 MHz Turbo for 18s, SSD1681 booster active for 2.5s.
+   - [`audio_chime.json`](file:///tools/thermal_sim/actions/audio_chime.json) $\to$ Mirrors chime playback: ES8311 codec + NS4150B amplifier active for 3s.
 2. **Master Timeline (`tools/thermal_sim/scenario.json`)**:
    - Declares the compounding schedule on pure battery power: e.g. "run `flow_a` every 60s", "run `flow_b` every 300s", "trigger chime at t=600s".
    - As time advances, the engine compounds the heat pulses from active battery discharge and simulates physical cooling during deep sleep intervals.

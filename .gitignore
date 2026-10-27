@@ -11,5 +11,14 @@ compile_commands.json
 # Python Artifacts
 __pycache__/
 *.py[cod]
-dist/
-release/
+
+# Tracking dist builds in root
+# /dist/
+/release/
+/releases/
+
+# Sanitization Local Configurations (Personal identity words)
+.sanitize_names
+sanitize_names.txt
+tools/agent/sanitize_names.txt
+tools/agent/.sanitize_names

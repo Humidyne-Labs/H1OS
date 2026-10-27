@@ -17,7 +17,7 @@ Instead of relying on regex or eager whole-repo LLM extraction (Graphify), `clan
 * **Command**: `uvx --from git+https://github.com/schuay/clangd-mcp.git --with "mcp<2" clangd-mcp`
 * **Underlying Binary**: `C:\clang+llvm-18.1.8\bin\clangd_esp32.cmd` (wraps `clangd.exe` with `--query-driver="**/*xtensa-esp32s3-elf*,**/*esp-elf*"`)
 * **Compilation Database**: `compile_commands.json`
-* **Workspace Root**: `C:/Users/Matt/Documents/GitHub/H1OS`
+* **Workspace Root**: `<workspace_root>`
 
 ### 💡 Compilation Database Linkage Directive
 When opening or indexing the workspace, LLVM `clangd` searches the project root for `compile_commands.json`. 

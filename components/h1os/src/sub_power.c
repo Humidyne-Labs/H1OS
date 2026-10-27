@@ -431,7 +431,7 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         sub_power_init();
     }
 
-    uint32_t full_slices = s_flow_b_sec / s_flow_a_sec;
+    uint32_t full_slices = (s_flow_a_sec > 0) ? (s_flow_b_sec / s_flow_a_sec) : 0;
 
     ulp_overflow_limit = s_overflow_limit;
     ulp_remainder_sec  = s_remainder_sec;

@@ -36,27 +36,54 @@
 
 static const char *TAG = "h1os_lifecycle";
 
-#define LIFECYCLE_TASK_STACK_SESSION_MONITOR 4096U /**< Session monitor task stack floor (4 KB).  */
-#define LIFECYCLE_TASK_PRIO_SESSION_MONITOR 3 /**< Session monitor FreeRTOS priority.        */
-#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS 6000U /**< Max wait to drain LVGL rendering (6s).    */
-#define LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS 20U /**< LVGL drain poll step interval (20 ms).    */
-#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV 3250U /**< Critical brownout warning voltage (3.25V).*/
-#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U /**< Minimum 3.0% SoC rebound to reset lap.    */
-#define LIFECYCLE_POWER_KEY_POLL_CYCLES 200U /**< Power key debounce loop iterations.       */
-#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD 4U /**< Stable HIGH consecutive read count.       */
+#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).    */
+#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V).*/
+#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.    */
+#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.       */
+#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.       */
 
-static h1os_lifecycle_t s_app_lifecycle = {0};
-static volatile int64_t s_session_expiry_us = 0;
-static volatile TaskHandle_t s_session_task_handle = NULL;
-static volatile bool s_session_running = false;
-static bool s_audio_initialized = false;
-static portMUX_TYPE s_session_mux = portMUX_INITIALIZER_UNLOCKED;
+static h1os_lifecycle_t   s_app_lifecycle     = {0};
+static esp_timer_handle_t s_session_timer     = NULL;
+static volatile bool      s_session_running   = false;
+static bool               s_audio_initialized = false;
+static portMUX_TYPE       s_session_mux       = portMUX_INITIALIZER_UNLOCKED;
 
 /* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
 RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
 
 /**
+ * @brief One-shot esp_timer callback fired when the interactive session inactivity window expires.
+ */
+static void h1os_session_timeout_timer_cb(void *arg)
+{
+    (void)arg;
+    bool was_running = false;
+    portENTER_CRITICAL(&s_session_mux);
+    was_running       = s_session_running;
+    s_session_running = false;
+    portEXIT_CRITICAL(&s_session_mux);
+
+    if (!was_running) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
+             (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
+
+    uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+    if (sleep_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
+        h1os_shutdown();
+        return;
+    }
+    (void)h1os_sleep(sleep_sec);
+}
+
+/**
  * @brief Reset the interactive session inactivity timer (extends session by timeout_sec).
+ *
+ * @details Uses the hardware-backed one-shot esp_timer alarm (`esp_timer_restart` / `esp_timer_start_once`)
+ *          rather than a 500 ms polling FreeRTOS task, saving 4 KB of task stack and eliminating periodic wakes.
  */
 void h1os_reset_session_timer(void)
 {
@@ -65,10 +92,25 @@ void h1os_reset_session_timer(void)
         ESP_LOGE(TAG, "Lifecycle configuration error: inactivity_timeout_sec is 0. Aborting session timer reset.");
         return;
     }
-    int64_t new_expiry = esp_timer_get_time() + ((int64_t)timeout_sec * 1000000LL);
-    portENTER_CRITICAL(&s_session_mux);
-    s_session_expiry_us = new_expiry;
-    portEXIT_CRITICAL(&s_session_mux);
+
+    uint64_t timeout_us = (uint64_t)timeout_sec * 1000000ULL;
+    if (s_session_timer == NULL) {
+        const esp_timer_create_args_t timer_args = {
+            .callback              = &h1os_session_timeout_timer_cb,
+            .arg                   = NULL,
+            .dispatch_method       = ESP_TIMER_TASK,
+            .name                  = "h1os_sess_tmr",
+            .skip_unhandled_events = true,
+        };
+        if (esp_timer_create(&timer_args, &s_session_timer) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create h1os_sess_tmr esp_timer");
+            return;
+        }
+    }
+
+    if (esp_timer_restart(s_session_timer, timeout_us) != ESP_OK) {
+        (void)esp_timer_start_once(s_session_timer, timeout_us);
+    }
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
 
@@ -117,55 +159,15 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
 }
 
 /**
- * @brief Drain pending LVGL render/flush tasks and stop the Core 1 LVGL worker task.
+ * @brief Drain pending LVGL render/flush tasks using event-driven semaphore wait and stop the Core 1 LVGL worker task.
  */
 static void h1os_quiesce_lvgl_pipeline(void)
 {
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
-        uint32_t wait_ms = 0;
-        while (h1os_lvgl_has_pending_tasks() && wait_ms < LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS) {
-            vTaskDelay(pdMS_TO_TICKS(LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS));
-            wait_ms += LIFECYCLE_LVGL_DRAIN_POLL_STEP_MS;
-        }
+        (void)h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
     }
     h1os_lvgl_stop();
-}
-
-/**
- * @brief H1os session monitor task.
- *
- * @param[in]    arg             Parameter arg.
- *
- * @return Return value of type static void.
- */
-static void h1os_session_monitor_task(void *arg)
-{
-    (void)arg;
-    while (s_session_running) {
-        vTaskDelay(pdMS_TO_TICKS(500));
-
-        int64_t expiry = 0;
-        portENTER_CRITICAL(&s_session_mux);
-        expiry = s_session_expiry_us;
-        portEXIT_CRITICAL(&s_session_mux);
-
-        if (expiry > 0 && esp_timer_get_time() >= expiry) {
-            ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
-                     (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
-            s_session_running = false;
-            uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
-            if (sleep_sec == 0) {
-                ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
-                h1os_shutdown();
-                break;
-            }
-            h1os_sleep(sleep_sec);
-            break;
-        }
-    }
-    s_session_task_handle = NULL;
-    vTaskDelete(NULL);
 }
 
 /**
@@ -403,10 +405,9 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     bool alarm_f = false, timer_f = false;
     (void)sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
 
+    portENTER_CRITICAL(&s_session_mux);
     s_session_running = !is_rtc_wake;
-    if (s_session_running) {
-        h1os_reset_session_timer();
-    }
+    portEXIT_CRITICAL(&s_session_mux);
 
     volatile orch_persisted_state_t *st = orch_state_get();
 
@@ -435,8 +436,8 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
     h1os_lvgl_start(5, 1);
 
     if (is_rtc_wake) {
-        /* Allow Core 1 LVGL task to pick up and begin flushing the updated frame */
-        vTaskDelay(pdMS_TO_TICKS(10));
+        /* Wait on the event-driven LVGL idle semaphore for the updated screen frame to flush */
+        (void)h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         uint32_t sleep_sec = st->flow_b_period_sec;
         if (sleep_sec == 0) {
@@ -452,20 +453,8 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
             h1os_shutdown();
             return ESP_ERR_INVALID_ARG;
         }
-        ESP_LOGI(TAG, "Starting %lu-second interactive session monitor...", (unsigned long)timeout_sec);
+        ESP_LOGI(TAG, "Arming %lu-second interactive session esp_timer alarm...", (unsigned long)timeout_sec);
         h1os_reset_session_timer();
-        BaseType_t res = xTaskCreatePinnedToCore(h1os_session_monitor_task, "h1os_sess", LIFECYCLE_TASK_STACK_SESSION_MONITOR, NULL, LIFECYCLE_TASK_PRIO_SESSION_MONITOR, (TaskHandle_t *)&s_session_task_handle, 0);
-        if (res != pdPASS) {
-            ESP_LOGE(TAG, "Failed to create h1os_sess monitor task (%ld). Entering sleep fallback.", (long)res);
-            s_session_running = false;
-            s_session_task_handle = NULL;
-            uint32_t sleep_sec = st->flow_b_period_sec;
-            if (sleep_sec == 0) {
-                h1os_shutdown();
-                return ESP_ERR_NO_MEM;
-            }
-            return h1os_sleep(sleep_sec);
-        }
     }
 
     return ESP_OK;
@@ -545,6 +534,7 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     out_telemetry->sample_count = st->total_samples;
     out_telemetry->sensor_fail_count = st->sensor_fail_count;
     out_telemetry->last_sensor_error = st->last_sensor_error;
+    out_telemetry->is_rh_alert_active = ((st->flags & ORCH_FLAG_RH_ALERT_ACTIVE) != 0);
     out_telemetry->flow_a_period_sec = st->sample_interval_sec;
     out_telemetry->flow_b_period_sec = st->flow_b_period_sec;
 
@@ -598,6 +588,13 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
         ESP_LOGE(TAG, "Lifecycle error: h1os_sleep received sleep_sec = 0. Aborting sleep transition.");
         return ESP_ERR_INVALID_ARG;
     }
+    portENTER_CRITICAL(&s_session_mux);
+    s_session_running = false;
+    portEXIT_CRITICAL(&s_session_mux);
+    if (s_session_timer != NULL) {
+        (void)esp_timer_stop(s_session_timer);
+    }
+
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
     h1os_lvgl_lock(1000);
@@ -621,7 +618,12 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
 static void execute_system_shutdown(bool force_clean_white)
 {
     ESP_LOGI(TAG, "Executing system shutdown (%s)...", force_clean_white ? "storage mode: clean white" : "standard mode");
+    portENTER_CRITICAL(&s_session_mux);
     s_session_running = false;
+    portEXIT_CRITICAL(&s_session_mux);
+    if (s_session_timer != NULL) {
+        (void)esp_timer_stop(s_session_timer);
+    }
 
     sub_rtc_cancel_countdown();
 
@@ -701,4 +703,33 @@ void h1os_shutdown_for_storage(void)
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 {
     return sub_audio_set_volume(volume_pct);
+}
+
+/**
+ * @brief Retrieve historical Tri-Node telemetry samples from the RTC Slow SRAM ring buffer in chronological order.
+ */
+esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count)
+{
+    if (out_samples == NULL || max_samples == 0 || out_count == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    (void)orch_state_get_ring_chronological(out_samples, max_samples, out_count);
+    return ESP_OK;
+}
+
+/**
+ * @brief Configure relative humidity target alert thresholds in centi-percent (1% = 100, e.g. 6200..7200).
+ */
+esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct)
+{
+    if (rh_high_centi_pct > 10000U || (rh_high_centi_pct > 0U && rh_low_centi_pct > rh_high_centi_pct)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    volatile orch_persisted_state_t *st = orch_state_get();
+    st->rh_alert_low_centi_pct  = rh_low_centi_pct;
+    st->rh_alert_high_centi_pct = rh_high_centi_pct;
+    if (rh_high_centi_pct == 0U) {
+        st->flags &= (uint8_t)~ORCH_FLAG_RH_ALERT_ACTIVE;
+    }
+    return ESP_OK;
 }

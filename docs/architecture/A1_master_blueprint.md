@@ -61,7 +61,7 @@ The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
-- **`h1os_version.h`**: Semantic version macros (`2.4.0-dev`) and inline getters.
+- **`h1os_version.h`**: Semantic version macros (`2.4.4-dev`) and inline getters.
 - **`h1os_lifecycle.c`**: Declarative lifecycle engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`.
 - **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, keypad indev binding, 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.

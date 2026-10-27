@@ -1,9 +1,11 @@
 ## Component metadata
-version:     "2.4.3-dev"
+version:     "2.4.4-dev"
 description: "H1OS: E-Class Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8)."
 url:         "https://github.com/Humidyne-Labs/H1OS"
 repository:  "https://github.com/Humidyne-Labs/H1OS.git"
-license:     "MIT"
+license:     "MIT | CC-BY-4.0 | APACHE"
+maintainers: "HUMIDYNE LABS / HUMIDITRON"
+discussion:  "(Not Affiliated with Waveshare)"
 tags:
   - h1os
   - bsp
@@ -20,12 +22,26 @@ dependencies:
   idf:                            ">=5.1"
   lvgl/lvgl:                      "==9.6.0"
 
+## Target Hardware
+targets:
+  - esp32s3
+
 ## File inclusion/exclusion rules (for registry packaging)
 files:
   exclude:
     - ".git*"
-    - "build/"
+    - ".agents/"
+    - ".jules/"
+    - ".vscode/"
+    - "dist/"
     - "docs/"
-    - "legacy_reference/"
     - "profiles/"
     - "partition-table/"
+    - "examples/"
+    - "tools/usb/"
+    - "tools/agent/"
+    - "tools/package/"
+    - "tools/thermal_sim/"
+    - "tools/fonts/preview/"
+    - "tools/fonts/metrics/"
+    

@@ -9,7 +9,9 @@ This rule governs the implementation quality, hardware-first design principles, 
 This is embedded silicon code. Actively exploit all on-chip hardware accelerators, coprocessors, and peripheral engines:
 
 1. **Leverage FreeRTOS SMP:** Use dual-core affinity (Core 0 for system/radio, Core 1 for UI/sensors), queues, semaphores, and event groups rather than bespoke synchronization.
-2. **Never Busy-Wait:** Polling in busy-wait `while()` loops during idle states is prohibited. Block on FreeRTOS notifications, semaphores, or schedule hardware timer interrupts.
+2. **Never Busy-Wait (Event-Driven Awake vs. Bare-Metal Sleep Split):**
+   - **Awake FreeRTOS Layers:** Polling with `vTaskDelay()` spin loops for hardware `BUSY` pins, button states, inactivity timeouts, or worker task exits is prohibited. Use `esp_timer` (`esp_timer_start_once` / `esp_timer_start_periodic` / `esp_timer_restart`) for timeouts and periodic state machines, GPIO edge interrupts (`gpio_isr_handler_add`) + hardware glitch filters (`gpio_new_pin_glitch_filter`) + `xSemaphoreTake` / `ulTaskNotifyTake` for hardware lines, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) for task teardown joins.
+   - **Bare-Metal Wake Stub (`orch_wake_stub.c`) & ULP (`ulp/main.c`):** Never call FreeRTOS or `esp_timer` while SPI Flash is powered down. Use bounded `ccount`/register loops guarded with `__attribute__((noinline))`, loop register clobbers (`asm volatile("" : "+r"(i))`), and `rtc_reg_barrier()` (`memw` / `fence`).
 3. **Coprocessor & DMA Utilization:** Delegate ultra-low-power interrupt evaluation to the ULP-RISC-V coprocessor and bulk display transfers to SPI DMA channels.
 4. **Platform & Hardware Reality Checks:** Always cross-reference proposed features against actual board schematics and Espressif documentation. If an operation is physically impossible (e.g. attempting RTC I2C transactions on digital-only GPIOs), state it as an unalterable hardware fact.
 

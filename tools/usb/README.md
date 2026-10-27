@@ -112,5 +112,5 @@ riscv32-esp-elf-addr2line -pfia -e build/esp-idf/ulp/ulp_main.elf 0x00000028
 
 ## 🔒 Security & Architecture Notes
 
-* **Driver Safety:** No third-party filter drivers (such as WinUSB / LibUSB-Win32) are injected. All operations use native Windows PnP mechanisms and Microsoft host-controller IOCTL interfaces (`IOCTL_USB_HUB_CYCLE_PORT` = `0x220414`).
+* **Driver Safety:** No third-party filter drivers (such as WinUSB / LibUSB-Win32) are injected. All operations use native Windows PnP mechanisms and Microsoft host-controller IOCTL interfaces (`IOCTL_USB_HUB_CYCLE_PORT` = `0x220444`).
 * **Handle Concurrency:** Windows prevents bus resets when an open file handle exists on a virtual serial device (`\\.\COMx`). The tool enforces handle closure before firing IOCTL routines to prevent system thread hangs.

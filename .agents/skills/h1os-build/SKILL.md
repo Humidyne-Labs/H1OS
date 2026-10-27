@@ -20,7 +20,7 @@ This skill defines the canonical build procedures, paths, and environment activa
 - **Host Tools Root:** `C:\Espressif\tools`
 - **Active Python Virtualenv:** `C:\Espressif\tools\python\v6.1\venv`
 - **Canonical Profile Script:** `C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`
-- **Project Working Directory:** `c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS`
+- **Project Working Directory:** `examples\H1OS`
 
 > [!WARNING]
 > On Windows, running `idf.py` requires access to `C:\Espressif\tools`. In AI agent terminals, commands running ESP-IDF builds MUST set `BypassSandbox: true`.
@@ -29,7 +29,7 @@ This skill defines the canonical build procedures, paths, and environment activa
 
 ## 2. Canonical One-Liner Commands
 
-All commands must be executed in `c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS` using PowerShell:
+All commands must be executed in `examples\H1OS` using PowerShell:
 
 ### Production Build (Default)
 Compiles `bootloader.bin`, `ulp_h1os.bin`, and `h1os.bin` into `build_prod`:
@@ -101,7 +101,7 @@ Flashes the bootloader, partition table, and application over USB-Serial:
 
 | Directory | Purpose |
 | :--- | :--- |
-| `c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS` | **Main CMake project root**. All `idf.py` commands run from here. |
-| `c:\Users\Matt\Documents\GitHub\H1OS\components\h1os` | **Core H1OS component library** (HAL, subsystems, state, lifecycle, ULP). |
-| `c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS\build_prod` | **Production build output** (`h1os.bin`, `ulp_h1os.bin`, `bootloader.bin`). |
-| `c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS\build_dev` | **Development build output**. |
+| `examples\H1OS` | **Main CMake project root**. All `idf.py` commands run from here. |
+| `components\h1os` | **Core H1OS component library** (HAL, subsystems, state, lifecycle, ULP). |
+| `examples\H1OS\build_prod` | **Production build output** (`h1os.bin`, `ulp_h1os.bin`, `bootloader.bin`). |
+| `examples\H1OS\build_dev` | **Development build output**. |

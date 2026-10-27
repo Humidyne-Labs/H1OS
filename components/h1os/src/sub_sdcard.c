@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "hal_types.h"
 #include "sdmmc_cmd.h"
@@ -22,14 +23,16 @@
 
 static const char *TAG = "sub_sdcard";
 
-#define SUB_SDCARD_TASK_STACK_MOUNT     4096U /**< SD mount worker task stack depth.     */
-#define SUB_SDCARD_TASK_PRIO_MOUNT      2     /**< SD mount worker task priority.        */
-#define SUB_SDCARD_COMMAND_TIMEOUT_MS   500U  /**< SD card command timeout (500 ms).     */
-#define SUB_SDCARD_UNMOUNT_DRAIN_CYCLES 50U   /**< Max 10 ms drain cycles awaiting mount.*/
+#define SUB_SDCARD_TASK_STACK_MOUNT   4096U /**< SD mount worker task stack depth.     */
+#define SUB_SDCARD_TASK_PRIO_MOUNT    2     /**< SD mount worker task priority.        */
+#define SUB_SDCARD_COMMAND_TIMEOUT_MS 500U  /**< SD card command timeout (500 ms).     */
+#define SUB_SDCARD_UNMOUNT_TIMEOUT_MS 500U  /**< Max wait for async mount worker (500 ms).*/
 
-static sdmmc_card_t *s_sd_card = NULL;
-static volatile TaskHandle_t s_mount_task = NULL;
-static bool s_card_absent_latched = false;
+static sdmmc_card_t         *s_sd_card             = NULL;
+static volatile TaskHandle_t s_mount_task          = NULL;
+static bool                  s_card_absent_latched = false;
+static StaticSemaphore_t     s_mount_done_sem_buf;
+static SemaphoreHandle_t     s_mount_done_sem      = NULL;
 
 /**
  * @brief Sdcard mount worker task.
@@ -44,6 +47,9 @@ static void sdcard_mount_worker_task(void *pvParameters)
     if (s_card_absent_latched) {
         ESP_LOGD(TAG, "MicroSD slot known empty (latched). Bypassing async mount.");
         s_mount_task = NULL;
+        if (s_mount_done_sem != NULL) {
+            (void)xSemaphoreGive(s_mount_done_sem);
+        }
         vTaskDelete(NULL);
         return;
     }
@@ -55,6 +61,9 @@ static void sdcard_mount_worker_task(void *pvParameters)
         ESP_LOGD(TAG, "Asynchronous MicroSD mount result: %s (slot empty or unformatted)", esp_err_to_name(err));
     }
     s_mount_task = NULL;
+    if (s_mount_done_sem != NULL) {
+        (void)xSemaphoreGive(s_mount_done_sem);
+    }
     vTaskDelete(NULL);
 }
 
@@ -75,6 +84,13 @@ esp_err_t sub_sdcard_mount_async(void)
     }
     if (s_mount_task != NULL) {
         return ESP_OK;
+    }
+
+    if (s_mount_done_sem == NULL) {
+        s_mount_done_sem = xSemaphoreCreateBinaryStatic(&s_mount_done_sem_buf);
+    }
+    if (s_mount_done_sem != NULL) {
+        (void)xSemaphoreTake(s_mount_done_sem, 0);
     }
 
     TaskHandle_t handle = NULL;
@@ -159,10 +175,9 @@ esp_err_t sub_sdcard_mount(void)
  */
 esp_err_t sub_sdcard_unmount(void)
 {
-    /* Wait briefly if an asynchronous mount worker is still in flight */
-    int32_t wait_cycles = (int32_t)SUB_SDCARD_UNMOUNT_DRAIN_CYCLES;
-    while (s_mount_task != NULL && wait_cycles-- > 0) {
-        vTaskDelay(pdMS_TO_TICKS(10));
+    /* Event-driven wait if an asynchronous mount worker is still in flight */
+    if (s_mount_task != NULL && s_mount_done_sem != NULL) {
+        (void)xSemaphoreTake(s_mount_done_sem, pdMS_TO_TICKS(SUB_SDCARD_UNMOUNT_TIMEOUT_MS));
     }
 
     if (s_sd_card == NULL) {
@@ -221,6 +236,6 @@ esp_err_t sub_sdcard_format(void)
     if (s_sd_card == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-	
+
     return esp_vfs_fat_sdcard_format(SUB_SDCARD_MOUNT_POINT, s_sd_card);
 }

@@ -13,6 +13,7 @@ This skill provides step-by-step procedures, one-liner automation commands, and 
 
 | Step | Action | Tools / Files Involved | Verification |
 | :--- | :--- | :--- | :--- |
+| **0. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check` | Zero leaks in code, archives, or git logs |
 | **1. Invariant Check** | Firmware Safety Audit | `.agents/rules/coding.md`, `.agents/skills/h1os-firmware-standards` | 10 Safety Invariants validated |
 | **2. Clean Build** | Compile firmware | `idf.py -B build_dev build` via ESP-IDF v6.1 profile | Exit code 0, 0 warnings/errors |
 | **3. Memory Audit** | Profile memory regions | `murdock_memory_budget` (`embedded-ops`) | DIRAM $\le 85\%$, RTC Slow $\le 4\text{ KB}$ |
@@ -25,6 +26,22 @@ This skill provides step-by-step procedures, one-liner automation commands, and 
 ---
 
 ## 2. Step-by-Step Execution Guide
+
+### Step 0: Identity Hygiene & Repository Sanitization
+
+Run the automated identity and name sanitizer before staging or committing changes:
+
+```powershell
+python tools/agent/sanitize.py --check
+```
+
+If un-sanitized author names, personal workstation paths, or archive leaks are reported, apply automatic in-place sanitization:
+
+```powershell
+python tools/agent/sanitize.py --fix
+```
+
+---
 
 ### Step 1: Rev Semantic Version Strings (4 Locations)
 
@@ -81,14 +98,14 @@ Insert the new release ledger block directly above the previous release in `CHAN
 Run incremental build via canonical profile:
 
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; Set-Location "c:\Users\Matt\Documents\GitHub\H1OS\examples\H1OS"; idf.py -B build_dev build
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"; idf.py -B build_dev build
 ```
 
 Then query MCP memory profiling tool:
 ```json
 // Tool: murdock_memory_budget (Server: embedded-ops)
 {
-  "elf_path": "C:\\Users\\Matt\\Documents\\GitHub\\H1OS\\examples\\H1OS\\build_dev\\h1os.elf"
+  "elf_path": "examples\\H1OS\\build_dev\\h1os.elf"
 }
 ```
 

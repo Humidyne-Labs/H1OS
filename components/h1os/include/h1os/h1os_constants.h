@@ -7,9 +7,9 @@
  *          Component-internal operational parameters remain encapsulated within their
  *          respective driver source files.
  *
- * @copyright Copyright (c) 2026
+ * Copyright (c) 2026 Humidyne Labs
  *
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  */
 
 #pragma once

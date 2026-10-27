@@ -2674,6 +2674,7 @@
     let T_grid = new Float64Array(N_CELLS);
     let T_next = new Float64Array(N_CELLS);
     let C_cell = new Float64Array(N_CELLS);
+    let s_cellHeatInW = new Float64Array(N_CELLS);
     let edgeMask = new Uint8Array(N_CELLS);
     let battMask = new Uint8Array(N_CELLS);
     let slotMask = new Uint8Array(N_CELLS);
@@ -2824,6 +2825,18 @@
       return null;
     }
 
+    const sleepPowerLookup = {};
+    let sleepTotalCurrentMa = 0.0;
+    function rebuildSleepPowerLookup() {
+      for (const k in sleepPowerLookup) delete sleepPowerLookup[k];
+      sleepTotalCurrentMa = 0.0;
+      ((DEFAULT_DEEP_SLEEP && DEFAULT_DEEP_SLEEP.activity) || []).forEach(act => {
+        const partId = (act.part === 'BOOST_EPD') ? 'L9_BOOST' : act.part;
+        sleepPowerLookup[partId] = (sleepPowerLookup[partId] || 0.0) + (act.power_mw || 0.0);
+        sleepTotalCurrentMa += act.current_ma || 0.0;
+      });
+    }
+
     function getFlowBForCycle(cycleOneBasedIndex, baseObj) {
       const srcObj = baseObj || customDevAction || DEFAULT_FLOW_B;
       const isSixthFullRefresh = (cycleOneBasedIndex % 6 === 0);
@@ -2831,43 +2844,44 @@
         ? (srcObj.epd_full_otp_duration_ms || 1413)
         : (srcObj.epd_partial_duration_ms || 582);
       const cyclePos = ((cycleOneBasedIndex - 1) % 6) + 1;
-      const cloned = JSON.parse(JSON.stringify(srcObj));
-      if (isSixthFullRefresh && cloned.full_otp_total_duration_ms) {
-        cloned.duration_ms = cloned.full_otp_total_duration_ms;
+      const srcActs = srcObj.activity || [];
+      const acts = new Array(srcActs.length);
+      for (let i = 0; i < srcActs.length; i++) {
+        const a = srcActs[i];
+        const partId = (a.part === 'BOOST_EPD') ? 'L9_BOOST' : a.part;
+        acts[i] = {
+          part: partId,
+          start_ms: (isSixthFullRefresh && a.full_otp_start_ms !== undefined) ? a.full_otp_start_ms : a.start_ms,
+          duration_ms: (partId === 'L9_BOOST')
+            ? epdDurMs
+            : ((isSixthFullRefresh && a.full_otp_duration_ms !== undefined) ? a.full_otp_duration_ms : a.duration_ms),
+          power_mw: a.power_mw,
+          current_ma: a.current_ma
+        };
       }
-      cloned.name = isSixthFullRefresh
-        ? ('FLOW_B_FULL_OTP (Cycle ' + cyclePos + '/6 • 1413ms EPD)')
-        : ('FLOW_B_PARTIAL (Cycle ' + cyclePos + '/6 • 582ms EPD)');
-      cloned.is_full_otp = isSixthFullRefresh;
-      cloned.cycle_pos = cyclePos;
-      cloned.cycle_total = cycleOneBasedIndex;
-      (cloned.activity || []).forEach(a => {
-        if (isSixthFullRefresh) {
-          if (a.full_otp_start_ms !== undefined) a.start_ms = a.full_otp_start_ms;
-          if (a.full_otp_duration_ms !== undefined) a.duration_ms = a.full_otp_duration_ms;
-        }
-        if (a.part === 'L9_BOOST' || a.part === 'BOOST_EPD') {
-          a.part = 'L9_BOOST';
-          a.duration_ms = epdDurMs;
-        }
-      });
-      return cloned;
+      return {
+        name: isSixthFullRefresh
+          ? ('FLOW_B_FULL_OTP (Cycle ' + cyclePos + '/6 • 1413ms EPD)')
+          : ('FLOW_B_PARTIAL (Cycle ' + cyclePos + '/6 • 582ms EPD)'),
+        duration_ms: (isSixthFullRefresh && srcObj.full_otp_total_duration_ms) ? srcObj.full_otp_total_duration_ms : srcObj.duration_ms,
+        is_full_otp: isSixthFullRefresh,
+        cycle_pos: cyclePos,
+        cycle_total: cycleOneBasedIndex,
+        activity: acts
+      };
     }
 
     function computeStepComponentPowers(t0, dt) {
+      if (Object.keys(sleepPowerLookup).length === 0) rebuildSleepPowerLookup();
       const t1 = t0 + dt;
       let compPowerMw = {};
-      let compCurrentMa = 0.0;
+      const compsList = DEFAULT_COMPONENTS.components || [];
+      for (let i = 0; i < compsList.length; i++) {
+        const cid = compsList[i].id;
+        compPowerMw[cid] = sleepPowerLookup[cid] || 0.0;
+      }
+      let compCurrentMa = sleepTotalCurrentMa;
       let hasActivePulse = false;
-      (DEFAULT_COMPONENTS.components || []).forEach(c => { compPowerMw[c.id] = 0.0; });
-
-      (DEFAULT_DEEP_SLEEP.activity || []).forEach(act => {
-        const partId = (act.part === 'BOOST_EPD') ? 'L9_BOOST' : act.part;
-        if (compPowerMw[partId] !== undefined) {
-          compPowerMw[partId] += act.power_mw || 0.0;
-        }
-        compCurrentMa += act.current_ma || 0.0;
-      });
       let dominantState = 'DEEP_SLEEP';
 
       function accumulateActionWindow(actionObj, winStartSec) {
@@ -2877,14 +2891,16 @@
         if (t1 <= winStartSec || t0 >= winEndSec) return;
 
         hasActivePulse = true;
-        actionObj.activity.forEach(a => {
+        const acts = actionObj.activity;
+        for (let i = 0; i < acts.length; i++) {
+          const a = acts[i];
           const partId = (a.part === 'BOOST_EPD') ? 'L9_BOOST' : a.part;
           const actStart = winStartSec + ((a.start_ms || 0.0) / 1000.0);
           const actEnd = actStart + ((a.duration_ms || actionObj.duration_ms || 12.5) / 1000.0);
           const overlap = Math.max(0.0, Math.min(t1, actEnd) - Math.max(t0, actStart));
           if (overlap > 0.0) {
             const duty = overlap / dt;
-            const baseP = (DEFAULT_DEEP_SLEEP.activity.find(s => s.part === partId) || {}).power_mw || 0.0;
+            const baseP = sleepPowerLookup[partId] || 0.0;
             const netAddP = Math.max(0.0, (a.power_mw || 0.0) - baseP) * duty;
             if (compPowerMw[partId] !== undefined) {
               compPowerMw[partId] += netAddP;
@@ -2894,7 +2910,7 @@
             }
             dominantState = actionObj.name || 'ACTIVE_BURST';
           }
-        });
+        }
       }
 
       let scheduledFlowBCount = 0;
@@ -2964,7 +2980,7 @@
 
       const probeCheck = computeStepComponentPowers(simTimeSec, dt);
       const inPlaneSpread = maxPcbTemp - minPcbTemp;
-      if (!probeCheck.hasActivePulse && inPlaneSpread <= 0.015 && dt <= 5.0) {
+      if (!probeCheck.hasActivePulse && inPlaneSpread <= 0.025 && dt <= 15.0) {
         currentStateName = probeCheck.dominantState;
         window.activeComponentPower = probeCheck.compPowerMw;
         let qSleepW = 0.0;
@@ -3021,7 +3037,8 @@
           cumulativeEnergyJ += (stepPowerMw * 1e-3) * subDt;
 
           let Q_j_to_cav_W = 0.0;
-          let cellHeatInW = new Float64Array(N_CELLS);
+          s_cellHeatInW.fill(0.0);
+          let cellHeatInW = s_cellHeatInW;
 
           for (let ci = 0; ci < comps.length; ci++) {
             const comp = comps[ci];
@@ -3193,37 +3210,43 @@
       return { minT, maxT: minT + delta };
     }
 
-    function getThermalRgb(tempC, minT, maxT) {
-      const norm = Math.max(0.0, Math.min(1.0, (tempC - minT) / Math.max(0.05, maxT - minT)));
-      let r, g, b;
-      if (norm < 0.20) {
-        const t = norm / 0.20;
-        r = Math.round(6 * (1 - t));
-        g = Math.round(24 + 80 * t);
-        b = Math.round(68 + 115 * t);
-      } else if (norm < 0.40) {
-        const t = (norm - 0.20) / 0.20;
-        r = 0;
-        g = Math.round(104 + 100 * t);
-        b = Math.round(183 + 30 * (1 - t));
-      } else if (norm < 0.60) {
-        const t = (norm - 0.40) / 0.20;
-        r = Math.round(61 + 190 * t);
-        g = Math.round(204 + 24 * t);
-        b = Math.round(150 * (1 - t));
-      } else if (norm < 0.82) {
-        const t = (norm - 0.60) / 0.22;
-        r = 251;
-        g = Math.round(228 - 140 * t);
-        b = Math.round(30 * (1 - t));
-      } else {
-        const t = (norm - 0.82) / 0.18;
-        r = 255;
-        g = Math.round(88 * (1 - t) + 180 * Math.pow(t, 2));
-        b = Math.round(190 * Math.pow(t, 2));
+    const THERMAL_LUT_SIZE = 1024;
+    const THERMAL_RGB_LUT = new Uint8Array(THERMAL_LUT_SIZE * 3);
+    (function initThermalLut() {
+      for (let i = 0; i < THERMAL_LUT_SIZE; i++) {
+        const norm = i / (THERMAL_LUT_SIZE - 1);
+        let r, g, b;
+        if (norm < 0.20) {
+          const t = norm / 0.20;
+          r = Math.round(6 * (1 - t));
+          g = Math.round(24 + 80 * t);
+          b = Math.round(68 + 115 * t);
+        } else if (norm < 0.40) {
+          const t = (norm - 0.20) / 0.20;
+          r = 0;
+          g = Math.round(104 + 100 * t);
+          b = Math.round(183 + 30 * (1 - t));
+        } else if (norm < 0.60) {
+          const t = (norm - 0.40) / 0.20;
+          r = Math.round(61 + 190 * t);
+          g = Math.round(204 + 24 * t);
+          b = Math.round(150 * (1 - t));
+        } else if (norm < 0.82) {
+          const t = (norm - 0.60) / 0.22;
+          r = 251;
+          g = Math.round(228 - 140 * t);
+          b = Math.round(30 * (1 - t));
+        } else {
+          const t = (norm - 0.82) / 0.18;
+          r = 255;
+          g = Math.round(88 * (1 - t) + 180 * (t * t));
+          b = Math.round(190 * (t * t));
+        }
+        THERMAL_RGB_LUT[i * 3]     = r;
+        THERMAL_RGB_LUT[i * 3 + 1] = g;
+        THERMAL_RGB_LUT[i * 3 + 2] = b;
       }
-      return [r, g, b, norm];
-    }
+    })();
 
     function renderBoard() {
       const { minT, maxT } = getColorScaleBounds();
@@ -3246,27 +3269,29 @@
 
       if (mode !== 'optical') {
         const data = offThermalImgData.data;
+        const invSpan = 1.0 / Math.max(0.05, maxT - minT);
         for (let i = 0; i < N_CELLS; i++) {
-          const [r, g, b, norm] = getThermalRgb(T_grid[i], minT, maxT);
+          const norm = Math.max(0.0, Math.min(1.0, (T_grid[i] - minT) * invSpan));
+          const lutIdx = ((norm * (THERMAL_LUT_SIZE - 1)) | 0) * 3;
           const pIdx = i * 4;
-          data[pIdx]     = r;
-          data[pIdx + 1] = g;
-          data[pIdx + 2] = b;
+          data[pIdx]     = THERMAL_RGB_LUT[lutIdx];
+          data[pIdx + 1] = THERMAL_RGB_LUT[lutIdx + 1];
+          data[pIdx + 2] = THERMAL_RGB_LUT[lutIdx + 2];
           if (mode === 'thermal') {
             data[pIdx + 3] = 255;
           } else if (mode === 'spotlight') {
-            const spotAlpha = Math.min(1.0, Math.pow(norm, 0.55) * 1.35) * userAlpha;
-            data[pIdx + 3] = Math.round(spotAlpha * 255);
+            const spotAlpha = Math.min(1.0, Math.sqrt(norm) * 1.35) * userAlpha;
+            data[pIdx + 3] = (spotAlpha * 255) | 0;
           } else {
             const fusionAlpha = Math.min(1.0, userAlpha * (0.65 + 0.55 * norm));
-            data[pIdx + 3] = Math.round(fusionAlpha * 255);
+            data[pIdx + 3] = (fusionAlpha * 255) | 0;
           }
         }
         offThermalCtx.putImageData(offThermalImgData, 0, 0);
 
         pcbCtx.save();
         pcbCtx.imageSmoothingEnabled = true;
-        pcbCtx.imageSmoothingQuality = 'high';
+        pcbCtx.imageSmoothingQuality = 'medium';
         pcbCtx.drawImage(offThermalCanvas, 0, 0, GRID_W, GRID_H, 0, 0, pcbCanvas.width, pcbCanvas.height);
         pcbCtx.restore();
       }
@@ -3278,18 +3303,22 @@
         const levels = [minT + 0.12 * span, minT + 0.30 * span, minT + 0.55 * span, minT + 0.80 * span];
         pcbCtx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
         pcbCtx.lineWidth = 0.9;
-        levels.forEach(lvl => {
+        pcbCtx.beginPath();
+        for (let li = 0; li < levels.length; li++) {
+          const lvl = levels[li];
           for (let y = 0; y < GRID_H - 1; y++) {
+            const rowOff = y * GRID_W;
             for (let x = 0; x < GRID_W - 1; x++) {
-              const t00 = T_grid[y * GRID_W + x];
-              const t10 = T_grid[y * GRID_W + x + 1];
-              const t01 = T_grid[(y + 1) * GRID_W + x];
+              const t00 = T_grid[rowOff + x];
+              const t10 = T_grid[rowOff + x + 1];
+              const t01 = T_grid[rowOff + GRID_W + x];
               if ((t00 < lvl && t10 >= lvl) || (t00 >= lvl && t10 < lvl) || (t00 < lvl && t01 >= lvl) || (t00 >= lvl && t01 < lvl)) {
-                pcbCtx.strokeRect((x + 0.35) * SCALE, (y + 0.35) * SCALE, 1.4, 1.4);
+                pcbCtx.rect((x + 0.35) * SCALE, (y + 0.35) * SCALE, 1.4, 1.4);
               }
             }
           }
-        });
+        }
+        pcbCtx.stroke();
       }
 
       if (document.getElementById('chkIsolationSlot') && document.getElementById('chkIsolationSlot').checked) {
@@ -3541,7 +3570,13 @@
       chartCtx.fillText('t=' + formatTime(tEnd), plotRight - 72, H - 6);
     }
 
-    function renderPartsTable() {
+    let s_lastPartsTableRenderMs = 0;
+    function renderPartsTable(forceRender = false) {
+      const nowMs = performance.now();
+      if (!forceRender && isPlaying && (nowMs - s_lastPartsTableRenderMs) < 250) return;
+      const paneParts = document.getElementById('paneParts');
+      if (!forceRender && paneParts && !paneParts.classList.contains('active')) return;
+      s_lastPartsTableRenderMs = nowMs;
       const tbody = document.getElementById('tblPartsBody');
       if (!tbody) return;
       const comps = DEFAULT_COMPONENTS.components || [];
@@ -4079,14 +4114,42 @@
     }
 
     function stepSimulation(seconds) {
-      const stepSize = (seconds >= 600) ? 1.0 : 0.1;
-      const steps = Math.round(seconds / stepSize);
-      for (let i = 0; i < steps; i++) {
-        stepPhysics(stepSize);
+      let rem = seconds;
+      while (rem > 1e-6) {
+        let dt = 0.1;
+        if (rem > 5.0) {
+          /* Check how far to the next scheduled periodic burst */
+          const sched = (DEFAULT_SCENARIO && DEFAULT_SCENARIO.schedule) || [];
+          let minToNext = rem;
+          for (let i = 0; i < sched.length; i++) {
+            const s = sched[i];
+            if (s.type === 'PERIODIC_INTERVAL' && s.interval_sec > 0) {
+              const mod = simTimeSec % s.interval_sec;
+              const durSec = ((resolveActionObject(s.action_file) || {}).duration_ms || 3500) / 1000.0;
+              if (mod < durSec + 0.5) {
+                minToNext = Math.min(minToNext, 0.25);
+              } else {
+                const toNext = (s.interval_sec - mod) - 0.1;
+                if (toNext > 0.25) minToNext = Math.min(minToNext, toNext);
+              }
+            }
+          }
+          const inPlaneSpread = maxPcbTemp - minPcbTemp;
+          if (inPlaneSpread <= 0.025 && minToNext >= 2.0) {
+            dt = Math.min(rem, minToNext, 10.0);
+          } else {
+            dt = Math.min(rem, 0.5);
+          }
+        } else {
+          dt = Math.min(rem, 0.1);
+        }
+        stepPhysics(dt);
+        rem -= dt;
       }
       renderBoard();
       renderStripChart();
       updateUiMetrics();
+      renderPartsTable(true);
     }
 
     // Advances to the start of the next scheduled App Wake cycle and steps 1.5s into the active burst
@@ -4194,6 +4257,7 @@
       if (btnEl) btnEl.classList.add('active');
       const pane = document.getElementById(paneId);
       if (pane) pane.classList.add('active');
+      if (paneId === 'paneParts') renderPartsTable(true);
     }
 
     function selectManifestEditor(textareaId, btnEl) {

@@ -175,12 +175,13 @@ typedef struct {
     h1os_autonomy_metrics_t autonomy; /**< Empirical battery autonomy metrics over total elapsed runtime.  */
     uint32_t sensor_fail_count; /**< Total count of failed wake-stub sensor sample attempts.         */
     uint8_t last_sensor_error; /**< Most recent sensor error enum code (orch_sensor_err_t).         */
+    bool is_rh_alert_active; /**< True if settled RH is outside configured humidor target bounds. */
 } h1os_telemetry_t;
 
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.4.0-dev").
+ * @return Null-terminated semantic version string (e.g. "2.4.4-dev").
  */
 static inline const char *h1os_get_version(void)
 {
@@ -229,6 +230,37 @@ esp_err_t h1os_set_volume(uint8_t volume_pct);
  *   - ESP_ERR_INVALID_ARG: Null pointer passed.
  */
 esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry);
+
+/**
+ * @brief Retrieve historical Tri-Node telemetry samples from the RTC Slow SRAM ring buffer in chronological order.
+ *
+ * Designed for batch wireless telemetry publishing (Wi-Fi MQTT / BLE GATT) and local SD card logging
+ * without exposing Layer 3 internal structures to the application layer.
+ *
+ * @param[out] out_samples  Destination array of orch_tri_node_sample_t elements. Must not be NULL.
+ * @param[in]  max_samples  Maximum capacity of out_samples array (up to ORCH_RING_CAPACITY = 32).
+ * @param[out] out_count    Number of valid chronological samples copied into out_samples. Must not be NULL.
+ *
+ * @return
+ *   - ESP_OK: Historical samples copied in oldest-to-newest chronological order.
+ *   - ESP_ERR_INVALID_ARG: Null pointer or zero capacity passed.
+ */
+esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count);
+
+/**
+ * @brief Configure relative humidity target alert thresholds in centi-percent (1% = 100, e.g. 6200..7200).
+ *
+ * Persisted in RTC Slow SRAM so humidor out-of-bounds excursions are evaluated deterministically across
+ * deep sleep cycles (set both to 0 to disable alert evaluation).
+ *
+ * @param[in] rh_low_centi_pct  Lower relative humidity alert threshold in centi-% (0..10000).
+ * @param[in] rh_high_centi_pct Upper relative humidity alert threshold in centi-% (0..10000).
+ *
+ * @return
+ *   - ESP_OK: Alert bounds configured successfully.
+ *   - ESP_ERR_INVALID_ARG: Invalid range (low > high or > 10000).
+ */
+esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct);
 
 /**
  * @brief Put the platform into ultra-low-power deep sleep.

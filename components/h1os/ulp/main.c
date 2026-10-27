@@ -82,9 +82,12 @@ static inline uint32_t ulp_raw_to_mv(int32_t raw)
 static inline void ulp_clear_gpio_wakeup_latch(void)
 {
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    asm volatile("fence" ::: "memory");
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    asm volatile("fence" ::: "memory");
     ulp_riscv_delay_us(120);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    asm volatile("fence" ::: "memory");
 }
 
 /**

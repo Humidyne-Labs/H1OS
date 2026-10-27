@@ -25,3 +25,8 @@ This rule governs documentation integrity, living memory tracking, and open-sour
 2. **Strict Attribution & Licensing:**
    - Always credit original authors, upstream algorithms, font designers, and driver creators.
    - Maintain appropriate SPDX license tags (`SPDX-License-Identifier: MIT` or `CC-BY-4.0`) across all code and documentation files.
+
+### Project Engineering Attribution
+- **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
+- **Principal Firmware Audit, `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+- **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

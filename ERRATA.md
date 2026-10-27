@@ -2,7 +2,7 @@
 
 > **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch)
 >
-> **Applicable Firmware:** H1OS `v2.4.0-dev` (E-Class Environmental Operating System)
+> **Applicable Firmware:** H1OS `v2.4.4-dev` (E-Class Environmental Operating System)
 >
 > **Purpose:** Document physical PCB layout defects, electrical hazards, and architectural limitations discovered during driver bring-up, and provide engineering schematics/layout guidelines for a hardware **Rev B** redesign.
 
@@ -869,3 +869,14 @@ During environmental chamber qualification soak **Run #2** (`TST_002`), the firm
   - Configured `SENS_TSENS_XPD_FORCE = 1` during sample and `0` on sleep.
   - Implemented the de-assert latch step (`DUMP_OUT = 1` $\rightarrow$ poll `READY` $\rightarrow$ `DUMP_OUT = 0` $\rightarrow$ read `OUT`).
   - Increased timeout to 1000 cycles (5 ms ceiling).
+
+##### 5. `-O2` Loop Unrolling, Implicit `memset` Synthesis & I2C Final-Byte NACK (`v2.4.4-dev`)
+
+* **Defect Description:**
+  1. Under `-O2`, GCC unrolls the 8-iteration bit-shift loops in `i2c_write_byte()` and `i2c_read_byte()` across every call site in `bsp_wake_stub()`, inflating `.rtc.text` footprint and coalescing adjacent peripheral register writes across the APB/RTC bridge.
+  2. Aggregate struct/array zero-initialization (`uint8_t rx[6] = {0};`, `orch_tri_node_sample_t sample = {...};`, and byte-clearing loops in `orch_state_reset()`) can be transformed by GCC `-ftree-loop-distribute-patterns` into calls to `memset` located in unmapped SPI Flash ROM/RAM when cache is powered down.
+  3. Reading the 6th byte (`rx[5]`) of the SHTC3 measurement frame with `ACK` (`true`) instead of `NACK` (`false`) violates the I2C master read specification, causing the SHTC3 state machine to drive the next bit onto `SDA` and potentially hold `SDA` low during the master's `STOP` transition (`ORCH_SENSOR_ERR_BUS_STUCK`).
+* **Firmware Mitigation:**
+  - Marked `i2c_write_byte()`, `i2c_read_byte()`, `wake_stub_read_die_temp_centi_c()`, `rtc_write_reg_retry()`, and `i2c_recover_stuck_bus()` with `__attribute__((noinline))` and loop index register clobbers `asm volatile("" : "+r"(i));`.
+  - Replaced aggregate zero-initializers in `RTC_IRAM_ATTR` functions with explicit per-field assignments and `asm volatile("" : "+m"(p[i]));` memory barriers.
+  - Added `scl_high_wait()` with a bounded `2,000 µs` clock-stretch timeout (`ORCH_SENSOR_ERR_SCL_STUCK = 7`), a 9-clock bus recovery helper (`i2c_recover_stuck_bus()`), and `i2c_read_byte(false)` (`NACK`) on `rx[5]`.

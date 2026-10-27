@@ -34,10 +34,12 @@ void RTC_IRAM_ATTR orch_state_reset(void)
     volatile uint8_t *p = (volatile uint8_t *)&s_persisted_state;
     for (size_t i = 0; i < sizeof(s_persisted_state); i++) {
         p[i] = 0;
+        asm volatile("" : "+m"(p[i]));
     }
 
     s_persisted_state.magic                = ORCH_RTC_MAGIC;
     s_persisted_state.tsens_offset_centi_c = ORCH_TSENS_DEFAULT_INTERCEPT_CENTI_C;
+    asm volatile("memw" ::: "memory");
 }
 
 void orch_state_save_runtimes_to_nvs(void)
@@ -156,5 +158,41 @@ bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample)
 
     uint8_t latest_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (st->ring_head - 1);
     *out_sample = st->ring[latest_idx];
+    return true;
+}
+
+/**
+ * @brief Copy historical samples from the RTC ring buffer in chronological order (oldest to newest).
+ *
+ * @param[out]   out_samples     Destination array for samples.
+ * @param[in]    max_samples     Capacity of destination array.
+ * @param[out]   out_count       Number of samples copied.
+ *
+ * @return true if at least one sample was copied, false if buffer empty or args invalid.
+ */
+bool orch_state_get_ring_chronological(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count)
+{
+    if (out_count != NULL) {
+        *out_count = 0;
+    }
+    if (out_samples == NULL || max_samples == 0 || out_count == NULL) {
+        return false;
+    }
+
+    volatile orch_persisted_state_t *st = orch_state_get();
+    if (st->total_samples == 0) {
+        return false;
+    }
+
+    size_t avail = (st->total_samples < ORCH_RING_CAPACITY) ? (size_t)st->total_samples : (size_t)ORCH_RING_CAPACITY;
+    size_t to_copy = (avail < max_samples) ? avail : max_samples;
+    uint8_t newest_idx = (st->ring_head == 0) ? (ORCH_RING_CAPACITY - 1) : (uint8_t)(st->ring_head - 1);
+    uint8_t start_idx  = (uint8_t)((newest_idx + ORCH_RING_CAPACITY - (to_copy - 1)) % ORCH_RING_CAPACITY);
+
+    for (size_t i = 0; i < to_copy; i++) {
+        uint8_t idx = (uint8_t)((start_idx + i) % ORCH_RING_CAPACITY);
+        out_samples[i] = st->ring[idx];
+    }
+    *out_count = to_copy;
     return true;
 }

@@ -84,11 +84,15 @@ Defines all hardware fixed constants and base enums for the Waveshare ESP32-S3 e
 - **Power Rail Policy (Keep Gates Open - Zero Glitch Strategy):**
   - Both `GPIO 17` (`BAT_CTRL` = 1) and `GPIO 6` (`EPD_3V3_EN` = 0, Active LOW = rail ON) remain permanently asserted and latched with RTC pad holds during deep sleep.
   - `GPIO 42` (`PA_EN` = 0, rail ON) remains energized across runtime and deep sleep to prevent unpowered ES8311 from pulling down the shared I2C bus.
-- **Stateless Button Reading & USB Detection:**
-  - `hal_io` provides raw register level checks without event queues or callback tables, plus SOF-based USB host detection (`hal_check_usb_ll`).
+- **Event-Driven Button ISR, Hardware Glitch Filtering & `esp_timer` LED Pacing (`v2.4.4-dev`):**
+  - `hal_io_early_init()` installs the per-pin GPIO ISR dispatcher (`gpio_install_isr_service(0)`), enables the ESP32-S3 hardware pin glitch filters (`gpio_new_pin_glitch_filter`) on `GPIO 0` (`BOOT`) and `GPIO 18` (`POWER`), and arms `GPIO_INTR_ANYEDGE` interrupts coupled to a `15 ms` one-shot `esp_timer` debounce filter (`hal_io_register_button_cb`).
+  - `hal_led_start_breathing()` drives the hardware LEDC fade engine via a periodic `esp_timer` alarm (`hal_led_breath_timer_cb`) rather than a dedicated FreeRTOS polling task, saving `2 KB` of task stack and eliminating `50 ms` polling wakes.
 
 ```c
+typedef void (*hal_io_button_cb_t)(hal_btn_mask_t btn_mask, void *arg);
+
 esp_err_t      hal_io_early_init(void);
+esp_err_t      hal_io_register_button_cb(hal_io_button_cb_t cb, void *arg);
 esp_err_t      hal_io_set_led(bool on);
 esp_err_t      hal_led_pwm_init(void);
 esp_err_t      hal_led_set_brightness(uint8_t brightness_pct);

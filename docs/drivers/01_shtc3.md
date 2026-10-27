@@ -4,7 +4,7 @@
 - **Manufacturer / IC:** Sensirion SHTC3
 - **Bus Interface:** Shared Master I2C (`I2C_NUM_0`)
 - **7-Bit Slave Address:** `0x70` (Fixed)
-- **Bus Speed:** 400 kHz Fast-Mode
+- **Bus Speed:** 400 kHz Fast-Mode (Hardware I2C0) / 50 kHz Cycle-Accurate Bit-Bang (`10 µs` half-period in RTC Fast Wake Stub)
 - **Pull-ups:** Hardware external 4.7 kΩ pull-ups to 3.3V on `GPIO 47` (SDA) and `GPIO 48` (SCL)
 - **Power Rail:** Powered from `EPD_3V3_EN` (`GPIO 6`, Active LOW). Stays energized across deep sleep.
 
@@ -16,11 +16,11 @@ The SHTC3 is a stateless, low-power environmental sensor that operates using 16-
 
 | Command Name | 16-Bit Hex Code | Payload Transmitted | Required Post-Command Delay | Description |
 |---|---|---|---|---|
-| **WAKEUP** | `0x3517` | `[0x35, 0x17]` | **250 µs** (`esp_rom_delay_us(250)`) | Transitions sensor from sleep mode to idle ready state. |
+| **WAKEUP** | `0x3517` | `[0x35, 0x17]` | **240 µs min / 500 µs stub** (`rtc_delay_us_exact(500)`) | Transitions sensor from sleep mode to idle ready state. |
 | **SLEEP** | `0xB098` | `[0xB0, 0x98]` | None (instantaneous) | Puts sensor into low-power sleep mode to prevent self-heating. |
 | **READ_ID** | `0xEFC8` | `[0xEF, 0xC8]` | None | Reads 3 bytes: 2-byte Product ID + 1-byte CRC. Mask `0x0847`. |
 | **SOFT_RESET** | `0x805D` | `[0x80, 0x5D]` | **200 µs** | Reinitializes digital control logic. |
-| **MEAS_NORMAL_T_FIRST** | `0x7866` | `[0x78, 0x66]` | **13–15 ms** | **Standard H1OS Mode:** Normal precision measurement (full ADC resolution, Temperature read first). Clock stretching disabled. |
+| **MEAS_NORMAL_T_FIRST** | `0x7866` | `[0x78, 0x66]` | **18.0 ms budget** (`450 µs` TSENS + `17,550 µs` wait) | **Standard H1OS Mode:** Normal precision measurement (full ADC resolution, Temperature read first). Clock stretching disabled. |
 | **MEAS_LOWPWR_T_FIRST** | `0x609C` | `[0x60, 0x9C]` | **1000 µs** | Low-power fast measurement (reduced ADC precision; not used in H1OS Flow A/B). |
 
 ---
@@ -100,8 +100,8 @@ $$
 | Parameter / Feature | Legacy Reference (`bsp_sensors.c`) | Clean-Slate (`orch_wake_stub.c` RTC IRAM) | Status |
 |---|---|---|---|
 | I2C Address | `0x70` | `HAL_I2C_ADDR_SHTC3` (`0x70`) | **PASS** |
-| Wake Command | `0x3517` + 250 µs delay | `0x3517` + 250 µs delay | **PASS** |
-| Normal Meas Command | `0x7866` + 15 ms delay | `0x7866` + 15 ms delay | **PASS** |
+| Wake Command | `0x3517` + 250 µs delay | `0x3517` + 500 µs `rtc_delay_us_exact` | **PASS** |
+| Normal Meas Command | `0x7866` + 15 ms delay | `0x7866` + 18.0 ms (`450 µs` TSENS + `17.55 ms` wait) | **PASS** |
 | Low Power Command | `0x609C` + 1000 µs delay | `0x609C` + 1000 µs delay | **PASS** |
 | Sleep Command | `0xB098` (Sent immediately after read) | `0xB098` (Sent immediately after read) | **PASS** |
 | CRC-8 Polynomial | `0x31` (Init `0xFF`) | `0x31` (Init `0xFF`) | **PASS** |

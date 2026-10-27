@@ -20,7 +20,9 @@ This file constitutes the authoritative, always-active engineering and behaviora
    - **Dual-Core Affinity:** Core 0 handles system, radio, and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation task.
    - **Power Latching:** `BAT_CTRL` (GPIO 17) is asserted in `h1os_boot_hook` within 25 ms and held across deep sleep via RTC pad hold.
    - **Zero-Heat Sensing:** Never poll the SHTC3 during active CPU operation. SHTC3 sampling is restricted to headless Flow A sample bursts (<10 ms at 80 MHz) or the ULP coprocessor to prevent PCB self-heating bias.
-   - **Never Busy-Wait:** Polling in `while()` loops during idle states is prohibited; block on FreeRTOS notifications, semaphores, or hardware interrupts.
+   - **Never Busy-Wait (Two-Domain Synchronization Law):**
+     - **Awake FreeRTOS Domain (`hal_*`, `sub_*`, `orch_flow.c`, `h1os_*`):** Never spawn dedicated polling tasks or `vTaskDelay()` spin-wait loops to monitor timeouts, task exits, or hardware `BUSY`/button pins. Always use `esp_timer` (`esp_timer_start_once` / `esp_timer_start_periodic` / `esp_timer_restart`) for asynchronous timeouts and periodic state machines, GPIO edge interrupts (`gpio_isr_handler_add`) + hardware glitch filters (`gpio_new_pin_glitch_filter`) + `xSemaphoreTake` / `ulTaskNotifyTake` for hardware ready/busy/button lines, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) for cross-task teardown synchronization.
+     - **Bare-Metal Sleep Domain (`orch_wake_stub.c` & `ulp/main.c`):** FreeRTOS, `esp_timer`, and `gptimer` interrupt vectors reside in Flash/IRAM and are unmapped or powered down during deep sleep. Inside `RTC_IRAM_ATTR` and ULP code, straight-line bounded `ccount`/register polling with `rtc_reg_barrier()` (`memw` / `fence`) and `__attribute__((noinline))` loop barriers is mandatory.
 5. **Compiler Diagnostics & Two-Strike Resolution Protocol:**
    - Always verify compilation with the canonical ESP-IDF profile (`C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`).
    - If a build fails, isolate the exact diagnostic line and propose one targeted fix. If it fails a second time, **STOP IMMEDIATELY**, state the diagnostic verbatim, and request confirmation.
@@ -75,9 +77,9 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
    - Execution Sequence: Bootloader latches power $\rightarrow$ boot FreeRTOS $\rightarrow$ spawn Core 1 LVGL v9 task $\rightarrow$ dispatch `on_wake(ctx)` $\rightarrow$ run interactive session $\rightarrow$ track 30s inactivity timer $\rightarrow$ initiate coordinated sleep transition sequence.
 
 ### Deterministic Sleep Transition Sequence
-1. Invoke pre-sleep application callback (`on_sleep`).
-2. Signal Core 1 LVGL presentation task to drain buffers and halt cleanly.
-3. Poll SSD1681 display `BUSY` signal release at 80 MHz.
+1. Invoke pre-sleep application callback (`on_pre_sleep`).
+2. Signal Core 1 LVGL presentation task via `h1os_lvgl_wait_idle()` and `h1os_lvgl_stop()` to drain buffers and halt cleanly on static binary semaphores.
+3. Block on SSD1681 display `BUSY` (`GPIO 8`) falling-edge GPIO interrupt semaphore at 80 MHz (`sub_display_wait_busy()`).
 4. Wait mandatory **250 ms physical settling delay** for electrophoretic ink microcapsules.
 5. If frame marked dirty, commit 5,000-byte 1-bit buffer to SPI Flash partition `epd_frame`.
 6. Suspend audio codec (`sub_audio` software standby) and isolate I2C/SPI buses.
@@ -97,7 +99,7 @@ All UI code targets the Waveshare ESP32-S3 ePaper 1.54" V2 panel (SSD1681 driver
 * **Proportional Font Rules:** Montserrat font metrics are proportional with 4-bit fractional advance widths and class kerning. Never use multiple spaces for alignment; use dual column labels or single-space padding.
 * **Layout Grid (200 px Total):** Header ($Y = 0..20\text{ px}$ with 1 px bottom border), Body ($Y = 22..148\text{ px}$), Footer ($Y = 150..200\text{ px}$).
 * **Thread Safety:** Wrap all UI mutations in `h1os_lvgl_lock()` / `h1os_lvgl_unlock()`.
-* **Font Validation Tools:** Verify all strings against layout boundaries using `python tools/check_string_width.py --audit-screens` and CSV metrics in `tools/fonts/`.
+* **Font Validation Tools:** Verify all strings against layout boundaries using `python tools/agent/check_string_width.py --audit-screens` and CSV metrics in `tools/fonts/`.
 
 ---
 
@@ -127,12 +129,13 @@ All UI code targets the Waveshare ESP32-S3 ePaper 1.54" V2 panel (SSD1681 driver
 ## 7. Release Governance & Pre-Merge Checklist
 
 Direct commits to `main` are strictly prohibited. Before merging any branch into `main`:
-1. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via `idf.py -B build_dev build`.
-2. **Mandatory `sdkconfig` Removal Invariant:** Always remove root `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
-3. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
-4. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
-5. **Touch Changelog:** Record changes in `CHANGELOG.md` under Keep a Changelog categories (`Added`, `Changed`, `Fixed & Hardened`, `Removed`).
-6. **Tag Release:** Push annotated tag `vX.Y.Z-tag` to remote.
+1. **Identity & Name Sanitization Audit:** Run `python tools/agent/sanitize.py --check` (or `--fix`) to verify zero personal identities, workstation usernames, or local filesystem paths leak into committed repository files or release archives.
+2. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via `idf.py -B build_dev build`. You must build the examples `in` the examples home directory, to avoid polluting root.
+3. **Mandatory `sdkconfig` Removal Invariant:** Always remove root `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
+4. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
+5. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
+6. **Touch Changelog:** Record changes in `CHANGELOG.md` under Keep a Changelog categories (`Added`, `Changed`, `Fixed & Hardened`, `Removed`).
+7. **Tag Release:** Push annotated tag `vX.Y.Z-tag` to remote.
 
 
 ---
@@ -213,3 +216,29 @@ The 3-Finger MCP tool suite equips the agent with compiler-grade AST intelligenc
 * **Available Tools:** `search_code_advanced`, `find_files`, `get_file_summary`, `search_espressif_sources`.
 * **Purpose & Application:** Precision search across repository architecture docs, IC datasheets (SHTC3, PCF85063A, ES8311, SSD1681), and Espressif Technical Reference Manuals.
 * **Tool Quirk:** `local-index/search_code_advanced` strictly requires argument `pattern: str` (do not pass `query`).
+
+---
+
+## 10. Senior Architect's Field Guide for Future Junior Agents & Maintainers
+
+Welcome to the H1OS source tree. Every line in this repository exists because physical hardware—a dual-core ESP32-S3-PICO-1-N8R8, a 200x200 SSD1681 e-Paper panel, a Sensirion SHTC3 sensor, a PCF85063A quartz RTC, and an ES8311/NS4168 audio pipeline—demanded it on the bench. Before modifying any file, internalize these six engineering principles:
+
+1. **Respect the Two Execution Worlds (FreeRTOS Awake vs. Bare-Metal RTC Sleep):**
+   - When the system is **awake in Flow B**, let hardware interrupts and `esp_timer` do the waiting. Never write a `while (busy) { vTaskDelay(10); }` loop or spawn a `4 KB` FreeRTOS task just to poll a timestamp or a GPIO pin. Use `esp_timer` one-shot/periodic alarms, `GPIO_INTR_NEGEDGE`/`GPIO_INTR_ANYEDGE` ISRs, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) so both Xtensa cores can enter low-power idle states cleanly—especially when upper-layer applications run Wi-Fi and BLE stacks on Core 0.
+   - When the system is **asleep in Flow A (`orch_wake_stub.c`) or the ULP (`ulp/main.c`)**, SPI NOR Flash is powered off and the MMU cache is disabled. Never call standard library functions (`memset`, `memcpy`), `esp_timer`, or FreeRTOS primitives from `orch_wake_stub.c`. Always guard fixed-trip-count bit-bang loops with `__attribute__((noinline))` and inline assembly loop clobbers (`asm volatile("" : "+r"(i))`), guard local array zeroing with `asm volatile("" : "+m"(buf[i]))` so GCC `-O2` `-ftree-loop-distribute-patterns` never synthesizes a fatal call to Flash-resident `memset`, and place `rtc_reg_barrier()` (`memw` on Xtensa, `fence` on RISC-V) between sequential peripheral register writes.
+2. **Never Fight Physics with Software Fudge Factors:**
+   - The SHTC3 is factory-calibrated. When the PCB is thermally settled (`|T2 - T1| <= 0.20 C` across consecutive quiescent Flow A wakes), trust the SHTC3 directly and compute true water vapor pressure ($e$), dew point ($T_{	ext{dew}}$), and absolute humidity ($d_v$) using pure August-Roche-Magnus equations. Never add synthetic temperature offsets or linear tares.
+3. **Protect the Shared Open-Drain I2C Bus (`GPIO 47` SDA / `GPIO 48` SCL):**
+   - Three peripherals share `I2C_NUM_0`: SHTC3 (`0x70`), PCF85063A (`0x51`), and ES8311 (`0x18`). Never cut `PA_EN` (`GPIO 42`) power (keep ES8311 in `<1 uA` software standby instead per Errata E4), always verify `SCL` high rise (`scl_high_wait()`) to honor slave clock stretching, and always send `NACK` (`false`) on the final byte of any master I2C read frame so the slave releases `SDA` high before `STOP`.
+4. **Guard Flash Endurance & Static SRAM Headroom:**
+   - Keep `RTC_SLOW_MEM` structures compact (`orch_persisted_state_t` is 640 bytes) and allocate synchronization primitives statically (`StaticSemaphore_t`) with zero runtime heap churn (`PIT-04-C`). Throttle periodic NVS Flash commits to hourly Flow B piggyback intervals (`ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC = 3600`) paired with immediate commits on clean shutdown or state transitions.
+5. **Measure Twice, Cut Once (Craftsmanship & Humility):**
+   - Read the target header, trace every caller, check the hardware errata (`ERRATA.md`), and verify numeric bounds in 64-bit arithmetic before writing code. Leave every module cleaner, leaner, and more deterministic than you found it.
+
+---
+
+## 11. Engineering Attribution & Contributors
+
+* **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
+* **Principal Firmware Audit, `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

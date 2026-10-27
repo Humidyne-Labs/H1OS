@@ -51,12 +51,12 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh);
  *   - ESP_OK: Task created and running.
  *   - ESP_FAIL: Task creation failed.
  */
-esp_err_t h1os_lvgl_start(int priority, int core_id);
+esp_err_t h1os_lvgl_start(int32_t priority, int32_t core_id);
 
 /**
  * @brief Stop the LVGL background task.
  *
- * Signals the event loop to terminate cleanly and waits for task exit.
+ * Signals the event loop to terminate cleanly via event-driven semaphore synchronization and waits for task exit.
  *
  * @return
  *   - ESP_OK: Task stopped successfully.
@@ -88,6 +88,18 @@ void h1os_lvgl_unlock(void);
  * @return True if display driver is currently flushing or widgets are invalidated.
  */
 bool h1os_lvgl_has_pending_tasks(void);
+
+/**
+ * @brief Event-driven wait until the LVGL display pipeline completes all pending renders and flushes.
+ *
+ * Blocks on a static binary semaphore signaled immediately by the Core 1 LVGL task when idle,
+ * eliminating 20 ms polling loops during pre-sleep teardown.
+ *
+ * @param[in] timeout_ms Maximum wait time in milliseconds.
+ *
+ * @return ESP_OK when pipeline is idle, ESP_ERR_TIMEOUT on expiration.
+ */
+esp_err_t h1os_lvgl_wait_idle(uint32_t timeout_ms);
 
 /**
  * @brief Retrieve the LVGL keypad input device handle.

@@ -13,7 +13,6 @@
 #include "freertos/task.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_version.h"
-#include "h1os/orch_state.h"
 #include "screens.h"
 
 #include <inttypes.h>
@@ -63,7 +62,7 @@ static const char *get_wake_causes_str(uint32_t causes)
  */
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
-    (void)telem;
+
     uint32_t base_cpu_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
     h1os_lvgl_lock(100);
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "5/5", event_cb);
@@ -158,10 +157,11 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_k6, LV_ALIGN_TOP_LEFT, 6, 128);
 
     lv_obj_t *lbl_v6 = lv_label_create(scr);
-    if (st->sensor_fail_count > 0) {
+    uint32_t fails = telem ? telem->sensor_fail_count : st->sensor_fail_count;
+    if (fails > 0) {
         lv_label_set_text_fmt(lbl_v6, "%lu (Fail %lu)",
                               (unsigned long)st->wake_count,
-                              (unsigned long)st->sensor_fail_count);
+                              (unsigned long)fails);
     } else {
         lv_label_set_text_fmt(lbl_v6, "%lu (Ring %u/32)",
                               (unsigned long)st->wake_count,
@@ -177,12 +177,13 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_k7, LV_ALIGN_TOP_LEFT, 6, 148);
 
     lv_obj_t *lbl_v7 = lv_label_create(scr);
-    if (st->last_sensor_error == ORCH_SENSOR_ERR_NONE) {
+    uint8_t last_err = telem ? telem->last_sensor_error : st->last_sensor_error;
+    if (last_err == ORCH_SENSOR_ERR_NONE) {
         lv_label_set_text_fmt(lbl_v7, "%luMHz • SHT:OK", (unsigned long)base_cpu_mhz);
     } else {
         lv_label_set_text_fmt(lbl_v7, "%luMHz • ERR_%u",
                               (unsigned long)base_cpu_mhz,
-                              (unsigned int)st->last_sensor_error);
+                              (unsigned int)last_err);
     }
     lv_obj_set_style_text_font(lbl_v7, H1OS_FONT_14, 0);
     lv_obj_align(lbl_v7, LV_ALIGN_TOP_RIGHT, -6, 148);

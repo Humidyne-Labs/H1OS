@@ -96,8 +96,14 @@ typedef struct {
 
     uint32_t total_sleep_sec;
     uint32_t total_app_run_ms;
+    uint32_t last_nvs_commit_sec;
     uint16_t initial_soc_x10;
     uint8_t  _pad_soc[2];
+    uint32_t sensor_fail_count;
+    uint8_t  last_sensor_error;
+    uint8_t  _pad_sensor[3];
+    uint16_t rh_alert_low_centi_pct;
+    uint16_t rh_alert_high_centi_pct;
 } orch_persisted_state_t;
 
 volatile orch_persisted_state_t *orch_state_get(void);

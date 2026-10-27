@@ -32,8 +32,10 @@
 #endif
 
 // clang-format off
-#define ORCH_I2C_RECOVERY_TIMEOUT_US 20000U /**< I2C bus recovery timeout (20 ms).  */
-#define ORCH_I2C_RECOVERY_STEP_US    500U   /**< I2C recovery polling step (500 µs).*/
+#define ORCH_I2C_RECOVERY_TIMEOUT_US    20000U /**< I2C bus recovery timeout (20 ms).               */
+#define ORCH_I2C_RECOVERY_STEP_US       500U   /**< I2C recovery polling step (500 µs).             */
+#define ORCH_I2C_SCL_STRETCH_TIMEOUT_US 2000U  /**< Maximum SCL clock-stretch / RC rise wait (2 ms).*/
+#define ORCH_I2C_BUS_CLEAR_PULSES       9      /**< 9-clock bus clear sequence for stuck SDA slave. */
 
 #define SDA_BIT_MASK (1UL << (HAL_PIN_I2C_SDA - 32))
 #define SCL_BIT_MASK (1UL << (HAL_PIN_I2C_SCL - 32))
@@ -72,48 +74,81 @@ static inline void RTC_IRAM_ATTR rtc_delay_us_exact(uint32_t us)
     } while ((current - start) < cycles_to_wait);
 }
 
+/**
+ * @brief Full peripheral register write-completion and compiler barrier.
+ *
+ * @details Under -O2 loop unrolling and instruction scheduling, GCC can reorder or coalesce
+ * adjacent MMIO register accesses across the APB/RTC bridge. Issuing `memw` with a `"memory"`
+ * clobber forces the Xtensa load/store unit to drain all pending peripheral writes before
+ * advancing to the next instruction.
+ */
+static inline void RTC_IRAM_ATTR rtc_reg_barrier(void)
+{
+    asm volatile("memw" ::: "memory");
+}
+
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
-    //rtc_delay_us_exact(5); //5us,  100khz
-    rtc_delay_us_exact(10);  //10us, 50khz
+    rtc_delay_us_exact(10); /* 10 us half-period = 50 kHz clock for rock-solid open-drain margin */
 }
 
 static inline void RTC_IRAM_ATTR sda_high(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
 }
 
 static inline void RTC_IRAM_ATTR sda_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SDA_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SDA_BIT_MASK);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
 }
 
-static inline void RTC_IRAM_ATTR scl_high(void)
+static inline uint8_t RTC_IRAM_ATTR sda_read(void)
+{
+    rtc_reg_barrier();
+    return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1U : 0U;
+}
+
+static inline uint8_t RTC_IRAM_ATTR scl_read(void)
+{
+    rtc_reg_barrier();
+    return (REG_READ(GPIO_IN1_REG) & SCL_BIT_MASK) ? 1U : 0U;
+}
+
+/**
+ * @brief Release SCL open-drain line HIGH and verify physical rise with bounded clock-stretch wait.
+ *
+ * @return True if SCL reached logic HIGH within ORCH_I2C_SCL_STRETCH_TIMEOUT_US, false if stuck LOW.
+ */
+static inline bool RTC_IRAM_ATTR scl_high_wait(void)
 {
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
+
+    uint32_t wait_us = 0;
+    while (scl_read() == 0) {
+        if (wait_us >= ORCH_I2C_SCL_STRETCH_TIMEOUT_US) {
+            return false;
+        }
+        rtc_delay_us_exact(2);
+        wait_us += 2U;
+    }
+    return true;
 }
 
 static inline void RTC_IRAM_ATTR scl_low(void)
 {
     REG_WRITE(GPIO_OUT1_W1TC_REG, SCL_BIT_MASK);
     REG_WRITE(GPIO_ENABLE1_W1TS_REG, SCL_BIT_MASK);
-    asm volatile("memw" ::: "memory");
-}
-
-static inline uint8_t RTC_IRAM_ATTR sda_read(void)
-{
-    asm volatile("memw" ::: "memory");
-    return (REG_READ(GPIO_IN1_REG) & SDA_BIT_MASK) ? 1 : 0;
+    rtc_reg_barrier();
 }
 
 static void RTC_IRAM_ATTR i2c_start(void)
 {
     sda_high();
-    scl_high();
+    (void)scl_high_wait();
     i2c_delay();
     sda_low();
     i2c_delay();
@@ -125,13 +160,44 @@ static void RTC_IRAM_ATTR i2c_stop(void)
 {
     sda_low();
     i2c_delay();
-    scl_high();
+    (void)scl_high_wait();
     i2c_delay();
     sda_high();
     i2c_delay();
 }
 
-static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
+/**
+ * @brief Execute 9-clock I2C bus clear recovery sequence when a slave holds SDA low.
+ *
+ * @return True if SDA and SCL both released to logic HIGH, false if bus remains stuck.
+ */
+static bool RTC_IRAM_ATTR __attribute__((noinline)) i2c_recover_stuck_bus(void)
+{
+    sda_high();
+    for (int32_t pulse = 0; pulse < ORCH_I2C_BUS_CLEAR_PULSES; pulse++) {
+        scl_low();
+        i2c_delay();
+        if (!scl_high_wait()) {
+            return false;
+        }
+        i2c_delay();
+        if (sda_read() != 0) {
+            break;
+        }
+        asm volatile("" : "+r"(pulse));
+    }
+    i2c_stop();
+    return (sda_read() != 0 && scl_read() != 0);
+}
+
+/**
+ * @brief Transmit a single byte over bit-banged I2C.
+ *
+ * @details Guarded with __attribute__((noinline)) and an explicit loop register barrier so -O2
+ * does not unroll 8x across every call site, preserving RTC Fast IRAM instruction density and
+ * preventing back-to-back GPIO register store coalescing.
+ */
+static bool RTC_IRAM_ATTR __attribute__((noinline)) i2c_write_byte(uint8_t byte)
 {
     for (int32_t i = 7; i >= 0; i--) {
         if ((byte >> i) & 1) {
@@ -140,15 +206,22 @@ static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
             sda_low();
         }
         i2c_delay();
-        scl_high();
+        if (!scl_high_wait()) {
+            scl_low();
+            return false;
+        }
         i2c_delay();
         scl_low();
         i2c_delay();
+        asm volatile("" : "+r"(i));
     }
 
     sda_high();
     i2c_delay();
-    scl_high();
+    if (!scl_high_wait()) {
+        scl_low();
+        return false;
+    }
     i2c_delay();
     bool ack = (sda_read() == 0);
     scl_low();
@@ -156,20 +229,27 @@ static bool RTC_IRAM_ATTR i2c_write_byte(uint8_t byte)
     return ack;
 }
 
-static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
+/**
+ * @brief Receive a single byte over bit-banged I2C.
+ *
+ * @details Guarded with __attribute__((noinline)) and an explicit loop register barrier so -O2
+ * does not unroll the 8-bit shift loop across all 6 SHTC3 readout bytes.
+ */
+static uint8_t RTC_IRAM_ATTR __attribute__((noinline)) i2c_read_byte(bool ack)
 {
     uint8_t byte = 0;
     sda_high();
 
     for (int32_t i = 7; i >= 0; i--) {
         i2c_delay();
-        scl_high();
+        (void)scl_high_wait();
         i2c_delay();
         if (sda_read()) {
             byte |= (uint8_t)(1U << i);
         }
         scl_low();
         i2c_delay();
+        asm volatile("" : "+r"(byte), "+r"(i));
     }
 
     if (ack) {
@@ -178,7 +258,7 @@ static uint8_t RTC_IRAM_ATTR i2c_read_byte(bool ack)
         sda_high();
     }
     i2c_delay();
-    scl_high();
+    (void)scl_high_wait();
     i2c_delay();
     scl_low();
     i2c_delay();
@@ -208,35 +288,57 @@ static uint8_t RTC_IRAM_ATTR __attribute__((noinline)) shtc3_crc8(const uint8_t 
 /**
  * @brief Read internal ESP32-S3 SAR temperature sensor in centi-degrees Celsius using Q12 fixed-point math.
  *
+ * @details Enforces explicit `rtc_reg_barrier()` (`memw`) between every sequential SENS_SAR register
+ * write so GCC `-O2` cannot reorder or coalesce peripheral bus stores across the RTC/SENS bridge.
+ *
  * @param[in]    offset_centi_c   Pre-computed intercept (2052 + tsens_cal_centi_c).
  * @param[in]    default_centi_c  Default temperature if conversion fails.
  *
  * @return Sampled die temperature in centi-°C.
  */
-static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
+static int16_t RTC_IRAM_ATTR __attribute__((noinline)) wake_stub_read_die_temp_centi_c(int16_t offset_centi_c, int16_t default_centi_c)
 {
     REG_SET_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+    rtc_reg_barrier();
+
     REG_SET_BIT(SENS_SAR_PERI_RESET_CONF_REG, SENS_TSENS_RESET);
+    rtc_reg_barrier();
     rtc_delay_us_exact(5);
+
     REG_CLR_BIT(SENS_SAR_PERI_RESET_CONF_REG, SENS_TSENS_RESET);
+    rtc_reg_barrier();
+
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_CLK_DIV, 6);
+    rtc_reg_barrier();
+
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 1);
+    rtc_reg_barrier();
+
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    rtc_reg_barrier();
 
     rtc_delay_us_exact(ORCH_TSENS_SETTLING_DELAY_US);
 
     REG_SET_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
+    rtc_reg_barrier();
+
     int32_t timeout = (int32_t)ORCH_TSENS_READY_TIMEOUT_CYCLES;
     while (((REG_READ(SENS_SAR_TSENS_CTRL_REG) & SENS_TSENS_READY) == 0) && (--timeout > 0)) {
         rtc_delay_us_exact(ORCH_TSENS_READY_POLL_INTERVAL_US);
     }
+
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_DUMP_OUT);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
     uint32_t raw = REG_GET_FIELD(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_OUT);
 
     REG_CLR_BIT(SENS_SAR_TSENS_CTRL_REG, SENS_TSENS_POWER_UP_FORCE | SENS_TSENS_POWER_UP);
+    rtc_reg_barrier();
+
     REG_SET_FIELD(SENS_SAR_TSENS_CTRL2_REG, SENS_TSENS_XPD_FORCE, 0);
+    rtc_reg_barrier();
+
     REG_CLR_BIT(SENS_SAR_PERI_CLK_GATE_CONF_REG, SENS_TSENS_CLK_EN);
+    rtc_reg_barrier();
 
     if (timeout <= 0 || raw == 0 || raw == 0xFF) {
         return default_centi_c;
@@ -253,7 +355,7 @@ static int16_t RTC_IRAM_ATTR wake_stub_read_die_temp_centi_c(int16_t offset_cent
 /**
  * @brief Write a register to PCF85063A over bit-banged I2C with up to 3 attempts.
  */
-static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
+static bool RTC_IRAM_ATTR __attribute__((noinline)) rtc_write_reg_retry(uint8_t reg, uint8_t val)
 {
     for (int32_t attempt = 0; attempt < 3; attempt++) {
         bool ok = false;
@@ -268,6 +370,7 @@ static bool RTC_IRAM_ATTR rtc_write_reg_retry(uint8_t reg, uint8_t val)
             return true;
         }
         rtc_delay_us_exact(20);
+        asm volatile("" : "+r"(attempt));
     }
     return false;
 }
@@ -334,7 +437,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
 {
     /* Suppress ULP GPIO wakeups while wake stub executes */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
 
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
@@ -349,21 +452,34 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     /* Account for the elapsed Flow A deep sleep slice */
     st->total_sleep_sec += st->sample_interval_sec;
 
+    /* Release open-drain output enable before muxing pins to prevent any transient low glitch */
+    REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK | SCL_BIT_MASK);
+    rtc_reg_barrier();
+
     PIN_FUNC_SELECT(IO_MUX_GPIO47_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO47_REG); /* I2C SDA */
 
     PIN_FUNC_SELECT(IO_MUX_GPIO48_REG, PIN_FUNC_GPIO);
     PIN_INPUT_ENABLE(IO_MUX_GPIO48_REG); /* I2C SCL */
 
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
     i2c_delay();
 
     uint8_t err_code = ORCH_SENSOR_ERR_NONE;
     bool sample_ok = true;
 
-    if (sda_read() == 0) {
-        err_code = ORCH_SENSOR_ERR_BUS_STUCK;
-        sample_ok = false;
+    if (scl_read() == 0) {
+        if (!scl_high_wait()) {
+            err_code = ORCH_SENSOR_ERR_SCL_STUCK;
+            sample_ok = false;
+        }
+    }
+
+    if (sample_ok && sda_read() == 0) {
+        if (!i2c_recover_stuck_bus()) {
+            err_code = ORCH_SENSOR_ERR_BUS_STUCK;
+            sample_ok = false;
+        }
     }
 
     if (sample_ok) {
@@ -372,7 +488,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             !i2c_write_byte(0x35) ||
             !i2c_write_byte(0x17)) {
             i2c_stop();
-            err_code = ORCH_SENSOR_ERR_NACK_WAKE;
+            err_code = (scl_read() == 0) ? ORCH_SENSOR_ERR_SCL_STUCK : ORCH_SENSOR_ERR_NACK_WAKE;
             sample_ok = false;
         } else {
             i2c_stop();
@@ -388,7 +504,7 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             !i2c_write_byte(0x66)) {
             i2c_stop();
             shtc3_send_sleep();
-            err_code = ORCH_SENSOR_ERR_NACK_MEASURE;
+            err_code = (scl_read() == 0) ? ORCH_SENSOR_ERR_SCL_STUCK : ORCH_SENSOR_ERR_NACK_MEASURE;
             sample_ok = false;
         } else {
             i2c_stop();
@@ -399,12 +515,17 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         }
     }
 
-    uint8_t rx[6] = {0};
+    uint8_t rx[6];
+    for (size_t i = 0; i < sizeof(rx); i++) {
+        rx[i] = 0;
+        asm volatile("" : "+m"(rx[i]));
+    }
+
     if (sample_ok) {
         i2c_start();
         if (!i2c_write_byte((I2C_ADDR_SHTC3 << 1) | 1)) {
             i2c_stop();
-            err_code = ORCH_SENSOR_ERR_NACK_ADDR_RD;
+            err_code = (scl_read() == 0) ? ORCH_SENSOR_ERR_SCL_STUCK : ORCH_SENSOR_ERR_NACK_ADDR_RD;
             sample_ok = false;
         } else {
             rx[0] = i2c_read_byte(true);
@@ -412,7 +533,8 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
             rx[2] = i2c_read_byte(true);
             rx[3] = i2c_read_byte(true);
             rx[4] = i2c_read_byte(true);
-            rx[5] = i2c_read_byte(true);
+            /* Master MUST send NACK (false) on the final (6th) byte per I2C & SHTC3 specification */
+            rx[5] = i2c_read_byte(false);
             i2c_stop();
         }
 
@@ -459,20 +581,30 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
                 } else {
                     st->valid_trend++;
                 }
+
+                /* Evaluate humidor RH target alert bounds if configured */
+                if (st->rh_alert_high_centi_pct > 0 &&
+                    (rh_centi_pct < st->rh_alert_low_centi_pct || rh_centi_pct > st->rh_alert_high_centi_pct)) {
+                    st->flags |= ORCH_FLAG_RH_ALERT_ACTIVE;
+                } else {
+                    st->flags &= (uint8_t)~ORCH_FLAG_RH_ALERT_ACTIVE;
+                }
             } else {
                 q_flags = 0;
                 st->valid_trend = 0;
             }
         }
 
-        orch_tri_node_sample_t sample = {
-            .shtc3_temp_centi_c = temp_centi_c,
-            .shtc3_rh_centi_pct = rh_centi_pct,
-            .mcu_tsens_centi_c = die_centi_c,
-            .epd_glass_centi_c = st->last_glass_temp_centi_c,
-            .timestamp_sec = st->total_sleep_sec,
-            .quality_flags = q_flags,
-        };
+        orch_tri_node_sample_t sample;
+        sample.shtc3_temp_centi_c = temp_centi_c;
+        sample.shtc3_rh_centi_pct = rh_centi_pct;
+        sample.mcu_tsens_centi_c  = die_centi_c;
+        sample.epd_glass_centi_c  = st->last_glass_temp_centi_c;
+        sample.timestamp_sec      = st->total_sleep_sec;
+        sample.quality_flags      = q_flags;
+        sample._pad[0]            = 0;
+        sample._pad[1]            = 0;
+        sample._pad[2]            = 0;
         orch_state_push_sample(&sample);
     } else {
         st->last_sensor_error = err_code;
@@ -501,33 +633,46 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
         timeout_us -= ORCH_I2C_RECOVERY_STEP_US;
     }
 
-    /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection */
+    /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection (with -O2 register barriers) */
     CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
+    rtc_reg_barrier();
+
     SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
                       RTC_CNTL_SLP_REJECT_INT_CLR |
                           RTC_CNTL_SLP_WAKEUP_INT_CLR |
                           RTC_CNTL_COCPU_INT_CLR |
                           RTC_CNTL_COCPU_TRAP_INT_CLR |
                           RTC_CNTL_ULP_CP_INT_CLR);
-    REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
-    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    rtc_reg_barrier();
 
-    /* Re-arm ULP GPIO wakeup */
+    REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
+    rtc_reg_barrier();
+
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    rtc_reg_barrier();
+
+    /* Re-arm ULP GPIO wakeup with >= 120 us slow-clock CDC hold time */
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    rtc_reg_barrier();
     rtc_delay_us_exact(120);
 
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    rtc_reg_barrier();
+
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    rtc_reg_barrier();
+    rtc_delay_us_exact(120);
 
     /* Tear down I2C pads to eliminate deep-sleep leakage */
     PIN_INPUT_DISABLE(IO_MUX_GPIO47_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO47_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SDA_BIT_MASK);
+    rtc_reg_barrier();
 
     PIN_INPUT_DISABLE(IO_MUX_GPIO48_REG);
     PIN_PULLUP_DIS(IO_MUX_GPIO48_REG);
     REG_WRITE(GPIO_ENABLE1_W1TC_REG, SCL_BIT_MASK);
-    asm volatile("memw" ::: "memory");
+    rtc_reg_barrier();
 
     esp_wake_stub_sleep(&bsp_wake_stub);
 }

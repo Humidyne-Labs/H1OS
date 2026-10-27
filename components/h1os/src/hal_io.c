@@ -1,6 +1,6 @@
 /**
  * @file hal_io.c
- * @brief Layer 1: Base pin, pad hold, and power rail driver implementation
+ * @brief Layer 1: Base pin, pad hold, GPIO ISR dispatcher, and power rail driver implementation
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -9,12 +9,15 @@
 #include "h1os/hal_io.h"
 
 #include "driver/gpio.h"
+#include "driver/gpio_filter.h"
 #include "driver/ledc.h"
 #include "driver/rtc_io.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_private/io_mux.h"
 #include "esp_rom_sys.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/rtc_io_reg.h"
@@ -22,14 +25,76 @@
 
 static const char *TAG = "HAL_IO";
 
-#define HAL_IO_TASK_STACK_BREATH        2048U /**< LED breath PWM animation task stack.  */
-#define HAL_IO_TASK_PRIO_BREATH         1     /**< Idle-level priority for LED breath.   */
-#define HAL_IO_DEFAULT_BREATH_PERIOD_MS 2000U /**< Default LED breath period in ms (2s). */
+#define HAL_IO_DEFAULT_BREATH_PERIOD_MS 2000U  /**< Default LED breath period in ms (2s).        */
+#define HAL_IO_BTN_DEBOUNCE_US          15000U /**< Tactile button debounce window (15 ms).      */
+
+static esp_timer_handle_t        s_btn_debounce_timer = NULL;
+static gpio_glitch_filter_handle_t s_boot_glitch_flt  = NULL;
+static gpio_glitch_filter_handle_t s_pwr_glitch_flt   = NULL;
+static volatile hal_btn_mask_t   s_debounced_btn_mask = HAL_BTN_NONE;
+static volatile bool             s_btn_isr_installed  = false;
+static hal_io_button_cb_t        s_btn_user_cb        = NULL;
+static void                     *s_btn_user_arg       = NULL;
 
 /**
- * @brief Early boot initialization of non-latched application pins.
+ * @brief Sample instantaneous raw GPIO levels of BOOT and POWER tactile buttons.
+ */
+static inline hal_btn_mask_t hal_io_sample_raw_buttons(void)
+{
+    hal_btn_mask_t mask = HAL_BTN_NONE;
+    if (gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0) {
+        mask |= HAL_BTN_BOOT;
+    }
+    if (gpio_get_level(HAL_PIN_BUTTON_POWER) == 0) {
+        mask |= HAL_BTN_POWER;
+    }
+    return mask;
+}
+
+/**
+ * @brief One-shot esp_timer debounce callback for tactile button state transitions.
+ */
+static void hal_io_btn_debounce_timer_cb(void *arg)
+{
+    (void)arg;
+    hal_btn_mask_t prev = s_debounced_btn_mask;
+    hal_btn_mask_t curr = hal_io_sample_raw_buttons();
+    s_debounced_btn_mask = curr;
+
+    if (curr != prev && s_btn_user_cb != NULL) {
+        s_btn_user_cb(curr, s_btn_user_arg);
+    }
+}
+
+/**
+ * @brief IRAM GPIO edge interrupt handler for BOOT (GPIO 0) and POWER (GPIO 18) buttons.
+ */
+static void IRAM_ATTR hal_io_btn_gpio_isr_handler(void *arg)
+{
+    (void)arg;
+    if (s_btn_debounce_timer != NULL) {
+        (void)esp_timer_stop(s_btn_debounce_timer);
+        (void)esp_timer_start_once(s_btn_debounce_timer, HAL_IO_BTN_DEBOUNCE_US);
+    }
+}
+
+/**
+ * @brief Register an asynchronous callback invoked when tactile buttons change state after 15 ms esp_timer debounce.
+ */
+esp_err_t hal_io_register_button_cb(hal_io_button_cb_t cb, void *arg)
+{
+    s_btn_user_arg = arg;
+    s_btn_user_cb  = cb;
+    return ESP_OK;
+}
+
+/**
+ * @brief Early boot initialization of non-latched application pins and GPIO ISR service.
  *
- * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader (h1os_boot_hook.c).
+ * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46),
+ *          status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters),
+ *          and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
+ *          are strictly latched in the 2nd-stage bootloader (h1os_boot_hook.c).
  *
  * @return ESP_OK on success, or driver error code.
  */
@@ -51,45 +116,90 @@ esp_err_t hal_io_early_init(void)
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
     hal_io_release_pad_holds();
 
+    /* Install global per-pin GPIO ISR dispatcher (safe if already installed) */
+    esp_err_t isr_err = gpio_install_isr_service(0);
+    if (isr_err != ESP_OK && isr_err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "gpio_install_isr_service returned: %s", esp_err_to_name(isr_err));
+    }
+
     gpio_config_t pa_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_PA_CTRL),
-        .mode = GPIO_MODE_INPUT_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_INPUT_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&pa_cfg);
     gpio_set_level(HAL_PIN_PA_CTRL, 0);
 
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
-        .mode = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_cfg);
     gpio_set_level(HAL_PIN_STATUS_LED, 1);
 
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_ANYEDGE,
     };
     gpio_config(&btn_cfg);
 
+    /* Enable ESP32-S3 hardware pin glitch filters on tactile button inputs */
+    if (s_boot_glitch_flt == NULL) {
+        gpio_pin_glitch_filter_config_t flt_boot = {
+            .clk_src  = GLITCH_FILTER_CLK_SRC_DEFAULT,
+            .gpio_num = HAL_PIN_BUTTON_BOOT,
+        };
+        if (gpio_new_pin_glitch_filter(&flt_boot, &s_boot_glitch_flt) == ESP_OK) {
+            (void)gpio_glitch_filter_enable(s_boot_glitch_flt);
+        }
+    }
+    if (s_pwr_glitch_flt == NULL) {
+        gpio_pin_glitch_filter_config_t flt_pwr = {
+            .clk_src  = GLITCH_FILTER_CLK_SRC_DEFAULT,
+            .gpio_num = HAL_PIN_BUTTON_POWER,
+        };
+        if (gpio_new_pin_glitch_filter(&flt_pwr, &s_pwr_glitch_flt) == ESP_OK) {
+            (void)gpio_glitch_filter_enable(s_pwr_glitch_flt);
+        }
+    }
+
+    s_debounced_btn_mask = hal_io_sample_raw_buttons();
+
+    if (s_btn_debounce_timer == NULL) {
+        const esp_timer_create_args_t timer_args = {
+            .callback        = &hal_io_btn_debounce_timer_cb,
+            .arg             = NULL,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name            = "hal_btn_dbnc",
+            .skip_unhandled_events = true,
+        };
+        (void)esp_timer_create(&timer_args, &s_btn_debounce_timer);
+    }
+
+    if (!s_btn_isr_installed) {
+        (void)gpio_isr_handler_add(HAL_PIN_BUTTON_BOOT, hal_io_btn_gpio_isr_handler, NULL);
+        (void)gpio_isr_handler_add(HAL_PIN_BUTTON_POWER, hal_io_btn_gpio_isr_handler, NULL);
+        s_btn_isr_installed = true;
+    }
+
     gpio_config_t rtc_int_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_RTC_INT),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&rtc_int_cfg);
 
-    ESP_LOGD(TAG, "Early IO configuration complete (power rails held by 2nd-stage bootloader).");
+    ESP_LOGD(TAG, "Early IO configuration complete (GPIO ISR service and button glitch filters active).");
     return ESP_OK;
 }
 
@@ -115,7 +225,11 @@ esp_err_t hal_io_release_power_latch(void)
 #define HAL_LEDC_DUTY_RES  LEDC_TIMER_10_BIT
 #define HAL_LEDC_FREQUENCY 5000
 
-static bool s_led_pwm_active = false;
+static bool               s_led_pwm_active    = false;
+static esp_timer_handle_t s_breath_timer      = NULL;
+static volatile bool      s_breathing_running = false;
+static volatile bool      s_breath_phase_high = false;
+static volatile uint32_t  s_breath_half_ms    = HAL_IO_DEFAULT_BREATH_PERIOD_MS / 2U;
 
 /**
  * @brief Initializes LEDC hardware PWM controller for user LED on GPIO 3.
@@ -135,12 +249,12 @@ esp_err_t hal_led_pwm_init(void)
     gpio_reset_pin(HAL_PIN_STATUS_LED);
 
     ledc_timer_config_t timer_cfg = {
-        .speed_mode = HAL_LEDC_MODE,
+        .speed_mode      = HAL_LEDC_MODE,
         .duty_resolution = HAL_LEDC_DUTY_RES,
-        .timer_num = HAL_LEDC_TIMER,
-        .freq_hz = HAL_LEDC_FREQUENCY,
-        .clk_cfg = LEDC_AUTO_CLK,
-        .deconfigure = false,
+        .timer_num       = HAL_LEDC_TIMER,
+        .freq_hz         = HAL_LEDC_FREQUENCY,
+        .clk_cfg         = LEDC_AUTO_CLK,
+        .deconfigure     = false,
     };
     esp_err_t err = ledc_timer_config(&timer_cfg);
     if (err != ESP_OK) {
@@ -148,13 +262,13 @@ esp_err_t hal_led_pwm_init(void)
     }
 
     ledc_channel_config_t ch_cfg = {
-        .gpio_num = HAL_PIN_STATUS_LED,
+        .gpio_num   = HAL_PIN_STATUS_LED,
         .speed_mode = HAL_LEDC_MODE,
-        .channel = HAL_LEDC_CHANNEL,
-        .intr_type = LEDC_INTR_DISABLE,
-        .timer_sel = HAL_LEDC_TIMER,
-        .duty = 0,
-        .hpoint = 0,
+        .channel    = HAL_LEDC_CHANNEL,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .timer_sel  = HAL_LEDC_TIMER,
+        .duty       = 0,
+        .hpoint     = 0,
         .flags =
             {
                 .output_invert = 1,
@@ -222,58 +336,27 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
     return ledc_fade_start(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
-static volatile TaskHandle_t s_breath_task = NULL;
-static volatile bool s_breathing_running = false;
-static volatile uint32_t s_breath_period_ms = HAL_IO_DEFAULT_BREATH_PERIOD_MS;
-
 /**
- * @brief Led breath task.
- *
- * @param[in]    arg             Parameter arg.
- *
- * @return Return value of type static void.
+ * @brief Periodic esp_timer callback driving hardware LEDC fade-in / fade-out half-cycles.
  */
-static void led_breath_task(void *arg)
+static void hal_led_breath_timer_cb(void *arg)
 {
     (void)arg;
-    while (s_breathing_running) {
-        uint32_t half = s_breath_period_ms / 2U;
-        if (half < 100U) {
-            half = 100U;
-        }
-
-        hal_led_fade_to(100, half);
-        TickType_t start = xTaskGetTickCount();
-        TickType_t duration = pdMS_TO_TICKS(half);
-        while (s_breathing_running && (xTaskGetTickCount() - start < duration)) {
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-        if (!s_breathing_running) {
-            break;
-        }
-
-        hal_led_fade_to(0, half);
-        start = xTaskGetTickCount();
-        while (s_breathing_running && (xTaskGetTickCount() - start < duration)) {
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
+    if (!s_breathing_running || !s_led_pwm_active) {
+        return;
     }
-
-    if (s_led_pwm_active) {
-        hal_led_set_brightness(0);
-    }
-    s_breath_task = NULL;
-    vTaskDelete(NULL);
+    s_breath_phase_high = !s_breath_phase_high;
+    (void)hal_led_fade_to(s_breath_phase_high ? 100U : 0U, s_breath_half_ms);
 }
 
 /**
- * @brief Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+ * @brief Starts an asynchronous periodic esp_timer to "breathe" (fade in and fade out) the status LED.
  *
- * @details Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+ * @details Uses hardware LEDC PWM fading paced by a periodic esp_timer alarm (eliminating dedicated FreeRTOS task stack and 50 ms polling).
  *
  * @param[in]    cycle_period_ms Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0.
  *
- * @return ESP_OK on success, or ESP_FAIL if task creation fails.
+ * @return ESP_OK on success, or error code if timer creation fails.
  */
 esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 {
@@ -287,40 +370,44 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
     if (cycle_period_ms == 0) {
         cycle_period_ms = HAL_IO_DEFAULT_BREATH_PERIOD_MS;
     }
-    s_breath_period_ms = cycle_period_ms;
+    uint32_t half = cycle_period_ms / 2U;
+    if (half < 100U) {
+        half = 100U;
+    }
+    s_breath_half_ms = half;
 
-    if (s_breathing_running && s_breath_task != NULL) {
-        return ESP_OK;
+    if (s_breath_timer == NULL) {
+        const esp_timer_create_args_t timer_args = {
+            .callback        = &hal_led_breath_timer_cb,
+            .arg             = NULL,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name            = "hal_led_breath",
+            .skip_unhandled_events = true,
+        };
+        esp_err_t err = esp_timer_create(&timer_args, &s_breath_timer);
+        if (err != ESP_OK) {
+            return err;
+        }
+    } else {
+        (void)esp_timer_stop(s_breath_timer);
     }
 
     s_breathing_running = true;
-    BaseType_t res = xTaskCreate(led_breath_task, "led_breath", HAL_IO_TASK_STACK_BREATH, NULL, HAL_IO_TASK_PRIO_BREATH, (TaskHandle_t *)&s_breath_task);
-    if (res != pdPASS) {
-        s_breathing_running = false;
-        s_breath_task = NULL;
-        return ESP_FAIL;
-    }
-    return ESP_OK;
+    s_breath_phase_high = true;
+    (void)hal_led_fade_to(100U, half);
+    return esp_timer_start_periodic(s_breath_timer, (uint64_t)half * 1000ULL);
 }
 
 /**
- * @brief Stops the asynchronous breathing task and turns the LED off.
+ * @brief Stops the asynchronous LED breathing timer and turns the LED off immediately.
  *
  * @return ESP_OK on success.
  */
 esp_err_t hal_led_stop_breathing(void)
 {
-    if (!s_breathing_running && s_breath_task == NULL) {
-        return ESP_OK;
-    }
     s_breathing_running = false;
-    int32_t wait_cycles = 15;
-    while (s_breath_task != NULL && wait_cycles-- > 0) {
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-    if (s_breath_task != NULL) {
-        vTaskDelete(s_breath_task);
-        s_breath_task = NULL;
+    if (s_breath_timer != NULL) {
+        (void)esp_timer_stop(s_breath_timer);
     }
     if (s_led_pwm_active) {
         hal_led_set_brightness(0);
@@ -329,9 +416,9 @@ esp_err_t hal_led_stop_breathing(void)
 }
 
 /**
- * @brief Queries whether the asynchronous breathing task is actively running.
+ * @brief Queries whether the asynchronous LED breathing timer is actively running.
  *
- * @return True if breathing task is active, false otherwise.
+ * @return True if breathing timer is active, false otherwise.
  */
 bool hal_led_is_breathing(void)
 {
@@ -346,6 +433,11 @@ bool hal_led_is_breathing(void)
 esp_err_t hal_led_pwm_deinit(void)
 {
     hal_led_stop_breathing();
+
+    if (s_breath_timer != NULL) {
+        (void)esp_timer_delete(s_breath_timer);
+        s_breath_timer = NULL;
+    }
 
     if (!s_led_pwm_active) {
         return ESP_OK;
@@ -395,14 +487,9 @@ esp_err_t hal_io_set_led(bool on)
  */
 hal_btn_mask_t hal_io_read_buttons(void)
 {
-    hal_btn_mask_t mask = HAL_BTN_NONE;
-    if (gpio_get_level(HAL_PIN_BUTTON_BOOT) == 0) {
-        mask |= HAL_BTN_BOOT;
-    }
-    if (gpio_get_level(HAL_PIN_BUTTON_POWER) == 0) {
-        mask |= HAL_BTN_POWER;
-    }
-    return mask;
+    hal_btn_mask_t raw = hal_io_sample_raw_buttons();
+    s_debounced_btn_mask = raw;
+    return raw;
 }
 
 /**
@@ -417,6 +504,26 @@ hal_btn_mask_t hal_io_read_buttons(void)
  */
 esp_err_t hal_io_isolate_sleep_pads(void)
 {
+    /* Disarm tactile button GPIO ISRs and debounce timer before switching pins to RTC IO domain */
+    if (s_btn_isr_installed) {
+        (void)gpio_isr_handler_remove(HAL_PIN_BUTTON_BOOT);
+        (void)gpio_isr_handler_remove(HAL_PIN_BUTTON_POWER);
+        s_btn_isr_installed = false;
+    }
+    if (s_btn_debounce_timer != NULL) {
+        (void)esp_timer_stop(s_btn_debounce_timer);
+    }
+    if (s_boot_glitch_flt != NULL) {
+        (void)gpio_glitch_filter_disable(s_boot_glitch_flt);
+        (void)gpio_del_glitch_filter(s_boot_glitch_flt);
+        s_boot_glitch_flt = NULL;
+    }
+    if (s_pwr_glitch_flt != NULL) {
+        (void)gpio_glitch_filter_disable(s_pwr_glitch_flt);
+        (void)gpio_del_glitch_filter(s_pwr_glitch_flt);
+        s_pwr_glitch_flt = NULL;
+    }
+
     gpio_set_level(HAL_PIN_EPD_CS, 1);
     gpio_hold_en(HAL_PIN_EPD_CS);
 

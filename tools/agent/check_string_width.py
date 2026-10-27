@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_DIR = REPO_ROOT / "examples" / "H1OS" / "build_dev" / "esp-idf" / "h1os" / "generated_fonts"
 OUTPUT_DIR = REPO_ROOT / "tools" / "fonts"
 SCREEN_DIR = REPO_ROOT / "examples" / "H1OS" / "main" / "screens"

@@ -1,6 +1,6 @@
 /**
  * @file hal_io.h
- * @brief Layer 1: Base pinout, power latch, and sleep pad hold driver
+ * @brief Layer 1: Base pinout, power latch, GPIO ISR dispatcher, and sleep pad hold driver
  *
  * Copyright (c) 2026 Humidyne Labs
  * SPDX-License-Identifier: MIT
@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "driver/gpio.h"
 #include "h1os/hal_types.h"
 
 #ifdef __cplusplus
@@ -15,16 +16,35 @@ extern "C" {
 #endif
 
 /**
- * @brief Early boot initialization of non-latched application pins.
+ * @brief Callback signature for tactile button state-change interrupts.
+ *
+ * @param[in] btn_mask Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
+ * @param[in] arg      Optional user context pointer registered with hal_io_register_button_cb().
+ */
+typedef void (*hal_io_button_cb_t)(hal_btn_mask_t btn_mask, void *arg);
+
+/**
+ * @brief Early boot initialization of non-latched application pins and GPIO ISR service.
  *
  * Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46),
- * status LED (GPIO 3), buttons (GPIO 0/18), and RTC INT (GPIO 5).
+ * status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters),
+ * and RTC INT (GPIO 5).
  * Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly
  * latched in the 2nd-stage bootloader (h1os_boot_hook.c).
  *
  * @return ESP_OK on success, or driver error code.
  */
 esp_err_t hal_io_early_init(void);
+
+/**
+ * @brief Register an asynchronous callback invoked when tactile buttons change state after 15 ms esp_timer debounce.
+ *
+ * @param[in] cb  Callback function pointer (or NULL to unregister).
+ * @param[in] arg Optional context pointer passed to cb.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t hal_io_register_button_cb(hal_io_button_cb_t cb, void *arg);
 
 /**
  * @brief Controls user status LED (GPIO 3, Active LOW).
@@ -66,27 +86,27 @@ esp_err_t hal_led_set_brightness(uint8_t brightness_pct);
 esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms);
 
 /**
- * @brief Starts an asynchronous background task to "breathe" (fade in and fade out) the status LED.
+ * @brief Starts an asynchronous periodic esp_timer to "breathe" (fade in and fade out) the status LED.
  *
- * Uses hardware LEDC PWM fading with FreeRTOS background pacing. Automatically yields CPU.
+ * Uses hardware LEDC PWM fading paced by a lightweight esp_timer callback (zero dedicated FreeRTOS task stack).
  *
  * @param[in] cycle_period_ms Total duration of one breathe cycle in ms (fade-in + fade-out). Default: 2000 ms if 0.
  *
- * @return ESP_OK on success, or ESP_FAIL if task creation fails.
+ * @return ESP_OK on success, or error code if timer creation fails.
  */
 esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms);
 
 /**
- * @brief Stops the asynchronous breathing task and turns the LED off.
+ * @brief Stops the asynchronous LED breathing timer and turns the LED off immediately.
  *
  * @return ESP_OK on success.
  */
 esp_err_t hal_led_stop_breathing(void);
 
 /**
- * @brief Queries whether the asynchronous breathing task is actively running.
+ * @brief Queries whether the asynchronous LED breathing timer is actively running.
  *
- * @return True if breathing task is active, false otherwise.
+ * @return True if breathing timer is active, false otherwise.
  */
 bool hal_led_is_breathing(void);
 
@@ -107,7 +127,7 @@ esp_err_t hal_led_pwm_deinit(void);
 esp_err_t hal_io_release_power_latch(void);
 
 /**
- * @brief Samples instantaneous state of hardware tactile buttons.
+ * @brief Samples instantaneous or debounced state of hardware tactile buttons.
  *
  * @return Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
  */
@@ -128,7 +148,7 @@ static inline bool hal_io_button_is_pressed(gpio_num_t pin)
 /**
  * @brief Configures and locks dynamic peripheral lines prior to deep sleep.
  *
- * - Latches GPIO 11 (EPD_CS) and GPIO 9 (EPD_RST) HIGH via gpio_hold_en().
+ * - Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en().
  * - Holds amplifier mute GPIO 46 (PA_CTRL) LOW.
  * - Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18).
  * - Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).

@@ -45,6 +45,6 @@ The interaction follows a strict two-stage lifecycle:
 
 ## 2. Mathematical & Empirical Compliance
 
-Per [`.agents/rules/science.md`](file:///c:/Users/Matt/Documents/GitHub/H1OS/.agents/rules/science.md):
+Per [`.agents/rules/science.md`](file:///.agents/rules/science.md):
 - Every approval ceremony must explicitly cite the physical invariants, register configurations, and empirical measurements verified (e.g. August-Roche-Magnus psychrometrics, eFuse ADC calibration curves, zero-leakage pin pad isolation).
 - Never celebrate ungrounded heuristics or unverified builds. All celebratory sessions must be preceded by a clean build (`build_dev` / `build_prod` with 0 errors).

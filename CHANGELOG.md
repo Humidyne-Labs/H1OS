@@ -4,7 +4,42 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [2.4.4-dev] - 2026-10-27
+
+### 🚀 Added (Production Humidor Telemetry Middleware Primitives)
+
+* **Chronological Telemetry History Export API** (`h1os.h`, `orch_state.h`, `orch_state.c`, `h1os_lifecycle.c`, `docs/architecture/B1_api_and_services.md`):
+  * Added `h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count)` and `orch_state_get_ring_chronological()` to export up to 32 historical Tri-Node samples in chronological order (oldest to newest) directly from RTC Slow SRAM without exposing Layer 3 internal storage to the application layer.
+  * Enables single-shot batch cloud publishing (Wi-Fi MQTT / HTTPS) and BLE GATT history synchronization for the production humidor application.
+* **Configurable Humidor RH Target Alert Bounds** (`h1os.h`, `orch_state.h`, `orch_wake_stub.c`, `h1os_lifecycle.c`):
+  * Added `h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct)`, persistent RTC Slow SRAM thresholds (`rh_alert_low_centi_pct`, `rh_alert_high_centi_pct`), `ORCH_FLAG_RH_ALERT_ACTIVE`, and `h1os_telemetry_t.is_rh_alert_active`.
+  * Evaluates settled SHTC3 relative humidity against configured humidor boundaries inside `bsp_wake_stub()` during Flow A deep-sleep sample bursts.
+
+### 🛡️ Fixed & Hardened (`H1OS-STD-001` Audit & `-O2` Wake Stub Register Protections)
+
+* **Event-Driven Timer, GPIO ISR & Static Semaphore Architecture (`esp_timer` / `GPIO_INTR` Refactor)** (`hal_io.c`, `hal_io.h`, `sub_display.cpp`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `h1os_lvgl.h`, `sub_sdcard.c`, `sub_audio.c`):
+  * **SSD1681 `EPD_BUSY` (`GPIO 8`) Falling-Edge Interrupt Synchronization (`sub_display.cpp`):** Replaced the `10 ms` `vTaskDelay()` polling loop in `sub_display_wait_busy()` with a `GPIO_INTR_NEGEDGE` ISR (`epd_busy_falling_isr_handler()`) and a static binary semaphore (`s_busy_idle_sem`), eliminating 58–141 context switches per e-Paper refresh and releasing Core 1 the microsecond the display finishes driving microcapsules.
+  * **One-Shot `esp_timer` Interactive Session Monitor (`h1os_lifecycle.c`):** Replaced the dedicated `h1os_sess` FreeRTOS polling task (`4,096 B` stack waking every `500 ms`) with a hardware-backed one-shot `esp_timer` (`s_session_timer`, `esp_timer_start_once()` / `esp_timer_restart()`), reclaiming `4 KB` of internal SRAM and eliminating periodic idle wakes.
+  * **Periodic `esp_timer` LED Breathing & Hardware Glitch-Filtered Button ISRs (`hal_io.c`, `hal_io.h`):** Replaced the `led_breath` FreeRTOS polling task (`2,048 B` stack waking every `50 ms`) with a periodic `esp_timer` callback (`hal_led_breath_timer_cb()`) driving the hardware LEDC fade unit, saving an additional `2 KB` of SRAM (`6 KB` total stack savings). Configured `GPIO 0` (`BOOT`) and `GPIO 18` (`POWER`) with ESP32-S3 hardware pin glitch filters (`gpio_new_pin_glitch_filter()`), `GPIO_INTR_ANYEDGE` interrupts, and a `15 ms` one-shot `esp_timer` debounce filter (`hal_io_register_button_cb()`) that wakes the LVGL keypad handler immediately via `xTaskNotifyGive()`.
+  * **Zero-Polling Semaphore Teardown & Drain Joins (`h1os_lvgl.cpp`, `sub_sdcard.c`, `sub_audio.c`):** Replaced the `10–20 ms` pre-sleep polling `while` loops in `h1os_quiesce_lvgl_pipeline()`, `h1os_lvgl_stop()`, `sub_sdcard_unmount()`, and `sub_audio_wait_idle()` with static binary semaphores (`s_lvgl_idle_sem`, `s_lvgl_stop_sem`, `s_mount_done_sem`, `s_audio_idle_sem`) and `ulTaskNotifyTake()`.
+* **RTC Wake Stub `-O2` Loop Unrolling, Stack Memset & Register Barrier Hardening** (`orch_wake_stub.c`, `orch_state.c`, `ulp/main.c`, `ERRATA.md`):
+  * Guarded `i2c_write_byte()`, `i2c_read_byte()`, `wake_stub_read_die_temp_centi_c()`, `rtc_write_reg_retry()`, and `i2c_recover_stuck_bus()` with `__attribute__((noinline))` and inline assembly loop register barriers (`asm volatile("" : "+r"(i))`), preventing `-O2` loop unrolling across bit-banged I2C call sites and eliminating back-to-back GPIO store coalescing.
+  * Prevented `-O2` `-ftree-loop-distribute-patterns` from replacing byte loops and struct zero-initializations (`uint8_t rx[6] = {0}`, `orch_tri_node_sample_t sample = {...}`, and `orch_state_reset()`) with implicit calls to Flash-resident `memset` by using explicit field assignments and `asm volatile("" : "+m"(p[i]))` memory barriers.
+  * Added `rtc_reg_barrier()` (`asm volatile("memw" ::: "memory")`) between every sequential `SENS_SAR_TSENS_*`, `SENS_SAR_PERI_*`, `RTC_CNTL_*`, and `RTC_GPIO_*` register write in `orch_wake_stub.c`, and added `asm volatile("fence" ::: "memory")` around `RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR` in `ulp/main.c` (`PIT-03-B`, `PIT-03-C`).
+  * Implemented `scl_high_wait()` with bounded 2,000 µs clock-stretch / RC rise verification (`ORCH_SENSOR_ERR_SCL_STUCK = 7`) and 9-clock I2C bus recovery (`i2c_recover_stuck_bus()`) for stuck SDA lines.
+  * Fixed I2C master read protocol violation in `bsp_wake_stub()` where the 6th (final) byte of the SHTC3 measurement frame (`rx[5]`) was read with `ACK` (`true`) instead of `NACK` (`false`), preventing the SHTC3 from holding SDA low during the subsequent `STOP` condition.
+* **Bounded LVGL Mutex & SPI Read Buffer Overflow Prevention** (`h1os_lvgl.cpp`, `h1os_lvgl.h`, `hal_spi.c`, `sub_power.c`, `orch_flow.c`):
+  * Implemented bounded recursive mutex acquisition in `h1os_lvgl_lock(uint32_t timeout_ms)` via static `xSemaphoreCreateRecursiveMutexStatic()` instead of discarding `timeout_ms` (`(void)timeout_ms;`), satisfying `PIT-01-B` and `PIT-07-B`.
+  * Added `len > 4` bounds validation in `hal_spi_read_data()` (`hal_spi.c`) to prevent overflowing the 4-byte `spi_transaction_t.rx_data[4]` inline buffer when `SPI_TRANS_USE_RXDATA` is set.
+  * Guarded `s_flow_b_sec / s_flow_a_sec` against division-by-zero in `sub_power_enter_deep_sleep_mode()` (`sub_power.c`) when `h1os_shutdown()` enters standby prior to `orch_flow_execute_sleep()`.
+  * Fixed cold-boot `orch_flow_scan_ring_metrics()` (`orch_flow.c`) to zero out `window_low_temp_centi_c` and `window_high_temp_centi_c` when `valid_cnt == 0`, preventing `+327.67°C` (`INT16_MAX`) / `-327.68°C` (`INT16_MIN`) display artifacts.
+  * Replaced naked `int` parameters in `h1os_lvgl_start()` with `int32_t` (`B3_firmware_standards.md` Rule 1) and aligned `h1os_constants.h` SPDX license header to `MIT`.
+* **Browser Thermal Simulator (`tools/thermal_sim/index.html`) 60 FPS Optimization**:
+  * Eliminated 60 Hz DOM table reconstruction (`renderPartsTable()` `innerHTML` rebuild on 26 rows every animation frame) by gating updates to 4 Hz only when the `26-Part Thermal Table` tab is active.
+  * Replaced `JSON.parse(JSON.stringify(srcObj))` inside `getFlowBForCycle()` and `Array.find()` inside `accumulateActionWindow()` with zero-allocation pre-indexed lookup tables, and reused a pre-allocated `Float64Array(1680)` (`s_cellHeatInW`) across all finite-volume sub-steps.
+  * Pre-computed a 1,024-entry `Uint8Array` thermal RGB colormap LUT and batched isotherm contour rectangles into a single `beginPath()` / `stroke()` pass, reducing `stepSimulation(9000)` preset load latency by >15x.
+* **Documentation & Architecture Synchronization** (`README.md`, `ERRATA.md`, `AGENTS.md`, `_agent_rules/lifecycle.md`, `docs/guide.md`, `docs/pinout.md`, `docs/drivers/*`, `docs/architecture/*`, `tools/usb/README.md`):
+  * Synchronized `h1os_lifecycle_t` examples (`on_pre_sleep`, `clk_mode = SYS_CLK_MODE_DYNAMIC`), battery divider values (`200kΩ / 200kΩ`), SHTC3 wake stub timings (`500 µs` wake, `18.0 ms` conversion budget), 5-screen carousel numbering, and `IOCTL_USB_HUB_CYCLE_PORT` (`0x220444`).
 
 ## [2.4.3-dev] - 2026-10-26
 

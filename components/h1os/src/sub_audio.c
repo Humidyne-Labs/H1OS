@@ -97,6 +97,8 @@ static uint8_t s_volume_pct = 0;
 
 static StaticSemaphore_t s_cmd_sync_sem_buffer;
 static SemaphoreHandle_t s_cmd_sync_sem = NULL;
+static StaticSemaphore_t s_audio_idle_sem_buffer;
+static SemaphoreHandle_t s_audio_idle_sem = NULL;
 static int16_t           s_audio_work_buffer[FRAME_SIZE];
 
 #if CONFIG_PM_ENABLE
@@ -912,6 +914,9 @@ static void audio_worker_task(void *pvParameters)
 
             audio_cpu_max_release();
             s_audio_is_busy = false;
+            if (uxQueueMessagesWaiting(s_audio_queue) == 0 && s_audio_idle_sem != NULL) {
+                (void)xSemaphoreGive(s_audio_idle_sem);
+            }
         }
     }
 }
@@ -1048,12 +1053,24 @@ bool sub_audio_is_busy(void)
  */
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 {
-    uint32_t elapsed = 0;
-    while (sub_audio_is_busy() && elapsed < timeout_ms) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        elapsed += 10;
+    if (!sub_audio_is_busy()) {
+        return ESP_OK;
     }
-    return sub_audio_is_busy() ? ESP_ERR_TIMEOUT : ESP_OK;
+    if (s_audio_idle_sem == NULL) {
+        s_audio_idle_sem = xSemaphoreCreateBinaryStatic(&s_audio_idle_sem_buffer);
+    }
+
+    TickType_t start_ticks   = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+
+    while (sub_audio_is_busy()) {
+        TickType_t elapsed = xTaskGetTickCount() - start_ticks;
+        if (elapsed >= timeout_ticks) {
+            return ESP_ERR_TIMEOUT;
+        }
+        (void)xSemaphoreTake(s_audio_idle_sem, timeout_ticks - elapsed);
+    }
+    return ESP_OK;
 }
 
 /**

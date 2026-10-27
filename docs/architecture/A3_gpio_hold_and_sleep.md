@@ -134,7 +134,9 @@ The 2nd-stage bootloader hook ([`h1os_boot_hook.c`](../../components/h1os/bootlo
 Before the CPU enters deep sleep, [`hal_io_isolate_sleep_pads()`](../../components/h1os/src/hal_io.c) isolates static outputs to prevent parasitic leakage currents through external components:
 - `HAL_PIN_EPD_CS` (GPIO 11 / `RTCIO 11`): Driven HIGH, latched via `gpio_hold_en()`.
 - `HAL_PIN_EPD_RST` (GPIO 9 / `RTCIO 9`): Driven HIGH, latched via `gpio_hold_en()`.
+- `HAL_PIN_EPD_DC` (GPIO 10 / `RTCIO 10`): Driven HIGH, latched via `gpio_hold_en()`.
 - `HAL_PIN_PA_CTRL` (GPIO 46, Digital IO): Driven LOW (Mute), latched via `gpio_hold_en()`.
+- `HAL_PIN_I2S_*` (GPIO 14, 15, 16, 38, 45): Reset and driven LOW (`0`), latched via `gpio_hold_en()`.
 - `HAL_PIN_STATUS_LED` (GPIO 3 / `RTCIO 3`): Driven HIGH (LED OFF), latched via `gpio_hold_en()`.
 - `gpio_deep_sleep_hold_en()` is called once to activate the digital autohold domain for GPIO 42 and GPIO 46.
 

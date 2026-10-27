@@ -12,7 +12,7 @@ Direct low-level peripheral initialization, manual reset reason checking (`esp_r
 ```
 +-------------------------------------------------------------------------------+
 | LAYER 4: APPLICATION & UI ENGINE (h1os.h, h1os_lvgl.h, h1os_time.h)           |
-| - Declarative lifecycle hooks: on_boot, on_wake, on_sleep, on_shutdown        |
+| - Declarative lifecycle hooks: on_boot, on_wake, on_pre_sleep, on_shutdown    |
 | - Decoupled LVGL v9 presentation task pinned to Core 1                        |
 +-------------------------------------------------------------------------------+
                                        |
@@ -75,9 +75,9 @@ Direct low-level peripheral initialization, manual reset reason checking (`esp_r
 ## 4. Coordinated Sleep Transition Sequence
 
 Applications transition to sleep via `h1os_sleep()` or `h1os_shutdown()` to trigger the deterministic 8-step sequence:
-1. **Invoke Pre-Sleep Hook:** Execute registered `on_sleep` callback for custom resource cleanup.
-2. **Drain UI Engine:** Drain LVGL draw buffers and signal the Core 1 presentation task to halt cleanly.
-3. **Wait for Display Bus:** Poll SSD1681 `BUSY` signal release at 80 MHz CPU frequency.
+1. **Invoke Pre-Sleep Hook:** Execute registered `on_pre_sleep` callback for custom resource cleanup.
+2. **Drain UI Engine:** Drain LVGL draw buffers via `h1os_lvgl_wait_idle()` and signal the Core 1 presentation task (`h1os_lvgl_stop()`) to halt cleanly via static binary semaphores.
+3. **Wait for Display Bus:** Block on the SSD1681 `BUSY` (`GPIO 8`) falling-edge GPIO interrupt semaphore at 80 MHz CPU frequency (`sub_display_wait_busy()`).
 4. **Microcapsule Settling Delay:** Wait mandatory 250 ms physical settling delay for electrophoretic ink microcapsules.
 5. **Flash Frame Sync:** If active frame was marked dirty, commit 5000-byte 1-bit buffer to SPI Flash partition `epd_frame` (`orch_display_sync`).
 6. **Peripheral Isolation:** Suspend audio codec (`sub_audio` software standby) and isolate I2C/SPI buses.
@@ -109,28 +109,28 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     }
 }
 
-static void app_on_sleep(void *user_data)
+static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
 {
-    ESP_LOGI(TAG, "Entering unattended sleep.");
+    (void)user_data;
+    ESP_LOGI(TAG, "Entering unattended sleep for %lu s.", (unsigned long)sleep_sec);
 }
 
 void app_main(void)
 {
     const h1os_lifecycle_t lifecycle = {
-        .on_boot     = app_on_boot,
-        .on_wake     = app_on_wake,
-        .on_sleep    = app_on_sleep,
-        .on_shutdown = NULL,
-        .user_data   = NULL,
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_pre_sleep = app_on_pre_sleep,
+        .on_shutdown  = NULL,
+        .session = {
+            .inactivity_timeout_sec = 30,
+            .clk_mode               = SYS_CLK_MODE_DYNAMIC,
+            .flow_a_period_sec      = 60,
+            .flow_b_period_sec      = 300,
+        },
+        .user_data    = NULL,
     };
 
-    const h1os_config_t config = {
-        .inactivity_timeout_sec = 30,
-        .flow_a_period_sec      = 60,
-        .enable_audio           = true,
-    };
-
-    ESP_ERROR_CHECK(h1os_init(&config));
     ESP_ERROR_CHECK(h1os_start(&lifecycle));
 }
 ```

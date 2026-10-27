@@ -107,7 +107,7 @@ To update the display using differential partial refresh without full-screen fla
 The SSD1681 includes an internal on-glass thermistor used to compensate electrophoretic pigment viscosity.
 
 ### Invariant: Continuous CS# Hold
-Under 4-wire SPI on the SSD1681, **CS# must remain held LOW continuously** across both the Command Phase (`DC# = LOW`, MOSI sends `0x1B`) and the Data Read Phase (`DC# = HIGH`, SDA switches to input to read 2 bytes `[temp_int, temp_frac]`). See [`ERRATA.md` Errata E3](../../ERRATA.md#e3-ssd1681-3-wire-half-duplex-spi-cs-hold-violation) for full bus protocol details.
+Under 4-wire SPI on the SSD1681, **CS# must remain held LOW continuously** across both the Command Phase (`DC# = LOW`, MOSI sends `0x1B`) and the Data Read Phase (`DC# = HIGH`, SDA switches to input to read 2 bytes `[temp_int, temp_frac]`). See [`ERRATA.md` Errata E8](../../ERRATA.md#errata-e8-ssd1681-single-line-half-duplex-display-read-no-miso) for full bus protocol details.
 
 ### Mathematical Decoding & Bitfield Architecture
 The SSD1681 temperature sensor register structure (Command `0x1B`):
@@ -137,7 +137,7 @@ The on-glass reading must strictly be captured **before** any SPI DMA frame writ
 3. The display enters low-power standby with RAM contents retained.
 
 ### Wakeup Procedure
-1. Hardware Reset Pulse on `RST#` (`GPIO 9`): 10 ms HIGH, 10 ms LOW, 10 ms HIGH.
+1. Hardware Reset Pulse on `RST#` (`GPIO 9`): 2 ms LOW (`esp_rom_delay_us(2000)`), 2 ms HIGH (`esp_rom_delay_us(2000)`).
 2. Software Reset: Command `0x12` + wait busy.
 3. Re-apply core registers (`0x01`, `0x11`, `0x44`, `0x45`, `0x3C`, `0x22 0xB1`, `0x20`).
 4. If waking from deep sleep, pre-synchronize shadow RAM (`0x26`) with the frame restored from flash so differential updates resume seamlessly!

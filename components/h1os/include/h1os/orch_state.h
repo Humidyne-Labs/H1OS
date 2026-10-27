@@ -9,6 +9,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -65,7 +66,8 @@ typedef enum {
     ORCH_SENSOR_ERR_NACK_ADDR_RD = 3, /**< SHTC3 read address (0x71) NACKed.                     */
     ORCH_SENSOR_ERR_CRC_FAIL     = 4, /**< CRC-8 checksum verification failed on received bytes.  */
     ORCH_SENSOR_ERR_BUS_STUCK    = 5, /**< SDA or SCL line held low prior to starting transfer.  */
-    ORCH_SENSOR_ERR_NACK_SLEEP   = 6  /**< SHTC3 sleep command (0xB098) NACKed.                  */
+    ORCH_SENSOR_ERR_NACK_SLEEP   = 6, /**< SHTC3 sleep command (0xB098) NACKed.                  */
+    ORCH_SENSOR_ERR_SCL_STUCK    = 7  /**< SCL clock line held low beyond clock-stretch timeout. */
 } orch_sensor_err_t;
 
 #define SAMPLE_FLAG_VALID_COLD      0x01 /**< Steady-state sample captured during quiescent sleep.   */
@@ -151,6 +153,8 @@ typedef struct {
     uint32_t sensor_fail_count; /**< Monotonic count of failed wake-stub sensor reads.                     */
     uint8_t last_sensor_error; /**< Last error code (orch_sensor_err_t).                                  */
     uint8_t _pad_sensor[3];    /**< Alignment padding to 32-bit boundary.                                 */
+    uint16_t rh_alert_low_centi_pct;  /**< Lower RH alert threshold in centi-% (0 = disabled).             */
+    uint16_t rh_alert_high_centi_pct; /**< Upper RH alert threshold in centi-% (0 = disabled).             */
 } orch_persisted_state_t;
 
 // clang-format off
@@ -158,6 +162,7 @@ typedef struct {
 #define ORCH_FLAG_EPD_FRAME_VALID   (1 << 0) /**< Flash partition contains valid preserved display frame. */
 #define ORCH_FLAG_CRITICAL_BATTERY  (1 << 1) /**< Battery below brownout threshold.                       */
 #define ORCH_FLAG_THERMAL_LOCKOUT   (1 << 2) /**< Self-heating lockout active.                            */
+#define ORCH_FLAG_RH_ALERT_ACTIVE   (1 << 3) /**< Settled RH outside configured humidor target bounds.    */
 // clang-format on
 
 /**
@@ -198,6 +203,17 @@ bool orch_state_get_latest_sample(orch_tri_node_sample_t *out_sample);
  * @return True if a valid settled sample was located, false otherwise.
  */
 bool orch_state_get_latest_valid_sample(orch_tri_node_sample_t *out_sample);
+
+/**
+ * @brief Copy historical samples from the RTC ring buffer in chronological order (oldest to newest).
+ *
+ * @param[out] out_samples Destination array for samples. Must not be NULL.
+ * @param[in]  max_samples Capacity of destination array.
+ * @param[out] out_count   Number of samples copied. Must not be NULL.
+ *
+ * @return True if at least one sample was copied, false if ring buffer is empty or arguments invalid.
+ */
+bool orch_state_get_ring_chronological(orch_tri_node_sample_t *out_samples, size_t max_samples, size_t *out_count);
 
 /**
  * @brief Save cumulative battery autonomy runtimes to Flash NVS.

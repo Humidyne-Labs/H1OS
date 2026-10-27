@@ -245,7 +245,10 @@ esp_err_t hal_spi_write_frame_dma(const uint8_t *frame_buffer)
  */
 esp_err_t hal_spi_read_data(uint8_t cmd, uint8_t *out_data, size_t len)
 {
-    if (!s_is_inited || !s_spi_dev || !s_spi_read_dev || !out_data || len == 0) {
+    if (!out_data || len == 0 || len > 4) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_is_inited || !s_spi_dev || !s_spi_read_dev) {
         return ESP_ERR_INVALID_STATE;
     }
 

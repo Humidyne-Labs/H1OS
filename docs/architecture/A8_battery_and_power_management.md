@@ -52,7 +52,7 @@ flowchart TD
         CREM --> DAYS
     end
 
-    DAYS --> S3["Screen 3: System Health Display"]
+    DAYS --> S3["Screen 4: System Health Display"]
     IAVG --> S3
 ```
 
@@ -179,7 +179,7 @@ If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_s
 
 * `autonomy_days = -1.0f`
 * `avg_draw_ma = -1.0f`
-* Screen 3 displays: `"Autonomy: ~CALIBRATING..."` until $\ge 1.0\%$ SoC has been empirically discharged.
+* Screen 4 displays: `"Autonomy: CALIBRATE"` until $\ge 1.0\%$ SoC has been empirically discharged.
 
 ### 6.4 Flash Wear-Leveling & Non-Volatile Persistence Strategy
 
@@ -237,4 +237,4 @@ A single atomic blob call guarantees:
 | `orch_wake_stub.h` | `orch_wake_stub.c` | Increments `total_sleep_sec` on every headless Flow A sample burst. |
 | `sub_nvs.h` | `sub_nvs.c` | Cross-session Flash NVS mirroring across deep sleep, battery swaps, and reflashes. |
 | `h1os.h` | `h1os_lifecycle.c` | Telemetry public API binding (`h1os_telemetry_t.autonomy` and `battery_state`) and `RTC_DATA_ATTR` state transition tracking. |
-| `screens.h` | `screen_system_health.c` | Screen 3 UI presentation of voltage, SoC %, operational state, and projected days. |
+| `screens.h` | `screen_system_health.c` | Screen 4 UI presentation of voltage, SoC %, operational state, and projected days. |

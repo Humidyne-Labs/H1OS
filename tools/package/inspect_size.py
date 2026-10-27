@@ -121,8 +121,8 @@ def find_active_build_dir(search_roots=None):
             Path("."),
             Path("examples/H1OS"),
             Path("../examples/H1OS"),
-            Path(__file__).resolve().parent.parent / "examples" / "H1OS",
-            Path(__file__).resolve().parent.parent
+            Path(__file__).resolve().parents[2] / "examples" / "H1OS",
+            Path(__file__).resolve().parents[2],
         ]
 
     valid_candidates = []

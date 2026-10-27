@@ -31,6 +31,8 @@ Manages the electrophoretic particle state on the 200x200 non-touch panel.
   - Partial refreshes use differential hardware waveforms between `0x24` and `0x26`.
 - **Pre-Display Glass Thermistor Capture (`0x1B`)**:
   - Reads the internal SSD1681 temperature sensor during `sub_display_init()` prior to any frame transfer or charge-pump activation and caches the reading in centi-°C (`sub_display_get_glass_temp_centi_c()`).
+- **Falling-Edge Interrupt `BUSY` Synchronization (`v2.4.4-dev`)**:
+  - `sub_display_wait_busy()` configures `HAL_PIN_EPD_BUSY` (`GPIO 8`) with `GPIO_INTR_NEGEDGE` and blocks on a static binary semaphore (`s_busy_idle_sem`) signaled from `epd_busy_falling_isr_handler()`, eliminating `10 ms` polling loops (58–141 context switches per refresh) and releasing the calling task the microsecond the SSD1681 finishes driving electrophoretic microcapsules.
 - **Power Isolation**:
   - Puts panel into Deep Sleep Mode 1 (`0x10, 0x01`) while keeping 3.3V rail latched.
 

@@ -12,7 +12,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 | **IO1** | `IO1` | Expansion Header | GPIO / Output | Push-Pull | Tristate / User | Available GPIO header |
 | **IO2** | `IO2` | Expansion Header | GPIO / Output | Push-Pull | Tristate / User | Available GPIO header |
 | **IO3** | `LED_GREEN` | User Status Indicator | Digital Output | **Open-Drain, Active LOW** (0 = ON, 1 = OFF) | `1` (OFF) | Cathode connected to IO3; drive 0 to illuminate |
-| **IO4** | `BAT_ADC` | Power Management | Analog Input | ADC1 Channel 3 | Linear 0-3.1V sensing | Measured via 1:2 divider (100kΩ / 100kΩ; VBAT = VADC * 2.0) |
+| **IO4** | `BAT_ADC` | Power Management | Analog Input | ADC1 Channel 3 | Linear 0-3.1V sensing | Measured via 1:2 divider (200kΩ / 200kΩ; VBAT = VADC * 2.0) |
 | **IO5** | `RTC_INT` | PCF85063A RTC | Digital Input | **Active LOW**, Open-Drain | `INPUT_PULLUP` enabled | PCF85063A INT is open-drain; PCB has NO pull-up $\rightarrow$ internal pull-up mandatory |
 | **IO6** | `EPD3V3_EN` | 1.54″ e-Paper Display | Digital Output | **Active LOW** (0 = ON, 1 = OFF) | `0` (Power ON) | Gate control for EPD 3.3V power rail; held LOW (`0`) via RTC pad hold in sleep to keep display RAM energized (SSD1681 Deep Sleep Mode 1 @ 1µA) and eliminate inrush current |
 | **IO7** | `IO7` | Expansion / Unused | GPIO | Floating | Tristate | Available GPIO |
@@ -34,7 +34,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 | **IO39** | `SD_CLK` | MicroSD Card Slot | SDMMC / SPI Clock | Clock line (400kHz init, up to 20MHz) | Driven by SD driver | MicroSD clock |
 | **IO40** | `SD_MISO` | MicroSD Card Slot | SDMMC D0 / SPI MISO | Master In Slave Out (Data 0) | `INPUT_PULLUP` enabled | MicroSD read line |
 | **IO41** | `SD_MOSI` | MicroSD Card Slot | SDMMC CMD / SPI MOSI | Master Out Slave In (Command) | `INPUT_PULLUP` enabled | MicroSD command line |
-| **IO42** | `PA_EN` | Audio Power Amp (NS4168)| Digital Output | **Active LOW** (0 = Power ON, 1 = OFF) | `1` (PA Power Cut) | High-side power switch for Class-D amplifier rail |
+| **IO42** | `PA_EN` | Audio Power Amp (NS4168)| Digital Output | **Active LOW** (0 = Power ON, 1 = OFF) | `0` (Power ON / Held) | Held LOW across sleep per Errata E4 to prevent shared I2C bus disruption |
 | **IO43** | `TXD` | UART0 TX | UART Output | Serial Debug Transmit | 115200 8N1 default | Console log output |
 | **IO44** | `RXD` | UART0 RX | UART Input | Serial Debug Receive | 115200 8N1 default | Console log input / flashing |
 | **IO45** | `I2S_DSDIN` | Audio Codec (ES8311) | I2S0 DOUT Output | Serial Audio Data Out to Codec | Driven by I2S driver | Mono audio playback stream |

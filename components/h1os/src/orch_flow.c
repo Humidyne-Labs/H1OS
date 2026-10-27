@@ -199,6 +199,14 @@ static void orch_flow_scan_ring_metrics(volatile orch_persisted_state_t *st)
         }
     }
 
+    if (valid_cnt == 0) {
+        st->window_low_temp_centi_c  = 0;
+        st->window_high_temp_centi_c = 0;
+        st->window_avg_shtc3_c       = 0.0f;
+        st->window_avg_die_c         = 0.0f;
+        return;
+    }
+
     st->window_low_temp_centi_c  = current_low;
     st->window_high_temp_centi_c = current_high;
     st->window_avg_shtc3_c       = ((float)sum_shtc3 / (float)valid_cnt) / 100.0f;

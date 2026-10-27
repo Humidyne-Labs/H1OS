@@ -11,7 +11,7 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 # Resolve directory anchors
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PDF_DIR = REPO_ROOT / "docs" / "hardware_docs"
 OUTPUT_DIR = REPO_ROOT / "docs" / "hardware_docs" / "markdown"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -98,8 +98,8 @@ Flow A runs **strictly** inside [`bsp_wake_stub()`](../../components/h1os/src/or
    - Verify `ulp_dispatch_reason == ULP_DISPATCH_SENSOR_SAMPLE` (or `cause == TIMER_EXPIRE`). For all other wakeup causes (`ULP_DISPATCH_MAIN_WAKE`, button tap, critical shutdown, bootloader jump), immediately boot the main OS via `esp_default_wake_deep_sleep()`.
 2. **SHTC3 Normal-Power Readout (`~15 ms`):**
    - Configure `IO_MUX_GPIO47_REG` (`SDA`) and `IO_MUX_GPIO48_REG` (`SCL`) with `PIN_FUNC_GPIO` and `PIN_INPUT_ENABLE`.
-   - Transmit `0x3517` (Wakeup) $\rightarrow$ delay `250 µs`.
-   - Transmit `0x7866` (Normal Mode, T-first, no clock stretching) $\rightarrow$ delay `14,500 µs`.
+   - Transmit `0x3517` (Wakeup) $\rightarrow$ delay `500 µs` (`rtc_delay_us_exact(500)`).
+   - Transmit `0x7866` (Normal Mode, T-first, no clock stretching) $\rightarrow$ immediately sample MCU Die TSENS (`~450 µs`) and wait the remaining `17,550 µs` (`ORCH_SHTC3_POST_TSENS_DELAY_US`, total `18,000 µs` conversion budget).
    - Read 6 bytes `[T_MSB, T_LSB, T_CRC, RH_MSB, RH_LSB, RH_CRC]`.
    - **Unconditionally transmit `0xB098` (Sleep)** with up to 3 retries so the SHTC3 never remains awake.
    - Verify both Sensirion CRC-8 checksums (polynomial `0x31`, init `0xFF`).

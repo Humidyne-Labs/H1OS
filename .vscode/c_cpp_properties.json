@@ -2,7 +2,7 @@
   "configurations": [
     {
       "name": "ESP32-S3",
-      "compilerPath": "C:/Users/Matt/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc.exe",
+      "compilerPath": "${env:USERPROFILE}/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc.exe",
       "compileCommands": "${workspaceFolder}/examples/H1OS/build_prod/compile_commands.json",
       "cStandard": "gnu17",
       "cppStandard": "gnu++23",

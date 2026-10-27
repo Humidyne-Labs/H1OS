@@ -33,7 +33,6 @@ static const char *TAG = "h1os_lvgl";
 #define LVGL_TASK_STACK_PORT      8192U /**< Stack allocation for LVGL port task (8 KB).  */
 #define LVGL_TASK_PRIO_PORT       5     /**< Default FreeRTOS priority for LVGL task.     */
 #define LVGL_SHUTDOWN_TIMEOUT_MS  6000U /**< Max wait for LVGL task deletion (6s).        */
-#define LVGL_SHUTDOWN_STEP_MS     20U   /**< Shutdown poll step interval (20 ms).         */
 #define LVGL_KEYPAD_LONG_PRESS_MS 2000U /**< Keypad long-press actuation time (2.0s).     */
 #define LVGL_PARTIAL_BUFFER_LINES 40U   /**< Lines per partial draw buffer.               */
 
@@ -45,6 +44,12 @@ static volatile TaskHandle_t s_lvgl_task_handle = NULL;
 static volatile bool s_lvgl_task_running = false;
 static volatile bool s_flush_in_progress = false;
 static bool s_first_boot_flush           = true;
+
+static StaticSemaphore_t s_lvgl_stop_sem_buf;
+static SemaphoreHandle_t s_lvgl_stop_sem = NULL;
+
+static StaticSemaphore_t s_lvgl_idle_sem_buf;
+static SemaphoreHandle_t s_lvgl_idle_sem = NULL;
 
 #define LVGL_I1_PALETTE_SIZE 8
 
@@ -68,12 +73,23 @@ static void h1os_lvgl_port_task(void *pvParameters);
  *
  * @return True on success, false otherwise.
  */
+static SemaphoreHandle_t s_lvgl_api_mutex = NULL;
+static StaticSemaphore_t s_lvgl_api_mutex_buf;
+
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 {
-    (void)timeout_ms;
-    if (s_lv_display != NULL) {
-        lv_lock();
+    if (s_lv_display == NULL) {
+        return true;
     }
+    if (s_lvgl_api_mutex == NULL) {
+        s_lvgl_api_mutex = xSemaphoreCreateRecursiveMutexStatic(&s_lvgl_api_mutex_buf);
+    }
+    TickType_t ticks = (timeout_ms == 0) ? pdMS_TO_TICKS(100) : pdMS_TO_TICKS(timeout_ms);
+    if (xSemaphoreTakeRecursive(s_lvgl_api_mutex, ticks) != pdTRUE) {
+        ESP_LOGW(TAG, "h1os_lvgl_lock timed out after %lu ms", (unsigned long)timeout_ms);
+        return false;
+    }
+    lv_lock();
     return true;
 }
 
@@ -84,6 +100,9 @@ void h1os_lvgl_unlock(void)
 {
     if (s_lv_display != NULL) {
         lv_unlock();
+        if (s_lvgl_api_mutex != NULL) {
+            (void)xSemaphoreGiveRecursive(s_lvgl_api_mutex);
+        }
     }
 }
 
@@ -95,6 +114,21 @@ void h1os_lvgl_unlock(void)
 static uint32_t lvgl_tick_get_cb(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
+}
+
+/**
+ * @brief Asynchronous button state-change callback invoked by hal_io after 15 ms esp_timer debounce.
+ */
+static void lvgl_button_edge_cb(hal_btn_mask_t btn_mask, void *arg)
+{
+    (void)arg;
+    if (btn_mask != HAL_BTN_NONE) {
+        h1os_reset_session_timer();
+    }
+    TaskHandle_t task = s_lvgl_task_handle;
+    if (task != NULL) {
+        xTaskNotifyGive(task);
+    }
 }
 
 /**
@@ -259,6 +293,9 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 
     lv_display_flush_ready(disp);
     s_flush_in_progress = false;
+    if (s_lvgl_idle_sem != NULL) {
+        (void)xSemaphoreGive(s_lvgl_idle_sem);
+    }
 }
 
 /**
@@ -270,6 +307,13 @@ static void lvgl_display_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
  */
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 {
+    if (s_lvgl_stop_sem == NULL) {
+        s_lvgl_stop_sem = xSemaphoreCreateBinaryStatic(&s_lvgl_stop_sem_buf);
+    }
+    if (s_lvgl_idle_sem == NULL) {
+        s_lvgl_idle_sem = xSemaphoreCreateBinaryStatic(&s_lvgl_idle_sem_buf);
+    }
+
     if (s_lv_display != NULL) {
         return ESP_OK;
     }
@@ -326,7 +370,8 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
             lv_group_set_default(def_grp);
         }
         lv_indev_set_group(s_lv_keypad_indev, def_grp);
-        ESP_LOGI(TAG, "Registered LVGL keypad indev handler with default group (Long-press: 2000ms)");
+        (void)hal_io_register_button_cb(lvgl_button_edge_cb, NULL);
+        ESP_LOGI(TAG, "Registered LVGL keypad indev handler with GPIO ISR edge wakeup (Long-press: 2000ms)");
     }
 
     ESP_LOGI(TAG, "LVGL v9 port initialized in 1-bit monochrome mode (first flush: %s)",
@@ -352,7 +397,7 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh)
  *
  * @return ESP_OK on success, or an error code.
  */
-esp_err_t h1os_lvgl_start(int task_priority, int core_id)
+esp_err_t h1os_lvgl_start(int32_t task_priority, int32_t core_id)
 {
     if (s_lvgl_task_handle != NULL) {
         return ESP_OK;
@@ -363,8 +408,12 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
         return ret;
     }
 
+    if (s_lvgl_stop_sem != NULL) {
+        (void)xSemaphoreTake(s_lvgl_stop_sem, 0);
+    }
+
     task_priority = (task_priority > 0) ? task_priority : LVGL_TASK_PRIO_PORT;
-    core_id = ((core_id >= 0) && (core_id < (int)configNUM_CORES)) ? core_id : -1;
+    core_id = ((core_id >= 0) && (core_id < (int32_t)configNUM_CORES)) ? core_id : -1;
 
     s_lvgl_task_running = true;
 
@@ -378,31 +427,37 @@ esp_err_t h1os_lvgl_start(int task_priority, int core_id)
 
     if (res != pdPASS) {
         s_lvgl_task_running = false;
-        ESP_LOGE(TAG, "Failed to spawn LVGL port task on Core %d", core_id);
+        ESP_LOGE(TAG, "Failed to spawn LVGL port task on Core %ld", (long)core_id);
         return ESP_FAIL;
     }
     return ESP_OK;
 }
 
 /**
- * @brief Stop the LVGL background task.
+ * @brief Stop the LVGL background task using event-driven semaphore synchronization.
  *
  * @details Safely handles being called from within an LVGL input callback on the
- *          LVGL task thread itself (e.g. long-press shutdown) without self-deletion.
+ *          LVGL task thread itself (e.g. long-press shutdown) without self-deletion,
+ *          and wakes the Core 1 LVGL task immediately via xTaskNotifyGive() so it exits
+ *          without waiting for a timer period.
  *
  * @return ESP_OK on success, or an error code.
  */
 esp_err_t h1os_lvgl_stop(void)
 {
-    if (s_lvgl_task_handle != NULL) {
+    TaskHandle_t handle = s_lvgl_task_handle;
+    if (handle != NULL) {
         s_lvgl_task_running = false;
-        if (xTaskGetCurrentTaskHandle() == s_lvgl_task_handle) {
+        if (xTaskGetCurrentTaskHandle() == handle) {
             return ESP_OK;
         }
-        uint32_t wait_ms = 0;
-        while (s_lvgl_task_handle != NULL && wait_ms < LVGL_SHUTDOWN_TIMEOUT_MS) {
-            vTaskDelay(pdMS_TO_TICKS(LVGL_SHUTDOWN_STEP_MS));
-            wait_ms += LVGL_SHUTDOWN_STEP_MS;
+        if (s_lvgl_stop_sem != NULL) {
+            (void)xSemaphoreTake(s_lvgl_stop_sem, 0);
+        }
+        xTaskNotifyGive(handle);
+
+        if (s_lvgl_stop_sem != NULL) {
+            (void)xSemaphoreTake(s_lvgl_stop_sem, pdMS_TO_TICKS(LVGL_SHUTDOWN_TIMEOUT_MS));
         }
         if (s_lvgl_task_handle != NULL) {
             vTaskDelete(s_lvgl_task_handle);
@@ -432,15 +487,48 @@ bool h1os_lvgl_has_pending_tasks(void)
     }
 
     bool pending = false;
-    lv_lock();
-    lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
-    if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
-        if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
-            pending = true;
+    if (h1os_lvgl_lock(100)) {
+        lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
+        if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
+            if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
+                pending = true;
+            }
         }
+        h1os_lvgl_unlock();
+    } else {
+        pending = true;
     }
-    lv_unlock();
     return pending;
+}
+
+/**
+ * @brief Event-driven wait until the LVGL display pipeline completes all pending renders and flushes.
+ */
+esp_err_t h1os_lvgl_wait_idle(uint32_t timeout_ms)
+{
+    if (!h1os_lvgl_has_pending_tasks()) {
+        return ESP_OK;
+    }
+    if (s_lvgl_idle_sem == NULL) {
+        s_lvgl_idle_sem = xSemaphoreCreateBinaryStatic(&s_lvgl_idle_sem_buf);
+    }
+
+    TaskHandle_t handle = s_lvgl_task_handle;
+    if (handle != NULL && xTaskGetCurrentTaskHandle() != handle) {
+        xTaskNotifyGive(handle);
+    }
+
+    TickType_t start_ticks   = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+
+    while (h1os_lvgl_has_pending_tasks()) {
+        TickType_t elapsed = xTaskGetTickCount() - start_ticks;
+        if (elapsed >= timeout_ticks) {
+            return ESP_ERR_TIMEOUT;
+        }
+        (void)xSemaphoreTake(s_lvgl_idle_sem, timeout_ticks - elapsed);
+    }
+    return ESP_OK;
 }
 
 lv_indev_t *h1os_lvgl_get_indev(void)
@@ -460,12 +548,32 @@ static void h1os_lvgl_port_task(void *pvParameters)
     (void)pvParameters;
     ESP_LOGI(TAG, "LVGL port task active on Core %d", xPortGetCoreID());
     while (s_lvgl_task_running) {
-        lv_lock();
-        uint32_t delay_ms = lv_timer_handler();
-        lv_unlock();
+        uint32_t delay_ms = LV_DEF_REFR_PERIOD;
+        if (h1os_lvgl_lock(100)) {
+            delay_ms = lv_timer_handler();
+            bool still_pending = false;
+            if (s_lv_display != NULL) {
+                lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
+                if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
+                    if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
+                        still_pending = true;
+                    }
+                }
+            }
+            h1os_lvgl_unlock();
+            if (!still_pending && !s_flush_in_progress && s_lvgl_idle_sem != NULL) {
+                (void)xSemaphoreGive(s_lvgl_idle_sem);
+            }
+        }
+        if (!s_lvgl_task_running) {
+            break;
+        }
         delay_ms = (delay_ms == LV_NO_TIMER_READY || delay_ms > LV_DEF_REFR_PERIOD) ? LV_DEF_REFR_PERIOD : delay_ms;
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(delay_ms));
     }
     s_lvgl_task_handle = NULL;
+    if (s_lvgl_stop_sem != NULL) {
+        (void)xSemaphoreGive(s_lvgl_stop_sem);
+    }
     vTaskDelete(NULL);
 }
