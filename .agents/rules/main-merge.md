@@ -12,7 +12,8 @@ Before executing a merge into `main`, the developer or autonomous agent **MUST**
 
 ```mermaid
 flowchart TD
-    A0["0. Identity & Name Audit\n(python tools/agent/sanitize.py --check)"] --> A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"]
+    A0["0a. Identity & Name Audit\n(python tools/agent/sanitize.py --check)"] --> A0b["0b. Asset Shrink & Quantization\n(/shrink: optimize_images + optimize_pdf)"]
+    A0b --> A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"]
     A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"] --> B["2. Rev Semantic Version Strings\n(h1os_version.h, idf_component.yml, README.md)"]
     B --> C["3. Regenerate docs/api.md\n(doxygen Doxyfile + moxygen)"]
     C --> D["4. Touch & Update CHANGELOG.md\n(Keep a Changelog format with timestamp)"]
@@ -105,7 +106,15 @@ Before committing or merging:
 
 ---
 
-## 7. Git Branching & Tagging Lifecycle
+## 7. Invariant 6: Asset Optimization & Shrink Gate (/shrink)
+
+Before staging, committing, or merging to `main`:
+1. Ensure uncompressed original PDFs are backed up to gitignored `docs/hardware_docs/original_pdfs/`.
+2. Run `/shrink` (or `python tools/agent/optimize_images.py docs/logs/` and `python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets --dpi 300`) to guarantee all images have `HUMIDITRON/HUMADYNE_LABS` EXIF attribution and PDFs are quantized to 300 DPI without repo bloat.
+
+---
+
+## 8. Git Branching & Tagging Lifecycle
 
 1. **Commit to Feature Branch:** Commit all staged code, updated version strings, regenerated `docs/api.md`, and `CHANGELOG.md`.
 2. **Push Feature Branch:** Push to `origin/<branch_name>`.

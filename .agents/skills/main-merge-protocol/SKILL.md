@@ -13,7 +13,8 @@ This skill provides step-by-step procedures, one-liner automation commands, and 
 
 | Step | Action | Tools / Files Involved | Verification |
 | :--- | :--- | :--- | :--- |
-| **0. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check` | Zero leaks in code, archives, or git logs |
+| **0a. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check` | Zero leaks in code, archives, or git logs |
+| **0b. Asset Shrink Gate** | Quantize Docs & Images | `/shrink` or `tools/agent/optimize_*.py` | 300 DPI PDFs, EXIF stamped, originals backed up |
 | **1. Invariant Check** | Firmware Safety Audit | `.agents/rules/coding.md`, `.agents/skills/h1os-firmware-standards` | 10 Safety Invariants validated |
 | **2. Clean Build** | Compile firmware | `idf.py -B build_dev build` via ESP-IDF v6.1 profile | Exit code 0, 0 warnings/errors |
 | **3. Memory Audit** | Profile memory regions | `murdock_memory_budget` (`embedded-ops`) | DIRAM $\le 85\%$, RTC Slow $\le 4\text{ KB}$ |
