@@ -1,5 +1,5 @@
 /__pycache__/
-
+*.py
 # Removes Build Directories.
 build*/
 sdkconfig
