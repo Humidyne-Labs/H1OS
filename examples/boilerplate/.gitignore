@@ -1,2 +1,5 @@
-/build_dev/
-/managed_components/
+build*/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
