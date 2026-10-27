@@ -1,6 +1,6 @@
 # Hardware Errata, Silicon Nuances & PCB Rev B Redesign Guide
 
-> **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch)
+> **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with, sponsored by, or endorsed by Waveshare Electronics)*
 >
 > **Applicable Firmware:** H1OS `v2.4.4-dev` (E-Class Environmental Operating System)
 >

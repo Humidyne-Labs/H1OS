@@ -2,6 +2,9 @@
 
 Minimal starter template for building custom applications atop the **H1OS Class-E Environmental Telemetry Operating System** on the Waveshare ESP32-S3 ePaper 1.54" V2.
 
+> [!NOTE]
+> *H1OS is an independent open-source embedded software framework by Humidyne Labs and is not affiliated with or endorsed by Waveshare Electronics.*
+
 ## Features
 - **Event-Driven Lifecycle:** Connects directly into `h1os_start()` with `on_boot`, `on_wake`, `on_pre_sleep`, and `on_shutdown` callbacks.
 - **200x200 Monochrome LVGL v9 UI:** Uses packed 1-bit Montserrat typography (`H1OS_FONT_14` & `H1OS_FONT_20`).

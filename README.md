@@ -12,6 +12,9 @@ An instrument-grade, event-driven embedded runtime and peripheral middleware fra
 
 H1OS turns the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32-S3-PICO-1-N8R8**) into an ultra-low-power **E-Class environmental telemetry platform**. It provides deterministic power sequencing, psychrometric telemetry pipelines, ULP coprocessor state machines, and a specialized 1-bit bi-tonal display pipeline.
 
+> [!NOTE]
+> **Independent Hardware Development:** H1OS is an independent open-source embedded software project developed by Humidyne Labs and is not affiliated with, sponsored by, or endorsed by Waveshare Electronics. We love the hardware form factor and price point, and warmly welcome manufacturer collaboration, upstream engagement, and sponsorship opportunities!
+
 > 📘 **Looking for documentation?**
 > - **[H1OS Developer Guide & Reference Manual](docs/guide.md)**
 > - **[API Reference](docs/api.md)**

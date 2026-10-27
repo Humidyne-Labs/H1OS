@@ -1,6 +1,6 @@
 # 📖 H1OS Developer Guide & Reference Manual
 
-**Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch)  
+**Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with Waveshare Electronics)*  
 **Operating System:** H1OS (E-Class Environmental Telemetry Operating System)  
 **Supported Frameworks:** ESP-IDF `v6.1` | LVGL `v9.6.0`  
 **License:** MIT  

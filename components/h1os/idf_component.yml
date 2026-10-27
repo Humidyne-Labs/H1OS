@@ -1,11 +1,12 @@
 ## Component metadata
 version:     "2.4.4-dev"
-description: "H1OS: E-Class Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8)."
+description: "H1OS: E-Class Environmental Operating System for Waveshare ESP32-S3 ePaper 1.54 V2 (ESP32-S3-PICO-1-N8R8). Not affiliated with Waveshare."
 url:         "https://github.com/Humidyne-Labs/H1OS"
 repository:  "https://github.com/Humidyne-Labs/H1OS.git"
 license:     "MIT | CC-BY-4.0 | APACHE"
-maintainers: "HUMIDYNE LABS / HUMIDITRON"
-discussion:  "(Not Affiliated with Waveshare)"
+maintainers:
+  - "HUMIDYNE LABS / HUMIDITRON"
+discussion:  "https://github.com/orgs/Humidyne-Labs/discussions"
 tags:
   - h1os
   - bsp
@@ -44,4 +45,3 @@ files:
     - "tools/thermal_sim/"
     - "tools/fonts/preview/"
     - "tools/fonts/metrics/"
-    
