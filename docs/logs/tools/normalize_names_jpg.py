@@ -104,22 +104,22 @@ def main():
 
         # Step 2: Determine normalized base name
         normalized_stem = parse_timestamp(file_path.stem) or file_path.stem
-        target_path = folder / f"{normalized_stem}.png"
+        target_path = folder / f"{normalized_stem}.jpg"
 
         # Avoid collision if destination name already exists as a distinct file
         counter = 1
         while target_path.exists() and target_path != file_path and not DRY_RUN:
-            target_path = folder / f"{normalized_stem}_{counter}.png"
+            target_path = folder / f"{normalized_stem}_{counter}.jpg"
             counter += 1
 
         print(f"[CONVERT & RENAME] '{file_path.name}' -> '{target_path.name}'")
 
         if not DRY_RUN:
-            # Step 3: Convert to PNG and save
+            # Step 3: Convert to JPG and save
             with Image.open(file_path) as img:
-                img.save(target_path, format="PNG")
+                img.save(target_path, format="JPEG")
 
-            # Remove original file if it was not already the target PNG
+            # Remove original file if it was not already the target JPG
             if file_path.resolve() != target_path.resolve():
                 file_path.unlink()
 
