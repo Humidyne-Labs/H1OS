@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🛡️ Fixed & Hardened (`H1OS-STD-001` Audit & `-O2` Wake Stub Register Protections)
 
+* **ESP-IDF Component Manifest & Hardware Attribution Notices** (`components/h1os/idf_component.yml`, `README.md`, `ERRATA.md`, `docs/guide.md`, `examples/boilerplate/README.md`):
+  * Formatted `maintainers` as a valid sequence and resolved `discussion` URL in `idf_component.yml` to satisfy ESP-IDF v6.1 Component Manager schema validation.
+  * Added clear hardware non-affiliation notices and collaboration/sponsorship invitation callouts across public README and documentation entry points.
 * **Event-Driven Timer, GPIO ISR & Static Semaphore Architecture (`esp_timer` / `GPIO_INTR` Refactor)** (`hal_io.c`, `hal_io.h`, `sub_display.cpp`, `h1os_lifecycle.c`, `h1os_lvgl.cpp`, `h1os_lvgl.h`, `sub_sdcard.c`, `sub_audio.c`):
   * **SSD1681 `EPD_BUSY` (`GPIO 8`) Falling-Edge Interrupt Synchronization (`sub_display.cpp`):** Replaced the `10 ms` `vTaskDelay()` polling loop in `sub_display_wait_busy()` with a `GPIO_INTR_NEGEDGE` ISR (`epd_busy_falling_isr_handler()`) and a static binary semaphore (`s_busy_idle_sem`), eliminating 58–141 context switches per e-Paper refresh and releasing Core 1 the microsecond the display finishes driving microcapsules.
   * **One-Shot `esp_timer` Interactive Session Monitor (`h1os_lifecycle.c`):** Replaced the dedicated `h1os_sess` FreeRTOS polling task (`4,096 B` stack waking every `500 ms`) with a hardware-backed one-shot `esp_timer` (`s_session_timer`, `esp_timer_start_once()` / `esp_timer_restart()`), reclaiming `4 KB` of internal SRAM and eliminating periodic idle wakes.
