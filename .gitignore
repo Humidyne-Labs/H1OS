@@ -22,10 +22,3 @@ __pycache__/
 sanitize_names.txt
 tools/agent/sanitize_names.txt
 tools/agent/.sanitize_names
-
-# Local Large Unreferenced Archives & Original Backups
-docs/hardware_docs/datasheets/img/ref_details.zip
-*.orig.pdf
-*.original.pdf
-*_backup.pdf
-docs/hardware_docs/original_pdfs/
