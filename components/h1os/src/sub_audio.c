@@ -7,6 +7,7 @@
  */
 
 #include "h1os/sub_audio.h"
+#include "h1os/h1os.h"
 
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
@@ -1176,4 +1177,35 @@ esp_err_t sub_audio_set_low_power_mode(bool enable)
 bool sub_audio_get_low_power_mode(void)
 {
     return s_low_power_mode;
+}
+
+/* =========================================================================
+ * Layer 4 Public Audio API Implementations
+ * ========================================================================= */
+
+esp_err_t h1os_audio_play_raw(const int16_t *ptr, size_t len, size_t *bytes_written)
+{
+    if (ptr == NULL || len < sizeof(int16_t)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_err_t err = sub_audio_play(SUB_AUDIO_PCM, ptr, len);
+    if (err == ESP_OK && bytes_written != NULL) {
+        *bytes_written = len;
+    }
+    return err;
+}
+
+esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
+{
+    if (freq_hz < 100 || freq_hz > 10000 || duration_ms < 10 || duration_ms > 5000) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    uint32_t params[2] = {freq_hz, duration_ms};
+    return sub_audio_play(SUB_AUDIO_TONE, params, sizeof(params));
+}
+
+esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
+{
+    uint8_t type_val = (uint8_t)chime_type;
+    return sub_audio_play(SUB_AUDIO_CHIME, &type_val, sizeof(type_val));
 }

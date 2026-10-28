@@ -25,6 +25,15 @@ extern "C" {
 #include "h1os_version.h"
 
 /**
+ * @name Thermodynamic & Psychrometric Unit Conversion Primitives
+ * @brief Base Celsius derived mathematical conversions avoiding compounding precision loss.
+ * @{
+ */
+#define H1OS_CELSIUS_TO_KELVIN(c)      ((float)(c) + 273.15f)
+#define H1OS_CELSIUS_TO_FAHRENHEIT(c)  (((float)(c) * 1.8f) + 32.0f)
+/** @} */
+
+/**
  * @brief Default compound literal macro for standard lifecycle session configuration.
  */
 #define H1OS_LIFECYCLE_DEFAULT_CONFIG()                                    \
@@ -142,9 +151,11 @@ typedef struct {
 typedef struct {
     float ambient_temp_c; /**< Trusted steady-state SHTC3 ambient temperature in degrees Celsius. */
     float ambient_temp_f; /**< Trusted steady-state SHTC3 ambient temperature in degrees Fahr.    */
+    float ambient_temp_k; /**< Trusted steady-state SHTC3 ambient temperature in Kelvin (derived). */
     float ambient_rh_pct; /**< Trusted steady-state SHTC3 relative humidity percentage (0..100%). */
     float dew_point_c; /**< Psychrometrically calculated dew point in degrees Celsius.         */
     float dew_point_f; /**< Psychrometrically calculated dew point in degrees Fahrenheit.      */
+    float dew_point_k; /**< Psychrometrically calculated dew point in Kelvin (derived).         */
     float vapor_pressure_hpa; /**< Calculated water vapor partial pressure in hectopascals (hPa).     */
     float absolute_humidity_g; /**< Calculated absolute humidity in grams per cubic meter (g/m³).      */
 
@@ -306,6 +317,60 @@ void h1os_shutdown(void);
  * power latch, protecting e-Paper microcapsules against dye migration and burn-in.
  */
 void h1os_shutdown_for_storage(void);
+
+/**
+ * @brief Force a driver-level electrophoretic display clear and full waveform scrub.
+ *
+ * @note This is a hardware driver-level operation on the SSD1681 controller (not an LVGL widget call).
+ *       It writes pure white (0xFF) to both black/white and red RAM planes, triggers a full OTP waveform
+ *       refresh cycle (~2.5s), waits for hardware BUSY de-assertion, and resets the partial refresh counter.
+ *       Use to eliminate electrophoretic microcapsule ghosting or initialize the panel.
+ *
+ * @return ESP_OK on success, or an error code from the display driver.
+ */
+esp_err_t h1os_display_force_clear(void);
+
+/**
+ * @brief Play raw 16-bit signed Mono PCM audio asynchronously from memory (C header arrays or RAM buffer).
+ *
+ * @param[in]  ptr           Pointer to 16-bit signed PCM buffer in Flash or RAM. Must not be NULL.
+ * @param[in]  len           Length of sample buffer in bytes.
+ * @param[out] bytes_written Pointer to receive count of bytes queued. Can be NULL.
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on NULL ptr, or I2S/DMA driver error code.
+ */
+esp_err_t h1os_audio_play_raw(const int16_t *ptr, size_t len, size_t *bytes_written);
+
+/**
+ * @brief Synthesize and play a pure sine tone asynchronously at specified frequency and duration.
+ *
+ * @param[in] freq_hz     Tone frequency in Hertz (100..10000 Hz).
+ * @param[in] duration_ms Tone duration in milliseconds (10..5000 ms).
+ * @return ESP_OK on success, or driver error code.
+ */
+esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms);
+
+/**
+ * @brief Play a predefined acoustic presentation chime asynchronously.
+ *
+ * @param[in] chime_type Predefined chime pattern (H1OS_CHIME_BOOT, H1OS_CHIME_SLEEP, etc.).
+ * @return ESP_OK on success, or driver error code.
+ */
+esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type);
+
+/**
+ * @brief Check if a MicroSD card is actively mounted in the FATFS filesystem.
+ *
+ * @return true if mounted and ready for file I/O, false otherwise.
+ */
+bool h1os_sdcard_is_mounted(void);
+
+/**
+ * @brief Retrieve total capacity of the mounted MicroSD card in megabytes.
+ *
+ * @param[out] out_capacity_mb Pointer to receive card capacity in megabytes (MB).
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if card is not mounted, or ESP_ERR_INVALID_ARG.
+ */
+esp_err_t h1os_sdcard_get_capacity_mb(uint32_t *out_capacity_mb);
 
 #ifdef __cplusplus
 }

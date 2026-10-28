@@ -7,6 +7,7 @@
  */
 
 #include "sub_sdcard.h"
+#include "h1os/h1os.h"
 
 #include "driver/gpio.h"
 #include "driver/sdmmc_host.h"
@@ -238,4 +239,18 @@ esp_err_t sub_sdcard_format(void)
     }
 
     return esp_vfs_fat_sdcard_format(SUB_SDCARD_MOUNT_POINT, s_sd_card);
+}
+
+/* =========================================================================
+ * Layer 4 Public MicroSD Storage API Implementations
+ * ========================================================================= */
+
+bool h1os_sdcard_is_mounted(void)
+{
+    return sub_sdcard_is_mounted();
+}
+
+esp_err_t h1os_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
+{
+    return sub_sdcard_get_capacity_mb(out_capacity_mb);
 }

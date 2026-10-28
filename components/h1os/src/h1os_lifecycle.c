@@ -502,10 +502,12 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
 
     if (ret == ESP_OK) {
         out_telemetry->ambient_temp_c = t;
-        out_telemetry->ambient_temp_f = (t * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->ambient_temp_f = H1OS_CELSIUS_TO_FAHRENHEIT(t);
+        out_telemetry->ambient_temp_k = H1OS_CELSIUS_TO_KELVIN(t);
         out_telemetry->ambient_rh_pct = rh;
         out_telemetry->dew_point_c = dew;
-        out_telemetry->dew_point_f = (dew * 9.0f / 5.0f) + 32.0f;
+        out_telemetry->dew_point_f = H1OS_CELSIUS_TO_FAHRENHEIT(dew);
+        out_telemetry->dew_point_k = H1OS_CELSIUS_TO_KELVIN(dew);
         out_telemetry->vapor_pressure_hpa = st->vapor_pressure_hpa;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
         out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
@@ -732,4 +734,17 @@ esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_c
         st->flags &= (uint8_t)~ORCH_FLAG_RH_ALERT_ACTIVE;
     }
     return ESP_OK;
+}
+
+/**
+ * @brief Force a driver-level electrophoretic display clear and full waveform scrub.
+ */
+esp_err_t h1os_display_force_clear(void)
+{
+    ESP_LOGI(TAG, "Forced display clear: executing driver-level SSD1681 full OTP scrub to pure white...");
+    esp_err_t err = sub_display_clear_to_white_full();
+    if (err == ESP_OK) {
+        orch_display_sync_mark_dirty();
+    }
+    return err;
 }

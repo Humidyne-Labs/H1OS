@@ -20,7 +20,7 @@ tags:
 
 ## Required dependencies
 dependencies:
-  idf:                            ">=5.1"
+  idf:                            ">=6.1.0"
   lvgl/lvgl:                      "==9.6.0"
 
 ## Target Hardware

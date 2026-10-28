@@ -416,3 +416,12 @@ esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer)
 
     return ESP_OK;
 }
+
+bool sub_rtc_is_oscillator_valid(void)
+{
+    uint8_t sec_reg = 0;
+    if (pcf85063_read_reg(RTC_REG_SECONDS, &sec_reg, 1) != ESP_OK) {
+        return false;
+    }
+    return ((sec_reg & 0x80) == 0);
+}

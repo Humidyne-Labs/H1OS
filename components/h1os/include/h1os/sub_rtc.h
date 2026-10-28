@@ -87,6 +87,16 @@ esp_err_t sub_rtc_get_remaining_seconds(uint32_t *out_sec);
  */
 esp_err_t sub_rtc_get_and_clear_interrupts(bool *out_alarm, bool *out_timer);
 
+/**
+ * @brief Check whether PCF85063A oscillator integrity is valid.
+ *
+ * Checks Bit 7 (OS flag) in the Seconds register. If OS is set (1), oscillator
+ * stopped or power was lost and the clock is uncalibrated.
+ *
+ * @return True if oscillator has run continuously, false if stopped/uncalibrated.
+ */
+bool sub_rtc_is_oscillator_valid(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -163,9 +163,12 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
                               (unsigned long)st->wake_count,
                               (unsigned long)fails);
     } else {
+        uint8_t ring_count = (st->total_samples >= ORCH_RING_CAPACITY) ?
+                              (uint8_t)ORCH_RING_CAPACITY :
+                              (uint8_t)st->total_samples;
         lv_label_set_text_fmt(lbl_v6, "%lu (Ring %u/32)",
                               (unsigned long)st->wake_count,
-                              st->ring_head);
+                              ring_count);
     }
     lv_obj_set_style_text_font(lbl_v6, H1OS_FONT_14, 0);
     lv_obj_align(lbl_v6, LV_ALIGN_TOP_RIGHT, -6, 128);

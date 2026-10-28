@@ -85,9 +85,20 @@ if(NOT lvgl_dir)
     idf_component_get_property(lvgl_dir lvgl COMPONENT_DIR)
 endif()
 
-# Point to vendored font assets in the repo tools directory
-set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/../../tools/fonts")
-set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../../tools/generate_1bpp_fonts.py")
+# Point to vendored font assets self-contained within the component tools directory
+set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts")
+set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/generate_1bpp_fonts.py")
+
+if(NOT EXISTS "${FONT_GEN_SCRIPT}" OR NOT EXISTS "${FONT_SRC_DIR}/Montserrat-Bold.ttf")
+    message(FATAL_ERROR
+        "\n========================================================================\n"
+        "[H1OS BUILD ERROR] Required 1-BPP typography font assets missing!\n"
+        "Expected font directory: ${FONT_SRC_DIR}\n"
+        "Missing: generate_1bpp_fonts.py or TTF/WOFF font assets.\n"
+        "Please verify the H1OS component was cloned/pulled with full tools/ tree.\n"
+        "========================================================================\n"
+    )
+endif()
 
 set(GENERATED_FONT_SRCS
     "${GEN_FONT_DIR}/h1os_font_montserrat_14_1bpp.c"

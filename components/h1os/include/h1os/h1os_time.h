@@ -114,6 +114,17 @@ esp_err_t h1os_time_get_formatted(h1os_time_format_t fmt, char *dest, size_t max
  */
 esp_err_t h1os_time_get_date_formatted(h1os_date_format_t fmt, char *dest, size_t max_len);
 
+/**
+ * @brief Check whether the current hardware RTC timestamp is calibrated and valid.
+ *
+ * Performs deterministic verification:
+ * 1. Verifies PCF85063A hardware oscillator integrity (Seconds register OS flag == 0).
+ * 2. Compares active RTC calendar timestamp against firmware compile-time epoch (__DATE__ and __TIME__).
+ *
+ * @return True if hardware RTC is calibrated and past firmware compile epoch, false otherwise.
+ */
+bool h1os_time_is_valid(void);
+
 #ifdef __cplusplus
 }
 #endif

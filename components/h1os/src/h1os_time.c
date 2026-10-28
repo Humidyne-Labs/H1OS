@@ -217,3 +217,62 @@ esp_err_t h1os_time_get_date_formatted(h1os_date_format_t fmt, char *dest, size_
     size_t written = strftime(dest, max_len, format_str, &timeinfo);
     return (written > 0) ? ESP_OK : ESP_FAIL;
 }
+
+static time_t h1os_time_get_build_epoch(void)
+{
+    static time_t s_build_epoch = 0;
+    if (s_build_epoch != 0) {
+        return s_build_epoch;
+    }
+
+    const char *date_str = __DATE__;
+    const char *time_str = __TIME__;
+
+    char month_str[4] = {0};
+    int day = 0, year = 0, hour = 0, min = 0, sec = 0;
+
+    if (sscanf(date_str, "%3s %d %d", month_str, &day, &year) == 3 &&
+        sscanf(time_str, "%d:%d:%d", &hour, &min, &sec) == 3) {
+        static const char *months[] = {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+        int month = 0;
+        for (int i = 0; i < 12; i++) {
+            if (strcmp(month_str, months[i]) == 0) {
+                month = i;
+                break;
+            }
+        }
+        struct tm btm = {0};
+        btm.tm_year = year - 1900;
+        btm.tm_mon  = month;
+        btm.tm_mday = day;
+        btm.tm_hour = hour;
+        btm.tm_min  = min;
+        btm.tm_sec  = sec;
+        btm.tm_isdst = -1;
+        s_build_epoch = mktime(&btm);
+    }
+    return s_build_epoch;
+}
+
+bool h1os_time_is_valid(void)
+{
+    if (!sub_rtc_is_oscillator_valid()) {
+        return false;
+    }
+
+    struct tm rtc_tm = {0};
+    if (sub_rtc_get_time(&rtc_tm) != ESP_OK) {
+        return false;
+    }
+
+    time_t rtc_epoch = mktime(&rtc_tm);
+    if (rtc_epoch == (time_t)-1) {
+        return false;
+    }
+
+    time_t build_epoch = h1os_time_get_build_epoch();
+    return (rtc_epoch >= build_epoch);
+}

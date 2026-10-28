@@ -83,7 +83,7 @@ void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t e
     h1os_time_get_formatted(H1OS_TIME_FMT_12H_MIN, time_str, sizeof(time_str));
 
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot_l, "Conf: %u%% (T:%u)",
+    lv_label_set_text_fmt(lbl_foot_l, "Conf %u%% • T:%u",
                           telem->trinode_confidence_pct,
                           telem->valid_trend);
     lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
