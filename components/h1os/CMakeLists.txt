@@ -79,12 +79,6 @@ idf_component_register(
 # Dynamic 1-BPP Typography Generation
 # -----------------------------------------------------------------------------
 
-# Resolve LVGL root directory for header include references
-idf_component_get_property(lvgl_dir lvgl__lvgl COMPONENT_DIR)
-if(NOT lvgl_dir)
-    idf_component_get_property(lvgl_dir lvgl COMPONENT_DIR)
-endif()
-
 # Point to vendored font assets self-contained within the component tools directory
 set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts")
 set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/generate_1bpp_fonts.py")
@@ -115,10 +109,9 @@ idf_build_get_property(python_bin PYTHON)
 add_custom_command(
     OUTPUT ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR}
     COMMAND "${python_bin}" "${FONT_GEN_SCRIPT}"
-            --lvgl-font-dir "${FONT_SRC_DIR}"
-            --lvgl-root "${lvgl_dir}"
+            --font-dir "${FONT_SRC_DIR}"
             --out-dir "${GEN_FONT_DIR}"
-            --all
+            --sizes 14 16 18 20 24 32
     DEPENDS "${FONT_GEN_SCRIPT}"
             "${FONT_SRC_DIR}/Montserrat-Bold.ttf"
             "${FONT_SRC_DIR}/Montserrat-Medium.ttf"

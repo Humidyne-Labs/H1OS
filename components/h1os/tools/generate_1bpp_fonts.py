@@ -12,9 +12,9 @@ Overview:
 Standard LVGL fonts use 4-bpp anti-aliasing. On 1-bit monochrome electrophoretic
 displays (EPD / E-Ink), anti-aliasing causes severe stroke erosion.
 
-This script leverages LVGL's bundled font sources (Montserrat-Medium, DejaVuSans,
-FontAwesome5) and their official license files to synthesize crisp 1-bit bilevel
-C font descriptors during build-time.
+This script leverages vendored font sources (Montserrat-Bold, Montserrat-Medium, FontAwesome5)
+and their official license files to synthesize crisp 1-bit bilevel C font descriptors
+during build-time.
 """
 
 import os
@@ -92,7 +92,7 @@ def generate_font(size: int, font_path: Path, fa_path: Path, output_file: Path, 
         return True
     return False
 
-def generate_header(out_dir: Path, montserrat_sizes, dejavu_sizes):
+def generate_header(out_dir: Path, montserrat_sizes):
     """Generate master h1os_fonts.h header file."""
     header_path = out_dir / "h1os_fonts.h"
     lines = [
@@ -132,75 +132,58 @@ def generate_header(out_dir: Path, montserrat_sizes, dejavu_sizes):
     header_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"[+] Successfully wrote {header_path.name}")
 
-def copy_licenses(lvgl_dir: Path, out_dir: Path):
+def copy_licenses(font_dir: Path, out_dir: Path):
     """Copy license files into the generated licenses folder."""
-    lic_src = lvgl_dir / "font_license"
+    lic_src = font_dir / "font_license"
     lic_dst = out_dir / "licenses"
     lic_dst.mkdir(parents=True, exist_ok=True)
 
     if (lic_src / "Montserrat" / "OFL.txt").is_file():
         shutil.copy2(lic_src / "Montserrat" / "OFL.txt", lic_dst / "Montserrat_OFL.txt")
-    if (lic_src / "DejaVuSans" / "LICENSE").is_file():
-        shutil.copy2(lic_src / "DejaVuSans" / "LICENSE", lic_dst / "DejaVuSans_LICENSE.txt")
     if (lic_src / "FontAwesome5" / "LICENSE.txt").is_file():
         shutil.copy2(lic_src / "FontAwesome5" / "LICENSE.txt", lic_dst / "FontAwesome5_LICENSE.txt")
+    elif (lic_src / "FontAwesome" / "LICENSE.txt").is_file():
+        shutil.copy2(lic_src / "FontAwesome" / "LICENSE.txt", lic_dst / "FontAwesome5_LICENSE.txt")
 
     readme = lic_dst / "README.md"
     readme.write_text(
         "# H1OS 1-BPP Typography Licenses\n\n"
         "This directory contains the licenses for fonts incorporated into H1OS:\n"
         "- **Montserrat-Bold / Montserrat-Medium**: Licensed under the SIL Open Font License (OFL).\n"
-        "- **DejaVuSans**: Licensed under the Bitstream Vera / Arev Fonts License.\n"
         "- **FontAwesome5**: Licensed under the Font Awesome Free License.\n",
         encoding="utf-8"
     )
     print(f"[+] Successfully copied font license files to {lic_dst}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for H1OS from LVGL font assets")
-    parser.add_argument("--lvgl-font-dir", type=str, required=True, help="Path to LVGL built_in_font directory")
-    parser.add_argument("--lvgl-root", type=str, default=None, help="Root path of LVGL component")
-    parser.add_argument("--bold-font", type=str, default=None, help="Explicit path to Montserrat-Bold.ttf")
+    default_font_dir = (Path(__file__).parent / "fonts").resolve()
+
+    parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for H1OS from vendored font assets")
+    parser.add_argument("--font-dir", type=str, default=str(default_font_dir), help="Path to font assets directory (contains TTF/WOFF fonts and licenses)")
     parser.add_argument("--out-dir", type=str, required=True, help="Target output directory")
-    parser.add_argument("--all", action="store_true", help="Generate all standard H1OS font sizes")
+    parser.add_argument("--sizes", type=int, nargs="+", default=[14, 16, 18, 20, 24, 32], help="Font pixel sizes to generate (default: 14 16 18 20 24 32)")
     args = parser.parse_args()
 
-    lvgl_dir = Path(args.lvgl_font_dir).resolve()
+    font_dir = Path(args.font_dir).resolve()
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    montserrat_ttf = lvgl_dir / "Montserrat-Medium.ttf"
-    fa_woff = lvgl_dir / "FontAwesome5-Solid+Brands+Regular.woff"
+    montserrat_bold_ttf = font_dir / "Montserrat-Bold.ttf"
+    montserrat_ttf = font_dir / "Montserrat-Medium.ttf"
+    fa_woff = font_dir / "FontAwesome5-Solid+Brands+Regular.woff"
 
-    if not montserrat_ttf.is_file():
-        print(f"[!] Could not locate {montserrat_ttf}")
+    # Prioritize Montserrat-Bold.ttf for high-contrast 1-bpp EPD rendering
+    if montserrat_bold_ttf.is_file():
+        font_for_montserrat = montserrat_bold_ttf
+        print(f"[+] Prioritizing Bold typography for EPD: {montserrat_bold_ttf}")
+    elif montserrat_ttf.is_file():
+        font_for_montserrat = montserrat_ttf
+        print(f"[*] Bold font not located, falling back to: {montserrat_ttf}")
+    else:
+        print(f"[!] Could not locate Montserrat-Bold.ttf or Montserrat-Medium.ttf in {font_dir}")
         sys.exit(1)
 
-    # Search for Montserrat-Bold.ttf for high-contrast 1-bpp EPD rendering across all sizes
-    montserrat_bold_ttf = None
-    if (lvgl_dir / "Montserrat-Bold.ttf").is_file():
-        montserrat_bold_ttf = (lvgl_dir / "Montserrat-Bold.ttf").resolve()
-    elif args.bold_font and Path(args.bold_font).is_file():
-        montserrat_bold_ttf = Path(args.bold_font).resolve()
-    elif args.lvgl_root:
-        cand = Path(args.lvgl_root).resolve() / "tests" / "src" / "test_files" / "fonts" / "Montserrat-Bold.ttf"
-        if cand.is_file():
-            montserrat_bold_ttf = cand
-    if not montserrat_bold_ttf:
-        try:
-            cand = lvgl_dir.parents[2] / "tests" / "src" / "test_files" / "fonts" / "Montserrat-Bold.ttf"
-            if cand.is_file():
-                montserrat_bold_ttf = cand
-        except IndexError:
-            pass
-
-    font_for_montserrat = montserrat_bold_ttf if (montserrat_bold_ttf and montserrat_bold_ttf.is_file()) else montserrat_ttf
-    if montserrat_bold_ttf and montserrat_bold_ttf.is_file():
-        print(f"[+] Prioritizing Bold typography for EPD: {montserrat_bold_ttf}")
-    else:
-        print(f"[*] Bold font not located, falling back to: {montserrat_ttf}")
-
-    montserrat_sizes = [14, 16, 18, 20, 24, 32]
+    montserrat_sizes = args.sizes
 
     # Generate Montserrat suite (all sizes bold with autohint-strong)
     for sz in montserrat_sizes:
@@ -211,10 +194,10 @@ def main():
             sys.exit(1)
 
     # Generate Master Header
-    generate_header(out_dir, montserrat_sizes, [])
+    generate_header(out_dir, montserrat_sizes)
 
     # Copy Licenses
-    copy_licenses(lvgl_dir, out_dir)
+    copy_licenses(font_dir, out_dir)
 
     print("\n[+] H1OS build-time typography generation complete.")
 
