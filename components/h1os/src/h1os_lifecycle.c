@@ -76,7 +76,11 @@ static void h1os_session_timeout_timer_cb(void *arg)
         h1os_shutdown();
         return;
     }
-    (void)h1os_sleep(sleep_sec);
+    esp_err_t err = h1os_sleep(sleep_sec);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "h1os_sleep failed (%s), forcing safe shutdown", esp_err_to_name(err));
+        h1os_shutdown();
+    }
 }
 
 /**
@@ -109,7 +113,10 @@ void h1os_reset_session_timer(void)
     }
 
     if (esp_timer_restart(s_session_timer, timeout_us) != ESP_OK) {
-        (void)esp_timer_start_once(s_session_timer, timeout_us);
+        esp_err_t start_err = esp_timer_start_once(s_session_timer, timeout_us);
+        if (start_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start session timer: %s", esp_err_to_name(start_err));
+        }
     }
     ESP_LOGD(TAG, "Interactive session timer reset (+%lu s)", (unsigned long)timeout_sec);
 }
@@ -165,9 +172,15 @@ static void h1os_quiesce_lvgl_pipeline(void)
 {
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
-        (void)h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
+        esp_err_t err = h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "h1os_lvgl_wait_idle warning: %s", esp_err_to_name(err));
+        }
     }
-    h1os_lvgl_stop();
+    esp_err_t err = h1os_lvgl_stop();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "h1os_lvgl_stop warning: %s", esp_err_to_name(err));
+    }
 }
 
 /**
@@ -270,24 +283,56 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
  *
  * @return Return value of type static orch_flow_type_t.
  */
-static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config)
+static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t *config, orch_flow_type_t *out_flow)
 {
+    if (out_flow == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     if (config != NULL) {
         s_app_lifecycle = *config;
     }
 
-    (void)sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
-
-    hal_io_early_init();
-
-    (void)hal_i2c_init();
-
-    /* Initialize PCF85063A RTC (12.5pF load cap, disable 32.768 kHz CLKOUT) and sync POSIX clock */
-    if (sub_rtc_init() == ESP_OK) {
-        (void)h1os_time_sync_rtc_to_system();
+    esp_err_t err = sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "sub_power_init_dfs failed: %s", esp_err_to_name(err));
+        return err;
     }
 
-    (void)sub_nvs_init();
+    err = hal_io_early_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "hal_io_early_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = hal_i2c_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "hal_i2c_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    /* Initialize PCF85063A RTC (12.5pF load cap, disable 32.768 kHz CLKOUT) */
+    err = sub_rtc_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "sub_rtc_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    /* Only sync POSIX system clock from RTC if the RTC oscillator is valid and running */
+    if (sub_rtc_is_oscillator_valid()) {
+        esp_err_t sync_err = h1os_time_sync_rtc_to_system();
+        if (sync_err != ESP_OK) {
+            ESP_LOGW(TAG, "h1os_time_sync_rtc_to_system non-fatal warning: %s", esp_err_to_name(sync_err));
+        }
+    } else {
+        ESP_LOGI(TAG, "RTC oscillator stopped / uninitialized; skipping system clock synchronization");
+    }
+
+    err = sub_nvs_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "sub_nvs_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
     /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
@@ -315,9 +360,14 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     }
 
     /* Call sub_power_init_ulp on all flows: loads ULP on cold boot, or accounts for final Flow B sleep slice on RTC overflow wake */
-    (void)sub_power_init_ulp(st->sample_interval_sec);
+    err = sub_power_init_ulp(st->sample_interval_sec);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "sub_power_init_ulp failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
-    return flow;
+    *out_flow = flow;
+    return ESP_OK;
 }
 
 /**
@@ -378,7 +428,12 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         }
     }
 
-    h1os_lvgl_init(is_wake);
+    esp_err_t err = h1os_lvgl_init(is_wake);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "h1os_lvgl_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     if (is_wake) {
         esp_err_t r_err = orch_display_sync_restore_to_framebuffer();
         if (r_err != ESP_OK) {
@@ -397,7 +452,10 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     /* Always clear any latched PCF85063A interrupt flags on Flow B entry */
     bool alarm_f = false, timer_f = false;
-    (void)sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
+    err = sub_rtc_get_and_clear_interrupts(&alarm_f, &timer_f);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to clear RTC interrupt flags (%s)", esp_err_to_name(err));
+    }
 
     portENTER_CRITICAL(&s_session_mux);
     s_session_running = !is_rtc_wake;
@@ -427,11 +485,18 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         h1os_lvgl_unlock();
     }
 
-    h1os_lvgl_start(5, 1);
+    err = h1os_lvgl_start(5, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "h1os_lvgl_start failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
     if (is_rtc_wake) {
         /* Wait on the event-driven LVGL idle semaphore for the updated screen frame to flush */
-        (void)h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
+        err = h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "h1os_lvgl_wait_idle warning: %s", esp_err_to_name(err));
+        }
         ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
         uint32_t sleep_sec = st->flow_b_period_sec;
         if (sleep_sec == 0) {
@@ -569,7 +634,12 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         return flow_err;
     }
 
-    orch_flow_type_t flow = h1os_early_system_bringup(config);
+    orch_flow_type_t flow = ORCH_FLOW_BOOT;
+    esp_err_t bringup_err = h1os_early_system_bringup(config, &flow);
+    if (bringup_err != ESP_OK) {
+        ESP_LOGE(TAG, "System bringup failed (%s)", esp_err_to_name(bringup_err));
+        return bringup_err;
+    }
 
     if (h1os_handle_non_ui_flows(flow)) {
         return ESP_OK;
@@ -690,7 +760,7 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
     s_session_running = false;
     portEXIT_CRITICAL(&s_session_mux);
     if (s_session_timer != NULL) {
-        (void)esp_timer_stop(s_session_timer);
+        esp_timer_stop(s_session_timer);
     }
 
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
@@ -720,10 +790,13 @@ static void execute_system_shutdown(bool force_clean_white)
     s_session_running = false;
     portEXIT_CRITICAL(&s_session_mux);
     if (s_session_timer != NULL) {
-        (void)esp_timer_stop(s_session_timer);
+        esp_timer_stop(s_session_timer);
     }
 
-    sub_rtc_cancel_countdown();
+    esp_err_t cancel_err = sub_rtc_cancel_countdown();
+    if (cancel_err != ESP_OK) {
+        ESP_LOGW(TAG, "sub_rtc_cancel_countdown failed: %s", esp_err_to_name(cancel_err));
+    }
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
     h1os_lvgl_lock(1000);
@@ -811,8 +884,7 @@ esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t
     if (out_samples == NULL || max_samples == 0 || out_count == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    (void)orch_state_get_ring_chronological(out_samples, max_samples, out_count);
-    return ESP_OK;
+    return orch_state_get_ring_chronological(out_samples, max_samples, out_count);
 }
 
 /**
