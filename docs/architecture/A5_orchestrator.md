@@ -150,13 +150,16 @@ bool  orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current
 - **ULP Sleep Gating:** The ULP Coprocessor is enabled **only** while the system is actively sleeping (`RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA = 1`). In Flow B, the dual-core Xtensa and LVGL have full ownership of all hardware; ULP GPIO wakeup is immediately disarmed upon wake.
 - **Hardware Countdown Timer Slicing (Midnight-Agnostic):**
   H1OS uses the PCF85063A **hardware countdown timer** (`Timer_val` Reg `0x10`, `Timer_mode` Reg `0x11`) in Pure Event Mode rather than competing internal/external timers.
-  - Given Flow A sample period $T_A$ (`sample_interval_sec`, default 60s) and Flow B refresh period $T_B$ (`flow_b_period_sec`, default 300s):
-    - $\text{full\_slices} = \lfloor T_B / T_A \rfloor$, $\text{remainder} = T_B \bmod T_A$, $\text{overflow} = \text{full\_slices} + (\text{remainder} > 0 ? 1 : 0)$.
-  - The PCF85063A countdown timer is armed for $T_A$ (or `remainder` if $\text{full\_slices} == 0$).
-  - On each `/INT` pulse on `GPIO 5`, the ULP increments `slice_counter`:
-    - While `slice_counter < overflow_limit`, ULP sets `ULP_DISPATCH_SENSOR_SAMPLE` and wakes Core 0 into `bsp_wake_stub()`. If `slice_counter == overflow_limit - 1` and `remainder > 0`, `bsp_wake_stub()` rearms PCF85063A for `remainder` seconds; otherwise it clears `TF` in `Control_2` (`0x07`) so the periodic countdown continues seamlessly.
-    - When `slice_counter == overflow_limit`, ULP resets `slice_counter = 0`, sets `ULP_DISPATCH_MAIN_WAKE`, and boots the main CPU into Flow B.
-  - Because a single external quartz countdown timer drives both Flow A slices and Flow B wakeups, **Zero-Hour timer collisions are physically impossible**.
+  - **Timing Law & Parameter Bounds:**
+    - **Flow A ($T_A$):** `H1OS_FLOW_A_MIN_SEC` ($60\text{s}$) to `H1OS_FLOW_A_MAX_SEC` ($14,400\text{s}$ / $4\text{ hours}$). Durations $> 255\text{s}$ must be exact multiples of 60 seconds to align with the hardware prescaler (`TIMER_CLK_1_60_HZ`).
+    - **Flow B ($T_B$):** `H1OS_FLOW_B_MIN_SEC` ($300\text{s}$ / $5\text{ min}$) to `H1OS_FLOW_B_MAX_SEC` ($86,400\text{s}$ / $24\text{ hours}$). Must be strictly greater than $T_A$.
+    - **Remainder Floor:** `H1OS_FLOW_REMAINDER_MIN_SEC` ($60\text{s}$). If $\text{remainder} = T_B \bmod T_A > 0$, it must be $\ge 60\text{s}$ to justify the re-arm cycle.
+  - **Slicing Equation & Silicon Auto-Reload:**
+    - $\text{full\_slices} = \lfloor T_B / T_A \rfloor$, $\text{remainder} = T_B \bmod T_A$, $\text{overflow} = \text{full\_slices} + (\text{remainder} > 0 \mathbin{?} 1 : 0)$.
+    - The PCF85063A countdown timer is armed for $T_A$ in periodic pulse mode (`TIMER_PULSE_MODE_BIT`).
+    - When $\text{remainder} == 0$, the timer **auto-reloads continuously in silicon** without software re-arming, accumulating $0.00\text{ ms}$ of compounding execution drift.
+    - If $\text{remainder} > 0$, on slice $\text{overflow} - 1$, `bsp_wake_stub()` re-arms the hardware timer for $\text{remainder}$ seconds via `rtc_rearm_countdown_stub()`.
+  - **Single Variable Authority:** All time logic across the orchestrator, lifecycle, and power subsystems derives strictly from `st->sample_interval_sec` ($T_A$) and `st->flow_b_period_sec` ($T_B$) in RTC Slow Memory. No duplicate file-static variables or fallback constants are permitted.
 
 #### Flow B Wake Profiles & Lifecycle Governance
 1. **User Interactive Wake (`ULP_DISPATCH_MAIN_WAKE` from Button Tap):**

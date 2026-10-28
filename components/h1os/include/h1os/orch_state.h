@@ -60,11 +60,11 @@ typedef enum {
  * @brief SHTC3 sensor acquisition error codes reported by wake stub.
  */
 typedef enum {
-    ORCH_SENSOR_ERR_NONE         = 0, /**< Normal operation: reading acknowledged and verified. */
+    ORCH_SENSOR_ERR_NONE         = 0, /**< Normal operation: reading acknowledged and verified.  */
     ORCH_SENSOR_ERR_NACK_WAKE    = 1, /**< SHTC3 wake command (0x3517) NACKed.                   */
     ORCH_SENSOR_ERR_NACK_MEASURE = 2, /**< SHTC3 measurement command (0x7866) NACKed.            */
     ORCH_SENSOR_ERR_NACK_ADDR_RD = 3, /**< SHTC3 read address (0x71) NACKed.                     */
-    ORCH_SENSOR_ERR_CRC_FAIL     = 4, /**< CRC-8 checksum verification failed on received bytes.  */
+    ORCH_SENSOR_ERR_CRC_FAIL     = 4, /**< CRC-8 checksum verification failed on received bytes. */
     ORCH_SENSOR_ERR_BUS_STUCK    = 5, /**< SDA or SCL line held low prior to starting transfer.  */
     ORCH_SENSOR_ERR_NACK_SLEEP   = 6, /**< SHTC3 sleep command (0xB098) NACKed.                  */
     ORCH_SENSOR_ERR_SCL_STUCK    = 7  /**< SCL clock line held low beyond clock-stretch timeout. */

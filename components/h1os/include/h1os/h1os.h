@@ -34,6 +34,23 @@ extern "C" {
 /** @} */
 
 /**
+ * @name Slicing & Flow Period Boundaries
+ * @brief Authoritative limits and time unit conversion primitives for Flow A and Flow B.
+ * @{
+ */
+#define H1OS_FLOW_A_MIN_SEC         60U        /**< 1 minute minimum Flow A period.         */
+#define H1OS_FLOW_A_MAX_SEC         14400U     /**< 4 hours maximum Flow A period.          */
+#define H1OS_FLOW_B_MIN_SEC         300U       /**< 5 minutes minimum Flow B period.        */
+#define H1OS_FLOW_B_MAX_SEC         86400U     /**< 24 hours maximum Flow B period.         */
+#define H1OS_FLOW_REMAINDER_MIN_SEC 60U        /**< 60 seconds minimum remainder slice.     */
+
+#define H1OS_MIN_TO_SEC(m)          ((uint32_t)(m) * 60U)
+#define H1OS_HOURS_TO_SEC(h)        ((uint32_t)(h) * 3600U)
+#define H1OS_SEC_TO_MIN(s)          ((uint32_t)(s) / 60U)
+#define H1OS_SEC_TO_HOURS(s)        ((uint32_t)(s) / 3600U)
+/** @} */
+
+/**
  * @brief Default compound literal macro for standard lifecycle session configuration.
  */
 #define H1OS_LIFECYCLE_DEFAULT_CONFIG()                                    \
@@ -213,6 +230,25 @@ static inline const char *h1os_get_version(void)
  *   - ESP_FAIL: Hardware initialization failure.
  */
 esp_err_t h1os_start(const h1os_lifecycle_t *config);
+
+/**
+ * @brief Dynamically configure Flow A and Flow B sleep intervals at runtime.
+ *
+ * Enforces all silicon constraints, ordering invariants, and remainder slice floors.
+ * Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown
+ * timer with the new Flow A cadence.
+ *
+ * @param[in] flow_a_sec Headless sensor acquisition interval (60s .. 14400s / 4h).
+ *                       Must be an exact multiple of 60 seconds if > 255s.
+ * @param[in] flow_b_sec Display refresh and network wake interval (300s .. 86400s / 24h).
+ *                       Must be strictly greater than flow_a_sec.
+ *                       Any remainder (flow_b_sec % flow_a_sec) must be >= 60 seconds.
+ *
+ * @return
+ *   - ESP_OK: Flow periods validated, committed to RTC Slow Memory, and hardware timer armed.
+ *   - ESP_ERR_INVALID_ARG: Any boundary, prescaler, ordering, or remainder invariant violated.
+ */
+esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec);
 
 /**
  * @brief Set audio subsystem output volume percentage.

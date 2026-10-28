@@ -128,6 +128,11 @@ To prevent unintended audio chirps and spurious screen skipping while deep sleep
 - **User Wakes (Cold Boot or Tactile Button):**
   - Audio subsystem initializes only when `is_user_wake` is true, setting volume strictly from `presentation.volume_pct`.
 
-### 3.3 Strict Lifecycle Contract Validation
-- Silent fallback magic numbers (`300s`, `120s`, `30s`) have been removed from `h1os_lifecycle.c`.
-- If an unconfigured duration or timeout of `0` is passed to `h1os_sleep()`, `inactivity_timeout_sec`, or `flow_b_period_sec`, the system logs an explicit `ESP_LOGE` error detailing the contract violation and triggers clean shutdown rather than silently injecting synthetic delays.
+### 3.3 Strict Lifecycle Contract Validation & Timing Parameter Bounds
+- **Single Variable Authority:** All time logic across all layers derives strictly from `st->sample_interval_sec` (Flow A) and `st->flow_b_period_sec` (Flow B) in RTC Slow Memory. Duplicate file-static variables and ternary fallbacks have been removed.
+- **Timing Bounds Law:**
+  - Flow A (`sample_interval_sec`): $60\text{s} \le A \le 14,400\text{s}$ ($4\text{ hours}$). Must be an exact multiple of $60\text{s}$ if $> 255\text{s}$.
+  - Flow B (`flow_b_period_sec`): $300\text{s} \le B \le 86,400\text{s}$ ($24\text{ hours}$). Must be strictly greater than $A$.
+  - Remainder Floor: If $\text{remainder} = B \bmod A > 0$, it must be $\ge 60\text{s}$ to justify the re-arm cycle.
+- **Unified Setter Enforcement:** Both `h1os_start()` and `h1os_set_flow_periods()` funnel strictly through `h1os_set_flow_periods_internal()`. If parameters violate any bound or invariant, the call fails immediately with `ESP_ERR_INVALID_ARG`.
+- Silent fallback magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.

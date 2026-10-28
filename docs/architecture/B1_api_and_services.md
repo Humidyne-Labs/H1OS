@@ -100,14 +100,27 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config);
     - Initializes audio codec only on user button wakes (`button_woke == true`).
     - Invokes `on_wake()`, starts Core 1 LVGL task (`h1os_lvgl_start(5, 1)`), and either returns to sleep immediately (unattended RTC refresh) or spawns `h1os_session_monitor_task` (user interactive wake).
 
-### 3.2 `h1os_sleep()`
+### 3.2 `h1os_set_flow_periods()`
+Dynamically update Flow A (headless sample) and Flow B (display/cloud wake) intervals at runtime:
+```c
+esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec);
+```
+- **Authoritative Constants & Range:**
+  - `H1OS_FLOW_A_MIN_SEC` ($60\text{s}$) .. `H1OS_FLOW_A_MAX_SEC` ($14,400\text{s}$ / $4\text{ hours}$).
+  - `H1OS_FLOW_B_MIN_SEC` ($300\text{s}$ / $5\text{ min}$) .. `H1OS_FLOW_B_MAX_SEC` ($86,400\text{s}$ / $24\text{ hours}$).
+  - `H1OS_FLOW_REMAINDER_MIN_SEC` ($60\text{s}$ minimum overlap remainder floor).
+- **Conversion Macros:** `H1OS_MIN_TO_SEC(m)`, `H1OS_HOURS_TO_SEC(h)`, `H1OS_SEC_TO_MIN(s)`, `H1OS_SEC_TO_HOURS(s)`.
+- **Validation Law:** Fails immediately with `ESP_ERR_INVALID_ARG` if out of bounds, if prescaler is unaligned ($> 255\text{s}$ not divisible by 60), if $B \le A$, or if $\text{remainder} > 0 \land \text{remainder} < 60\text{s}$.
+- Both `h1os_start()` and `h1os_set_flow_periods()` funnel through the single internal setter `h1os_set_flow_periods_internal()`.
+
+### 3.3 `h1os_sleep()`
 Explicit command to enter deep sleep:
 ```c
 esp_err_t h1os_sleep(uint32_t sleep_sec);
 ```
 - Invokes `on_pre_sleep()`, drains and stops the Core 1 LVGL task (`h1os_quiesce_lvgl_pipeline()`), and executes `orch_flow_transition_to_sleep(sleep_sec)`.
 
-### 3.3 `h1os_shutdown()` & `h1os_shutdown_for_storage()`
+### 3.4 `h1os_shutdown()` & `h1os_shutdown_for_storage()`
 Orderly power cut:
 ```c
 void h1os_shutdown(void);

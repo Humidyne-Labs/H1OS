@@ -300,12 +300,6 @@ static orch_flow_type_t h1os_early_system_bringup(const h1os_lifecycle_t *config
     }
 
     volatile orch_persisted_state_t *st = orch_state_get();
-    if (s_app_lifecycle.session.flow_a_period_sec > 0) {
-        st->sample_interval_sec = s_app_lifecycle.session.flow_a_period_sec;
-    }
-    if (s_app_lifecycle.session.flow_b_period_sec > 0) {
-        st->flow_b_period_sec = s_app_lifecycle.session.flow_b_period_sec;
-    }
 
     ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]",
              H1OS_NAME,
@@ -467,10 +461,112 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
  *
  * @return ESP_OK on success, or an error code.
  */
+/**
+ * @brief Internal validator and atomic setter for Flow A and Flow B periods.
+ *
+ * Enforces all silicon constraints, ordering invariants, and remainder slice floors.
+ */
+static esp_err_t h1os_set_flow_periods_internal(uint32_t flow_a_sec, uint32_t flow_b_sec)
+{
+    /* Invariant 1: Flow A bounds (60s .. 14400s / 4h) */
+    if (flow_a_sec < H1OS_FLOW_A_MIN_SEC || flow_a_sec > H1OS_FLOW_A_MAX_SEC) {
+        ESP_LOGE(TAG, "Flow A interval %lu s out of bounds [%u..%u]",
+                 (unsigned long)flow_a_sec, H1OS_FLOW_A_MIN_SEC, H1OS_FLOW_A_MAX_SEC);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Invariant 2: Flow B bounds (300s .. 86400s / 24h) */
+    if (flow_b_sec < H1OS_FLOW_B_MIN_SEC || flow_b_sec > H1OS_FLOW_B_MAX_SEC) {
+        ESP_LOGE(TAG, "Flow B interval %lu s out of bounds [%u..%u]",
+                 (unsigned long)flow_b_sec, H1OS_FLOW_B_MIN_SEC, H1OS_FLOW_B_MAX_SEC);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Invariant 3: Prescaler whole-minute alignment for Flow A (> 255s uses 1/60 Hz clock) */
+    if (flow_a_sec > 255U && (flow_a_sec % 60U != 0U)) {
+        ESP_LOGE(TAG, "Flow A interval %lu s > 255s must be an exact multiple of 60 seconds",
+                 (unsigned long)flow_a_sec);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Invariant 4: Ordering (Flow B must be strictly greater than Flow A) */
+    if (flow_b_sec <= flow_a_sec) {
+        ESP_LOGE(TAG, "Flow B (%lu s) must be strictly greater than Flow A (%lu s)",
+                 (unsigned long)flow_b_sec, (unsigned long)flow_a_sec);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint32_t full_slices = flow_b_sec / flow_a_sec;
+    uint32_t remainder   = flow_b_sec % flow_a_sec;
+
+    /* Invariant 5: Remainder floor (remainder must be 0 or >= 60s) */
+    if (remainder > 0U && remainder < H1OS_FLOW_REMAINDER_MIN_SEC) {
+        ESP_LOGE(TAG, "Remainder slice duration %lu s is below minimum floor (%u s)",
+                 (unsigned long)remainder, H1OS_FLOW_REMAINDER_MIN_SEC);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Invariant 6: Remainder prescaler whole-minute alignment (> 255s) */
+    if (remainder > 255U && (remainder % 60U != 0U)) {
+        ESP_LOGE(TAG, "Remainder slice %lu s > 255s must be an exact multiple of 60 seconds",
+                 (unsigned long)remainder);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint32_t overflow = full_slices + (remainder > 0U ? 1U : 0U);
+    if (overflow < 2U) {
+        ESP_LOGE(TAG, "Slicing overflow %lu < 2; Flow A must execute at least once before Flow B",
+                 (unsigned long)overflow);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Atomic commit to RTC Slow Memory */
+    volatile orch_persisted_state_t *st = orch_state_get();
+    st->sample_interval_sec = flow_a_sec;
+    st->flow_b_period_sec   = flow_b_sec;
+    asm volatile("memw" ::: "memory");
+
+    /* Cache in active session descriptor */
+    s_app_lifecycle.session.flow_a_period_sec = flow_a_sec;
+    s_app_lifecycle.session.flow_b_period_sec = flow_b_sec;
+
+    /* Synchronize ULP and power subsystem */
+    sub_power_set_sleep_slices(flow_a_sec, flow_b_sec, overflow, remainder);
+    ulp_slice_counter = 0;
+    asm volatile("memw" ::: "memory");
+
+    ESP_LOGI(TAG, "Configured flow periods: Flow A = %lu s, Flow B = %lu s (Slices=%lu, Remainder=%lu s)",
+             (unsigned long)flow_a_sec, (unsigned long)flow_b_sec,
+             (unsigned long)overflow, (unsigned long)remainder);
+
+    return ESP_OK;
+}
+
+esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec)
+{
+    esp_err_t err = h1os_set_flow_periods_internal(flow_a_sec, flow_b_sec);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    /* Immediately arm PCF85063A hardware countdown timer with the new Flow A duration */
+    return sub_rtc_arm_countdown(flow_a_sec);
+}
+
 esp_err_t h1os_start(const h1os_lifecycle_t *config)
 {
     if (config == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Validate and commit flow periods through the single internal setter */
+    esp_err_t flow_err = h1os_set_flow_periods_internal(
+        config->session.flow_a_period_sec,
+        config->session.flow_b_period_sec
+    );
+    if (flow_err != ESP_OK) {
+        ESP_LOGE(TAG, "Fatal lifecycle configuration: flow periods failed validation (%s)", esp_err_to_name(flow_err));
+        return flow_err;
     }
 
     orch_flow_type_t flow = h1os_early_system_bringup(config);
@@ -501,54 +597,54 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
     volatile orch_persisted_state_t *st = orch_state_get();
 
     if (ret == ESP_OK) {
-        out_telemetry->ambient_temp_c = t;
-        out_telemetry->ambient_temp_f = H1OS_CELSIUS_TO_FAHRENHEIT(t);
-        out_telemetry->ambient_temp_k = H1OS_CELSIUS_TO_KELVIN(t);
-        out_telemetry->ambient_rh_pct = rh;
-        out_telemetry->dew_point_c = dew;
-        out_telemetry->dew_point_f = H1OS_CELSIUS_TO_FAHRENHEIT(dew);
-        out_telemetry->dew_point_k = H1OS_CELSIUS_TO_KELVIN(dew);
-        out_telemetry->vapor_pressure_hpa = st->vapor_pressure_hpa;
+        out_telemetry->ambient_temp_c       = t;
+        out_telemetry->ambient_temp_f       = H1OS_CELSIUS_TO_FAHRENHEIT(t);
+        out_telemetry->ambient_temp_k       = H1OS_CELSIUS_TO_KELVIN(t);
+        out_telemetry->ambient_rh_pct       = rh;
+        out_telemetry->dew_point_c          = dew;
+        out_telemetry->dew_point_f          = H1OS_CELSIUS_TO_FAHRENHEIT(dew);
+        out_telemetry->dew_point_k          = H1OS_CELSIUS_TO_KELVIN(dew);
+        out_telemetry->vapor_pressure_hpa   = st->vapor_pressure_hpa;
         out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
-        out_telemetry->absolute_humidity_g = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
+        out_telemetry->absolute_humidity_g  = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
-    out_telemetry->window_low_c = (float)st->window_low_temp_centi_c / 100.0f;
-    out_telemetry->window_high_c = (float)st->window_high_temp_centi_c / 100.0f;
-    out_telemetry->window_avg_shtc3_c = st->window_avg_shtc3_c;
-    out_telemetry->window_avg_die_c = st->window_avg_die_c;
-    out_telemetry->temp_historical_c = st->temp_historical_c;
-    out_telemetry->rh_historical_pct = st->rh_historical_pct;
-    out_telemetry->trinode_temp_c = st->trinode_temp_c;
-    out_telemetry->trinode_delta_c = st->trinode_delta_c;
+    out_telemetry->window_low_c           = (float)st->window_low_temp_centi_c / 100.0f;
+    out_telemetry->window_high_c          = (float)st->window_high_temp_centi_c / 100.0f;
+    out_telemetry->window_avg_shtc3_c     = st->window_avg_shtc3_c;
+    out_telemetry->window_avg_die_c       = st->window_avg_die_c;
+    out_telemetry->temp_historical_c      = st->temp_historical_c;
+    out_telemetry->rh_historical_pct      = st->rh_historical_pct;
+    out_telemetry->trinode_temp_c         = st->trinode_temp_c;
+    out_telemetry->trinode_delta_c        = st->trinode_delta_c;
     out_telemetry->trinode_confidence_pct = st->trinode_confidence_pct;
-    out_telemetry->valid_trend = st->valid_trend;
-    out_telemetry->epd_glass_temp_c = (float)st->last_glass_temp_centi_c / 100.0f;
+    out_telemetry->valid_trend            = st->valid_trend;
+    out_telemetry->epd_glass_temp_c       = (float)st->last_glass_temp_centi_c / 100.0f;
 
     orch_tri_node_sample_t latest_samp = {0};
     if (orch_state_get_latest_sample(&latest_samp)) {
         out_telemetry->raw_shtc3_temp_c = (float)latest_samp.shtc3_temp_centi_c / 100.0f;
-        out_telemetry->mcu_die_temp_c = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
+        out_telemetry->mcu_die_temp_c   = (float)latest_samp.mcu_tsens_centi_c / 100.0f;
     } else {
         out_telemetry->raw_shtc3_temp_c = t;
-        out_telemetry->mcu_die_temp_c = st->window_avg_die_c;
+        out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
     out_telemetry->sample_count = st->total_samples;
-    out_telemetry->sensor_fail_count = st->sensor_fail_count;
-    out_telemetry->last_sensor_error = st->last_sensor_error;
+    out_telemetry->sensor_fail_count  = st->sensor_fail_count;
+    out_telemetry->last_sensor_error  = st->last_sensor_error;
     out_telemetry->is_rh_alert_active = ((st->flags & ORCH_FLAG_RH_ALERT_ACTIVE) != 0);
-    out_telemetry->flow_a_period_sec = st->sample_interval_sec;
-    out_telemetry->flow_b_period_sec = st->flow_b_period_sec;
+    out_telemetry->flow_a_period_sec  = st->sample_interval_sec;
+    out_telemetry->flow_b_period_sec  = st->flow_b_period_sec;
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
     h1os_battery_state_t bat_state = H1OS_BATTERY_DISCHARGING;
     if (sub_power_get_battery_status(&vbat_mv, &vbat_pct, &bat_state) == ESP_OK) {
-        out_telemetry->battery_mv = vbat_mv;
+        out_telemetry->battery_mv      = vbat_mv;
         out_telemetry->battery_percent = vbat_pct;
-        out_telemetry->is_usb_powered = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
-        out_telemetry->battery_state = bat_state;
-        st->last_vbat_mv = vbat_mv;
+        out_telemetry->is_usb_powered  = (bat_state == H1OS_BATTERY_CHARGED || sub_power_connected_usb());
+        out_telemetry->battery_state   = bat_state;
+        st->last_vbat_mv               = vbat_mv;
         if (!out_telemetry->is_usb_powered && (st->boot_vbat_mv == 0 || vbat_mv > st->boot_vbat_mv)) {
             st->boot_vbat_mv = vbat_mv;
         }

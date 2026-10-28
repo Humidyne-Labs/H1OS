@@ -245,13 +245,13 @@ static time_t h1os_time_get_build_epoch(void)
             }
         }
         struct tm btm = {0};
-        btm.tm_year = year - 1900;
-        btm.tm_mon  = month;
-        btm.tm_mday = day;
-        btm.tm_hour = hour;
-        btm.tm_min  = min;
-        btm.tm_sec  = sec;
-        btm.tm_isdst = -1;
+        btm.tm_year   = year - 1900;
+        btm.tm_mon    = month;
+        btm.tm_mday   = day;
+        btm.tm_hour   = hour;
+        btm.tm_min    = min;
+        btm.tm_sec    = sec;
+        btm.tm_isdst  = -1;
         s_build_epoch = mktime(&btm);
     }
     return s_build_epoch;

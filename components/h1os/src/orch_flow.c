@@ -383,9 +383,10 @@ static void orch_flow_quiesce_peripherals(void)
  */
 static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 {
+    (void)sleep_sec;
     volatile orch_persisted_state_t *st = orch_state_get();
     uint32_t flow_a_sec = st->sample_interval_sec;
-    uint32_t flow_b_sec = (sleep_sec > 0) ? sleep_sec : st->flow_b_period_sec;
+    uint32_t flow_b_sec = st->flow_b_period_sec;
 
     if (flow_a_sec == 0 || flow_b_sec == 0) {
         ESP_LOGE(TAG, "Cannot execute sleep: unconfigured flow periods (flow_a=%lu, flow_b=%lu)",
@@ -433,18 +434,21 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
 /**
  * @brief Execute coordinated sleep transition sequence to deep sleep.
  *
- * @param[in]    sleep_sec       Sleep duration in seconds.
+ * @param[in]    sleep_sec       Sleep duration in seconds (0 = use active flow_b_period_sec).
  *
  * @return ESP_OK on success.
  */
 esp_err_t orch_flow_transition_to_sleep(uint32_t sleep_sec)
 {
-    if (sleep_sec == 0) {
-        ESP_LOGE(TAG, "Lifecycle error: sleep_sec is 0. Aborting sleep transition.");
-        return ESP_ERR_INVALID_ARG;
+    (void)sleep_sec;
+    volatile orch_persisted_state_t *st = orch_state_get();
+    uint32_t flow_b_sec = st->flow_b_period_sec;
+    if (flow_b_sec == 0) {
+        ESP_LOGE(TAG, "Lifecycle error: flow_b_period_sec is 0. Aborting sleep transition.");
+        return ESP_ERR_INVALID_STATE;
     }
 
-    ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)sleep_sec);
+    ESP_LOGI(TAG, "Sleep transition sequence starting (%lu sec)", (unsigned long)flow_b_sec);
     orch_flow_quiesce_peripherals();
-    return orch_flow_execute_sleep(sleep_sec);
+    return orch_flow_execute_sleep(flow_b_sec);
 }

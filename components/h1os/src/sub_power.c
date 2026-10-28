@@ -50,11 +50,6 @@ static adc_cali_handle_t s_cali_handle        = NULL;
 
 static bool s_cali_valid = false;
 
-static uint32_t s_flow_a_sec     = 0;
-static uint32_t s_flow_b_sec     = 0;
-static uint32_t s_overflow_limit = 0;
-static uint32_t s_remainder_sec  = 0;
-
 static const struct {
     uint16_t mv;
     uint16_t soc_x10;
@@ -396,10 +391,10 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
  */
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 {
-    s_flow_a_sec     = flow_a_sec;
-    s_flow_b_sec     = flow_b_sec;
-    s_overflow_limit = overflow;
-    s_remainder_sec  = remainder_sec;
+    (void)flow_a_sec;
+    (void)flow_b_sec;
+    ulp_overflow_limit = overflow;
+    ulp_remainder_sec  = remainder_sec;
 }
 
 /**
@@ -431,10 +426,10 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         sub_power_init();
     }
 
-    uint32_t full_slices = (s_flow_a_sec > 0) ? (s_flow_b_sec / s_flow_a_sec) : 0;
+    uint32_t flow_a_sec = st->sample_interval_sec;
+    uint32_t flow_b_sec = st->flow_b_period_sec;
+    uint32_t full_slices = (flow_a_sec > 0) ? (flow_b_sec / flow_a_sec) : 0;
 
-    ulp_overflow_limit = s_overflow_limit;
-    ulp_remainder_sec  = s_remainder_sec;
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         ulp_slice_counter = 0;
     }
@@ -448,11 +443,11 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
              "Event Mode Slicing [%s]: Tick=%lus, Target=%lus -> FullSlices=%lu, Remainder=%lus -> "
              "TotalOverflowLimit=%lu (SliceAcc=%lu, USB=%lu)",
              (mode == SUB_POWER_SLEEP_FULL_CYCLE) ? "FULL_CYCLE" : "FLOW_A_BURST",
-             (unsigned long)s_flow_a_sec,
-             (unsigned long)s_flow_b_sec,
+             (unsigned long)flow_a_sec,
+             (unsigned long)flow_b_sec,
              (unsigned long)full_slices,
-             (unsigned long)s_remainder_sec,
-             (unsigned long)s_overflow_limit,
+             (unsigned long)ulp_remainder_sec,
+             (unsigned long)ulp_overflow_limit,
              (unsigned long)ulp_slice_counter,
              (unsigned long)ulp_usb_connected);
 
@@ -506,8 +501,8 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
                     (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 5)),
                     (unsigned long)REG_READ(RTC_GPIO_PIN0_REG + (4 * 18)));
     ESP_LOGI(TAG, "Entering deep sleep in Pure Event Mode (Timer: PCF85063A %lus pulse, Slices: %lu, Wake: ULP)...",
-                    (unsigned long)s_flow_a_sec,
-                    (unsigned long)s_overflow_limit);
+                    (unsigned long)flow_a_sec,
+                    (unsigned long)ulp_overflow_limit);
 
     /* Clear latched status and arm ULP GPIO wakeup immediately prior to sleep entry */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
