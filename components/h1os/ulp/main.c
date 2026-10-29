@@ -202,12 +202,18 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
 {
     bool wake_main = false;
 
-    /* 1. Critical battery brownout guard */
+    /* 1. Critical battery brownout guard (requires 2 consecutive samples to reject ADC noise) */
+    static uint32_t s_low_vbat_count = 0;
     if (!usb_connected && (vbat_mv >= 100 && vbat_mv < 3250)) {
-        last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
-        last_wake_btn   = H1OS_WAKE_BTN_NONE;
-        dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
-        wake_main       = true;
+        s_low_vbat_count++;
+        if (s_low_vbat_count >= 2) {
+            last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
+            last_wake_btn   = H1OS_WAKE_BTN_NONE;
+            dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
+            wake_main       = true;
+        }
+    } else {
+        s_low_vbat_count = 0;
     }
 
     /* 2. Tactile button evaluation (BOOT0 = GPIO 0, POWER = GPIO 18) */
@@ -329,8 +335,7 @@ int main(void)
     }
 
     if (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
-        /* Main processor is actively running; disarm ULP GPIO wake to prevent wake storm */
-        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        /* Main processor is actively entering sleep; clear trigger latch only and halt, keeping GPIO wake enabled */
         ulp_clear_gpio_wakeup_latch();
         ulp_riscv_halt();
         return 0;

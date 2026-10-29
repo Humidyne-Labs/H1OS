@@ -16,7 +16,9 @@
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_rom_sys.h"
+#include "esp_attr.h"
 #include "esp_sleep.h"
+#include "h1os/orch_state.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -369,8 +371,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
     return ESP_OK;
 }
 
-static uint32_t s_cached_flow_a_sec = 0;
-static uint32_t s_cached_flow_b_sec = 0;
+RTC_DATA_ATTR static uint32_t s_cached_flow_a_sec = 0;
+RTC_DATA_ATTR static uint32_t s_cached_flow_b_sec = 0;
 
 /**
  * @brief Configure ULP slice parameters prior to entering deep sleep.
@@ -408,6 +410,12 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         (void)sub_power_init();
     }
 
+    if (s_cached_flow_a_sec == 0U) {
+        s_cached_flow_a_sec = orch_state_get()->sample_interval_sec;
+    }
+    if (s_cached_flow_b_sec == 0U) {
+        s_cached_flow_b_sec = orch_state_get()->flow_b_period_sec;
+    }
     uint32_t flow_a_sec  = (sleep_seconds > 0U) ? sleep_seconds : s_cached_flow_a_sec;
     uint32_t flow_b_sec  = s_cached_flow_b_sec;
     uint32_t full_slices = (flow_a_sec > 0U) ? (flow_b_sec / flow_a_sec) : 0U;
@@ -483,13 +491,32 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
                     (unsigned long)flow_a_sec,
                     (unsigned long)ulp_overflow_limit);
 
+    /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection (PIT-02 / PIT-03) */
+    CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
+    asm volatile("memw" ::: "memory");
+
+    SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
+                      RTC_CNTL_SLP_REJECT_INT_CLR |
+                          RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                          RTC_CNTL_COCPU_INT_CLR |
+                          RTC_CNTL_COCPU_TRAP_INT_CLR |
+                          RTC_CNTL_ULP_CP_INT_CLR);
+    asm volatile("memw" ::: "memory");
+
+    REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
+    asm volatile("memw" ::: "memory");
+
     /* Clear latched status and arm ULP GPIO wakeup immediately prior to sleep entry */
     REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
-    REG_WRITE(RTC_CNTL_INT_CLR_REG, RTC_CNTL_COCPU_INT_CLR | RTC_CNTL_COCPU_TRAP_INT_CLR | RTC_CNTL_ULP_CP_INT_CLR);
+    asm volatile("memw" ::: "memory");
+
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    asm volatile("memw" ::: "memory");
     esp_rom_delay_us(120);
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_CLR);
+    asm volatile("memw" ::: "memory");
     SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    asm volatile("memw" ::: "memory");
     esp_rom_delay_us(120);
 
     esp_deep_sleep_start();

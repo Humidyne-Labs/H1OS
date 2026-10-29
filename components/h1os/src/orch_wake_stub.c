@@ -442,6 +442,24 @@ void RTC_IRAM_ATTR bsp_wake_stub(void)
     uint32_t cause = esp_wake_stub_get_wakeup_cause();
 
     if (ulp_dispatch_reason != ULP_DISPATCH_SENSOR_SAMPLE && cause != TIMER_EXPIRE) {
+        /* Clean up ULP and RTC controller interrupt flags to prevent sleep rejection when booting main */
+        CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
+        rtc_reg_barrier();
+
+        SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
+                          RTC_CNTL_SLP_REJECT_INT_CLR |
+                              RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                              RTC_CNTL_COCPU_INT_CLR |
+                              RTC_CNTL_COCPU_TRAP_INT_CLR |
+                              RTC_CNTL_ULP_CP_INT_CLR);
+        rtc_reg_barrier();
+
+        REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
+        rtc_reg_barrier();
+
+        REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+        rtc_reg_barrier();
+
         rtc_delay_us_exact(5);
         esp_default_wake_deep_sleep();
         return;
