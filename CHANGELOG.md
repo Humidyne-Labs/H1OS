@@ -39,6 +39,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🛡️ Fixed & Hardened (`H1OS-STD-001` Codebase Review & Invariant Audit)
 
+* **Deep Sleep Wake Failure After First Flow B Cycle (`PIT-02` / `PIT-03` / `S0`)** (`sub_power.c`, `orch_wake_stub.c`, `h1os_lifecycle.c`, `ulp/main.c`):
+  * Resolved a defect where the device accepted tactile button wakes during the first Flow B period (0..300 s) but became unresponsive to both the PCF85063A countdown and the `GPIO 0` / `GPIO 18` buttons after the first scheduled Flow B wake.
+  * **Root Cause 1 (Latched `RTC_CNTL_SW_CPU_INT`):** The ULP wakes the main CPU by asserting `RTC_CNTL_SW_CPU_INT`. The Flow A wake stub cleared it, but the Flow B path never did, so `esp_deep_sleep_start()` was entered with the software wake interrupt still asserted. `sub_power_enter_deep_sleep_mode()`, the `esp_default_wake_deep_sleep()` path in `bsp_wake_stub()`, and `h1os_early_system_bringup()` now clear `RTC_CNTL_SW_CPU_INT`, `RTC_CNTL_SLP_REJECT_INT_CLR`, `RTC_CNTL_SLP_WAKEUP_INT_CLR`, and `RTC_CNTL_SLP_REJECT_CAUSE_CLR` with `memw` barriers.
+  * **Root Cause 2 (ULP `RDY_FOR_WAKEUP` Race):** When the ULP was triggered during the main CPU sleep-entry window and timed out waiting on `RTC_CNTL_RDY_FOR_WAKEUP`, it cleared `RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA` before halting, leaving the SoC in deep sleep with all ULP GPIO wake sources disabled. The ULP now clears the trigger latch only and leaves the wake enable armed.
+  * Moved `s_cached_flow_a_sec` / `s_cached_flow_b_sec` in `sub_power.c` to `RTC_DATA_ATTR` with recovery-mode hydration from `orch_state` so slice periods survive deep sleep (`PIT-05`).
+  * Verified on hardware (`TST_005`): autonomous Flow B wake and button wake both operate past the 5-minute boundary.
+* **Battery ADC Calibration Trim (`SUB_POWER_VBAT_TRIM_OFFSET_MV`)** (`sub_power.h`, `sub_power.c`, `ulp/main.c`):
+  * Added a configurable `+80 mV` trim offset (`SUB_POWER_VBAT_TRIM_OFFSET_MV`, overridable at compile time) folded into the ULP linear calibration offset in `sub_power_get_ulp_cal_params()` (eFuse curve-fit and nominal default paths), with a matching `ULP_VBAT_TRIM_OFFSET_MV` default for `cal_offset` in the ULP image. Trim value derived from bench comparison against a reference meter on the DUT.
+
 * **Deterministic Error Propagation & Gated RTC POSIX Clock Sync (`PIT-08`)** (`h1os_lifecycle.c`):
   * Eliminated all `(void)` casts on error-returning calls across `h1os_lifecycle.c` (`sub_power_init_dfs`, `hal_io_early_init`, `hal_i2c_init`, `sub_rtc_init`, `sub_nvs_init`, `sub_power_init_ulp`, `h1os_lvgl_init`, `h1os_lvgl_start`, `sub_rtc_get_and_clear_interrupts`, `sub_rtc_cancel_countdown`, `h1os_sleep`, and `h1os_get_telemetry_history`).
   * Gated PCF85063A RTC to POSIX system clock synchronization strictly behind `sub_rtc_is_oscillator_valid()`, preventing uncalibrated or stopped RTC registers on cold boot from corrupting the internal system clock.
