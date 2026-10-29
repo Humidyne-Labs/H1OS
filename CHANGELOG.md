@@ -4,10 +4,28 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.5-dev] - 2026-10-28
+## [2.4.5-dev] - 2026-10-29
 
-### 🚀 Added (Dual-Core Parallel Lifecycle Concurrency, UI Actor Queue & Safe Error Shutdown)
+### 🚀 Added (Dual-Core Parallel Lifecycle Concurrency, Dynamic Flow Slicing & Subsystem Enhancements)
 
+* **Dynamic Flow Periods API & Silicon Prescaler Overlap Engine (`MANDATE-02`)** (`h1os.h`, `h1os_lifecycle.c`, `sub_power.c`, `orch_flow.c`, `A5_orchestrator.md`, `B1_api_and_services.md`, `B2_state_machine.md`):
+  * Added public API `h1os_set_flow_periods(flow_a_sec, flow_b_sec)` and internal validator enforcing all silicon timing invariants: Flow A range [60s..14400s / 4h], Flow B range [300s..86400s / 24h], prescaler whole-minute alignment for durations >255s, strict ordering ($B > A$), remainder floor $\ge 60\text{s}$, and prescaler alignment on remainders.
+  * Consolidated timing state to single-variable authority in RTC Slow Memory (`sample_interval_sec`, `flow_b_period_sec`), eliminating duplicate static variables and heuristic fallbacks.
+* **Pure Celsius-Derived Metric Conversions & Native Kelvin Telemetry (`MANDATE-03`)** (`h1os.h`, `h1os_lifecycle.c`):
+  * Added conversion macros `H1OS_CELSIUS_TO_KELVIN(c)` and `H1OS_CELSIUS_TO_FAHRENHEIT(c)`.
+  * Added native Kelvin telemetry fields `ambient_temp_k` and `dew_point_k` to `h1os_telemetry_t`.
+* **Deterministic Compile-Time RTC Validation (`MANDATE-05`)** (`h1os_time.h`, `h1os_time.c`):
+  * Added `H1OS_BUILD_EPOCH` (derived from `__DATE__` and `__TIME__`) and `h1os_time_is_valid()` to deterministically reject stopped oscillators or pre-compile dates.
+* **Public Subsystem Wrappers for Audio, Storage & Display** (`h1os.h`, `h1os_lifecycle.c`):
+  * Added asynchronous audio dispatch APIs `h1os_audio_play_raw()`, `h1os_audio_play_tone()`, and `h1os_audio_play_chime()`.
+  * Added MicroSD card state inspection APIs `h1os_sdcard_is_mounted()` and `h1os_sdcard_get_capacity_mb()`.
+  * Added driver-level display clear and waveform scrub API `h1os_display_force_clear()`.
+* **Self-Contained Typography Pipeline & Asset Pruning (`MANDATE-01`)** (`components/h1os/tools/fonts/`, `CMakeLists.txt`):
+  * Relocated font generation script and required Montserrat/FontAwesome typography assets directly into `components/h1os/tools/fonts/`.
+  * Pruned >1 MB of unused font bloat (`DejaVuSans`, `unscii-8`).
+  * Enforced fatal CMake configuration diagnostics if typography assets are missing.
+* **Dual-Core Concurrency Review Package & Transport Archive** (`docs/mandates/concurrency_review_package/`, `docs/mandates/concurrency_review_package.zip`):
+  * Created complete architectural review package and zip archive for external review of the dual-core lifecycle concurrency and sleep barrier models.
 * **Dual-Core Parallel Synchronization Phase & Static `EventGroup` Sleep Barrier (`MANDATE-04`)** (`h1os.h`, `h1os_lifecycle.c`, `h1os_lvgl.h`, `h1os_lvgl.cpp`, `examples/public/main/main.c`):
   * Added optional `h1os_sync_cb_t on_sync` hook to `h1os_lifecycle_t`, dispatched on Core 0 *after* `h1os_lvgl_start(5, 1)` spawns the Core 1 LVGL presentation task so network/bus I/O overlaps in parallel with the SSD1681 e-Paper display refresh ($\max(T_{\text{net}}, T_{\text{disp}})$ instead of $T_{\text{net}} + T_{\text{disp}}$).
   * Implemented a statically allocated FreeRTOS `EventGroup` sleep barrier (`xEventGroupCreateStatic(&s_sleep_barrier_buf)`, `BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`) with public coordination primitives `h1os_sync_hold()`, `h1os_sync_notify_complete()`, and `h1os_display_notify_quiescent()`.
@@ -21,6 +39,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🛡️ Fixed & Hardened (`H1OS-STD-001` Codebase Review & Invariant Audit)
 
+* **Deterministic Error Propagation & Gated RTC POSIX Clock Sync (`PIT-08`)** (`h1os_lifecycle.c`):
+  * Eliminated all `(void)` casts on error-returning calls across `h1os_lifecycle.c` (`sub_power_init_dfs`, `hal_io_early_init`, `hal_i2c_init`, `sub_rtc_init`, `sub_nvs_init`, `sub_power_init_ulp`, `h1os_lvgl_init`, `h1os_lvgl_start`, `sub_rtc_get_and_clear_interrupts`, `sub_rtc_cancel_countdown`, `h1os_sleep`, and `h1os_get_telemetry_history`).
+  * Gated PCF85063A RTC to POSIX system clock synchronization strictly behind `sub_rtc_is_oscillator_valid()`, preventing uncalibrated or stopped RTC registers on cold boot from corrupting the internal system clock.
+  * Refactored `h1os_early_system_bringup()` to return `esp_err_t` and output flow via pointer, allowing `h1os_start()` to deterministically propagate bringup faults directly back to `app_main()`.
 * **Cold-Boot Flow Period Initialization Order Blocker (`REV-01` / `S0`)** (`h1os_lifecycle.c`):
   * Resolved an initialization ordering bug introduced in `MANDATE-02` where `h1os_start()` committed `sample_interval_sec` and `flow_b_period_sec` to `RTC_SLOW_MEM` *before* `h1os_early_system_bringup()` called `orch_flow_determine_wakeup()`. On every cold boot, `orch_flow_determine_wakeup()` invoked `orch_state_reset()`, wiping `sample_interval_sec` back to `0` and causing `sub_power_init_ulp(0)` to fail with `ESP_ERR_INVALID_ARG`, while on deep-sleep wakes it overwrote runtime `h1os_set_flow_periods()` intervals and zeroed `ulp_slice_counter` prior to `debug_dump_ulp_telemetry()`.
   * Split validation (`h1os_validate_flow_periods()`) from `RTC_SLOW_MEM` commit (`h1os_apply_flow_periods()`), validating at entry to `h1os_start()` and committing after `orch_flow_determine_wakeup()` and `debug_dump_ulp_telemetry()`.
