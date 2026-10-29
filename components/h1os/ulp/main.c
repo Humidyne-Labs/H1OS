@@ -30,8 +30,9 @@ volatile uint32_t rtc_int_stuck   = 0;
 volatile uint32_t dispatch_reason = 0;
 volatile uint32_t gpio_status_raw = 0;
 
+#define ULP_VBAT_TRIM_OFFSET_MV 80
 volatile uint32_t cal_scale       = 8601;
-volatile int32_t  cal_offset      = 0;
+volatile int32_t  cal_offset      = ULP_VBAT_TRIM_OFFSET_MV;
 volatile uint32_t last_vbat_mv    = 4000;
 volatile uint32_t vbat_raw_adc    = 0;
 volatile uint32_t usb_connected   = 0;
@@ -202,18 +203,12 @@ static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32
 {
     bool wake_main = false;
 
-    /* 1. Critical battery brownout guard (requires 2 consecutive samples to reject ADC noise) */
-    static uint32_t s_low_vbat_count = 0;
+    /* 1. Critical battery brownout guard */
     if (!usb_connected && (vbat_mv >= 100 && vbat_mv < 3250)) {
-        s_low_vbat_count++;
-        if (s_low_vbat_count >= 2) {
-            last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
-            last_wake_btn   = H1OS_WAKE_BTN_NONE;
-            dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
-            wake_main       = true;
-        }
-    } else {
-        s_low_vbat_count = 0;
+        last_wake_cause = ULP_WAKE_CAUSE_CRITICAL_BATTERY;
+        last_wake_btn   = H1OS_WAKE_BTN_NONE;
+        dispatch_reason = ULP_DISPATCH_CRITICAL_SHUTDOWN;
+        wake_main       = true;
     }
 
     /* 2. Tactile button evaluation (BOOT0 = GPIO 0, POWER = GPIO 18) */

@@ -14,6 +14,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifndef SUB_POWER_VBAT_TRIM_OFFSET_MV
+#define SUB_POWER_VBAT_TRIM_OFFSET_MV 80 /**< Empirical ADC calibration trim offset in millivolts (+76..+80 mV). */
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

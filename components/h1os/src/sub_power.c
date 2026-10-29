@@ -306,13 +306,13 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
          * b_vbat = (2 * V_2000) - ((m_vbat * 2000) / 4096)
          */
         int32_t m_scale  = (int32_t)(((int64_t)2 * (v_3000 - v_2000) * 4096LL) / 1000LL);
-        int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL));
+        int32_t b_offset = (int32_t)((int64_t)2 * v_2000 - (((int64_t)m_scale * 2000LL) / 4096LL)) + SUB_POWER_VBAT_TRIM_OFFSET_MV;
 
         *out_scale     = (uint32_t)m_scale;
         *out_offset_mv = b_offset;
     } else {
         *out_scale     = 8601;
-        *out_offset_mv = 0;
+        *out_offset_mv = SUB_POWER_VBAT_TRIM_OFFSET_MV;
     }
     return ESP_OK;
 }
