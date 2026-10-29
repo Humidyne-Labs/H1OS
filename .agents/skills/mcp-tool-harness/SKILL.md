@@ -3,7 +3,7 @@ name: mcp-tool-harness
 description: Operational reference and subagent orchestration for the 3-Finger ESP32-S3 and H1OS MCP Tool Suite.
 ---
 
-# 3-Finger MCP Architecture & Subagent Orchestration Skill
+# 3-Finger MCP Architecture & Subagent Orchestration Skill (`v2.4.5-dev`)
 
 ## Overview
 This skill governs the operational procedures, subagent delegation patterns, and tool interaction models for the 3-Finger MCP embedded firmware development architecture supporting H1OS on ESP32-S3.
@@ -30,7 +30,7 @@ This skill governs the operational procedures, subagent delegation patterns, and
   - Monitor tools: Captures boot sequence and runtime panic backtraces directly without manual terminal copy-paste.
 
 ### Finger 3: Documentation & Datasheets (`local-index` & `espressif-documentation`)
-* **Local Indexer (`local-index`):** Runs `uvx code-index-mcp` targeting `H1OS/docs/` and converted markdown datasheets (`SHTC3`, `PCF85063A`, `ES8311`, `SSD1681`). Delivers pinpoint register definitions and blueprint excerpts on demand.
+* **Local Indexer (`local-index`):** Runs `uvx code-index-mcp` targeting `docs/` and converted markdown datasheets (`SHTC3`, `PCF85063A`, `ES8311`, `SSD1681`). Delivers pinpoint register definitions and blueprint excerpts on demand.
 * **Upstream Docs (`espressif-documentation`):** Official Espressif API docs, Technical Reference Manual (TRM) sections, and silicon errata via `https://mcp.espressif.com/docs`.
 * **Component Registry (`esp-component-registry`):** On-demand searches for certified Espressif IDF component packages.
 
@@ -61,14 +61,14 @@ This skill governs the operational procedures, subagent delegation patterns, and
 * **`local-index` / `search_code_advanced`**: Strictly requires the argument name `pattern: str` (do **NOT** pass `query`, which causes Pydantic schema validation failure).
 
 ### 2. Memory Regression Gate
-* After any modification to ULP RISC-V assembly/C, RTC wake stubs, `.rtc` data, or LVGL display buffers, execute `embedded-ops/murdock_memory_budget` to verify:
+* After any modification to ULP RISC-V assembly/C, RTC wake stubs, `.rtc` data (`orch_persisted_state_t`, `648 B`), or LVGL display buffers, execute `embedded-ops/murdock_memory_budget` to verify:
   - `rtc_fast_free_bytes` > 0
   - `rtc_slow_free_bytes` > 0
   - `diram_free_bytes` > 32 KB minimum operating headroom
 
 ### 3. Automated Hardware Verification Loop
 The canonical 3-step hardware verification sequence is:
-1. `esp-idf/build_project` (or PowerShell profile build)
+1. `esp-idf/build_project` (or PowerShell profile build in `examples/H1OS`)
 2. `esp-idf/flash_project`
 3. `embedded-ops/ba_serial_capture_and_decode` (captures boot banner, telemetry, or decodes panic backtrace frames)
 
@@ -81,5 +81,5 @@ The canonical 3-step hardware verification sequence is:
 
 ### 2. Zero Token-Burn Policy
 * **Never load entire repositories into context:** Always query `clangd` or `local-index` lazily.
-* **Single-file surgical edits:** Use `edit_file` with precise targets; avoid re-emitting whole files unnecessarily.
+* **Surgical header/source edits:** Keep `.h` and `.c`/`.cpp` edits focused and synchronized; avoid re-emitting unmodified files unnecessarily.
 * **Physical constraints over snapshots:** Validate UI against hardware constraints defined in `lvgl.md` rather than maintaining brittle host emulation frameworks.

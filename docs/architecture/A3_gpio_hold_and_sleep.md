@@ -78,41 +78,19 @@ On actual ESP32-S3 silicon, when an RTC IO pad is held in `RTC_CNTL_PAD_HOLD_REG
 To prevent race conditions, capacitor inrush brownouts, and display/audio bus contention during wake-up transitions, pad control follows a strict separation of concerns:
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    [*] --> Bootloader: Power Applied (Cold Boot)
-    state Bootloader {
-        BL_Hook: h1os_boot_hook runs (<25ms)
-        BL_Latch: Asserts & Latches Master Rails via RTC_CNTL_PAD_HOLD_REG
-        BL_Hook --> BL_Latch
-    }
-    Bootloader --> MainApp_Boot: Handoff to Xtensa LX7
-
-    state MainApp_Active {
-        MainApp_Boot --> Flow_Execution: hal_io_early_init()
-        state Flow_Execution {
-            direction LR
-            FlowA: Flow A (Sensor Burst)
-            FlowB: Flow B (Interactive UI / EPD)
-        }
-        Flow_Execution --> Sleep_Prep: sub_power_enter_deep_sleep_mode()
-    }
-
-    state Sleep_Isolation {
-        Sleep_Prep --> Isolate_Statics: hal_io_isolate_sleep_pads()
-        Isolate_Statics --> Arm_Event_Mode: Unhold Wake Pins & Arm Pure Event Mode
-        Arm_Event_Mode --> Deep_Sleep: esp_deep_sleep_start()
-    }
-
-    Deep_Sleep --> Bootloader: ULP Raises Wake Interrupt (Reset Vector)
-
-    state Shutdown_Sequence {
-        Cut_Power: sub_power_cut_power_latch()
-        Unhold_BAT: Clear Hold & Drive BAT_CTRL LOW
-        Cut_Power --> Unhold_BAT
-    }
-    MainApp_Active --> Shutdown_Sequence: Power Off Key / Critical Battery
-    Shutdown_Sequence --> [*]: Total System Depower
+graph TD;
+    START(["Power Applied (Cold Boot)"]) --> BL_HOOK["2nd-Stage Bootloader: h1os_boot_hook (<25ms)"];
+    BL_HOOK --> BL_LATCH["Latch Master Rails via RTC_CNTL_PAD_HOLD_REG<br/>(BAT_CTRL=1, EPD_3V3_EN=0, PA_EN=0)"];
+    BL_LATCH --> MAIN_BOOT["Handoff to Xtensa LX7: hal_io_early_init()"];
+    MAIN_BOOT --> FLOW_B["Flow B Active: Parallel Core 0 on_sync + Core 1 LVGL"];
+    FLOW_B --> SLEEP_PREP["Sleep Entry: sub_power_enter_deep_sleep_mode()"];
+    SLEEP_PREP --> ISOLATE["hal_io_isolate_sleep_pads() (CS, RST, DC, PA_CTRL, I2S, LED)"];
+    ISOLATE --> UNHOLD_WAKE["Unhold Wake Pins (0, 18, 5, 4) & Arm Pure Event Mode"];
+    UNHOLD_WAKE --> DEEP_SLEEP["Hardware Deep Sleep: esp_deep_sleep_start()"];
+    DEEP_SLEEP -->|"Intermediate Slice: ULP -> Flow A Wake Stub (~18.5ms)"| DEEP_SLEEP;
+    DEEP_SLEEP -->|"Button Tap / Overflow Slice: ULP Main Wake"| BL_HOOK;
+    FLOW_B -->|"Power Off / Critical Battery / Fatal Startup Error"| CUT_PWR["sub_power_cut_power_latch(): Unhold & Drive BAT_CTRL LOW"];
+    CUT_PWR --> OFF(["Total System Depower"]);
 ```
 
 ### 4.1 Master Rails Latched in 2nd-Stage Bootloader
@@ -198,11 +176,11 @@ sequenceDiagram
     end
 ```
 
-### 5.1 Flow A: Low-Power Sensor Burst
-During Flow A, the dual-core Xtensa processor executes a rapid wake stub ($<120\text{ ms}$) to read temperature and humidity from the SHTC3 sensor.
-- The master power rails (`BAT_CTRL`, `EPD_3V3_EN`) are already latched HIGH/LOW by the bootloader hook.
-- The display rail never drops, eliminating the $\sim 2.5\text{ ms}$ power-on delay and avoiding cold initialization spikes.
-- Upon completing the sample, Core 0 immediately calls `sub_power_enter_deep_sleep_mode(..., SUB_POWER_SLEEP_BURST)` to return to sleep.
+### 5.1 Flow A: Low-Power Sensor Burst (`bsp_wake_stub`)
+During Flow A, Core 0 executes the bare-metal `RTC_IRAM_ATTR` wake stub (`bsp_wake_stub()` in `orch_wake_stub.c`, $\sim 18.5\text{ ms}$ total active window at 80 MHz) directly from RTC Fast Memory without booting the 2nd-stage bootloader or FreeRTOS:
+- The master power rails (`BAT_CTRL`, `EPD_3V3_EN`, `PA_EN`) remain continuously latched via their hardware pad holds.
+- The display rail never drops, eliminating power-on transients and avoiding cold initialization spikes.
+- Upon completing the SHTC3 (`0x7866`) and MCU die TSENS sample, Core 0 re-arms the ULP GPIO wake gate and calls `esp_wake_stub_sleep(&bsp_wake_stub)` to return directly to deep sleep.
 
 ### 5.2 Flow B: Interactive UI & Display Session
 When woken by a tactile button press (`GPIO 0` or `GPIO 18`) or periodic countdown overflow (`GPIO 5`), the system enters Flow B.

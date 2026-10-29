@@ -58,7 +58,14 @@ static void app_on_boot(void *user_data)
 
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
 {
-    ESP_LOGI("APP", "Woke from sleep (Causes bitmask: 0x%08lX)", (unsigned long)ctx->wakeup_causes);
+    ESP_LOGI("APP", "Woke from sleep (State: %d, Flow B count: %lu)",
+             (int)ctx->wake_state, (unsigned long)ctx->flow_b_count);
+}
+
+static void app_on_sync(const h1os_wake_context_t *ctx, void *user_data)
+{
+    ESP_LOGI("APP", "Core 0 parallel sync running alongside Core 1 EPD refresh (wake=%lu)",
+             (unsigned long)ctx->wake_count);
 }
 
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
@@ -66,18 +73,27 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
     ESP_LOGI("APP", "Entering sleep for %lu seconds", (unsigned long)sleep_sec);
 }
 
+static void app_on_error(esp_err_t err, const char *stage, void *user_data)
+{
+    ESP_LOGE("APP", "Fatal startup error at %s: %s", stage, esp_err_to_name(err));
+}
+
 void app_main(void)
 {
     h1os_lifecycle_t lifecycle = {
-        .on_boot = app_on_boot,
-        .on_wake = app_on_wake,
+        .on_boot      = app_on_boot,
+        .on_wake      = app_on_wake,
+        .on_sync      = app_on_sync,
         .on_pre_sleep = app_on_pre_sleep,
-        .on_shutdown = NULL,
+        .on_shutdown  = NULL,
+        .on_error     = app_on_error,
         .session = {
-            .inactivity_timeout_sec = 30, // Developer-configured inactivity sleep timeout
+            .inactivity_timeout_sec = 30,   // Developer-configured inactivity sleep timeout
             .clk_mode               = SYS_CLK_MODE_DYNAMIC,
-            .flow_a_period_sec      = 60, // Developer-configured sensor sample burst interval
-            .flow_b_period_sec      = 300,// Developer-configured display refresh interval
+            .flow_a_period_sec      = 60,   // Developer-configured sensor sample burst interval
+            .flow_b_period_sec      = 300,  // Developer-configured display refresh interval
+            .sync_wait_ms           = 0,    // Inbound pre-flush coalescing gate (ms)
+            .sync_timeout_ms        = 5000, // Max sleep barrier wait (ms) for async on_sync
         },
     };
 
@@ -163,7 +179,7 @@ $$
 
 ## 7. Persistent State & Flash Frame Synchronization
 
-- **RTC Slow Memory:** State is preserved across deep sleep in `640 bytes` (`orch_persisted_state_t`, including the 512-byte 32-slot Tri-Node ring buffer), leaving >7.3 KB free for the ULP coprocessor.
+- **RTC Slow Memory:** State is preserved across deep sleep in `648 bytes` (`orch_persisted_state_t`, including the 512-byte 32-slot Tri-Node ring buffer and monotonic `boot_count`, `wake_count`, `flow_b_counter`, and `button_wake_count` counters), leaving >7.3 KB free for the ULP coprocessor.
 - **Flash Frame Sync:** When the display is marked dirty, `orch_display_sync_save_if_dirty()` writes the 5000-byte frame to the raw `epd_frame` partition. On wake, `orch_display_sync_restore_to_framebuffer()` restores the prior frame for differential updates.
 
 ---
@@ -180,4 +196,4 @@ While the main cores are in deep sleep, the ULP coprocessor runs autonomously in
 
 ## 9. Complete Application Template
 
-See [`examples/H1OS/main/main.c`](../examples/H1OS/main/main.c) for a complete working reference application featuring modular screen navigation, Montserrat bold typography, and multi-node telemetry.
+See [`examples/public/main/main.c`](../examples/public/main/main.c) for a complete working reference application featuring modular screen navigation, parallel `on_sync` telemetry hooks, Montserrat bold typography, and multi-node telemetry.

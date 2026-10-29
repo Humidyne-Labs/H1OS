@@ -39,10 +39,10 @@ graph TD;
         LaunchFlowB_Tap --> Bootloader2;
         Boot["Initial Power On / Boot"] --> Bootloader2;
         Bootloader2 --> BootFreeRTOS["Initialize FreeRTOS SMP, Sync PCF85063A -> POSIX Clock"];
-        BootFreeRTOS --> TurboRender["Read Pre-Display Glass Temp (0x1B), Evaluate Telemetry & Render LVGL Screen"];
-        TurboRender --> WakeSource{"Wake Source?"};
-        WakeSource -- "RTC Countdown Overflow" --> SleepStart["Initiate Immediate Sleep Transition (Audio Skipped)"];
-        WakeSource -- "User Button Tap or Boot" --> LVGL_Active["Interactive Session (Audio Ready, LVGL Owns Display and Buttons)"];
+        BootFreeRTOS --> TurboRender["Read Glass Temp (0x1B), Invoke on_boot/on_wake, Start Core 1 LVGL & Parallel Core 0 on_sync"];
+        TurboRender --> WakeSource{"Wake State (h1os_wake_state_t)?"};
+        WakeSource -- "H1OS_WAKE_STATE_RTC_FLOW_B" --> SleepStart["Await EventGroup Barrier (SYNC_DONE | DISPLAY_DONE) -> Sleep (Audio Skipped)"];
+        WakeSource -- "BOOT or INTERACTIVE_SESSION" --> LVGL_Active["Interactive Session (Audio Ready, One-Shot esp_timer Inactivity Guard)"];
         LVGL_Active --> UserClick{"User Button Click?"};
         UserClick -- "BOOT (Fwd) or POWER (Rev) Click" --> ScreenToggle["Play 50ms Nav Tone, Cycle Screen & Reset Inactivity Timer"];
         ScreenToggle --> LVGL_Active;
@@ -54,7 +54,8 @@ graph TD;
     end
 
     subgraph Sleep_Transition_Seq ["Coordinated Sleep Transition Sequence"]
-        SleepStart --> PreSleepHook["1. Trigger Sleep Chime/Splash & Invoke user on_pre_sleep hook"];
+        SleepStart --> BarrierWait["0. Await Static EventGroup Barrier (BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE)"];
+        BarrierWait --> PreSleepHook["1. Trigger Sleep Chime/Splash & Invoke user on_pre_sleep hook"];
         PreSleepHook --> DrainLVGL["2. Drain LVGL Pipeline & Stop Core 1 LVGL Task"];
         DrainLVGL --> QuiesceAudio["3. Wait Audio Idle & Place ES8311 + NS4168 in <1uA Standby"];
         QuiesceAudio --> WaitBusy["4. Wait for SSD1681 BUSY release at 80 MHz"];
@@ -134,5 +135,5 @@ To prevent unintended audio chirps and spurious screen skipping while deep sleep
   - Flow A (`sample_interval_sec`): $60\text{s} \le A \le 14,400\text{s}$ ($4\text{ hours}$). Must be an exact multiple of $60\text{s}$ if $> 255\text{s}$.
   - Flow B (`flow_b_period_sec`): $300\text{s} \le B \le 86,400\text{s}$ ($24\text{ hours}$). Must be strictly greater than $A$.
   - Remainder Floor: If $\text{remainder} = B \bmod A > 0$, it must be $\ge 60\text{s}$ to justify the re-arm cycle.
-- **Unified Setter Enforcement:** Both `h1os_start()` and `h1os_set_flow_periods()` funnel strictly through `h1os_set_flow_periods_internal()`. If parameters violate any bound or invariant, the call fails immediately with `ESP_ERR_INVALID_ARG`.
+- **Unified Validation & Post-Reset Application (`REV-01`):** Both `h1os_start()` and `h1os_set_flow_periods()` funnel strictly through `h1os_validate_flow_periods()` and `h1os_apply_flow_periods()`. On cold boot, validation runs prior to `orch_flow_init()` and period application runs immediately after `orch_state_reset()` so configured periods are never clobbered. If parameters violate any bound or invariant, the call fails immediately with `ESP_ERR_INVALID_ARG`.
 - Silent fallback magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.

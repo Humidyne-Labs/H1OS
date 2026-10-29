@@ -87,5 +87,5 @@ To prevent quiescent current dissipation and thermal contamination of the enclos
 - Hardcoded fallback defaults (e.g. `50%` or `60%`) have been removed; audio levels are contractual and developer-defined.
 
 ### 4.3 Hardware & Silicon Errata References
-- **Register 0x37 Digital Equalizer Bypass:** Writing `0x08` to Register `0x37` is required to disable the volume fade ramp and bypass the uncalibrated hardware EQ filter. For detailed silicon defect analysis, see [`ERRATA.md` ERR-S2](../../ERRATA.md#err-s2-es8311-register-0x37-digital-equalizer-bypass--low-power-default).
+- **Register 0x37 Digital Equalizer Bypass:** Writing `0x08` to Register `0x37` is required to disable the volume fade ramp and bypass the uncalibrated hardware EQ filter. For detailed silicon defect analysis, see [`ERRATA.md` ERR-S2](../../ERRATA.md#err-s2-es8311-register-0x37-uncalibrated-digital-eq-filter-distortion).
 - **Shared I2C Bus Power-Gating Hazard:** For physical defect analysis on keeping `PA_EN` energized, see [`ERRATA.md` Errata E4](../../ERRATA.md#errata-e4-audio-codec-power-gating-disrupts-shared-i2c-bus).

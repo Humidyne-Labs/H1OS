@@ -3,7 +3,7 @@
     {
       "name": "ESP32-S3",
       "compilerPath": "",
-      "compileCommands": "${workspaceFolder}\\examples\\H1OS\\build_dev\\compile_commands.json",
+      "compileCommands": "c:\\Users\\Matt\\Documents\\GitHub\\H1OS\\examples\\H1OS\\build_prod\\compile_commands.json",
       "cStandard": "gnu17",
       "cppStandard": "gnu++23",
       "intelliSenseMode": "windows-gcc-arm",

@@ -20,7 +20,7 @@ To achieve metrological reliability with minimal runtime overhead, H1OS enforces
 ## 2. End-to-End Metrology & Execution Flow
 
 ```mermaid
-flowchart TD
+graph TD;
     subgraph SENSING ["1. Quiet-State Sensing (ULP-RISC-V Coprocessor)"]
         WAKE["ULP Sleep Tick / Timer Event"] --> READ["ulp_read_vbat_adc_bounded()<br/>SAR ADC1_CH3 on GPIO 4"]
         READ --> CAL["Folded eFuse Calibration:<br/>V_BAT = ((raw * cal_scale) >> 12) + cal_offset"]
@@ -187,7 +187,9 @@ Mirroring battery telemetry and operational metrics into non-volatile storage (S
 
 1. **Flash Endurance Limit:** Standard SPI NOR Flash (such as the Winbond W25Q series commonly paired with ESP32-S3 modules) is physically rated for approximately $100{,}000$ Program/Erase (P/E) cycles per sector.
 2. **Headless Cadence Flash Churn:** In headless Flow A monitoring, the device awakens every $60\text{ s}$ to sample sensors:
-   $$\text{Unthrottled Writes} = \frac{86{,}400\text{ s/day}}{60\text{ s/wake}} = 1{,}440\text{ commits/day} \implies 525{,}600\text{ commits/year}$$
+
+$$\text{Unthrottled Writes} = \frac{86{,}400\text{ s/day}}{60\text{ s/wake}} = 1{,}440\text{ commits/day} \implies 525{,}600\text{ commits/year}$$
+
    Unthrottled NVS commits would exhaust the Flash sector P/E endurance budget within approximately two to three months of continuous deployment.
 3. **Power Budget Impact:** Initiating SPI Flash write operations draws $15\text{--}25\text{ mA}$ across several milliseconds, substantially degrading the battery energy profile of an otherwise $<10\text{ ms}$ headless wake pass.
 
@@ -197,11 +199,13 @@ To preserve Flash longevity and maintain the low-power envelope, H1OS implements
 * **Fast In-Memory Layer (RTC Slow SRAM):** Runtime counters (`total_sleep_sec`, `total_app_run_ms`, `initial_soc_x10`) update continuously in `orch_persisted_state_t`. RTC Slow SRAM retains data across all deep sleep cycles at negligible leakage current ($\approx 0.8\ \mu\text{A}$) with zero silicon wear.
 * **Non-Volatile Mirror (Flash NVS):** Synchronized on a strict throttling policy governed by `ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` ($3600\text{ s}$ = 1 hour).
 
-#### Commit Arbitration Rules (`sub_power_enter_deep_sleep_mode()`)
-An NVS write occurs if and only if one of the following conditions is satisfied:
-1. **Interactive Session Exit:** A user session (Flow B) was active (`h1os_is_session_active() == true`). Interactive sessions inherently warrant committing UI and power state changes immediately.
+#### Commit Arbitration Rules (Layer 3 `orch_flow_execute_sleep()` & Layer 4 `h1os_sleep()` — `REV-07`)
+To preserve strict 4-layer unidirectional isolation (`sub_power.c` in Layer 2 has zero upward dependencies on Layer 3 or Layer 4), NVS commit arbitration executes in Layer 3 `orch_flow_execute_sleep()` and Layer 4 `h1os_sleep()` / `h1os_session_timeout_timer_cb()`. An NVS write (`orch_state_save_runtimes_to_nvs()`) occurs if and only if one of the following conditions is satisfied:
+1. **Interactive Session Exit:** A user session (Flow B) was active when entering sleep (`h1os_sleep()` or inactivity timer expiration). Interactive sessions inherently warrant committing UI and power state changes immediately.
 2. **Periodic Interval Expiration:** The elapsed sleep time since the last commit exceeds the throttle threshold:
-   $$(T_{\text{sleep\_sec}} - T_{\text{last\_nvs\_commit\_sec}}) \ge 3600\text{ s}$$
+
+$$(T_{\text{sleep\_sec}} - T_{\text{last\_nvs\_commit\_sec}}) \ge 3600\text{ s}$$
+
    This caps headless unattended Flash commits to exactly 24 writes per day ($8{,}760\text{ commits/year}$), reducing Flash write churn by **98.3%** and extending SPI NOR Flash lifetime to $>11\text{ years}$.
 3. **Deterministic System Shutdown:** Clean shutdown via `execute_system_shutdown()` performs an explicit flush before de-asserting the `BAT_CTRL` power latch (GPIO 17).
 4. **Discharge Lap Reset:** Explicit charger unplug transitions (`orch_state_reset_discharge_lap()`) reset metrics and commit immediately.

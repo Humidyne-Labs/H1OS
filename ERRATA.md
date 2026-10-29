@@ -2,7 +2,7 @@
 
 > **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with, sponsored by, or endorsed by Waveshare Electronics)*
 >
-> **Applicable Firmware:** H1OS `v2.4.4-dev` (E-Class Environmental Operating System)
+> **Applicable Firmware:** H1OS `v2.4.5-dev` (E-Class Environmental Operating System)
 >
 > **Purpose:** Document physical PCB layout defects, electrical hazards, and architectural limitations discovered during driver bring-up, and provide engineering schematics/layout guidelines for a hardware **Rev B** redesign.
 
@@ -175,17 +175,19 @@ A thorough investigation of the vendor documentation (Everest Semiconductor ES83
    * However, the vendor documentation **never explains what `S0`–`S7` mean**, what state transitions occur, or how to query what state the chip is currently in.
 4. **DC Operating Characteristic (Page 12):**
    * Under *DC CHARACTERISTICS* (page 12), the only related specification is:
-     $$V_{\text{IH}} = 0.7 \times P_{\text{VDD}}\,\text{V}$$
+
+$$V_{\text{IH}} = 0.7 \times P_{\text{VDD}}\,\text{V}$$
+
    * The $0.7 \times P_{\text{VDD}}$ threshold implies an internal PN junction or threshold drop. When $P_{\text{VDD}}$ collapses to $0\,\text{V}$ while external $4.7\,\text{k}\Omega$ pull-up resistors hold the bus lines towards $3.3\,\text{V}$, an unbuffered connection into the unpowered IC silicon pulls down the bus lines, extinguishing communication.
 
 ```mermaid
-flowchart TD
-    V33["Permanent 3.3V System Rail"] --> RPU["4.7 kOhm Pull-up Resistors"]
-    RPU --> BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL)"]
-    BUS --> SHTC3["Sensirion SHTC3 (Online)"]
-    BUS --> RTC["NXP PCF85063A (Online)"]
-    BUS --> CODEC["ES8311 Codec (Unpowered when PA_EN = 1)"]
-    CODEC -.->|"Pulls bus down<br/>(Total I2C Loss)"| BUS
+graph TD;
+    V33["Permanent 3.3V System Rail"] --> RPU["4.7 kOhm Pull-up Resistors"];
+    RPU --> BUS["Shared I2C Bus (GPIO 47 SDA / GPIO 48 SCL)"];
+    BUS --> SHTC3["Sensirion SHTC3 (Online)"];
+    BUS --> RTC["NXP PCF85063A (Online)"];
+    BUS --> CODEC["ES8311 Codec (Unpowered when PA_EN = 1)"];
+    CODEC -.->|"Pulls bus down<br/>(Total I2C Loss)"| BUS;
 ```
 
 #### 3. Current H1OS Firmware Mitigations
@@ -275,6 +277,8 @@ System battery power distribution is controlled by `GPIO 17` (`BAT_CTRL`).
 * **Strict 2nd-Stage Bootloader Latching:** `h1os_boot_hook.c` (`bootloader_before_init()`) asserts `GPIO 17 = 1` and locks the pad hold immediately upon entering the 2nd-stage bootloader before application decompression.
 
 * Enforced `esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON)` across all sleep calls to guarantee the latch remains energized in deep sleep.
+
+* **Fatal Startup Error Battery Latch Release (`v2.4.5-dev` / `MANDATE-06`):** If any cold-boot hardware initialization fails (`orch_flow_init()`, `sub_display_init()`, or `h1os_lvgl_init()`), `h1os_handle_fatal_startup_error()` invokes the application `on_error` hook and immediately calls `hal_io_release_power_latch()` (`GPIO 17 = 0`) when running on battery (or enters `EXT0` deep sleep on `GPIO 18` when USB power is attached) so a faulted board never sits latched on draining the LiPo battery.
 
 #### 4. Rev B Hardware Redesign Recommendations
 
@@ -569,22 +573,21 @@ The Waveshare ESP32-S3 ePaper 1.54" V2 relies exclusively on a mechanical 24-pin
 
 Replace (or parallel for field charging) the exposed mechanical charging port with a flush, enclosure-mounted **3-Pin Magnetic Pogo-Pin Charge Connector** (`2.54 mm` or `2.20 mm` pitch) engineered with **Center-Hot (`[GND] [VBUS +5V] [GND]`) Geometric Reverse-Polarity Protection**:
 
-```
+```mermaid
 graph LR;
     subgraph CABLE ["Magnetic Charge Cable (Spring Pogo Plungers)"]
-        P1["Pin 1: GND"]
-        P2["Pin 2 (Center): VBUS +5.0V HOT"]
-        P3["Pin 3: GND"]
+        P1["Pin 1: GND"];
+        P2["Pin 2 (Center): VBUS +5.0V HOT"];
+        P3["Pin 3: GND"];
     end
     subgraph APPLIANCE ["Rev B Appliance Perimeter (Flush Gold Target Pads)"]
-        T1["Pad 1 (Left): GND"]
-        T2["Pad 2 (Center): VBUS +5.0V Input"]
-        T3["Pad 3 (Right): GND"]
+        T1["Pad 1 (Left): GND"];
+        T2["Pad 2 (Center): VBUS +5.0V Input"];
+        T3["Pad 3 (Right): GND"];
     end
-    P1 --- T1
-    P2 --- T2
-    P3 --- T3
-
+    P1 --- T1;
+    P2 --- T2;
+    P3 --- T3;
 ```
 
 1. **100% Geometric Reverse-Polarity Immunity (Center-Hot Topology):**
@@ -880,3 +883,46 @@ During environmental chamber qualification soak **Run #2** (`TST_002`), the firm
   - Marked `i2c_write_byte()`, `i2c_read_byte()`, `wake_stub_read_die_temp_centi_c()`, `rtc_write_reg_retry()`, and `i2c_recover_stuck_bus()` with `__attribute__((noinline))` and loop index register clobbers `asm volatile("" : "+r"(i));`.
   - Replaced aggregate zero-initializers in `RTC_IRAM_ATTR` functions with explicit per-field assignments and `asm volatile("" : "+m"(p[i]));` memory barriers.
   - Added `scl_high_wait()` with a bounded `2,000 µs` clock-stretch timeout (`ORCH_SENSOR_ERR_SCL_STUCK = 7`), a 9-clock bus recovery helper (`i2c_recover_stuck_bus()`), and `i2c_read_byte(false)` (`NACK`) on `rx[5]`.
+
+##### 6. SSD1681 `EPD_BUSY` Falling Edge vs. Physical Electrophoretic Microcapsule Settling Window (`v2.4.5-dev` / `REV-04`)
+
+* **Defect Description:** When `sub_display_wait_busy()` was upgraded from a `10 ms` polling loop to a zero-latency `GPIO_INTR_NEGEDGE` interrupt semaphore (`s_busy_idle_sem`) on `GPIO 8` (`EPD_BUSY`), `sub_display_enter_deep_sleep()` immediately issued SSD1681 Deep Sleep Mode 1 (`0x10`, `0x01`) within microseconds of `BUSY` falling low.
+* **Physical Failure Mechanism:** On the Solomon Systech SSD1681, the `BUSY` line de-asserts when the internal waveform state machine completes its final clock frame, while charged titanium dioxide and carbon black microcapsules are still physically decelerating through the suspending fluid under residual electrode potential. Gating down the internal charge pumps (`0x10`, `0x01`) within microseconds of the `BUSY` falling edge can freeze pigment capsules mid-relaxation and degrade optical contrast ratio over repeated cycles.
+* **Firmware Mitigation (`REV-04`):** `sub_display_enter_deep_sleep()` enforces an explicit `vTaskDelay(pdMS_TO_TICKS(SUB_DISPLAY_SETTLING_WINDOW_MS))` (`250 ms`) settling window immediately after `sub_display_wait_busy()` returns and before transmitting command `0x10` (`0x01`).
+
+### ERR-S6: ESP32-S3 SAR ADC1 ULP-RISC-V Uncalibrated Internal Reference Saturation (`raw = 4095`) (`v2.4.5-dev` / `REV-09`)
+
+* **Component:** ESP32-S3 SAR ADC1 Controller & ESP-IDF `adc_oneshot` / `ulp_adc` Driver Layer
+* **Subsystem:** ULP-RISC-V Quiet-State Battery Voltage Metrology (`GPIO 4` / `ADC1_CHANNEL_3`, $200\text{ k}\Omega / 200\text{ k}\Omega$ Divider + Tap Hold-Up Capacitor, AntPow `AP502535` 400 mAh 3.7V LiPo Cell)
+* **Severity:** High (12-bit ADC output permanently railed at `raw = 4095` / `0xFFF` $\implies$ `vbat = 6917 mV`, triggering the `> 4500 mV` fallback clamp to `4000 mV` and masking real battery state of charge)
+
+#### Description & Root Cause Analysis
+
+On hardware bench verification (`10-28-2026-09-51-pm.log`) with a charged AntPow `AP502535` 400 mAh LiPo cell ($4.20\text{ V} \pm 0.03\text{ V}$ charge cut-off, $4.28\text{ V}$ PCM overcharge protection, feeding the $200\text{ k}\Omega / 200\text{ k}\Omega$ voltage divider and filter capacitor on `GPIO 4`), ULP telemetry reported a saturated 12-bit reading on every wake cycle:
+```text
+I (1527) sub_power: ULP battery linear calibration primed: scale=6758, offset=161 mV
+...
+I (1292) h1os_lifecycle: [ULP TELEMETRY] Wake #6: cause=3 (LONG_OVERFLOW), slice=0/5, vbat=6917 mV (raw=4095), btn=0, stuck=0
+I (1292) h1os_lifecycle: [ULP TELEMETRY] Wake #11: cause=3 (LONG_OVERFLOW), slice=0/5, vbat=6917 mV (raw=4095), btn=0, stuck=0
+I (1292) h1os_lifecycle: [ULP TELEMETRY] Wake #51: cause=3 (LONG_OVERFLOW), slice=0/5, vbat=6917 mV (raw=4095), btn=0, stuck=0
+```
+
+**Electrical Safety Verification:**
+At $V_{\text{BAT}} = 4.10\text{–}4.20\text{ V}$, the physical tap voltage at `GPIO 4` (`ADC1_CH3`) is strictly $2.05\text{–}2.10\text{ V}$ (well within the $3.3\text{ V}$ `VDD3P3_RTC` operating envelope), and the $200\text{ k}\Omega$ upper series resistor limits current into the pin to $< 21\ \mu\text{A}$. The filter capacitor on the tap node is electrically beneficial ($C_{\text{tap}} \gg C_{\text{SAR}}$), preventing charge-sharing droop across the $100\text{ k}\Omega$ Thevenin impedance during SAR sampling.
+
+**Silicon & ESP-IDF Driver Failure Mechanism:**
+1. **Deferred `reg_i2c` Hardware Reference Calibration in `adc_oneshot`:**
+   `sub_power_init()` previously initialized ADC1 for the ULP by calling `adc_oneshot_new_unit()` (`.ulp_mode = ADC_ULP_MODE_RISCV`) and `adc_oneshot_config_channel()` (`.atten = ADC_ATTEN_DB_12`) directly, rather than calling `ulp_adc_init()`. In ESP-IDF's `adc_oneshot` driver, `adc_oneshot_config_channel()` does **not** program the eFuse hardware reference calibration code (`adc_set_hw_calibration_code(ADC_UNIT_1, ADC_ATTEN_DB_12)`) into the SAR ADC1 internal analog `reg_i2c` registers; in standard `adc_oneshot` operation, that calibration is loaded lazily when `adc_oneshot_read()` is invoked on the main CPU. Because H1OS never calls `adc_oneshot_read()` on the main CPU (to avoid active $I \cdot R$ load sag) and bypassed `ulp_adc_init()`, the internal analog reference remained uncalibrated and `esp_sleep_enable_adc_tsens_monitor(true)` was never asserted. Without the `12 dB` hardware calibration code loaded into the internal analog `reg_i2c` frontend, any input above $\sim 1.1\text{ V}$ saturates the 12-bit SAR comparator at `raw = 4095` (`((4095 * 6758) >> 12) + 161 = 6917 mV`).
+2. **ULP Register Control & Attenuation Enforcement:**
+   In `ulp/main.c`, `ulp_read_vbat_adc_bounded()` toggled `SENS_MEAS1_START_SAR` directly without forcing the SAR analog power domain (`SENS_FORCE_XPD_SAR = 0x3`) or explicitly enforcing `ADC_ATTEN_DB_12` (`0x3`) on `ADC1_CHANNEL_3` (`bits [7:6]` of `SENS_SAR_ATTEN1_REG`) and `SENS_SAR1_EN_PAD_FORCE = 1` / `SENS_MEAS1_START_FORCE = 1`.
+3. **Post-Init Analog Pad Clobbering:**
+   `sub_power_enter_deep_sleep_mode()` called `rtc_gpio_init(HAL_PIN_BATTERY_ADC)` *after* `sub_power_init()`, overwriting the analog pad mux configured by `s_adc_io_init()`, while `hal_io_release_pad_holds()` called `rtc_gpio_deinit(HAL_PIN_BATTERY_ADC)` on every Flow B wake, reconnecting the digital CMOS input buffer to the $2.08\text{ V}$ analog divider tap.
+
+#### Firmware Mitigation & Architectural Mandate
+
+1. **Mandatory `ulp_adc_init()` Initialization (`sub_power.c`):**
+   Always initialize `ADC1_CHANNEL_3` via `ulp_adc_init(&ulp_adc_cfg)` (and release via `ulp_adc_deinit()`), which executes `adc_set_hw_calibration_code(ADC_UNIT_1, ADC_ATTEN_DB_12)` over internal `reg_i2c` and enables `esp_sleep_enable_adc_tsens_monitor(true)`.
+2. **Explicit ULP Register Guards (`ulp/main.c`):**
+   In `ulp_read_vbat_adc_bounded()`, explicitly assert `SENS_FORCE_XPD_SAR = 0x3`, `SET_PERI_REG_BITS(SENS_SAR_ATTEN1_REG, 0x3U, 0x3U, (ADC_CHANNEL_3 * 2))`, `SENS_SAR1_EN_PAD_FORCE = 1`, and `SENS_MEAS1_START_FORCE = 1` separated by explicit RISC-V device I/O fences (`ulp_reg_barrier()` / `asm volatile("fence iorw, iorw" ::: "memory")`) and a `40 µs` analog reference settling delay (`SAR1_XPD_SETTLE_US`) prior to pulsing `SENS_MEAS1_START_SAR` (with a `2 µs` strobe hold under `-Os` compilation), and restore `SENS_FORCE_XPD_SAR = 0x0` immediately after reading `SENS_MEAS1_DATA_SAR`.
+3. **Permanent Analog Pad Isolation (`sub_power.c`, `hal_io.c`):**
+   Never call `rtc_gpio_init(HAL_PIN_BATTERY_ADC)` after `ulp_adc_init()` or `rtc_gpio_deinit(HAL_PIN_BATTERY_ADC)` on Flow B wake; only call `rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC)` so `GPIO 4` remains continuously configured in low-leakage analog mode.

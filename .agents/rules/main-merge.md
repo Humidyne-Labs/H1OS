@@ -8,18 +8,18 @@ This rule governs the mandatory release and merge checklist required before ANY 
 
 The `main` branch represents production-grade, verifiable, and historical stability. Direct commits to `main` without completing the pre-merge checklist are strictly prohibited.
 
-Before executing a merge into `main`, the developer or autonomous agent **MUST** satisfy all four invariants in the following order:
+Before executing a merge into `main`, the developer or autonomous agent **MUST** satisfy all invariants in the following order:
 
 ```mermaid
-flowchart TD
-    A0["0a. Identity & Name Audit\n(python tools/agent/sanitize.py --check)"] --> A0b["0b. Asset Shrink & Quantization\n(/shrink: optimize_images + optimize_pdf)"]
-    A0b --> A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"]
-    A["1. Code & Build Verification\n(idf.py build: 0 warnings, 0 errors)"] --> B["2. Rev Semantic Version Strings\n(h1os_version.h, idf_component.yml, README.md)"]
-    B --> C["3. Regenerate docs/api.md\n(doxygen Doxyfile + moxygen)"]
-    C --> D["4. Touch & Update CHANGELOG.md\n(Keep a Changelog format with timestamp)"]
-    D --> E["5. Atomic Commit & Push to Feature Branch"]
-    E --> F["6. Checkout main & Merge Feature Branch"]
-    F --> G["7. Push main & Create Annotated Tag\n(vX.Y.Z-tag)"]
+graph TD;
+    A0["0a. Identity & Name Audit<br/>(python tools/agent/sanitize.py --check)"] --> A0b["0b. Asset Shrink & Quantization<br/>(/shrink: optimize_images + optimize_pdf)"];
+    A0b --> A["1. Code & Build Verification<br/>(idf.py build in examples/H1OS: 0 warnings, 0 errors)"];
+    A --> B["2. Rev Semantic Version Strings<br/>(h1os_version.h, idf_component.yml, README.md)"];
+    B --> C["3. Regenerate docs/api.md<br/>(doxygen Doxyfile + moxygen)"];
+    C --> D["4. Touch & Update CHANGELOG.md<br/>(Keep a Changelog format with timestamp)"];
+    D --> E["5. Atomic Commit & Push to Feature Branch"];
+    E --> F["6. Checkout main & Merge Feature Branch"];
+    F --> G["7. Push main & Create Annotated Tag<br/>(vX.Y.Z-tag)"];
 ```
 
 ---
@@ -31,22 +31,22 @@ Version strings must never drift across documentation, packaging metadata, and c
 1. **Firmware C Header (`components/h1os/include/h1os/h1os_version.h`):**
    ```c
    #define H1OS_VERSION_MAJOR   2
-   #define H1OS_VERSION_MINOR   3
-   #define H1OS_VERSION_PATCH   3
+   #define H1OS_VERSION_MINOR   4
+   #define H1OS_VERSION_PATCH   5
    #define H1OS_VERSION_TAG     "dev"
-   #define H1OS_VERSION_STRING  "2.3.3-dev"
+   #define H1OS_VERSION_STRING  "2.4.5-dev"
    ```
 2. **Component Registry Manifest (`components/h1os/idf_component.yml`):**
    ```yaml
-   version: "2.3.3-dev"
+   version: "2.4.5-dev"
    ```
 3. **Repository Readme Badge (`README.md`):**
    ```markdown
-   [![Version](https://img.shields.io/badge/H1OS-v2.3.3--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
+   [![Version](https://img.shields.io/badge/H1OS-v2.4.5--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
    ```
 4. **Changelog Release Heading (`CHANGELOG.md`):**
    ```markdown
-   ## [2.3.3-dev] - 2026-10-24
+   ## [2.4.5-dev] - 2026-10-28
    ```
 
 ---
@@ -85,9 +85,9 @@ Every merge to `main` must touch `CHANGELOG.md` adhering to the [Keep a Changelo
 ## 5. Invariant 4: Verified Clean Build & Memory Profiling
 
 Before merging:
-1. Compile using the canonical ESP-IDF v6.1 profile script:
+1. Compile inside `examples/H1OS` using the canonical ESP-IDF v6.1 profile script:
    ```powershell
-   & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev build
+   & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; cd examples/H1OS; idf.py -B build_dev build
    ```
 2. Build must exit with code 0 and ZERO warnings or `-Werror` breaks.
 3. Verify memory budgets using `murdock_memory_budget` to confirm DIRAM, RTC Slow, and Flash app partition headroom remain within design limits.

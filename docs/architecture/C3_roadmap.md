@@ -59,7 +59,7 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] `hal_spi.c`: DMA-backed 20MHz SPI Master bus for SSD1681 display updates and 2MHz half-duplex sensor read.
   - [x] `hal_flash.c`: Sector-aligned erase/read/write for `epd_frame` partition (16KB) with bounds checking.
 - [x] **3.2 Layer 2 Subsystems Concrete Implementation**:
-  - [x] `sub_sensor.c`: SHTC3 physical acquisition (`Wake` -> `Read` -> `Sleep`) and ESP32-S3 internal TSENS die temperature.
+  - [x] `orch_wake_stub.c` (retired `sub_sensor.c`): Headless `RTC_IRAM_ATTR` SHTC3 physical acquisition (`0x3517` -> `0x7866` -> `0xB098`) and Q12 ESP32-S3 internal TSENS die temperature.
   - [x] `sub_rtc.c`: PCF85063A POSIX timekeeping, clock calibration, countdown timer on GPIO 5, remaining duration query.
   - [x] `sub_audio.c`: ES8311 22-register clock tree, CSM state polling, background FreeRTOS worker task (`h1os_audio_worker`), soft-mute ramp teardown.
   - [x] `sub_display.cpp`: SSD1681 dual-RAM Ping-Pong buffer (0x24/0x26), 159-byte partial LUT, GPIO 8 ISR semaphore, on-glass temperature (0x1B).
@@ -67,7 +67,7 @@ Development follows the **Four Canonical Stages of Construction**:
   - [x] `sub_sdcard.c`: Basic SD SPI/MMC initialization, file I/O, format, and capacity checking.
   - [x] `sub_nvs.c`: NVS open, read/write blob, and commit routines.
 - [x] **3.3 Layer 3 Pipeline & Orchestrator Implementation**:
-  - [x] `orch_state.c`: RTC Slow Memory persistent state (<256 bytes), Tri-Node ring buffer, validity bitmasks.
+  - [x] `orch_state.c`: RTC Slow Memory persistent state (`648 bytes` total including 512B 32-slot Tri-Node ring buffer), monotonic wake counters (`boot_count`, `wake_count`, `flow_b_counter`, `button_wake_count`), validity bitmasks.
   - [x] `orch_math.c`: Integer slope delta gating, E-Class psychrometrics (Vapor pressure $e$, Dew point $T_{\text{dew}}$, reconstructed $RH_{\text{amb}}$), EWMA filter.
   - [x] `orch_flow.c`: Flow A sample burst, Flow B interactive session with 80MHz DFS power droop, Zero-Hour conflict suppression, and sleep transition.
   - [x] `orch_display_sync.c`: Dirty-frame tracking, deferred SPI flash commit on sleep and shutdown.
@@ -103,5 +103,8 @@ Development follows the **Four Canonical Stages of Construction**:
 | **E-Paper Residual Charge Mitigation** | Auto full refresh after 6 partials to protect microcapsules | VERIFIED |
 | **Storage Panel Whitening** | Drive panel full white before shutdown | VERIFIED |
 | **MicroSD Rail Optimization** | Audit quiescent draw on battery vs unmounted | VERIFIED |
-| **Asynchronous Audio Worker** | Decoupled non-blocking chimes via FreeRTOS queue | VERIFIED |
-| **Dynamic Sleep Intervals** | User-configurable Flow A & B periods | VERIFIED |
+| **Asynchronous Audio Worker** | Decoupled non-blocking chimes via FreeRTOS queue & static exit semaphore (`s_exit_sem`) | VERIFIED |
+| **Dynamic Sleep Intervals** | User-configurable Flow A & B periods (`h1os_validate_flow_periods` + `h1os_apply_flow_periods`) | VERIFIED |
+| **Dual-Core Parallel `on_sync` & Sleep Barrier (`v2.4.5-dev`)** | Parallel Core 0 `on_sync` + Core 1 EPD refresh gated by static `EventGroup` (`BARRIER_SYNC_DONE \| BARRIER_DISPLAY_DONE`) | VERIFIED |
+| **Cross-Core UI Actor Queue (`v2.4.5-dev`)** | 16-slot static `h1os_ui_post()` queue drained inside `h1os_lvgl_lock(100)` with `sync_wait_ms` coalescing | VERIFIED |
+| **Fatal Startup Battery Protection (`v2.4.5-dev`)** | `on_error` hook + `h1os_handle_fatal_startup_error()` releasing `GPIO 17` (`BAT_CTRL`) on battery fault | VERIFIED |

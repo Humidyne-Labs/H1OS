@@ -7,7 +7,6 @@
  */
 
 #include "h1os/sub_power.h"
-#include "h1os/orch_state.h"
 
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
@@ -23,9 +22,9 @@
 #include "freertos/task.h"
 #include "h1os/hal_io.h"
 #include "h1os/hal_types.h"
-#include "h1os/h1os.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/rtc_io_reg.h"
+#include "ulp_adc.h"
 #include "ulp_h1os.h"
 #include "ulp_riscv.h"
 
@@ -45,10 +44,9 @@ static const char *TAG = "sub_power";
 #define SUB_POWER_CHARGING_RAMP_DELTA_MV        15U    /**< Voltage rise confirming active charging (15 mV). */
 #define SUB_POWER_CHARGING_FLOAT_DELTA_MV       5U     /**< Maximum float delta at CV confirming charged.    */
 
-static adc_oneshot_unit_handle_t s_adc_handle = NULL;
-static adc_cali_handle_t s_cali_handle        = NULL;
-
-static bool s_cali_valid = false;
+static bool              s_ulp_adc_inited = false;
+static adc_cali_handle_t s_cali_handle    = NULL;
+static bool              s_cali_valid     = false;
 
 static const struct {
     uint16_t mv;
@@ -103,29 +101,29 @@ static uint8_t mv_to_percent(uint16_t mv)
  */
 esp_err_t sub_power_init(void)
 {
-    if (s_adc_handle != NULL) {
+    if (s_ulp_adc_inited) {
         return ESP_OK;
     }
 
-    adc_oneshot_unit_init_cfg_t unit_cfg = {
-        .unit_id = ADC_UNIT_1,
+    rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
+
+    /* Use ulp_adc_init() rather than raw adc_oneshot_new_unit() so ESP-IDF loads
+     * the eFuse hardware reference calibration code (adc_set_hw_calibration_code)
+     * into the SAR ADC1 internal analog reg_i2c registers for 12 dB attenuation and
+     * enables the deep-sleep SAR ADC monitor domain (esp_sleep_enable_adc_tsens_monitor). */
+    const ulp_adc_cfg_t ulp_adc_cfg = {
+        .adc_n    = ADC_UNIT_1,
+        .channel  = ADC_CHANNEL_3,
+        .atten    = ADC_ATTEN_DB_12,
+        .width    = ADC_BITWIDTH_DEFAULT,
         .ulp_mode = ADC_ULP_MODE_RISCV,
     };
-    esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &s_adc_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ADC1 unit: %s", esp_err_to_name(err));
+    esp_err_t err = ulp_adc_init(&ulp_adc_cfg);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "Failed to initialize ULP ADC1 CH3: %s", esp_err_to_name(err));
         return err;
     }
-
-    adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten    = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-    };
-    err = adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_3, &chan_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure ADC1 CH3: %s", esp_err_to_name(err));
-        return err;
-    }
+    s_ulp_adc_inited = true;
 
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     adc_cali_curve_fitting_config_t cali_cfg = {
@@ -160,9 +158,9 @@ esp_err_t sub_power_deinit(void)
         s_cali_valid  = false;
     }
 
-    if (s_adc_handle != NULL) {
-        adc_oneshot_del_unit(s_adc_handle);
-        s_adc_handle = NULL;
+    if (s_ulp_adc_inited) {
+        (void)ulp_adc_deinit();
+        s_ulp_adc_inited = false;
     }
     return ESP_OK;
 }
@@ -296,10 +294,10 @@ esp_err_t sub_power_get_ulp_cal_params(uint32_t *out_scale, int32_t *out_offset_
     }
 
     if (s_cali_valid && s_cali_handle != NULL) {
-        int v_2000 = 0;
-        int v_3000 = 0;
-        adc_cali_raw_to_voltage(s_cali_handle, 2000, &v_2000);
-        adc_cali_raw_to_voltage(s_cali_handle, 3000, &v_3000);
+        int32_t v_2000 = 0;
+        int32_t v_3000 = 0;
+        adc_cali_raw_to_voltage(s_cali_handle, 2000, (int *)&v_2000);
+        adc_cali_raw_to_voltage(s_cali_handle, 3000, (int *)&v_3000);
 
         /* Fold the 2x divider directly into slope and offset:
          * m_vbat = (2 * (V_3000 - V_2000) * 4096) / 1000
@@ -340,8 +338,8 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         sub_power_get_ulp_cal_params((uint32_t *)&ulp_cal_scale, (int32_t *)&ulp_cal_offset);
         ESP_LOGI(TAG, "ULP battery linear calibration primed: scale=%lu, offset=%ld mV",
                  (unsigned long)ulp_cal_scale, (long)ulp_cal_offset);
-        ulp_dispatch_reason = ULP_DISPATCH_NONE;
-        ulp_last_wake_btn   = H1OS_WAKE_BTN_NONE;
+        ulp_dispatch_reason = 0;
+        ulp_last_wake_btn   = 0;
         ulp_last_vbat_mv    = 4000;
 
         if (flow_a_period_sec == 0) {
@@ -367,19 +365,12 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         rtc_gpio_deinit(HAL_PIN_RTC_INT);
 
         ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized in Pure Event Mode (ERR-001 Mitigated)");
-    } else if (ulp_last_wake_cause == ULP_WAKE_CAUSE_LONG_OVERFLOW) {
-        /* Account for the final Flow B sleep slice when woken by the RTC countdown timer */
-        volatile orch_persisted_state_t *st = orch_state_get();
-        if (st->sample_interval_sec > 0) {
-            uint32_t flow_a = st->sample_interval_sec;
-            uint32_t flow_b = st->flow_b_period_sec;
-            uint32_t rem    = (flow_b > 0) ? (flow_b % flow_a) : 0;
-            uint32_t final_slice = (rem > 0) ? rem : flow_a;
-            st->total_sleep_sec += final_slice;
-        }
     }
     return ESP_OK;
 }
+
+static uint32_t s_cached_flow_a_sec = 0;
+static uint32_t s_cached_flow_b_sec = 0;
 
 /**
  * @brief Configure ULP slice parameters prior to entering deep sleep.
@@ -391,16 +382,16 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
  */
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 {
-    (void)flow_a_sec;
-    (void)flow_b_sec;
-    ulp_overflow_limit = overflow;
-    ulp_remainder_sec  = remainder_sec;
+    s_cached_flow_a_sec = flow_a_sec;
+    s_cached_flow_b_sec = flow_b_sec;
+    ulp_overflow_limit  = overflow;
+    ulp_remainder_sec   = remainder_sec;
 }
 
 /**
  * @brief Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
  *
- * @param[in]    sleep_seconds   Timer duration in seconds (0 = timer disabled).
+ * @param[in]    sleep_seconds   Timer duration in seconds (Flow A slice duration).
  * @param[in]    ext1_pins_mask  Bitmask of RTC GPIO pins for wakeup (e.g. GPIO 0, 18, 5).
  * @param[in]    mode            Full cycle or Flow A burst mode.
  *
@@ -408,33 +399,24 @@ void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32
  */
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 {
-    (void)sleep_seconds;
     (void)ext1_pins_mask;
-
-    volatile orch_persisted_state_t *st = orch_state_get();
-    st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
-    if (h1os_is_session_active() ||
-        (st->total_sleep_sec - st->last_nvs_commit_sec >= ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC)) {
-        orch_state_save_runtimes_to_nvs();
-        st->last_nvs_commit_sec = st->total_sleep_sec;
-    }
 
     hal_io_isolate_sleep_pads();
 
-    /* Ensure ADC1 is initialized in ULP RISC-V mode before sleep handoff */
-    if (s_adc_handle == NULL) {
-        sub_power_init();
+    /* Ensure ADC1 CH3 is initialized via ulp_adc_init() (loading SAR1 reg_i2c hw cal code) before sleep handoff */
+    if (!s_ulp_adc_inited) {
+        (void)sub_power_init();
     }
 
-    uint32_t flow_a_sec = st->sample_interval_sec;
-    uint32_t flow_b_sec = st->flow_b_period_sec;
-    uint32_t full_slices = (flow_a_sec > 0) ? (flow_b_sec / flow_a_sec) : 0;
+    uint32_t flow_a_sec  = (sleep_seconds > 0U) ? sleep_seconds : s_cached_flow_a_sec;
+    uint32_t flow_b_sec  = s_cached_flow_b_sec;
+    uint32_t full_slices = (flow_a_sec > 0U) ? (flow_b_sec / flow_a_sec) : 0U;
 
     if (mode == SUB_POWER_SLEEP_FULL_CYCLE) {
         ulp_slice_counter = 0;
     }
-    ulp_dispatch_reason = ULP_DISPATCH_NONE;
-    ulp_last_wake_btn   = H1OS_WAKE_BTN_NONE;
+    ulp_dispatch_reason = 0;
+    ulp_last_wake_btn   = 0;
     ulp_rtc_int_stuck   = 0;
     ulp_usb_connected   = sub_power_connected_usb() ? 1 : 0;
     asm volatile("memw" ::: "memory");
@@ -469,10 +451,7 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         rtc_gpio_wakeup_enable(pin, GPIO_INTR_LOW_LEVEL);
     }
 
-    rtc_gpio_init(HAL_PIN_BATTERY_ADC);
-    rtc_gpio_set_direction(HAL_PIN_BATTERY_ADC, RTC_GPIO_MODE_DISABLED);
-    rtc_gpio_pullup_dis(HAL_PIN_BATTERY_ADC);
-    rtc_gpio_pulldown_dis(HAL_PIN_BATTERY_ADC);
+    /* Keep GPIO 4 (ADC1_CH3) analog pad configuration from ulp_adc_init() intact; only ensure pad hold is off */
     rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC);
 
     esp_sleep_enable_ulp_wakeup();

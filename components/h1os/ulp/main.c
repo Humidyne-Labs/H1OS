@@ -54,7 +54,22 @@ volatile uint32_t vbat_ring_count = 0;
 
 #define PMU_RDY_SPIN_MAX               50000
 #define ADC_CONV_SPIN_MAX              10000
+#define SAR1_XPD_SETTLE_US             40
+#define SAR1_START_PULSE_US            2
 // clang-format on
+
+/**
+ * @brief Full RISC-V device I/O and memory fence barrier (`fence iorw, iorw`).
+ *
+ * @details ESP-IDF compiles the ULP-RISC-V target with `-Os`. Issuing `fence iorw, iorw`
+ * with a `"memory"` clobber forces both the compiler and the RV32IMC load/store unit to
+ * drain all preceding MMIO peripheral register writes across the RTC/SENS bus before
+ * executing subsequent register writes or status reads (`PIT-03-B`).
+ */
+static inline void ulp_reg_barrier(void)
+{
+    asm volatile("fence iorw, iorw" ::: "memory");
+}
 
 /**
  * @brief Converts raw ADC tick value to battery voltage in millivolts.
@@ -114,7 +129,7 @@ static inline void ulp_disarm_and_wake_main(void)
  *
  * @return true if conversion completed within timeout, false if timed out.
  */
-static bool ulp_read_vbat_adc_bounded(int32_t *out_raw)
+static bool __attribute__((noinline)) ulp_read_vbat_adc_bounded(int32_t *out_raw)
 {
 #if defined(SENS_SAR_MEAS1_CTRL2_REG) && defined(SENS_MEAS1_DONE_SAR_M)
     /* Verify RTC controller owns SAR1 before starting conversion */
@@ -122,18 +137,49 @@ static bool ulp_read_vbat_adc_bounded(int32_t *out_raw)
         return false;
     }
 
+    /* 1. Force SAR1 analog power-up and explicitly enforce 12 dB attenuation (0x3) on ADC1_CH3 (bits [7:6]) */
+    REG_SET_FIELD(SENS_SAR_POWER_XPD_SAR_REG, SENS_FORCE_XPD_SAR, 0x3U);
+    ulp_reg_barrier();
+
+    SET_PERI_REG_BITS(SENS_SAR_ATTEN1_REG, 0x3U, 0x3U, (ADC_CHANNEL_3 * 2));
+    ulp_reg_barrier();
+
+    REG_SET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_SAR1_EN_PAD_FORCE, 1U);
+    ulp_reg_barrier();
+
+    REG_SET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_MEAS1_START_FORCE, 1U);
+    ulp_reg_barrier();
+
     REG_SET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_SAR1_EN_PAD, (1U << ADC_CHANNEL_3));
+    ulp_reg_barrier();
+
+    /* Allow SAR1 internal voltage reference and 12 dB capacitive attenuator network to settle */
+    ulp_riscv_delay_us(SAR1_XPD_SETTLE_US);
+
+    /* 2. Strobe SENS_MEAS1_START_SAR 0 -> 1 with explicit I/O fence and hold delay */
     REG_SET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_MEAS1_START_SAR, 0);
+    ulp_reg_barrier();
+    ulp_riscv_delay_us(SAR1_START_PULSE_US);
+
     REG_SET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_MEAS1_START_SAR, 1);
+    ulp_reg_barrier();
 
     uint32_t spin = ADC_CONV_SPIN_MAX;
     while (REG_GET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_MEAS1_DONE_SAR) == 0) {
+        asm volatile("" : "+r"(spin));
         if (--spin == 0) {
+            REG_SET_FIELD(SENS_SAR_POWER_XPD_SAR_REG, SENS_FORCE_XPD_SAR, 0x0U);
+            ulp_reg_barrier();
             return false;
         }
     }
 
+    ulp_reg_barrier();
     *out_raw = (int32_t)REG_GET_FIELD(SENS_SAR_MEAS1_CTRL2_REG, SENS_MEAS1_DATA_SAR);
+
+    /* 3. Return SAR1 power control to hardware FSM for low-power deep sleep */
+    REG_SET_FIELD(SENS_SAR_POWER_XPD_SAR_REG, SENS_FORCE_XPD_SAR, 0x0U);
+    ulp_reg_barrier();
     return true;
 #else
     *out_raw = ulp_riscv_adc_read_channel(ADC_UNIT_1, ADC_CHANNEL_3);
@@ -300,20 +346,17 @@ int main(void)
     int32_t pwr_btn  = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_18);
     int32_t rtc_int  = (int32_t)ulp_riscv_gpio_get_level(GPIO_NUM_5);
 
-    bool is_btn_event = (((rtcio_int_st & (BIT(0) | BIT(18))) != 0) || boot_btn == 0 || pwr_btn == 0);
-
+    /* Main Xtensa cores are still in deep sleep here; sample resting battery voltage on every ULP wake */
     uint32_t vbat_mv = last_vbat_mv;
-    if (!is_btn_event) {
-        int32_t raw_adc = 0;
-        if (ulp_read_vbat_adc_bounded(&raw_adc) && raw_adc > 0) {
-            vbat_raw_adc              = (uint32_t)raw_adc;
-            vbat_mv                   = ulp_raw_to_mv(raw_adc);
-            last_vbat_mv              = vbat_mv;
-            vbat_ring[vbat_ring_head] = vbat_mv;
-            vbat_ring_head            = (vbat_ring_head + 1) % ULP_VBAT_RING_SIZE;
-            if (vbat_ring_count < ULP_VBAT_RING_SIZE) {
-                vbat_ring_count++;
-            }
+    int32_t  raw_adc = 0;
+    if (ulp_read_vbat_adc_bounded(&raw_adc) && raw_adc > 0) {
+        vbat_raw_adc              = (uint32_t)raw_adc;
+        vbat_mv                   = ulp_raw_to_mv(raw_adc);
+        last_vbat_mv              = vbat_mv;
+        vbat_ring[vbat_ring_head] = vbat_mv;
+        vbat_ring_head            = (vbat_ring_head + 1) % ULP_VBAT_RING_SIZE;
+        if (vbat_ring_count < ULP_VBAT_RING_SIZE) {
+            vbat_ring_count++;
         }
     }
 

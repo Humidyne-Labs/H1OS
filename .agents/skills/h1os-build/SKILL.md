@@ -3,7 +3,7 @@ name: h1os-build
 description: Authoritative build instructions, environment configuration, and execution commands for H1OS and ESP32-S3 firmware. Eliminates exploratory tool searching by providing the exact Espressif v6.1 profile script, paths, and build targets.
 ---
 
-# H1OS & ESP32-S3 Firmware Build Guide
+# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.5-dev`)
 
 This skill defines the canonical build procedures, paths, and environment activation for **H1OS** on ESP32-S3.
 
@@ -52,7 +52,7 @@ Forces a clean CMake re-generation applying the exact preset configs:
 > Failing to remove `sdkconfig` causes CMake to retain old settings (e.g. `-Og`, debug log levels, heap poisoning) rather than applying the target preset defaults.
 
 ```powershell
-# 1. Remove root sdkconfig before reconfiguring:
+# 1. Remove project sdkconfig before reconfiguring:
 Remove-Item -Force -ErrorAction SilentlyContinue sdkconfig, sdkconfig.old
 
 # 2. Reconfigure target preset:
@@ -101,7 +101,7 @@ Flashes the bootloader, partition table, and application over USB-Serial:
 
 | Directory | Purpose |
 | :--- | :--- |
-| `examples\H1OS` | **Main CMake project root**. All `idf.py` commands run from here. |
-| `components\h1os` | **Core H1OS component library** (HAL, subsystems, state, lifecycle, ULP). |
+| `examples\H1OS` | **Main CMake showcase project root**. All `idf.py` commands run from here. |
+| `components\h1os` | **Core H1OS component library** (HAL, subsystems, orchestrator, lifecycle, ULP). |
 | `examples\H1OS\build_prod` | **Production build output** (`h1os.bin`, `ulp_h1os.bin`, `bootloader.bin`). |
 | `examples\H1OS\build_dev` | **Development build output**. |

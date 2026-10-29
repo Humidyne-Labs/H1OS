@@ -57,6 +57,8 @@ typedef struct {
     uint32_t magic;
     uint32_t boot_count;
     uint32_t wake_count;
+    uint32_t flow_b_counter;
+    uint32_t button_wake_count;
     uint8_t  flags;
     uint8_t  ulp_dispatch_reason;
     uint16_t last_vbat_mv;
@@ -161,15 +163,15 @@ bool  orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current
     - If $\text{remainder} > 0$, on slice $\text{overflow} - 1$, `bsp_wake_stub()` re-arms the hardware timer for $\text{remainder}$ seconds via `rtc_rearm_countdown_stub()`.
   - **Single Variable Authority:** All time logic across the orchestrator, lifecycle, and power subsystems derives strictly from `st->sample_interval_sec` ($T_A$) and `st->flow_b_period_sec` ($T_B$) in RTC Slow Memory. No duplicate file-static variables or fallback constants are permitted.
 
-#### Flow B Wake Profiles & Lifecycle Governance
-1. **User Interactive Wake (`ULP_DISPATCH_MAIN_WAKE` from Button Tap):**
-   - Woken by user tap on `BOOT` or `POWER` (`ulp_last_wake_btn != 0`).
-   - Initializes audio subsystem (`sub_audio_init`), activates the configurable inactivity session (`session.inactivity_timeout_sec`, default 30s), renders the inverted awake indicator badge, and spawns `h1os_session_monitor_task`.
-2. **External RTC Timer Wake (`ULP_DISPATCH_MAIN_WAKE` from PCF85063A Overflow):**
-   - Woken to execute the periodic environmental screen update (`is_rtc_wake == true`).
-   - Skips audio initialization (preserving `<1 µA` codec standby), renders updated telemetry to the E-Paper panel, flushes the framebuffer, and **immediately returns to deep sleep**.
-3. **Cold Boot (`ORCH_FLOW_BOOT`):**
-   - Initializes hardware, loads persisted battery autonomy runtimes from NVS, loads and starts the ULP binary in Pure Event Mode, plays boot chime/splash, invokes `on_boot`, and runs the interactive session.
+#### Flow B Wake Profiles & Dual-Core Lifecycle Governance (`v2.4.5-dev`)
+1. **User Interactive Wake (`H1OS_WAKE_STATE_INTERACTIVE_SESSION` — `ULP_DISPATCH_MAIN_WAKE` from Button Tap):**
+   - Woken by user tap on `BOOT` or `POWER` (`ulp_last_wake_btn != 0`, incrementing `st->button_wake_count`).
+   - Initializes audio subsystem (`sub_audio_init`), activates the configurable inactivity session (`session.inactivity_timeout_sec`, default 30s) via the one-shot `esp_timer` (`s_session_timer`), invokes `on_wake()`, starts Core 1 LVGL (`h1os_lvgl_start(5, 1)`), and dispatches `on_sync()` on Core 0 in parallel.
+2. **External RTC Timer Wake (`H1OS_WAKE_STATE_RTC_FLOW_B` — `ULP_DISPATCH_MAIN_WAKE` from PCF85063A Overflow):**
+   - Woken to execute the periodic environmental screen update and telemetry sync (`is_rtc_wake == true`, incrementing `st->flow_b_counter`).
+   - Skips audio initialization (preserving `<1 µA` codec standby), invokes `on_wake()`, starts Core 1 LVGL (`h1os_lvgl_start(5, 1)`), and executes `on_sync()` on Core 0 in parallel with Core 1's e-Paper refresh. Once the static `EventGroup` sleep barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`) completes, the system **immediately returns to deep sleep**.
+3. **Cold Boot (`H1OS_WAKE_STATE_BOOT` — `ORCH_FLOW_BOOT`):**
+   - Validates flow periods (`h1os_validate_flow_periods()`), initializes hardware (`orch_flow_init()`), applies configured flow periods after `orch_state_reset()` (`h1os_apply_flow_periods()`), loads persisted battery autonomy runtimes from NVS, starts the ULP binary in Pure Event Mode, plays boot chime/splash, invokes `on_boot()`, starts Core 1 LVGL + parallel Core 0 `on_sync()`, and runs the interactive session.
 
 ```c
 typedef enum {

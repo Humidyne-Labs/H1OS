@@ -14,6 +14,7 @@
 static const char *TAG = "HAL_I2C";
 
 static i2c_master_bus_handle_t s_bus_handle = NULL;
+static StaticSemaphore_t s_i2c_mutex_buf;
 static SemaphoreHandle_t s_i2c_mutex        = NULL;
 static bool s_is_inited                     = false;
 
@@ -66,7 +67,7 @@ static esp_err_t hal_i2c_acquire_dev_handle(uint8_t dev_addr, i2c_master_dev_han
 /**
  * @brief Initializes the shared I2C master bus hardware.
  *
- * @details Installs ESP-IDF I2C driver on GPIO 47 / GPIO 48 and creates recursive mutex.
+ * @details Installs ESP-IDF I2C driver on GPIO 47 / GPIO 48 and creates static recursive mutex.
  *
  * @return ESP_OK on success, or driver error code.
  */
@@ -77,7 +78,7 @@ esp_err_t hal_i2c_init(void)
     }
 
     if (!s_i2c_mutex) {
-        s_i2c_mutex = xSemaphoreCreateRecursiveMutex();
+        s_i2c_mutex = xSemaphoreCreateRecursiveMutexStatic(&s_i2c_mutex_buf);
         if (!s_i2c_mutex) {
             ESP_LOGE(TAG, "Failed to create I2C recursive mutex");
             return ESP_ERR_NO_MEM;

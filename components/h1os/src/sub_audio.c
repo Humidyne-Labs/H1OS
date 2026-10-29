@@ -7,7 +7,6 @@
  */
 
 #include "h1os/sub_audio.h"
-#include "h1os/h1os.h"
 
 #include "driver/gpio.h"
 #include "driver/i2s_std.h"
@@ -36,6 +35,7 @@ static const char *TAG = "sub_audio";
 #define SUB_AUDIO_AMP_POWER_ON_DELAY_MS    120U  /**< Class-D amplifier power-up settling delay.  */
 #define SUB_AUDIO_AMP_POWER_OFF_DELAY_MS   80U   /**< Class-D amplifier power-down muting delay.  */
 #define SUB_AUDIO_DEFAULT_WAIT_TIMEOUT_MS  500U  /**< Default playback completion wait timeout.   */
+#define SUB_AUDIO_QUEUE_DEPTH              8U    /**< Static audio command queue depth (8 slots). */
 
 #define ES8311_REG_RESET       0x00
 #define ES8311_REG_SYS_PWR_ANA 0x0D
@@ -52,6 +52,7 @@ typedef enum {
     AUDIO_CMD_TONE = 0,
     AUDIO_CMD_CHIME,
     AUDIO_CMD_PCM,
+    AUDIO_CMD_STOP,
 } audio_cmd_type_t;
 
 typedef struct {
@@ -90,8 +91,10 @@ static bool s_low_power_mode   = true;
 
 RTC_DATA_ATTR static bool s_rtc_codec_in_standby = false;
 
+static StaticQueue_t s_audio_queue_struct;
+static uint8_t       s_audio_queue_storage[SUB_AUDIO_QUEUE_DEPTH * sizeof(audio_cmd_t)];
 static QueueHandle_t s_audio_queue       = NULL;
-static TaskHandle_t  s_audio_task_handle = NULL;
+static volatile TaskHandle_t s_audio_task_handle = NULL;
 static volatile bool s_audio_is_busy     = false;
 
 static uint8_t s_volume_pct = 0;
@@ -100,6 +103,8 @@ static StaticSemaphore_t s_cmd_sync_sem_buffer;
 static SemaphoreHandle_t s_cmd_sync_sem = NULL;
 static StaticSemaphore_t s_audio_idle_sem_buffer;
 static SemaphoreHandle_t s_audio_idle_sem = NULL;
+static StaticSemaphore_t s_audio_stop_sem_buffer;
+static SemaphoreHandle_t s_audio_stop_sem = NULL;
 static int16_t           s_audio_work_buffer[FRAME_SIZE];
 
 #if CONFIG_PM_ENABLE
@@ -134,27 +139,27 @@ static inline void audio_cpu_max_release(void)
 }
 
 static const uint8_t es8311_perceptual_vol_table[101] = {
-    0x00, 0x3A, 0x48, 0x51, 0x57, 
-	0x5D, 0x61, 0x65, 0x68, 0x6B, 
-	0x6E, 0x71, 0x73, 0x75, 0x77, 
-	0x79, 0x7B, 0x7D, 0x7E, 0x80, 
-	0x81, 0x83, 0x84, 0x85, 0x87, 
-	0x88, 0x89, 0x8A, 0x8B, 0x8C, 
-	0x8D, 0x8E, 0x8F, 0x90, 0x91, 
-	0x92, 0x93, 0x94, 0x95, 0x96,
-	0x97, 0x98, 0x99, 0x99, 0x9A, 
-	0x9B, 0x9C, 0x9D, 0x9E, 0x9E, 
-	0x9F, 0xA0, 0xA1, 0xA2, 0xA2, 
-	0xA3, 0xA4, 0xA5, 0xA5, 0xA6,
+    0x00, 0x3A, 0x48, 0x51, 0x57,
+    0x5D, 0x61, 0x65, 0x68, 0x6B,
+    0x6E, 0x71, 0x73, 0x75, 0x77,
+    0x79, 0x7B, 0x7D, 0x7E, 0x80,
+    0x81, 0x83, 0x84, 0x85, 0x87,
+    0x88, 0x89, 0x8A, 0x8B, 0x8C,
+    0x8D, 0x8E, 0x8F, 0x90, 0x91,
+    0x92, 0x93, 0x94, 0x95, 0x96,
+    0x97, 0x98, 0x99, 0x99, 0x9A,
+    0x9B, 0x9C, 0x9D, 0x9E, 0x9E,
+    0x9F, 0xA0, 0xA1, 0xA2, 0xA2,
+    0xA3, 0xA4, 0xA5, 0xA5, 0xA6,
     0xA7, 0xA8, 0xA8, 0xA9, 0xAA,
-	0xAA, 0xAB, 0xAC, 0xAC, 0xAD, 
-	0xAE, 0xAE, 0xAF, 0xB0, 0xB0, 
-	0xB1, 0xB2, 0xB2, 0xB3, 0xB3, 
-	0xB4, 0xB5, 0xB5, 0xB6, 0xB6, 
-	0xB7, 0xB7, 0xB8, 0xB9, 0xB9,
-    0xBA, 0xBA, 0xBB, 0xBC, 0xBC, 
-	0xBD, 0xBD, 0xBE, 0xBE, 0xBF, 
-	0xBF  //---------------------
+    0xAA, 0xAB, 0xAC, 0xAC, 0xAD,
+    0xAE, 0xAE, 0xAF, 0xB0, 0xB0,
+    0xB1, 0xB2, 0xB2, 0xB3, 0xB3,
+    0xB4, 0xB5, 0xB5, 0xB6, 0xB6,
+    0xB7, 0xB7, 0xB8, 0xB9, 0xB9,
+    0xBA, 0xBA, 0xBB, 0xBC, 0xBC,
+    0xBD, 0xBD, 0xBE, 0xBE, 0xBF,
+    0xBF
 };
 
 /*
@@ -335,7 +340,7 @@ static esp_err_t sub_audio_read_chip_id(uint16_t *chip_id)
 static esp_err_t sub_audio_flush_frame(void)
 {
     esp_err_t ret = ESP_ERR_INVALID_STATE;
-    if (s_audio_inited && s_i2s_chan_enabled) {
+    if (s_audio_inited && s_i2s_chan_enabled && s_tx_chan != NULL) {
         int16_t *buffer = s_audio_work_buffer;
         memset(buffer, 0x0000, sizeof(s_audio_work_buffer));
 
@@ -534,35 +539,40 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
         ESP_LOGI(TAG, "ES8311 Codec & NS4168 Amp initialized successfully (16kHz Mono, Vol: %u%%)", volume_pct);
     }
 
+    if (s_audio_stop_sem == NULL) {
+        s_audio_stop_sem = xSemaphoreCreateBinaryStatic(&s_audio_stop_sem_buffer);
+    }
+
     if (s_audio_queue == NULL) {
-        s_audio_queue = xQueueCreate(8, sizeof(audio_cmd_t));
-        if (s_audio_queue != NULL) {
-            TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
-            BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task,
-                                                        "h1os_audio_worker",
-                                                        SUB_AUDIO_TASK_STACK_WORKER,
-                                                        (void *)current_task,
-                                                        SUB_AUDIO_TASK_PRIO_WORKER,
-                                                        &s_audio_task_handle,
-                                                        tskNO_AFFINITY);
-            if (res == pdPASS) {
-                if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
-                    ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
-                    vTaskDelete(s_audio_task_handle);
-                    s_audio_task_handle = NULL;
-                    vQueueDelete(s_audio_queue);
-                    s_audio_queue = NULL;
-                    audio_cpu_max_release();
-                    return ESP_ERR_TIMEOUT;
-                }
-            } else {
-                ESP_LOGE(TAG, "Failed to create audio worker task: %d", res);
-                vQueueDelete(s_audio_queue);
-                s_audio_queue = NULL;
+        s_audio_queue = xQueueCreateStatic(SUB_AUDIO_QUEUE_DEPTH,
+                                           sizeof(audio_cmd_t),
+                                           s_audio_queue_storage,
+                                           &s_audio_queue_struct);
+    } else {
+        xQueueReset(s_audio_queue);
+    }
+
+    if (s_audio_task_handle == NULL) {
+        TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
+        TaskHandle_t worker_handle = NULL;
+        BaseType_t res = xTaskCreatePinnedToCore(audio_worker_task,
+                                                 "h1os_audio_worker",
+                                                 SUB_AUDIO_TASK_STACK_WORKER,
+                                                 (void *)current_task,
+                                                 SUB_AUDIO_TASK_PRIO_WORKER,
+                                                 &worker_handle,
+                                                 tskNO_AFFINITY);
+        if (res == pdPASS) {
+            s_audio_task_handle = worker_handle;
+            if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(500)) == 0) {
+                ESP_LOGE(TAG, "Audio worker task startup timeout (>500ms). Deleting orphan task.");
+                vTaskDelete(worker_handle);
+                s_audio_task_handle = NULL;
                 audio_cpu_max_release();
-                return ESP_ERR_NO_MEM;
+                return ESP_ERR_TIMEOUT;
             }
         } else {
+            ESP_LOGE(TAG, "Failed to create audio worker task: %d", res);
             audio_cpu_max_release();
             return ESP_ERR_NO_MEM;
         }
@@ -686,7 +696,9 @@ static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t durati
         }
 
         size_t bytes_written = 0;
-        (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        if (s_tx_chan != NULL) {
+            (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        }
         samples_generated += chunk_size;
     }
 }
@@ -719,7 +731,9 @@ static void sub_audio_render_pcm_samples(const int16_t *samples, size_t sample_c
         }
 
         size_t bytes_written = 0;
-        (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        if (s_tx_chan != NULL) {
+            (void)i2s_channel_write(s_tx_chan, buffer, sizeof(s_audio_work_buffer), &bytes_written, pdMS_TO_TICKS(100));
+        }
         samples_sent += chunk;
     }
 }
@@ -880,6 +894,9 @@ static void audio_worker_task(void *pvParameters)
 
     while (1) {
         if (xQueueReceive(s_audio_queue, &cmd, portMAX_DELAY) == pdTRUE) {
+            if (cmd.type == AUDIO_CMD_STOP) {
+                break;
+            }
             s_audio_is_busy = true;
             audio_cpu_max_acquire();
 
@@ -920,6 +937,13 @@ static void audio_worker_task(void *pvParameters)
             }
         }
     }
+
+    s_audio_is_busy     = false;
+    s_audio_task_handle = NULL;
+    if (s_audio_stop_sem != NULL) {
+        (void)xSemaphoreGive(s_audio_stop_sem);
+    }
+    vTaskDelete(NULL);
 }
 
 /**
@@ -933,7 +957,7 @@ static void audio_worker_task(void *pvParameters)
  */
 static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, uint32_t wait_ms)
 {
-    if (s_audio_queue == NULL) {
+    if (s_audio_queue == NULL || s_audio_task_handle == NULL) {
         esp_err_t err = sub_audio_init(s_volume_pct);
         if (err != ESP_OK) {
             return err;
@@ -1075,12 +1099,31 @@ esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 }
 
 /**
- * @brief Teardown audio subsystem, stop background worker task, and delete I2S channel.
+ * @brief Teardown audio subsystem, stop background worker task cleanly, and delete I2S channel.
  *
  * @return ESP_OK on success.
  */
 esp_err_t sub_audio_deinit(void)
 {
+    (void)sub_audio_wait_idle(1000);
+
+    if (s_audio_task_handle != NULL && s_audio_queue != NULL) {
+        if (s_audio_stop_sem == NULL) {
+            s_audio_stop_sem = xSemaphoreCreateBinaryStatic(&s_audio_stop_sem_buffer);
+        }
+        (void)xSemaphoreTake(s_audio_stop_sem, 0);
+        audio_cmd_t stop_cmd = {.type = AUDIO_CMD_STOP};
+        if (xQueueSendToBack(s_audio_queue, &stop_cmd, pdMS_TO_TICKS(50)) != pdTRUE) {
+            xQueueReset(s_audio_queue);
+            (void)xQueueSendToBack(s_audio_queue, &stop_cmd, 0);
+        }
+        (void)xSemaphoreTake(s_audio_stop_sem, pdMS_TO_TICKS(500));
+        if (s_audio_task_handle != NULL) {
+            vTaskDelete(s_audio_task_handle);
+            s_audio_task_handle = NULL;
+        }
+    }
+
     sub_audio_standby();
 
     if (s_tx_chan != NULL) {
@@ -1092,14 +1135,8 @@ esp_err_t sub_audio_deinit(void)
         s_tx_chan = NULL;
     }
 
-    if (s_audio_task_handle != NULL) {
-        vTaskDelete(s_audio_task_handle);
-        s_audio_task_handle = NULL;
-    }
-
     if (s_audio_queue != NULL) {
-        vQueueDelete(s_audio_queue);
-        s_audio_queue = NULL;
+        xQueueReset(s_audio_queue);
     }
 
 #if CONFIG_PM_ENABLE
@@ -1177,35 +1214,4 @@ esp_err_t sub_audio_set_low_power_mode(bool enable)
 bool sub_audio_get_low_power_mode(void)
 {
     return s_low_power_mode;
-}
-
-/* =========================================================================
- * Layer 4 Public Audio API Implementations
- * ========================================================================= */
-
-esp_err_t h1os_audio_play_raw(const int16_t *ptr, size_t len, size_t *bytes_written)
-{
-    if (ptr == NULL || len < sizeof(int16_t)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    esp_err_t err = sub_audio_play(SUB_AUDIO_PCM, ptr, len);
-    if (err == ESP_OK && bytes_written != NULL) {
-        *bytes_written = len;
-    }
-    return err;
-}
-
-esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
-{
-    if (freq_hz < 100 || freq_hz > 10000 || duration_ms < 10 || duration_ms > 5000) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    uint32_t params[2] = {freq_hz, duration_ms};
-    return sub_audio_play(SUB_AUDIO_TONE, params, sizeof(params));
-}
-
-esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
-{
-    uint8_t type_val = (uint8_t)chime_type;
-    return sub_audio_play(SUB_AUDIO_CHIME, &type_val, sizeof(type_val));
 }

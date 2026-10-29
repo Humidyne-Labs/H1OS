@@ -6,7 +6,7 @@ This rule governs source code documentation across all public headers (`componen
 
 High-quality code documentation serves two equal masters:
 1. **The Human Engineers:** Rapid comprehension of preconditions, hardware physics, and API contracts.
-2. **The Automation Tooling:** Flawless automated generation of developer manuals via Doxygen and `moxygen` into `docs/api.md`.
+2. **The Automation Tooling:** Deterministic automated generation of developer manuals via Doxygen and `moxygen` into `docs/api.md`.
 
 ---
 
@@ -21,8 +21,8 @@ Use Javadoc-style comment blocks:
  * @details Extended technical explanation detailing register manipulation,
  *          timings, or hardware constraints.
  *
- * @param[in]  config    Pointer to valid configuration struct. Must not be NULL.
- * @param[out] out_value Calculated telemetry value in engineering units.
+ * @param[in]  rtc_time  Pointer to valid calendar time struct. Must not be NULL.
+ * @param[out] out_epoch Calculated POSIX timestamp in seconds.
  *
  * @return
  *   - ESP_OK: Operation completed successfully.
@@ -32,7 +32,7 @@ Use Javadoc-style comment blocks:
  * @note Thread-safe. Acquires the shared I2C bus mutex.
  * @warning Must NOT be invoked from ISR context.
  */
-esp_err_t sub_sensor_read_sample(const sensor_cfg_t *config, float *out_value);
+esp_err_t sub_rtc_read_epoch(struct tm *rtc_time, int64_t *out_epoch);
 ```
 
 ---
@@ -54,13 +54,15 @@ Use trailing `/**< ... */` comments for members and enumerators:
 
 ```c
 /**
- * @brief Persistent RTC Slow Memory state block.
+ * @brief Persistent RTC Slow Memory state block (648 bytes total).
  */
 typedef struct {
-    uint32_t magic;                    /**< Sentinel validation magic word (0x48314F53). */
-    uint32_t boot_count;               /**< Total monotonic system boot cycles. */
-    uint16_t last_vbat_mv;             /**< Last sampled battery terminal voltage in mV. */
-    uint8_t  epd_partial_refresh_count;/**< Quota counter for panel DC bias clearing. */
+    uint32_t magic;                     /**< State validation magic word (0x534C4154 'SLAT'). */
+    uint32_t boot_count;                /**< Total monotonic cold-boot cycles. */
+    uint32_t flow_b_counter;            /**< Total monotonic Flow B application wake cycles. */
+    uint32_t button_wake_count;         /**< Total monotonic tactile button wake events. */
+    uint16_t last_vbat_mv;              /**< Last sampled battery terminal voltage in mV. */
+    uint8_t  epd_partial_refresh_count; /**< Quota counter for panel DC bias clearing. */
 } orch_persisted_state_t;
 
 /**

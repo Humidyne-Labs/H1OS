@@ -106,7 +106,9 @@ typedef struct {
 typedef struct {
     uint32_t magic; /**< State validation magic word (ORCH_RTC_MAGIC).                         */
     uint32_t boot_count; /**< Total monotonic system boot cycles.                                   */
-    uint32_t wake_count; /**< Monotonic deep sleep wake cycle count.                                */
+    uint32_t wake_count; /**< Monotonic deep sleep wake cycle count (Flow A + Flow B + Button).     */
+    uint32_t flow_b_counter; /**< Monotonic unattended RTC Flow B presentation wake cycle count.        */
+    uint32_t button_wake_count; /**< Monotonic interactive tactile button wake cycle count.                */
     uint8_t flags; /**< Operating state flags (ORCH_FLAG_*).                                  */
     uint8_t ulp_dispatch_reason; /**< Reason code from last ULP coprocessor dispatch.                       */
     uint16_t last_vbat_mv; /**< Last sampled battery terminal voltage in millivolts.                  */

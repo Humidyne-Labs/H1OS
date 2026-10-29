@@ -140,7 +140,7 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
 | **Power Latch** | Scattered across app & drivers | **`h1os_boot_hook`** asserts latch; HAL releases on shutdown |
 | **No-Battery Operation** | Spurious shutdown on $0\text{mV}$ | **Zero-Volt Cable Guard** (bypasses shutdown on USB) |
 | **Framebuffer Storage** | RTC memory (failed) $\to$ flash partition | SPI flash partition (`epd_frame`, 16KB) only |
-| **RTC Slow Memory Use** | ~5200 bytes (Over capacity) | **< 256 bytes** (Minimal footprint) |
+| **RTC Slow Memory Use** | ~5200 bytes (Over capacity) | **648 bytes** (`orch_persisted_state_t`, including 512B 32-slot ring buffer) |
 | **Flash Write Timing** | On every partial/full flush | **Deferred** to sleep and shutdown only |
 | **Sub-Execution Budget** | ~15–25 ms (checking locks & math) | **Fast burst** (pure HAL raw read + integer gate) |
 | **Public API** | Fragmented across `bsp_*.h` headers | Unified `h1os.h` (`h1os_app_start`, `sleep`, `shutdown`) |
@@ -245,3 +245,30 @@ This document captures the engineering decisions, dead ends, and post-mortem ana
   - Configured `SENS_TSENS_XPD_FORCE = 1` during sample and `0` on sleep.
   - Implemented the de-assert latch step (`DUMP_OUT = 1` $\rightarrow$ poll `READY` $\rightarrow$ `DUMP_OUT = 0` $\rightarrow$ read `OUT`).
   - Increased `ORCH_TSENS_READY_TIMEOUT_CYCLES` to `1000U` (5 ms ceiling).
+
+### 4.14 Cold-Boot Flow Period Initialization Order Trap (`v2.4.5-dev` / `MANDATE-02` / `REV-01`)
+- **The Issue:** User-configured `session.flow_a_period_sec` and `session.flow_b_period_sec` (e.g., `60 s` / `300 s`) were silently overwritten with default fallback periods (`60 s` / `900 s`) on every cold power-on reset (`ORCH_FLOW_BOOT`).
+- **Root Cause:** `h1os_start()` called `h1os_set_flow_periods_internal()` *before* `orch_flow_init()`. On cold boot, `orch_flow_init()` saw `st->magic != ORCH_RTC_MAGIC` and invoked `orch_state_reset()`, which wiped `st->sample_interval_sec = 60` and `st->flow_b_period_sec = 900`, clobbering the values written microseconds earlier.
+- **The Solution:** Split flow-period handling into `h1os_validate_flow_periods()` (called before `orch_flow_init()` to fail fast on invalid arguments before touching hardware) and `h1os_apply_flow_periods()` (called *after* `orch_flow_init()` / `orch_state_reset()` so configured periods are written to the initialized `RTC_SLOW_MEM` block and armed into the ULP and PCF85063A).
+
+### 4.15 Dual-Core Concurrency, `h1os_ui_post` Lock Protection & `EventGroup` Sleep Barrier (`v2.4.5-dev` / `MANDATE-04` / `REV-02`)
+- **The Issue:** Executing network/peripheral I/O (`on_wake`) sequentially before starting Core 1 LVGL wasted 350–1500 ms of battery-active time per Flow B wake, while proposed drafts that drained `h1os_ui_post()` outside `h1os_lvgl_lock()` or held `h1os_lvgl_lock(1000)` across `on_wake`/`on_pre_sleep` introduced data races and deadlocks.
+- **The Solution:**
+  1. Start Core 1 LVGL (`h1os_lvgl_start(5, 1)`) immediately after `on_wake()` returns, then invoke `on_sync()` on Core 0 in parallel with the SSD1681 display refresh.
+  2. Drain all queued `h1os_ui_post()` callbacks on Core 1 **strictly inside `h1os_lvgl_lock(100)`** immediately prior to `lv_timer_handler()` (`REV-02`), and remove outer `h1os_lvgl_lock(1000)` wrappers around `on_boot`, `on_wake`, `on_pre_sleep`, and `on_shutdown`.
+  3. Coordinate sleep entry using a static FreeRTOS `EventGroup` barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`) with `h1os_sync_hold()` / `h1os_sync_notify_complete()` and an optional `session.sync_wait_ms` inbound pre-flush gate to coalesce `on_wake` + `on_sync` updates into a single physical e-Paper refresh.
+
+### 4.16 Post-`GPIO_INTR_NEGEDGE` 250 ms Electrophoretic Settling Window & Fatal Startup Latch Cut (`v2.4.5-dev` / `MANDATE-06` / `REV-03` / `REV-04`)
+- **The Issue:**
+  1. After replacing `sub_display_wait_busy()` polling with a zero-latency `GPIO_INTR_NEGEDGE` interrupt semaphore on `GPIO 8` (`EPD_BUSY`), `sub_display_enter_deep_sleep()` sent command `0x10` (`0x01`) within microseconds of `BUSY` falling low, cutting charge pumps before electrophoretic microcapsules finished mechanical deceleration.
+  2. Using `ESP_RETURN_ON_ERROR` inside `h1os_start()` after the 2nd-stage bootloader had already latched `GPIO 17` (`BAT_CTRL = 1`) meant any cold-boot hardware fault returned to `app_main()` with the battery LDO permanently latched on, draining the LiPo cell to brownout.
+- **The Solution:**
+  1. Enforced a mandatory `250 ms` settling delay (`SUB_DISPLAY_SETTLING_WINDOW_MS`) inside `sub_display_enter_deep_sleep()` between `sub_display_wait_busy()` and command `0x10` (`0x01`) (`REV-04`).
+  2. Implemented `h1os_handle_fatal_startup_error()` (`MANDATE-06` / `REV-03`), which invokes `on_error(err, stage)` and immediately releases `GPIO 17` (`hal_io_release_power_latch()`) on battery power (or enters `EXT0` deep sleep on `GPIO 18` when USB power is attached).
+
+### 4.17 ULP-RISC-V SAR ADC1 Full-Scale Saturation Trap (`raw = 4095` / `vbat = 6917 mV`) (`v2.4.5-dev` / `ERR-S6` / `REV-09`)
+- **The Issue:** On hardware bench testing with a charged AntPow `AP502535` 400 mAh LiPo cell ($4.10\text{–}4.20\text{ V}$ across the $200\text{ k}\Omega / 200\text{ k}\Omega$ divider + tap filter capacitor on `GPIO 4`), `[ULP TELEMETRY]` reported `vbat=6917 mV (raw=4095)` across every deep sleep wake cycle, while the UI displayed `4.00 V` due to the `> 4500 mV` fallback clamp in `sub_power_get_battery_status()`.
+- **Root Cause:**
+  1. `sub_power_init()` called `adc_oneshot_new_unit()` (`.ulp_mode = ADC_ULP_MODE_RISCV`) and `adc_oneshot_config_channel()` (`.atten = ADC_ATTEN_DB_12`) directly instead of ESP-IDF's `ulp_adc_init()`. In ESP-IDF, `adc_oneshot_config_channel()` does not load the eFuse hardware reference calibration code (`adc_set_hw_calibration_code(ADC_UNIT_1, ADC_ATTEN_DB_12)`) into the SAR ADC1 internal analog `reg_i2c` registers until `adc_oneshot_read()` is called on the main CPU. Because H1OS never calls `adc_oneshot_read()` on the main CPU, the internal analog reference remained uncalibrated and `esp_sleep_enable_adc_tsens_monitor(true)` was omitted, causing the 12-bit SAR comparator to clip at `4095` for any input above $\sim 1.1\text{ V}$.
+  2. `ulp_read_vbat_adc_bounded()` in `ulp/main.c` did not force `SENS_FORCE_XPD_SAR = 0x3` or enforce `ADC_ATTEN_DB_12` (`0x3`) in `SENS_SAR_ATTEN1_REG` before starting conversion, and `sub_power_enter_deep_sleep_mode()` / `hal_io_release_pad_holds()` re-initialized/de-initialized `GPIO 4` (`HAL_PIN_BATTERY_ADC`) after `s_adc_io_init()`.
+- **The Solution:** Replaced raw `adc_oneshot_new_unit()` in `sub_power_init()` with `ulp_adc_init(&ulp_adc_cfg)`, enforced `SENS_FORCE_XPD_SAR = 0x3` and `SENS_SAR_ATTEN1_REG` (`12 dB`) inside `ulp_read_vbat_adc_bounded()`, and preserved `GPIO 4`'s analog pad configuration across sleep and wake transitions.

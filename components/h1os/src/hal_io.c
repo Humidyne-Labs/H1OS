@@ -576,7 +576,7 @@ esp_err_t hal_io_release_pad_holds(void)
     rtc_gpio_deinit(HAL_PIN_RTC_INT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
     rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
-    rtc_gpio_deinit(HAL_PIN_BATTERY_ADC);
+    /* Keep HAL_PIN_BATTERY_ADC (GPIO 4) in analog/RTC mode; never connect digital input buffer to 2.08V divider tap */
 
     gpio_hold_dis(HAL_PIN_EPD_CS);
     gpio_hold_dis(HAL_PIN_EPD_RST);

@@ -61,9 +61,9 @@ The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
-- **`h1os_version.h`**: Semantic version macros (`2.4.4-dev`) and inline getters.
-- **`h1os_lifecycle.c`**: Declarative lifecycle engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`.
-- **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, keypad indev binding, 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
+- **`h1os_version.h`**: Semantic version macros (`2.4.5-dev`) and inline getters.
+- **`h1os_lifecycle.c`**: Declarative lifecycle & dual-core concurrency engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_sync_hold()`, `h1os_sync_notify_complete()`, `h1os_display_notify_quiescent()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`, plus Layer 4 peripheral wrappers (`h1os_sdcard_mount_async()`, `h1os_sdcard_unmount()`, `h1os_led_start_breathing()`, `h1os_led_stop_breathing()`, `h1os_led_set()`).
+- **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, 16-slot static `h1os_ui_post()` cross-core actor queue drained inside `h1os_lvgl_lock(100)`, inbound `sync_wait_ms` single-refresh coalescing gate, keypad indev binding, and 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.
 
 ---
@@ -78,14 +78,14 @@ The public interface of H1OS exposed to developers.
    - If user holds POWER $\ge 2.5\text{s}$, ULP primes instant clean power-off (`ULP_DISPATCH_POWER_OFF`).
 2. **Flow B Execution Profiles & Sleep Timing:**
    - **User Tap Wake (Interactive Session):** Initiated by a user button tap on `GPIO 0` or `GPIO 18`. System activates the configurable inactivity session (`inactivity_timeout_sec`, default 30s) and displays the inverted awake badge. LVGL native `lv_indev` owns buttons. Between user interactions, DFS drops CPU to 80 MHz baseline. Any user click resets the inactivity timer.
-   - **External RTC Timer Wake (Unattended Refresh):** Initiated when PCF85063A countdown slices reach `overflow_limit` on `GPIO 5`. The dual-core processor boots, renders the updated telemetry dashboard to the E-Paper panel (skipping audio codec initialization), flushes the framebuffer, and **goes right back to sleep immediately** once the display update completes.
-   - **Boot:** Initiated by initial battery insertion or power-on. System boots, synchronizes RTC time, renders boot splash and initial screen, and runs the configured `inactivity_timeout_sec` interactive session before entering deep sleep.
-3. **Deterministic Sleep Transition Sequence (`h1os_sleep` -> `orch_flow_transition_to_sleep`):**
-   1. Trigger optional pre-sleep chime/splash and invoke application `on_pre_sleep` hook under `h1os_lvgl_lock()`.
-   2. Drain LVGL rendering and flush pipeline completely and stop the Core 1 LVGL task (`h1os_quiesce_lvgl_pipeline()`).
-   3. Wait for audio playback idle (`sub_audio_wait_idle()`) and place ES8311 + NS4168 into `<1 µA` standby (`sub_audio_standby()`).
-   4. Wait for physical EPD BUSY falling edge on `GPIO 8` (`sub_display_wait_busy()`).
-   5. Commit dirty framebuffer to raw SPI flash partition `epd_frame` if modified (`orch_display_sync_save_if_dirty()`).
-   6. Command SSD1681 display controller into Deep Sleep Mode 1 (`sub_display_enter_deep_sleep()`).
+   - **External RTC Timer Wake (Unattended Flow B Refresh & Parallel Sync):** Initiated when PCF85063A countdown slices reach `overflow_limit` on `GPIO 5` (`H1OS_WAKE_STATE_RTC_FLOW_B`, incrementing `flow_b_counter`). The dual-core processor boots, invokes `on_wake()`, starts the Core 1 LVGL task (`h1os_lvgl_start(5, 1)`), and runs `on_sync()` on Core 0 **in parallel** with Core 1's e-Paper refresh (skipping audio codec initialization). Once both `BARRIER_SYNC_DONE` and `BARRIER_DISPLAY_DONE` assert in the static `EventGroup` sleep barrier, the system **goes right back to sleep immediately**.
+   - **Boot (`H1OS_WAKE_STATE_BOOT`):** Initiated by initial battery insertion or power-on (`boot_count` incremented). System validates flow periods before `orch_flow_init()`, applies configured flow periods after `orch_state_reset()`, synchronizes RTC time, renders boot splash (`on_boot()`), spawns Core 1 LVGL + parallel Core 0 `on_sync()`, and runs the configured `inactivity_timeout_sec` interactive session before entering deep sleep. If any cold-boot initialization fails, `h1os_handle_fatal_startup_error()` invokes `on_error()` and releases `GPIO 17` (`BAT_CTRL`) on battery power (`MANDATE-06`).
+3. **Deterministic Sleep Transition Sequence (`h1os_sleep` -> `orch_flow_execute_sleep`):**
+   1. Wait on the static FreeRTOS `EventGroup` sleep barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`) bounded by `session.sync_timeout_ms`.
+   2. Trigger optional pre-sleep chime/splash and invoke application `on_pre_sleep` hook (without holding an outer `h1os_lvgl_lock`, allowing `h1os_ui_post()` queueing).
+   3. Drain LVGL rendering, actor queue, and flush pipeline completely and stop the Core 1 LVGL task (`h1os_quiesce_lvgl_pipeline()`).
+   4. Wait for audio playback idle (`sub_audio_wait_idle()`) and place ES8311 + NS4168 into `<1 µA` standby (`sub_audio_standby()`).
+   5. Wait for physical EPD BUSY falling edge on `GPIO 8` (`sub_display_wait_busy()`) and enforce the mandatory **250 ms post-`BUSY` electrophoretic settling delay** (`SUB_DISPLAY_SETTLING_WINDOW_MS`) inside `sub_display_enter_deep_sleep()` before sending command `0x10` (`0x01`).
+   6. Commit dirty framebuffer to raw SPI flash partition `epd_frame` if modified (`orch_display_sync_save_if_dirty()`).
    7. Arm external PCF85063A countdown timer for initial Flow A slice (`sub_rtc_arm_countdown()`) and install `bsp_wake_stub`.
    8. Persist cumulative autonomy runtimes to NVS, isolate static sleep pads, drain `RTC_INT` and button lines HIGH, arm ULP GPIO wakeup, and enter deep sleep (`sub_power_enter_deep_sleep()`).

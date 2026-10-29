@@ -81,18 +81,16 @@ The H1OS 8-Domain Catalog maps directly to established safety-critical C/C++ cod
 
 ## 4. The 8-Domain Firmware Pitfalls Catalog
 
-```
-flowchart TD
-    Audit["H1OS-STD-001 Audit Framework"]
-    Audit --> D1["1. Multicore Concurrency & FreeRTOS"]
-    Audit --> D2["2. Sleep, Wake & Power Domains"]
-    Audit --> D3["3. Coprocessor & CDC Synchronization"]
-    Audit --> D4["4. Bus Topologies & Shared Peripherals"]
-    Audit --> D5["5. Memory Invariants & State Persistence"]
-    Audit --> D6["6. Metrology & Numerical Precision"]
-    Audit --> D7["7. Display Pipeline & Async Refresh"]
-    Audit --> D8["8. Driver State Machine & Error Handling"]
-
+```mermaid
+graph TD;
+    Audit["H1OS-STD-001 Audit Framework"] --> D1["1. Multicore Concurrency & FreeRTOS"];
+    Audit --> D2["2. Sleep, Wake & Power Domains"];
+    Audit --> D3["3. Coprocessor & CDC Synchronization"];
+    Audit --> D4["4. Bus Topologies & Shared Peripherals"];
+    Audit --> D5["5. Memory Invariants & State Persistence"];
+    Audit --> D6["6. Metrology & Numerical Precision"];
+    Audit --> D7["7. Display Pipeline & Async Refresh"];
+    Audit --> D8["8. Driver State Machine & Error Handling"];
 ```
 
 ### Domain 1: Multicore Concurrency & FreeRTOS Synchronization
@@ -186,7 +184,7 @@ Firmware must fail safely and deterministically without leaving peripherals in h
 
 Auditors (human engineers or automated verification agents) must execute the following five-stage verification pipeline in strict sequential order:
 
-```
+```mermaid
 sequenceDiagram
     participant Auditor as Auditor (Engineer / Agent)
     participant Git as Step 1: Diff Scoping
@@ -227,7 +225,7 @@ Execute deterministic pattern and AST checks across all modified files before be
 2. **Unbounded Wait Trap (`PIT-01-B` / JPL Rule 2):**
 
    ```
-   rg "portMAX_DELAY" components/hal/ components/sub/ components/orch/
+   rg "portMAX_DELAY" components/h1os/src/
    
    ```
 
@@ -293,7 +291,7 @@ Both builds must terminate with **0 errors and 0 warnings**, and `.su` frame del
 
 ### Step 5: Formal Audit Certification Report
 
-Every completed audit must generate an immutable verification artifact in `docs/agent_notes/audits/YYYY-MM-DD_<slug>.md` adhering strictly to the schema in Section 6.
+Every completed audit must generate an immutable verification artifact in `docs/audits/` adhering strictly to the schema in Section 6.
 
 ## 6. Standardized Audit Report Template
 

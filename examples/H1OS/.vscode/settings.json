@@ -26,7 +26,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=${workspaceFolder}\\examples\\H1OS\\build_dev"
+    "--compile-commands-dir=c:\\Users\\Matt\\Documents\\GitHub\\H1OS\\examples\\H1OS\\build_prod"
   ],
   "idf.currentSetup": "C:\\esp\\v6.1\\esp-idf"
 }

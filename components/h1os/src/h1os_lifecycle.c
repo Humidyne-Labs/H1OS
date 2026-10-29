@@ -12,6 +12,7 @@
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "h1os.h"
 #include "h1os_lvgl.h"
@@ -29,6 +30,7 @@
 #include "sub_nvs.h"
 #include "sub_power.h"
 #include "sub_rtc.h"
+#include "sub_sdcard.h"
 #include "ulp_h1os.h"
 
 #include <stdio.h>
@@ -36,11 +38,16 @@
 
 static const char *TAG = "h1os_lifecycle";
 
-#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).    */
-#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V).*/
-#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.    */
-#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.       */
-#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.       */
+#define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS       6000U /**< Max wait to drain LVGL rendering (6s).     */
+#define LIFECYCLE_DEFAULT_SYNC_TIMEOUT_MS     5000U /**< Default max wait for parallel on_sync (5s).*/
+#define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV  3250U /**< Critical brownout warning voltage (3.25V). */
+#define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U   /**< Minimum 3.0% SoC rebound to reset lap.     */
+#define LIFECYCLE_POWER_KEY_POLL_CYCLES       200U  /**< Power key debounce loop iterations.        */
+#define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD  4U    /**< Stable HIGH consecutive read count.        */
+
+#define BARRIER_SYNC_DONE    (1U << 0) /**< EventGroup bit: Core 0 sync phase complete.        */
+#define BARRIER_DISPLAY_DONE (1U << 1) /**< EventGroup bit: Core 1 LVGL/EPD pipeline quiescent.*/
+#define BARRIER_ALL_READY    (BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE)
 
 static h1os_lifecycle_t   s_app_lifecycle     = {0};
 static esp_timer_handle_t s_session_timer     = NULL;
@@ -48,8 +55,93 @@ static volatile bool      s_session_running   = false;
 static bool               s_audio_initialized = false;
 static portMUX_TYPE       s_session_mux       = portMUX_INITIALIZER_UNLOCKED;
 
+static StaticEventGroup_t s_sleep_barrier_buf;
+static EventGroupHandle_t s_sleep_barrier_group = NULL;
+static volatile bool      s_sync_held           = false;
+
 /* Retain previous battery state across deep-sleep cycles in RTC Slow SRAM for accurate charger unplug detection */
 RTC_DATA_ATTR static h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING;
+
+static esp_err_t h1os_validate_flow_periods(uint32_t flow_a_sec,
+                                            uint32_t flow_b_sec,
+                                            uint32_t *out_overflow,
+                                            uint32_t *out_remainder);
+static esp_err_t h1os_apply_flow_periods(uint32_t flow_a_sec,
+                                         uint32_t flow_b_sec,
+                                         bool reset_slice_counter);
+
+/**
+ * @brief Initialize and clear the static FreeRTOS EventGroup sleep barrier.
+ */
+static void h1os_barrier_init_and_reset(void)
+{
+    if (s_sleep_barrier_group == NULL) {
+        s_sleep_barrier_group = xEventGroupCreateStatic(&s_sleep_barrier_buf);
+    }
+    s_sync_held = false;
+    (void)xEventGroupClearBits(s_sleep_barrier_group, BARRIER_ALL_READY);
+}
+
+/**
+ * @brief Hold the deep-sleep barrier open for an asynchronous synchronization task.
+ */
+void h1os_sync_hold(void)
+{
+    s_sync_held = true;
+}
+
+/**
+ * @brief Signal that Core 0 data synchronization is complete (`BARRIER_SYNC_DONE`).
+ */
+void h1os_sync_notify_complete(void)
+{
+    s_sync_held = false;
+    h1os_lvgl_release_sync_gate();
+    if (s_sleep_barrier_group != NULL) {
+        (void)xEventGroupSetBits(s_sleep_barrier_group, BARRIER_SYNC_DONE);
+    }
+}
+
+/**
+ * @brief Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`BARRIER_DISPLAY_DONE`).
+ */
+void h1os_display_notify_quiescent(void)
+{
+    if (s_sleep_barrier_group != NULL) {
+        (void)xEventGroupSetBits(s_sleep_barrier_group, BARRIER_DISPLAY_DONE);
+    }
+}
+
+/**
+ * @brief Fatal startup / lifecycle error handler with battery latch protection (MANDATE-06).
+ *
+ * @details Invokes the user `on_error` hook (if registered), places audio and display
+ *          subsystems into low-power standby, releases the `GPIO 17` (`BAT_CTRL`) power
+ *          latch so battery-powered units immediately power down without draining the
+ *          LiPo cell, and enters emergency EXT0 deep sleep if USB VBUS is attached.
+ */
+static void h1os_handle_fatal_startup_error(const h1os_lifecycle_t *config, esp_err_t err, const char *stage)
+{
+    ESP_LOGE(TAG, "[FATAL STARTUP ERROR] Stage '%s' failed with %s (0x%x)",
+             (stage != NULL) ? stage : "unknown", esp_err_to_name(err), (unsigned int)err);
+
+    if (config != NULL && config->on_error != NULL) {
+        config->on_error(err, (stage != NULL) ? stage : "unknown", config->user_data);
+    }
+
+    (void)sub_audio_standby();
+    (void)sub_display_enter_deep_sleep();
+
+    sub_power_cut_power_latch();
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGW(TAG, "External USB power detected after fatal error; entering standby (wake: POWER button)");
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    rtc_gpio_pullup_en(HAL_PIN_BUTTON_POWER);
+    rtc_gpio_pulldown_dis(HAL_PIN_BUTTON_POWER);
+    esp_sleep_enable_ext0_wakeup(HAL_PIN_BUTTON_POWER, 0);
+    esp_deep_sleep_start();
+}
 
 /**
  * @brief One-shot esp_timer callback fired when the interactive session inactivity window expires.
@@ -70,7 +162,12 @@ static void h1os_session_timeout_timer_cb(void *arg)
     ESP_LOGI(TAG, "Interactive session timeout reached (%lu s inactivity). Entering deep sleep...",
              (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
 
-    uint32_t sleep_sec = orch_state_get()->flow_b_period_sec;
+    /* Commit discharge lap autonomy metrics to NVS at the end of an interactive session */
+    volatile orch_persisted_state_t *st = orch_state_get();
+    orch_state_save_runtimes_to_nvs();
+    st->last_nvs_commit_sec = st->total_sleep_sec;
+
+    uint32_t sleep_sec = st->flow_b_period_sec;
     if (sleep_sec == 0) {
         ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0. Aborting to safe shutdown.");
         h1os_shutdown();
@@ -152,7 +249,7 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
 }
 
 /**
- * @brief H1os trigger splash.
+ * @brief H1os trigger splash under scoped LVGL lock.
  *
  * @param[in]    type            Parameter type.
  *
@@ -161,7 +258,10 @@ static void h1os_trigger_chime(h1os_chime_type_t type)
 static void h1os_trigger_splash(h1os_splash_type_t type)
 {
     if (s_app_lifecycle.presentation.on_splash != NULL) {
-        s_app_lifecycle.presentation.on_splash(type, s_app_lifecycle.user_data);
+        if (h1os_lvgl_lock(1000)) {
+            s_app_lifecycle.presentation.on_splash(type, s_app_lifecycle.user_data);
+            h1os_lvgl_unlock();
+        }
     }
 }
 
@@ -170,6 +270,7 @@ static void h1os_trigger_splash(h1os_splash_type_t type)
  */
 static void h1os_quiesce_lvgl_pipeline(void)
 {
+    h1os_lvgl_release_sync_gate();
     if (h1os_lvgl_has_pending_tasks()) {
         ESP_LOGI(TAG, "Waiting for LVGL pipeline to drain...");
         esp_err_t err = h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
@@ -242,12 +343,14 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
         trigger_desc = "ULP Periodic Sleep Timer (60s tick)";
         break;
     case ORCH_FLOW_B_MAIN_WAKE:
-        flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
         if (ulp_last_wake_btn == H1OS_WAKE_BTN_BOOT) {
+            flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
             trigger_desc = "ULP Tactile Press (BOOT / GPIO 0)";
         } else if (ulp_last_wake_btn == H1OS_WAKE_BTN_POWER) {
+            flow_title = "[FLOW B - INTERACTIVE UI SESSION]";
             trigger_desc = "ULP Tactile Press (POWER / GPIO 18)";
         } else {
+            flow_title = "[FLOW B - UNATTENDED RTC REFRESH & SYNC]";
             trigger_desc = "External RTC Alarm / Timer Tick";
         }
         break;
@@ -269,9 +372,11 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
     ESP_LOGI(TAG, "================================================================================");
     ESP_LOGI(TAG, ">>> H1OS ACTIVE FLOW: %s <<<", flow_title);
     ESP_LOGI(TAG, ">>> Trigger Source  : %s", trigger_desc);
-    ESP_LOGI(TAG, ">>> Boot Count      : %lu | Wake Count: %lu | Session Inactivity: %lu s",
+    ESP_LOGI(TAG, ">>> Boot: %lu | Wakes: %lu (FlowB: %lu, Btn: %lu) | Session Timeout: %lu s",
              (unsigned long)st->boot_count,
              (unsigned long)st->wake_count,
+             (unsigned long)st->flow_b_counter,
+             (unsigned long)st->button_wake_count,
              (unsigned long)s_app_lifecycle.session.inactivity_timeout_sec);
     ESP_LOGI(TAG, "================================================================================");
 }
@@ -280,18 +385,17 @@ static void h1os_log_flow_banner(orch_flow_type_t flow)
  * @brief H1os early system bringup.
  *
  * @param[in]    config          Parameter config.
+ * @param[out]   out_flow        Detected execution flow.
  *
- * @return Return value of type static orch_flow_type_t.
+ * @return ESP_OK on success, or an error code.
  */
 static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t *config, orch_flow_type_t *out_flow)
 {
-    if (out_flow == NULL) {
+    if (out_flow == NULL || config == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (config != NULL) {
-        s_app_lifecycle = *config;
-    }
+    s_app_lifecycle = *config;
 
     esp_err_t err = sub_power_init_dfs(s_app_lifecycle.session.clk_mode);
     if (err != ESP_OK) {
@@ -342,9 +446,31 @@ static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t *config, orch_
     /* Load persisted autonomy runtimes from NVS after cold-boot orch_state_reset() so NVS values are preserved */
     if (flow == ORCH_FLOW_BOOT) {
         orch_state_load_runtimes_from_nvs();
+    } else {
+        /* Dump ULP telemetry before any slice counter reset on wake */
+        debug_dump_ulp_telemetry();
     }
 
     volatile orch_persisted_state_t *st = orch_state_get();
+
+    /* Commit flow periods AFTER orch_flow_determine_wakeup() so cold-boot orch_state_reset() does not wipe them,
+     * and deep-sleep wakes preserve runtime periods set via h1os_set_flow_periods() */
+    if (flow == ORCH_FLOW_BOOT ||
+        h1os_validate_flow_periods(st->sample_interval_sec, st->flow_b_period_sec, NULL, NULL) != ESP_OK) {
+        err = h1os_apply_flow_periods(config->session.flow_a_period_sec,
+                                      config->session.flow_b_period_sec,
+                                      true);
+        if (err != ESP_OK) {
+            return err;
+        }
+    } else {
+        err = h1os_apply_flow_periods(st->sample_interval_sec,
+                                      st->flow_b_period_sec,
+                                      false);
+        if (err != ESP_OK) {
+            return err;
+        }
+    }
 
     ESP_LOGI(TAG, "Booting %s (%s) Version %s [Flow A: %lus, Flow B: %lus]",
              H1OS_NAME,
@@ -355,11 +481,7 @@ static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t *config, orch_
 
     h1os_log_flow_banner(flow);
 
-    if (flow != ORCH_FLOW_BOOT) {
-        debug_dump_ulp_telemetry();
-    }
-
-    /* Call sub_power_init_ulp on all flows: loads ULP on cold boot, or accounts for final Flow B sleep slice on RTC overflow wake */
+    /* Initialize ULP on cold boot / non-ULP wake with validated non-zero sample_interval_sec */
     err = sub_power_init_ulp(st->sample_interval_sec);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "sub_power_init_ulp failed: %s", esp_err_to_name(err));
@@ -398,7 +520,7 @@ static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 }
 
 /**
- * @brief H1os launch interactive session.
+ * @brief H1os launch interactive or unattended Flow B session with dual-core parallel sync barrier.
  *
  * @param[in]    flow            Parameter flow.
  *
@@ -407,16 +529,15 @@ static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 {
     ESP_LOGI(TAG, "Launching Flow B Main Session...");
-    bool is_wake = (flow != ORCH_FLOW_BOOT);
+    bool is_wake     = (flow != ORCH_FLOW_BOOT);
     bool is_rtc_wake = false;
     bool button_woke = false;
-    uint32_t causes = 0;
+    uint32_t causes  = 0;
 
     if (is_wake) {
         causes = esp_sleep_get_wakeup_causes();
         if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
             ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
-
             is_rtc_wake = false;
         } else if (causes & BIT(ESP_SLEEP_WAKEUP_ULP)) {
             button_woke = (ulp_last_wake_btn != 0);
@@ -463,26 +584,42 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 
     volatile orch_persisted_state_t *st = orch_state_get();
 
+    h1os_wake_state_t wake_state = H1OS_WAKE_STATE_BOOT;
+    if (is_wake) {
+        wake_state = button_woke ? H1OS_WAKE_STATE_INTERACTIVE_SESSION : H1OS_WAKE_STATE_RTC_FLOW_B;
+    }
+
+    h1os_wake_context_t ctx = {
+        .reset_reason       = esp_reset_reason(),
+        .wakeup_causes      = causes,
+        .wake_state         = wake_state,
+        .boot_count         = st->boot_count,
+        .deep_sleep_count   = st->wake_count,
+        .flow_b_count       = st->flow_b_counter,
+        .button_wake_count  = st->button_wake_count,
+        .woke_from_button   = button_woke,
+        .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
+        .sleep_duration_sec = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
+        .user_data          = s_app_lifecycle.user_data,
+    };
+
+    h1os_barrier_init_and_reset();
+
     if (flow == ORCH_FLOW_BOOT) {
         h1os_trigger_chime(H1OS_CHIME_BOOT);
-        h1os_lvgl_lock(1000);
         h1os_trigger_splash(H1OS_SPLASH_BOOT);
-        if (s_app_lifecycle.on_boot) {
+        if (s_app_lifecycle.on_boot != NULL) {
             s_app_lifecycle.on_boot(s_app_lifecycle.user_data);
         }
-        h1os_lvgl_unlock();
-    } else if (s_app_lifecycle.on_wake) {
-        h1os_wake_context_t ctx = {.reset_reason = esp_reset_reason(),
-                                   .wakeup_causes = causes,
-                                   .boot_count = st->boot_count,
-                                   .deep_sleep_count = st->wake_count,
-                                   .woke_from_button = button_woke,
-                                   .wake_button = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
-                                   .sleep_duration_sec = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
-                                   .user_data = s_app_lifecycle.user_data};
-        h1os_lvgl_lock(1000);
+    } else if (s_app_lifecycle.on_wake != NULL) {
         s_app_lifecycle.on_wake(&ctx, s_app_lifecycle.user_data);
-        h1os_lvgl_unlock();
+    }
+
+    /* Arm inbound pre-flush gate if configured so initial widgets + inbound sync coalesce into one refresh */
+    if (s_app_lifecycle.on_sync != NULL && s_app_lifecycle.session.sync_wait_ms > 0U) {
+        h1os_lvgl_set_sync_gate(s_app_lifecycle.session.sync_wait_ms);
+    } else {
+        h1os_lvgl_set_sync_gate(0U);
     }
 
     err = h1os_lvgl_start(5, 1);
@@ -491,13 +628,45 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         return err;
     }
 
+    /* Dispatch parallel on_sync hook on Core 0 while Core 1 drives the LVGL / SSD1681 display pipeline */
+    if (s_app_lifecycle.on_sync != NULL) {
+        s_app_lifecycle.on_sync(&ctx, s_app_lifecycle.user_data);
+        if (!s_sync_held) {
+            h1os_sync_notify_complete();
+        }
+    } else {
+        h1os_sync_notify_complete();
+    }
+
     if (is_rtc_wake) {
-        /* Wait on the event-driven LVGL idle semaphore for the updated screen frame to flush */
+        uint32_t sync_to_ms = (s_app_lifecycle.session.sync_timeout_ms > 0U)
+                                  ? s_app_lifecycle.session.sync_timeout_ms
+                                  : LIFECYCLE_DEFAULT_SYNC_TIMEOUT_MS;
+        uint32_t barrier_to_ms = (sync_to_ms > LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS)
+                                     ? sync_to_ms
+                                     : LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS;
+
+        EventBits_t bits = xEventGroupWaitBits(s_sleep_barrier_group,
+                                               BARRIER_ALL_READY,
+                                               pdFALSE,
+                                               pdTRUE,
+                                               pdMS_TO_TICKS(barrier_to_ms));
+        if ((bits & BARRIER_ALL_READY) != BARRIER_ALL_READY) {
+            ESP_LOGW(TAG, "Sleep barrier timeout after %lu ms (bits=0x%02lx: SYNC=%d, DISP=%d); releasing gate",
+                     (unsigned long)barrier_to_ms,
+                     (unsigned long)bits,
+                     (bits & BARRIER_SYNC_DONE) ? 1 : 0,
+                     (bits & BARRIER_DISPLAY_DONE) ? 1 : 0);
+            h1os_lvgl_release_sync_gate();
+        }
+
+        /* Ensure any UI updates queued via h1os_ui_post() just prior to BARRIER_SYNC_DONE finish flushing */
         err = h1os_lvgl_wait_idle(LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "h1os_lvgl_wait_idle warning: %s", esp_err_to_name(err));
         }
-        ESP_LOGI(TAG, "RTC Countdown wake completed screen refresh. Entering deep sleep immediately.");
+
+        ESP_LOGI(TAG, "RTC Countdown wake completed parallel refresh & sync. Entering deep sleep immediately.");
         uint32_t sleep_sec = st->flow_b_period_sec;
         if (sleep_sec == 0) {
             ESP_LOGE(TAG, "Lifecycle configuration error: flow_b_period_sec is 0 on RTC wake. Aborting to safe shutdown.");
@@ -520,18 +689,12 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 }
 
 /**
- * @brief Initialize H1OS and dispatch application lifecycle.
- *
- * @param[in]    config          Parameter config.
- *
- * @return ESP_OK on success, or an error code.
+ * @brief Validate Flow A and Flow B periods against all 6 MANDATE-02 silicon and slicing invariants.
  */
-/**
- * @brief Internal validator and atomic setter for Flow A and Flow B periods.
- *
- * Enforces all silicon constraints, ordering invariants, and remainder slice floors.
- */
-static esp_err_t h1os_set_flow_periods_internal(uint32_t flow_a_sec, uint32_t flow_b_sec)
+static esp_err_t h1os_validate_flow_periods(uint32_t flow_a_sec,
+                                            uint32_t flow_b_sec,
+                                            uint32_t *out_overflow,
+                                            uint32_t *out_remainder)
 {
     /* Invariant 1: Flow A bounds (60s .. 14400s / 4h) */
     if (flow_a_sec < H1OS_FLOW_A_MIN_SEC || flow_a_sec > H1OS_FLOW_A_MAX_SEC) {
@@ -585,6 +748,29 @@ static esp_err_t h1os_set_flow_periods_internal(uint32_t flow_a_sec, uint32_t fl
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (out_overflow != NULL) {
+        *out_overflow = overflow;
+    }
+    if (out_remainder != NULL) {
+        *out_remainder = remainder;
+    }
+    return ESP_OK;
+}
+
+/**
+ * @brief Atomically commit validated Flow A and Flow B periods to RTC Slow SRAM and ULP slice registers.
+ */
+static esp_err_t h1os_apply_flow_periods(uint32_t flow_a_sec,
+                                         uint32_t flow_b_sec,
+                                         bool reset_slice_counter)
+{
+    uint32_t overflow  = 0;
+    uint32_t remainder = 0;
+    esp_err_t err = h1os_validate_flow_periods(flow_a_sec, flow_b_sec, &overflow, &remainder);
+    if (err != ESP_OK) {
+        return err;
+    }
+
     /* Atomic commit to RTC Slow Memory */
     volatile orch_persisted_state_t *st = orch_state_get();
     st->sample_interval_sec = flow_a_sec;
@@ -597,7 +783,9 @@ static esp_err_t h1os_set_flow_periods_internal(uint32_t flow_a_sec, uint32_t fl
 
     /* Synchronize ULP and power subsystem */
     sub_power_set_sleep_slices(flow_a_sec, flow_b_sec, overflow, remainder);
-    ulp_slice_counter = 0;
+    if (reset_slice_counter) {
+        ulp_slice_counter = 0;
+    }
     asm volatile("memw" ::: "memory");
 
     ESP_LOGI(TAG, "Configured flow periods: Flow A = %lu s, Flow B = %lu s (Slices=%lu, Remainder=%lu s)",
@@ -609,7 +797,7 @@ static esp_err_t h1os_set_flow_periods_internal(uint32_t flow_a_sec, uint32_t fl
 
 esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec)
 {
-    esp_err_t err = h1os_set_flow_periods_internal(flow_a_sec, flow_b_sec);
+    esp_err_t err = h1os_apply_flow_periods(flow_a_sec, flow_b_sec, true);
     if (err != ESP_OK) {
         return err;
     }
@@ -624,13 +812,16 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Validate and commit flow periods through the single internal setter */
-    esp_err_t flow_err = h1os_set_flow_periods_internal(
+    /* Validate flow periods up front before touching hardware */
+    esp_err_t flow_err = h1os_validate_flow_periods(
         config->session.flow_a_period_sec,
-        config->session.flow_b_period_sec
+        config->session.flow_b_period_sec,
+        NULL,
+        NULL
     );
     if (flow_err != ESP_OK) {
         ESP_LOGE(TAG, "Fatal lifecycle configuration: flow periods failed validation (%s)", esp_err_to_name(flow_err));
+        h1os_handle_fatal_startup_error(config, flow_err, "flow_period_validation");
         return flow_err;
     }
 
@@ -638,6 +829,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
     esp_err_t bringup_err = h1os_early_system_bringup(config, &flow);
     if (bringup_err != ESP_OK) {
         ESP_LOGE(TAG, "System bringup failed (%s)", esp_err_to_name(bringup_err));
+        h1os_handle_fatal_startup_error(config, bringup_err, "early_system_bringup");
         return bringup_err;
     }
 
@@ -645,7 +837,13 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config)
         return ESP_OK;
     }
 
-    return h1os_launch_interactive_session(flow);
+    esp_err_t sess_err = h1os_launch_interactive_session(flow);
+    if (sess_err != ESP_OK) {
+        ESP_LOGE(TAG, "Interactive session launch failed (%s)", esp_err_to_name(sess_err));
+        h1os_handle_fatal_startup_error(config, sess_err, "launch_interactive_session");
+        return sess_err;
+    }
+    return ESP_OK;
 }
 
 /**
@@ -699,12 +897,17 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->raw_shtc3_temp_c = t;
         out_telemetry->mcu_die_temp_c   = st->window_avg_die_c;
     }
-    out_telemetry->sample_count = st->total_samples;
-    out_telemetry->sensor_fail_count  = st->sensor_fail_count;
-    out_telemetry->last_sensor_error  = st->last_sensor_error;
-    out_telemetry->is_rh_alert_active = ((st->flags & ORCH_FLAG_RH_ALERT_ACTIVE) != 0);
-    out_telemetry->flow_a_period_sec  = st->sample_interval_sec;
-    out_telemetry->flow_b_period_sec  = st->flow_b_period_sec;
+    out_telemetry->sample_count        = st->total_samples;
+    out_telemetry->boot_count          = st->boot_count;
+    out_telemetry->wake_count          = st->wake_count;
+    out_telemetry->flow_b_count        = st->flow_b_counter;
+    out_telemetry->button_wake_count   = st->button_wake_count;
+    out_telemetry->ulp_dispatch_reason = st->ulp_dispatch_reason;
+    out_telemetry->sensor_fail_count   = st->sensor_fail_count;
+    out_telemetry->last_sensor_error   = st->last_sensor_error;
+    out_telemetry->is_rh_alert_active  = ((st->flags & ORCH_FLAG_RH_ALERT_ACTIVE) != 0);
+    out_telemetry->flow_a_period_sec   = st->sample_interval_sec;
+    out_telemetry->flow_b_period_sec   = st->flow_b_period_sec;
 
     uint16_t vbat_mv = 0;
     uint8_t vbat_pct = 0;
@@ -756,21 +959,27 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
         ESP_LOGE(TAG, "Lifecycle error: h1os_sleep received sleep_sec = 0. Aborting sleep transition.");
         return ESP_ERR_INVALID_ARG;
     }
+    bool was_session_running = false;
     portENTER_CRITICAL(&s_session_mux);
-    s_session_running = false;
+    was_session_running = s_session_running;
+    s_session_running   = false;
     portEXIT_CRITICAL(&s_session_mux);
     if (s_session_timer != NULL) {
         esp_timer_stop(s_session_timer);
     }
 
+    if (was_session_running) {
+        volatile orch_persisted_state_t *st = orch_state_get();
+        orch_state_save_runtimes_to_nvs();
+        st->last_nvs_commit_sec = st->total_sleep_sec;
+    }
+
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);
     h1os_trigger_chime(H1OS_CHIME_SLEEP);
-    h1os_lvgl_lock(1000);
     h1os_trigger_splash(H1OS_SPLASH_SLEEP);
-    if (s_app_lifecycle.on_pre_sleep) {
+    if (s_app_lifecycle.on_pre_sleep != NULL) {
         s_app_lifecycle.on_pre_sleep(sleep_sec, s_app_lifecycle.user_data);
     }
-    h1os_lvgl_unlock();
 
     h1os_quiesce_lvgl_pipeline();
     return orch_flow_transition_to_sleep(sleep_sec);
@@ -799,12 +1008,10 @@ static void execute_system_shutdown(bool force_clean_white)
     }
 
     h1os_trigger_chime(H1OS_CHIME_SHUTDOWN);
-    h1os_lvgl_lock(1000);
     h1os_trigger_splash(H1OS_SPLASH_SHUTDOWN);
-    if (s_app_lifecycle.on_shutdown) {
+    if (s_app_lifecycle.on_shutdown != NULL) {
         s_app_lifecycle.on_shutdown(s_app_lifecycle.user_data);
     }
-    h1os_lvgl_unlock();
 
     h1os_quiesce_lvgl_pipeline();
 
@@ -884,7 +1091,7 @@ esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t *out_samples, size_t
     if (out_samples == NULL || max_samples == 0 || out_count == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    return orch_state_get_ring_chronological(out_samples, max_samples, out_count);
+    return orch_state_get_ring_chronological(out_samples, max_samples, out_count) ? ESP_OK : ESP_FAIL;
 }
 
 /**
@@ -915,4 +1122,70 @@ esp_err_t h1os_display_force_clear(void)
         orch_display_sync_mark_dirty();
     }
     return err;
+}
+
+/* =========================================================================
+ * Layer 4 Public Audio, MicroSD Storage, and Status LED API Implementations
+ * ========================================================================= */
+
+esp_err_t h1os_audio_play_raw(const int16_t *ptr, size_t len, size_t *bytes_written)
+{
+    if (ptr == NULL || len < sizeof(int16_t)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_err_t err = sub_audio_play(SUB_AUDIO_PCM, ptr, len);
+    if (err == ESP_OK && bytes_written != NULL) {
+        *bytes_written = len;
+    }
+    return err;
+}
+
+esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
+{
+    if (freq_hz < 100U || freq_hz > 10000U || duration_ms < 10U || duration_ms > 5000U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    uint32_t params[2] = {freq_hz, duration_ms};
+    return sub_audio_play(SUB_AUDIO_TONE, params, sizeof(params));
+}
+
+esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
+{
+    uint8_t type_val = (uint8_t)chime_type;
+    return sub_audio_play(SUB_AUDIO_CHIME, &type_val, sizeof(type_val));
+}
+
+bool h1os_sdcard_is_mounted(void)
+{
+    return sub_sdcard_is_mounted();
+}
+
+esp_err_t h1os_sdcard_get_capacity_mb(uint32_t *out_capacity_mb)
+{
+    return sub_sdcard_get_capacity_mb(out_capacity_mb);
+}
+
+esp_err_t h1os_sdcard_mount_async(void)
+{
+    return sub_sdcard_mount_async();
+}
+
+esp_err_t h1os_sdcard_unmount(void)
+{
+    return sub_sdcard_unmount();
+}
+
+void h1os_led_start_breathing(uint32_t period_ms)
+{
+    hal_led_start_breathing(period_ms);
+}
+
+void h1os_led_stop_breathing(void)
+{
+    hal_led_stop_breathing();
+}
+
+void h1os_led_set(bool on)
+{
+    hal_io_set_led(on);
 }

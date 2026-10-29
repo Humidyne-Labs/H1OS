@@ -52,10 +52,10 @@ The ESP32-S3 contains a hardware IEEE 754 single-precision floating point unit (
   ```
 - **Math Functions:** Always invoke single-precision `libm` variants: `expf()`, `logf()`, `powf()`, `fabsf()`.
 
-### Rule 3: Deterministic Memory Allocation
+### Rule 3: Deterministic Memory Allocation & 100% Static RTOS Primitives (`PIT-04-C`)
 - **Zero Runtime Dynamic Allocation:** Unbounded calls to `malloc()`, `calloc()`, `realloc()`, `free()`, or C++ `new`/`delete` are strictly banned inside FreeRTOS task loops, callbacks, and worker routines.
-- **Initialization Pools:** Dynamic allocation is permitted exclusively during board bring-up (`app_main()` / `h1os_start()`) prior to task activation (e.g. allocating large display framebuffers in external PSRAM).
-- **Persistent State:** Long-lived state must be allocated statically or placed in RTC Slow Memory (`RTC_DATA_ATTR`) for deep sleep survival.
+- **100% Static RTOS Primitives:** Never call dynamic FreeRTOS allocation APIs (`xSemaphoreCreateMutex`, `xQueueCreate`, `xEventGroupCreate`). Always pair `StaticSemaphore_t`, `StaticQueue_t`, and `StaticEventGroup_t` with `xSemaphoreCreateMutexStatic()`, `xSemaphoreCreateRecursiveMutexStatic()`, `xSemaphoreCreateBinaryStatic()`, `xQueueCreateStatic()`, and `xEventGroupCreateStatic()`.
+- **Persistent State:** Long-lived state must be allocated statically or placed in RTC Slow Memory (`RTC_DATA_ATTR` `orch_persisted_state_t`, `648 bytes`) for deep sleep survival.
 
 ### Rule 4: Guard-Clause Control Flow
 - **Early Exit Pattern:** Avoid nested `if/else` conditional pyramids (arrow anti-pattern). Validate preconditions and error statuses immediately with guard clauses:
@@ -107,9 +107,20 @@ The ESP32-S3 contains a hardware IEEE 754 single-precision floating point unit (
 - Public API interfaces accepting pointer arguments must validate inputs against `NULL` prior to dereferencing.
 
 ### Rule 11: Dynamic Frequency Scaling (DFS) & Turbo Blitz Invariants
-- **80 MHz Quiescent Baseline:** The main dual-core Xtensa CPU cores are gated down to an 80 MHz baseline during interactive standby, input polling, FreeRTOS idle, and quiescent sensor acquisition to minimize thermal dissipation and current draw.
-- **240 MHz LVGL Blitz:** During LVGL widget rendering, dirty rectangle calculation, font glyph rasterization, 1-bit monochrome pixel packing, and SSD1681 differential SPI frame transfer ("LVGL Blitz"), the CPU frequency must be bumped to 240 MHz via `sub_power_cpu_max_acquire()`. Upon completion of display flushing, the lock is released to drop back to 80 MHz immediately.
+- **80 MHz Quiescent Baseline:** The main dual-core Xtensa CPU cores are gated down to an 80 MHz baseline during interactive standby, `GPIO 8` (`EPD_BUSY`) interrupt waits, FreeRTOS idle, and headless Flow A sensor acquisition to minimize thermal dissipation and current draw.
+- **240 MHz LVGL Blitz:** During LVGL widget rendering, dirty rectangle calculation, font glyph rasterization, 1-bit monochrome pixel packing, and SSD1681 differential SPI frame transfer ("LVGL Blitz"), the CPU frequency must be bumped to 240 MHz via `sub_power_cpu_max_acquire()`. Upon completion of SPI DMA transfer, the lock is released to drop back to 80 MHz while waiting on the `EPD_BUSY` falling-edge interrupt.
 - **240 MHz Audio Playback Invariant:** During I2S audio initialization and tone/chime playback, `sub_power_cpu_max_acquire()` must be held. Without this clock lock, APB frequency droop during DFS drops the I2S MCLK/BCLK dividers, causing playback pitch to shift octaves lower and triggering DMA FIFO underruns.
+
+### Rule 12: Dual-Core Lifecycle Concurrency, `h1os_ui_post` & Sleep Barrier (`MANDATE-04`)
+- **Parallel Core 0 `on_sync` & Core 1 UI Refresh:** In Flow B, `on_sync()` runs on Core 0 in parallel with Core 1's LVGL v9 task (`h1os_lvgl`, priority `5`).
+- **Actor Queue UI Mutation:** Core 0 background tasks and `on_sync()` handlers must post UI updates via `h1os_ui_post(fn, arg, timeout_ms)` (drained on Core 1 inside `h1os_lvgl_lock(100)` before `lv_timer_handler()`), or acquire `h1os_lvgl_lock(timeout_ms)` with an explicit timeout.
+- **Sleep Barrier Coordination:** Deep sleep entry is gated by the static `EventGroup` barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`). Asynchronous `on_sync` handlers must call `h1os_sync_hold()` before returning and `h1os_sync_notify_complete()` when done.
+
+### Rule 13: Cooperative Worker Teardown (`PIT-01-E`)
+- Never call `vTaskDelete()` externally on an active peripheral worker task or tear down hardware channels (`i2s_del_channel`, `spi_bus_remove_device`) while a worker task may be mid-transfer. Signal the worker to stop and wait on a static completion binary semaphore (`s_exit_sem` / `s_stop_done_sem`).
+
+### Rule 14: Fatal Startup Battery Latch Release (`MANDATE-06`)
+- Any fatal cold-boot initialization failure in `h1os_start()` must invoke `h1os_handle_fatal_startup_error()` (`on_error`) to release `GPIO 17` (`BAT_CTRL`) on battery power (or enter `EXT0` deep sleep on `GPIO 18` when USB power is attached) so a faulted board never drains the LiPo battery.
 
 ---
 

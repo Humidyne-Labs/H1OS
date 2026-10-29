@@ -95,7 +95,7 @@ When the system enters deep sleep (`hal_io_isolate_sleep_pads()` and `sub_power_
 | `GPIO 46` | `PA_CTRL` | Output | **LOW (0)** | `gpio_hold_en` | Keeps NS4168 amplifier in zero-power mute |
 | `GPIO 14,15,16,38,45` | `I2S_*` | Output | **LOW (0)** | `gpio_hold_en` | Prevents floating I2S clock/data line leakage |
 | `GPIO 3` | `STATUS_LED` | Output (OD) | **HIGH (1)** | `gpio_hold_en` | Turns status LED OFF |
-| `GPIO 0` | `BUTTON_BOOT` | RTC Input | **Pullup EN** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Live ULP GPIO Wakeup Trigger (Low level) |
-| `GPIO 18` | `BUTTON_POWER`| RTC Input | **Pullup EN** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Live ULP GPIO Wakeup Trigger (Low level) |
+| `GPIO 0` | `BUTTON_BOOT` | RTC Input | **Pullup DIS (Ext 10kΩ)** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Live ULP GPIO Wakeup Trigger (Low level) |
+| `GPIO 18` | `BUTTON_POWER`| RTC Input | **Pullup DIS (Ext 10kΩ)** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Live ULP GPIO Wakeup Trigger (Low level) |
 | `GPIO 5` | `RTC_INT` | RTC Input | **Pullup EN** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Live ULP GPIO Wakeup Trigger (Low level) |
 | `GPIO 4` | `BATTERY_ADC` | RTC Disabled | **Hi-Z** | **Hold Disabled (`rtc_gpio_hold_dis`)** | Isolated for ULP SAR ADC1_CH3 sampling |

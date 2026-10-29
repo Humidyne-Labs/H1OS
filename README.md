@@ -3,7 +3,7 @@
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.1-blue.svg)](https://idf.espressif.com/)
 [![Target](https://img.shields.io/badge/Hardware-Waveshare%20ESP32--S3--ePaper--1.54%20V2-green.svg)](https://www.waveshare.com)
 [![Graphics](https://img.shields.io/badge/LVGL-v9.6.0-orange.svg)](https://lvgl.io/)
-[![Version](https://img.shields.io/badge/H1OS-v2.4.4--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
+[![Version](https://img.shields.io/badge/H1OS-v2.4.5--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
 [![Docs](https://img.shields.io/badge/Docs-Developer%20Guide-blue.svg)](docs/guide.md)
 [![Errata](https://img.shields.io/badge/Hardware-Errata%20%26%20Rev%20B-orange.svg)](ERRATA.md)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
@@ -120,7 +120,7 @@ H1OS resolves sensor self-heating bias by enforcing strict steady-state sampling
 
 ## Declarative Application Lifecycle Engine
 
-Applications define declarative lifecycle hooks:
+Applications define declarative lifecycle hooks for initial boot, wake UI preparation, parallel Core 0 network/storage synchronization (`on_sync`), pre-sleep teardown, shutdown, and fatal error recovery (`on_error`):
 
 ```c
 #include "h1os/h1os.h"
@@ -131,7 +131,12 @@ static void app_on_boot(void *user_data) {
 }
 
 static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data) {
-    ESP_LOGI("APP", "Woke from sleep (Causes: 0x%08lX)", (unsigned long)ctx->wakeup_causes);
+    ESP_LOGI("APP", "Wake state=%d (FlowB=%lu, Btn=%lu)",
+             (int)ctx->wake_state, (unsigned long)ctx->flow_b_count, (unsigned long)ctx->button_wake_count);
+}
+
+static void app_on_sync(const h1os_wake_context_t *ctx, void *user_data) {
+    ESP_LOGI("APP", "Core 0 sync running in parallel with Core 1 e-Paper refresh");
 }
 
 static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data) {
@@ -142,13 +147,17 @@ void app_main(void) {
     h1os_lifecycle_t lifecycle = {
         .on_boot = app_on_boot,
         .on_wake = app_on_wake,
+        .on_sync = app_on_sync,
         .on_pre_sleep = app_on_pre_sleep,
         .on_shutdown = NULL,
+        .on_error = NULL,
         .session = {
             .inactivity_timeout_sec = 30,             // Developer-configured inactivity sleep timeout
             .clk_mode = SYS_CLK_MODE_DYNAMIC,         // Dynamic 80 MHz baseline / 240 MHz turbo bursts
-            .flow_a_period_sec = 60,                  // Developer-configured sensor sample burst interval
-            .flow_b_period_sec = 300,                 // Developer-configured display refresh interval
+            .flow_a_period_sec = 60,                  // Developer-configured sensor sample burst interval (60s..4h)
+            .flow_b_period_sec = 300,                 // Developer-configured display refresh interval (300s..24h)
+            .sync_wait_ms = 0,                        // 0 = immediate parallel flush; >0 = inbound pre-flush gate
+            .sync_timeout_ms = 5000,                  // Max sleep barrier wait for async on_sync completion
         },
     };
 
@@ -161,9 +170,9 @@ void app_main(void) {
 
 ## Interactive Flow B & Configurable Inactivity Sleep
 
-* **Button Wake:** Waking the system by tapping `BOOT` or `POWER` launches an interactive session governed by `inactivity_timeout_sec` (default: 30s). Any button click resets the timer. An inverted page badge in the UI header shows the active awake state.
-* **RTC Periodic Wake:** When woken by the PCF85063A countdown timer (`ulp_slice_counter >= ulp_overflow_limit`) for a scheduled telemetry update, H1OS renders the new frame, flushes the display, and **immediately returns to deep sleep** to preserve battery.
-* **Sleep Transition Sequence:** Drains LVGL $\to$ waits audio idle and enters standby $\to$ waits `EPD_BUSY` falling edge $\to$ saves frame to flash if dirty $\to$ commands SSD1681 into Deep Sleep Mode 1 $\to$ arms PCF85063A countdown slice $\to$ installs RTC wake stub and enters hardware deep sleep.
+* **Button Wake (`H1OS_WAKE_STATE_INTERACTIVE_SESSION`):** Waking the system by tapping `BOOT` or `POWER` launches an interactive session governed by `inactivity_timeout_sec` (default: 30s). Any button click resets the timer. An inverted page badge in the UI header shows the active awake state.
+* **RTC Periodic Wake (`H1OS_WAKE_STATE_RTC_FLOW_B`):** When woken by the PCF85063A countdown timer (`ulp_slice_counter >= ulp_overflow_limit`) for a scheduled telemetry update, H1OS runs `on_sync()` on Core 0 in parallel with the Core 1 LVGL/SSD1681 refresh, waits on the static FreeRTOS `EventGroup` sleep barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`), and **immediately returns to deep sleep** to preserve battery.
+* **Sleep Transition Sequence:** Waits on dual-core sleep barrier $\to$ drains LVGL & UI queue $\to$ waits audio idle and enters standby $\to$ waits `EPD_BUSY` falling edge + mandatory 250 ms electrophoretic settling window $\to$ saves frame to flash if dirty $\to$ commands SSD1681 into Deep Sleep Mode 1 $\to$ arms PCF85063A countdown slice $\to$ installs RTC wake stub and enters hardware deep sleep.
 
 ---
 
@@ -198,7 +207,7 @@ idf.py -B build_dev -p COMx flash monitor
 ## Contributors & Attribution
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-* **Principal Firmware Audit, `-O2` Wake Stub Hardening & Event-Driven Architecture (`v2.4.4-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Principal Firmware Audit, Dual-Core Concurrency Architecture & `-O2` Wake Stub Hardening (`v2.4.4-dev` – `v2.4.5-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)
 
 ---

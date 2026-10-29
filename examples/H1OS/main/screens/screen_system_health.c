@@ -6,10 +6,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "h1os/h1os.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_time.h"
-#include "h1os/sub_power.h"
-#include "h1os/sub_sdcard.h"
 #include "screens.h"
 
 static const char *get_battery_icon(uint8_t pct)
@@ -91,7 +90,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
 
     lv_obj_t *lbl_v4 = lv_label_create(scr);
     uint32_t sd_mb = 0;
-    if (sub_sdcard_is_mounted() && sub_sdcard_get_capacity_mb(&sd_mb) == ESP_OK) {
+    if (h1os_sdcard_is_mounted() && h1os_sdcard_get_capacity_mb(&sd_mb) == ESP_OK) {
         lv_label_set_text_fmt(lbl_v4, "%.1f GB OK", (double)((float)sd_mb / 1024.0f));
     } else {
         lv_label_set_text(lbl_v4, "NO CARD");

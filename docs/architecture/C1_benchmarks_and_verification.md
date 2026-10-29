@@ -41,8 +41,8 @@ This document defines the physical measurement procedures, test fixtures, expect
 - **Critical Rail Invariants Verified:**
   1. `BAT_CTRL` (GPIO 17) latched HIGH via RTC pad hold (LDO enabled).
   2. `EPD_3V3_EN` (GPIO 6) held LOW via RTC pad hold (display rail active, SSD1681 in Deep Sleep Mode 1 @ $1.0\text{ }\mu\text{A}$).
-  3. `PA_EN` (GPIO 42) held HIGH and `PA_CTRL` (GPIO 46) held LOW (audio power cut & muted).
-  4. ES8311 Codec in software standby (Reg 0x0D = 0x00 @ $<1.0\text{ }\mu\text{A}$), keeping I2C bus un-clamped.
+  3. `PA_EN` (`GPIO 42`) held **LOW (`0`)** (audio rail energized per Errata E4 so the shared I2C bus is never pulled down) and `PA_CTRL` (`GPIO 46`) held **LOW (`0`)** (NS4168 Class-D amplifier muted).
+  4. ES8311 Codec in software standby (`Reg 0x0D = 0xFC`, `Reg 0x0E = 0x6A`, `Reg 0x12 = 0x02`, `Reg 0x00 = 0x1E` @ $<1.0\text{ }\mu\text{A}$), keeping the shared I2C bus (`GPIO 47/48`) un-clamped.
   5. PCF85063A `COF[2:0] = 111` (CLKOUT pin permanently disabled to prevent parasitic square-wave leakage).
 - **Pass Criterion:** Average standby floor $\le 15.0\text{ }\mu\text{A}$ RMS over a 60-second sleep interval.
 
@@ -59,14 +59,15 @@ This document defines the physical measurement procedures, test fixtures, expect
 
 ---
 
-### 2.4 Benchmark 4: Zero-Hour Conflict Elimination Stress Test
-- **Objective:** Verify that when a Flow A headless sensor sample burst coincides with or straddles an external PCF85063A countdown timer expiration, no rapid double-wake occurs.
+### 2.4 Benchmark 4: Pure Event Mode Slicing & Zero-Hour Conflict Elimination Stress Test
+- **Objective:** Verify that periodic Flow A headless sample bursts and Flow B application wakes are arbitrated deterministically from a single external timebase (PCF85063A countdown timer on `GPIO 5`) with zero competing internal/external timer collisions.
 - **Validation Logic:**
-  1. In Flow A Fast Wake Stub (`orch_wake_stub_run()`):
-     - Check `sub_rtc_get_and_clear_interrupts(&alarm, &timer)`: if either fired, abort sleep and promote directly to Flow B.
-     - Check `sub_rtc_get_remaining_seconds(&rem_sec)`: if $T_{\text{rem}} \le T_{\text{sleep}}$, clamp internal sleep time to $T_{\text{rem}}$.
-  2. In `orch_flow_transition_to_sleep()` / `sub_power_enter_deep_sleep()`:
-     - Lookahead evaluation: if $T_{\text{rem}} \le T_{\text{sleep}}$, suppress internal timer ($T_{\text{internal}} = 0$) and sleep exclusively on external GPIO 5 `RTC_INT`.
+  1. In the ULP-RISC-V Pure Event Mode monitor (`ulp/main.c`):
+     - On each `GPIO 5` (`RTC_INT`) falling edge, increment `slice_counter` and compare against `overflow_limit`.
+     - If `slice_counter < overflow_limit`, set `ULP_DISPATCH_SENSOR_SAMPLE` and wake Core 0 into `bsp_wake_stub()`.
+     - If `slice_counter >= overflow_limit`, reset `slice_counter = 0`, set `ULP_DISPATCH_MAIN_WAKE`, and wake the dual-core system into Flow B.
+  2. In `bsp_wake_stub()` (`orch_wake_stub.c`):
+     - Clear `TF` in PCF85063A `Control_2` (`0x07`) (or re-arm the remainder slice on `overflow - 1` via `rtc_rearm_countdown_stub()`), wait for `GPIO 5` to release HIGH (`wait_gpio5_high_bounded()`), and return to deep sleep.
 - **Pass Criterion:** Zero back-to-back wakes $< 100\text{ ms}$ observed over 1,000 continuous sleep cycles.
 
 ---
@@ -81,8 +82,8 @@ This document defines the physical measurement procedures, test fixtures, expect
 
 ---
 
-### 2.6 Benchmark 6: Tri-Node Thermal Equilibrium Validation
-- **Objective:** Verify that ambient temperature reconstruction correctly captures the cavity gradient without synthetic curve fitting.
+### 2.6 Benchmark 6: Tri-Node Thermal Equilibrium & Range Verification
+- **Objective:** Verify that the thermally isolated SHTC3 sensor (`SAMPLE_FLAG_THERMAL_SETTLED`, $|\Delta T| \le 0.20^\circ\text{C}$) directly reports true ambient temperature and relative humidity with zero synthetic offset reconstruction, and that the Tri-Node thermal hierarchy (`SHTC3`, `SSD1681 Glass 0x1B`, `MCU Die TSENS`) validates thermal settling confidence (`0..100%`).
 - **Gradient Rule:**
 
 $$
@@ -90,6 +91,6 @@ T_{\text{SHTC3}} \le T_{\text{Glass}} < T_{\text{MCU}}
 $$
 
   - $T_{\text{MCU}}$ (die junction) is warmest due to silicon dissipation.
-  - $T_{\text{Glass}}$ reflects frontal case surface temperature.
-  - $T_{\text{SHTC3}}$ reflects cavity thermodynamic floor.
-- **Pass Criterion:** Reconstructed ambient $T_{\text{amb}}$ tracks reference dry-bulb thermometer to within $\pm 0.3^\circ\text{C}$ and reconstructed $RH_{\text{amb}}$ tracks reference to within $\pm 2.0\%$.
+  - $T_{\text{Glass}}$ reflects frontal case surface temperature captured prior to display refresh.
+  - $T_{\text{SHTC3}}$ reflects the factory-calibrated ambient reference on the thermally isolated PCB edge slot.
+- **Pass Criterion:** Settled SHTC3 $T_{\text{amb}}$ tracks a calibrated reference dry-bulb thermometer within datasheet accuracy ($\pm 0.2^\circ\text{C}$) and $RH_{\text{amb}}$ tracks reference within $\pm 2.0\%\text{ RH}$.

@@ -1,22 +1,25 @@
 ---
 name: lvgl-ui
-description: Authoritative design guidelines, bilevel e-paper constraints, layout grids, font CSV paths, kerning metrics, and string width validation tools for LVGL v9 on SSD1681.
+description: Authoritative design guidelines, bilevel e-paper constraints, layout grids, font CSV paths, kerning metrics, cross-core h1os_ui_post actor queue, and string width validation tools for LVGL v9 on SSD1681.
 ---
 
-# LVGL v9 Bilevel UI Design & E-Paper Font Validation
+# LVGL v9 Bilevel UI Design & E-Paper Font Validation (`v2.4.5-dev`)
 
 This skill defines the canonical constraints, design patterns, font metric tables, and automated validation tools for developing LVGL v9 user interfaces on the **Waveshare ESP32-S3 ePaper 1.54" V2** (SSD1681) panel.
 
 ---
 
-## 1. Hardware & Silicon Display Constraints
+## 1. Hardware, Silicon Display & Dual-Core Concurrency Constraints
 
 - **Resolution:** 200 x 200 pixels (1:1 square aspect ratio).
 - **Usable Margin:** $X = 6\text{ px}$ to $194\text{ px}$ ($\le 188.0\text{ px}$ maximum string width).
 - **Color Depth:** 1-bit Monochrome (`LV_COLOR_FORMAT_I1`), pure black and pure white.
-- **Draw Buffer:** Exactly 5,000 bytes ($200 \times 200 \div 8\text{ bits}$).
+- **Draw Buffer:** Exactly 5,000 pixel bytes ($200 \times 200 \div 8\text{ bits}$) plus the 8-byte LVGL v9 palette header.
 - **Opacity Mandate:** Strict 100% opacity (`LV_OPA_COVER`). No alpha blending or partial opacities.
-- **Thread Safety:** The LVGL presentation task is pinned to **Core 1** at FreeRTOS priority 4. Wrap all LVGL operations in `h1os_lvgl_lock()` / `h1os_lvgl_unlock()`.
+- **Thread Safety & Cross-Core Actor Queue (`v2.4.5-dev`):**
+  - The LVGL presentation task (`h1os_lvgl`) is pinned to **Core 1** at FreeRTOS priority **5** (`LVGL_TASK_PRIO_PORT = 5`).
+  - During `on_boot()` and `on_wake()`, Core 1 has not yet started (`h1os_lvgl_start(5, 1)` runs immediately after `on_wake()` returns), so initial screen construction requires no outer mutex lock.
+  - Once Core 1 is running, Core 0 `on_sync()` and background tasks should post UI updates via `h1os_ui_post(fn, arg, timeout_ms)` (16-slot static queue drained on Core 1 inside `h1os_lvgl_lock(100)` before `lv_timer_handler()`), or wrap synchronous LVGL operations in `if (h1os_lvgl_lock(timeout_ms)) { ... h1os_lvgl_unlock(); }`.
 
 ---
 
@@ -77,7 +80,7 @@ python tools/agent/check_string_width.py --size 20 "72.5% RH"
 ```
 
 ### B. Automated Screen File Audit (`--audit-screens`)
-Scans all C screen files in `examples/H1OS/main/screens/`, extracts string formatting templates, simulates worst-case parameter expansion, and asserts that no string exceeds $188.0\text{ px}$:
+Scans all C screen files in `examples/H1OS/main/` (and `screens/`), extracts string formatting templates, simulates worst-case parameter expansion, and asserts that no string exceeds $188.0\text{ px}$:
 ```powershell
 python tools/agent/check_string_width.py --audit-screens
 ```

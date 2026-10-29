@@ -12,10 +12,6 @@
 #include "h1os/h1os.h"
 #include "h1os/h1os_lvgl.h"
 #include "h1os/h1os_version.h"
-#include "h1os/hal_io.h"
-#include "h1os/sub_audio.h"
-#include "h1os/sub_power.h"
-#include "h1os/sub_sdcard.h"
 #include "humid1_cyber_wave.h"
 #include "screens.h"
 
@@ -96,8 +92,7 @@ static void keypad_event_cb(lv_event_t *e)
     }
 
     if (code == LV_EVENT_SHORT_CLICKED) {
-        const uint32_t tone_rev[] = {880, 50};
-        sub_audio_play(SUB_AUDIO_TONE, tone_rev, sizeof(tone_rev));
+        (void)h1os_audio_play_tone(880, 50);
         s_app_state.active_page = (s_app_state.active_page + H1OS_NUM_SCREENS - 1) % H1OS_NUM_SCREENS;
         ESP_LOGI(TAG, "Keypad reverse (POWER): Navigating to page %u/%u",
                         s_app_state.active_page + 1,
@@ -114,8 +109,7 @@ static void keypad_event_cb(lv_event_t *e)
         ESP_LOGI(TAG, "Keypad event received: LV_EVENT_KEY (key=0x%lx)", (unsigned long)key);
 
         if (key == LV_KEY_NEXT || key == LV_KEY_RIGHT) {
-            const uint32_t tone_fwd[] = {1046, 50};
-            sub_audio_play(SUB_AUDIO_TONE, tone_fwd, sizeof(tone_fwd));
+            (void)h1os_audio_play_tone(1046, 50);
             s_app_state.active_page = (s_app_state.active_page + 1) % H1OS_NUM_SCREENS;
             ESP_LOGI(TAG, "Keypad forward (BOOT): Navigating to page %u/%u",
                             s_app_state.active_page + 1,
@@ -147,9 +141,9 @@ static void app_on_boot(void *user_data)
 
     screen_base_set_awake_badge(true);
 
-    sub_sdcard_mount_async();
+    (void)h1os_sdcard_mount_async();
 
-    hal_led_start_breathing(2000);
+    h1os_led_start_breathing(2000);
     update_active_display();
 }
 
@@ -169,21 +163,37 @@ static void app_on_wake(const h1os_wake_context_t *ctx, void *user_data)
     if (s_app_state.boot_epoch_sec > 0 && now >= (time_t)s_app_state.boot_epoch_sec) {
         s_app_state.total_uptime_sec = (uint32_t)(now - s_app_state.boot_epoch_sec);
     }
-    ESP_LOGI(TAG, "Lifecycle: WAKE #%lu (Causes bitmask: 0x%08lx, ButtonWake: %d)",
-                    (unsigned long)s_app_state.cycle_counter,
-                    (unsigned long)ctx->wakeup_causes,
-                    ctx->woke_from_button);
+    ESP_LOGI(TAG,
+             "Lifecycle: WAKE #%lu [state=%d, FlowB=%lu, Btn=%lu, Causes=0x%08lx]",
+             (unsigned long)s_app_state.cycle_counter,
+             (int)ctx->wake_state,
+             (unsigned long)ctx->flow_b_count,
+             (unsigned long)ctx->button_wake_count,
+             (unsigned long)ctx->wakeup_causes);
 
-    if (ctx->woke_from_button) {
+    if (ctx->wake_state == H1OS_WAKE_STATE_INTERACTIVE_SESSION) {
         ESP_LOGI(TAG, "First click intercepted by ULP: Inverting awake status badge.");
         screen_base_set_awake_badge(true);
-        sub_sdcard_mount_async();
-        hal_led_start_breathing(2000);
+        (void)h1os_sdcard_mount_async();
+        h1os_led_start_breathing(2000);
     } else {
         screen_base_set_awake_badge(false);
     }
 
     update_active_display();
+}
+
+/**
+ * @brief App on sync (parallel Core 0 synchronization hook).
+ *
+ * @param[in]    ctx             Populated wake context descriptor.
+ * @param[in]    user_data       User context pointer.
+ */
+static void app_on_sync(const h1os_wake_context_t *ctx, void *user_data)
+{
+    (void)user_data;
+    ESP_LOGI(TAG, "Lifecycle: SYNC executing on Core %d in parallel with Core 1 display flush (wake_state=%d)",
+             xPortGetCoreID(), (int)ctx->wake_state);
 }
 
 /**
@@ -199,8 +209,8 @@ static void app_on_pre_sleep(uint32_t sleep_sec, void *user_data)
     (void)user_data;
     ESP_LOGI(TAG, "Lifecycle: PRE-SLEEP hook (Duration: %lu s)", (unsigned long)sleep_sec);
     screen_base_set_awake_badge(false);
-    hal_led_stop_breathing();
-    sub_sdcard_unmount();
+    h1os_led_stop_breathing();
+    (void)h1os_sdcard_unmount();
 }
 
 /**
@@ -214,8 +224,17 @@ static void app_on_shutdown(void *user_data)
 {
     (void)user_data;
     ESP_LOGI(TAG, "Lifecycle: SHUTDOWN hook executing");
-    hal_led_stop_breathing();
-    sub_sdcard_unmount();
+    h1os_led_stop_breathing();
+    (void)h1os_sdcard_unmount();
+}
+
+/**
+ * @brief App on fatal startup error.
+ */
+static void app_on_error(esp_err_t err, const char *context, void *user_data)
+{
+    (void)user_data;
+    ESP_LOGE(TAG, "Lifecycle: FATAL ERROR in '%s': %s (0x%x)", context, esp_err_to_name(err), (unsigned int)err);
 }
 
 /**
@@ -260,6 +279,8 @@ void app_main(void)
                 .clk_mode               = SYS_CLK_MODE_DYNAMIC,
                 .flow_a_period_sec      = H1OS_DEFAULT_FLOW_A_PERIOD_SEC,
                 .flow_b_period_sec      = H1OS_DEFAULT_FLOW_B_PERIOD_SEC,
+                .sync_wait_ms           = 0U,
+                .sync_timeout_ms        = 5000U,
             },
 
         .presentation =
@@ -273,8 +294,10 @@ void app_main(void)
 
         .on_boot      = app_on_boot,
         .on_wake      = app_on_wake,
+        .on_sync      = app_on_sync,
         .on_pre_sleep = app_on_pre_sleep,
         .on_shutdown  = app_on_shutdown,
+        .on_error     = app_on_error,
         .user_data    = NULL,
     };
 

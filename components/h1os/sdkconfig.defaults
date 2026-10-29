@@ -1,13 +1,13 @@
 # -------------------------------------------------------------------------
 # H1OS Hardware & Silicon Invariants (ESP32-S3-PICO-1-N8R8)
-# Target Board: Waveshare ESP32-S3 Touch ePaper 1.54" V2
+# Target Board: Waveshare ESP32-S3 ePaper 1.54" V2 (Non-Touch)
 # Layer: H1OS Component Hardware Baseline (Shared Across All Applications)
 # -------------------------------------------------------------------------
 
 CONFIG_IDF_TARGET="esp32s3"
 
 # -------------------------------------------------------------------------
-# CPU Frequency: Max 240MHz (DFS Baseline Gated to 80MHz, Turbo Blitz at 240MHz)
+# CPU Frequency: Max 240MHz (DFS Baseline Gated to 80MHz, Turbo Burst at 240MHz)
 # -------------------------------------------------------------------------
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240

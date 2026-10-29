@@ -89,7 +89,7 @@ static inline void RTC_IRAM_ATTR rtc_reg_barrier(void)
 
 static inline void RTC_IRAM_ATTR i2c_delay(void)
 {
-    rtc_delay_us_exact(10); /* 10 us half-period = 50 kHz clock for rock-solid open-drain margin */
+    rtc_delay_us_exact(10); /* 10 us half-period = 50 kHz clock for reliable open-drain margin */
 }
 
 static inline void RTC_IRAM_ATTR sda_high(void)

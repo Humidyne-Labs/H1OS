@@ -12,6 +12,7 @@
 #include "esp_sleep.h"
 #include "esp_system.h"
 #include "hal_types.h"
+#include "orch_state.h"
 #include "sub_power.h"
 
 #include <stdbool.h>
@@ -60,20 +61,34 @@ extern "C" {
             .clk_mode = SYS_CLK_MODE_DYNAMIC,                              \
             .flow_a_period_sec = H1OS_DEFAULT_FLOW_A_PERIOD_SEC,           \
             .flow_b_period_sec = H1OS_DEFAULT_FLOW_B_PERIOD_SEC,           \
+            .sync_wait_ms = 0U,                                            \
+            .sync_timeout_ms = 5000U,                                      \
         },                                                                 \
         .presentation = { 0 }                                              \
     }
 
 /**
+ * @brief High-level application wake state classification (MANDATE-04).
+ */
+typedef enum {
+    H1OS_WAKE_STATE_BOOT                = 0, /**< Cold boot / power-on reset cycle.                          */
+    H1OS_WAKE_STATE_INTERACTIVE_SESSION = 1, /**< User tactile button wake into interactive UI session.      */
+    H1OS_WAKE_STATE_RTC_FLOW_B          = 2  /**< Unattended periodic RTC countdown Flow B refresh & sync.   */
+} h1os_wake_state_t;
+
+/**
  * @brief Platform wakeup context descriptor.
  *
- * Populated during boot and passed to the application lifecycle on_wake hook.
+ * Populated during boot and passed to the application lifecycle on_wake and on_sync hooks.
  */
 typedef struct {
     esp_reset_reason_t reset_reason; /**< Hardware reset reason code.                                         */
     uint32_t wakeup_causes; /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
+    h1os_wake_state_t wake_state; /**< Explicit wake state classification (BOOT, INTERACTIVE, RTC_FLOW_B). */
     uint32_t boot_count; /**< Monotonic system boot cycle count.                                  */
-    uint32_t deep_sleep_count; /**< Monotonic deep sleep wake cycle count.                              */
+    uint32_t deep_sleep_count; /**< Monotonic total deep sleep wake cycle count (Flow A + Flow B).      */
+    uint32_t flow_b_count; /**< Monotonic unattended RTC Flow B presentation wake cycle count.      */
+    uint32_t button_wake_count; /**< Monotonic interactive tactile button wake cycle count.              */
     bool woke_from_button; /**< True if system woke due to physical button actuation.               */
     uint8_t wake_button; /**< Waking button ID (h1os_wake_btn_t: 0=None, 1=BOOT, 2=POWER).        */
     uint32_t sleep_duration_sec; /**< Configured sleep interval prior to wake in seconds.                 */
@@ -106,6 +121,17 @@ typedef void (*h1os_boot_cb_t)(void *user_data);
 typedef void (*h1os_wake_cb_t)(const h1os_wake_context_t *ctx, void *user_data);
 
 /**
+ * @brief Parallel data synchronization callback signature (MANDATE-04).
+ *
+ * @details Invoked on Core 0 after Core 1 LVGL task startup so network/bus I/O
+ *          overlaps in parallel with physical SSD1681 display refresh.
+ *
+ * @param[in] ctx       Pointer to populated wake context struct.
+ * @param[in] user_data User context pointer configured in h1os_lifecycle_t.
+ */
+typedef void (*h1os_sync_cb_t)(const h1os_wake_context_t *ctx, void *user_data);
+
+/**
  * @brief Callback executed immediately prior to entering deep sleep.
  *
  * @param[in] sleep_sec Planned sleep interval in seconds.
@@ -119,6 +145,15 @@ typedef void (*h1os_pre_sleep_cb_t)(uint32_t sleep_sec, void *user_data);
  * @param[in] user_data User context pointer configured in h1os_lifecycle_t.
  */
 typedef void (*h1os_shutdown_cb_t)(void *user_data);
+
+/**
+ * @brief Fatal startup or lifecycle error callback signature (MANDATE-06).
+ *
+ * @param[in] err       Error code that triggered the fatal condition.
+ * @param[in] context   Null-terminated diagnostic string identifying the failing stage.
+ * @param[in] user_data User context pointer configured in h1os_lifecycle_t.
+ */
+typedef void (*h1os_error_cb_t)(esp_err_t err, const char *context, void *user_data);
 
 /**
  * @brief Presentation splash screen rendering callback signature.
@@ -142,8 +177,10 @@ typedef void (*h1os_chime_cb_t)(h1os_chime_type_t type, void *user_data);
 typedef struct {
     h1os_boot_cb_t on_boot; /**< System boot / power-on reset hook.                      */
     h1os_wake_cb_t on_wake; /**< Interactive wake hook (Timer / RTC Alarm / Button Tap). */
+    h1os_sync_cb_t on_sync; /**< Optional parallel network/storage sync hook on Core 0.  */
     h1os_pre_sleep_cb_t on_pre_sleep; /**< Hook executed immediately prior to entering deep sleep. */
     h1os_shutdown_cb_t on_shutdown; /**< Hook executed immediately prior to battery power cut.   */
+    h1os_error_cb_t on_error; /**< Optional fatal startup/lifecycle error hook.            */
 
     struct {
         h1os_splash_cb_t on_splash; /**< Presentation splash screen rendering hook.     */
@@ -157,6 +194,8 @@ typedef struct {
         sys_clk_mode_t clk_mode; /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
         uint32_t flow_a_period_sec; /**< Period between headless sensor sample bursts in seconds.        */
         uint32_t flow_b_period_sec; /**< Period between unattended display flushes in seconds.           */
+        uint32_t sync_wait_ms; /**< Inbound sync pre-flush gate window in ms (0 = immediate flush). */
+        uint32_t sync_timeout_ms; /**< Max barrier wait for async on_sync completion before sleep.     */
     } session;
 
     void *user_data; /**< Arbitrary user context pointer passed to lifecycle hooks.       */
@@ -193,6 +232,11 @@ typedef struct {
     bool is_thermally_settled; /**< True if steady-state thermal criteria (|T2-T1| <= gate) are met.   */
     uint16_t valid_trend; /**< Monotonic count of consecutive thermally settled Flow A samples.   */
     uint32_t sample_count; /**< Total monotonic environmental telemetry sample count.              */
+    uint32_t boot_count; /**< Total monotonic system boot cycles.                                */
+    uint32_t wake_count; /**< Total monotonic deep sleep wake cycles (Flow A + Flow B + Button). */
+    uint32_t flow_b_count; /**< Monotonic unattended RTC Flow B presentation wake cycles.          */
+    uint32_t button_wake_count; /**< Monotonic interactive tactile button wake cycles.                  */
+    uint8_t ulp_dispatch_reason; /**< Reason code from last ULP coprocessor dispatch.                    */
     uint32_t flow_a_period_sec; /**< Active Flow A sensor sample interval in seconds.                   */
     uint32_t flow_b_period_sec; /**< Active Flow B display refresh interval in seconds.                 */
     uint16_t battery_mv; /**< Sampled battery terminal voltage in millivolts.                    */
@@ -209,7 +253,7 @@ typedef struct {
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.4.4-dev").
+ * @return Null-terminated semantic version string (e.g. "2.4.5-dev").
  */
 static inline const char *h1os_get_version(void)
 {
@@ -249,6 +293,29 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config);
  *   - ESP_ERR_INVALID_ARG: Any boundary, prescaler, ordering, or remainder invariant violated.
  */
 esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec);
+
+/**
+ * @brief Hold the deep-sleep barrier open for an asynchronous synchronization task.
+ *
+ * @details When called inside on_sync(), prevents unattended RTC Flow B wakes from entering
+ *          deep sleep when on_sync() returns, deferring sleep until h1os_sync_notify_complete()
+ *          is called or session.sync_timeout_ms expires.
+ */
+void h1os_sync_hold(void);
+
+/**
+ * @brief Signal that Core 0 data synchronization is complete (`BARRIER_SYNC_DONE`).
+ *
+ * @details Releases the pre-flush inbound sync gate (if `session.sync_wait_ms > 0`) so Core 1
+ *          flushes any queued UI updates in a single physical refresh, and satisfies the sync
+ *          half of the deep-sleep barrier.
+ */
+void h1os_sync_notify_complete(void);
+
+/**
+ * @brief Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`BARRIER_DISPLAY_DONE`).
+ */
+void h1os_display_notify_quiescent(void);
 
 /**
  * @brief Set audio subsystem output volume percentage.
@@ -407,6 +474,39 @@ bool h1os_sdcard_is_mounted(void);
  * @return ESP_OK on success, ESP_ERR_INVALID_STATE if card is not mounted, or ESP_ERR_INVALID_ARG.
  */
 esp_err_t h1os_sdcard_get_capacity_mb(uint32_t *out_capacity_mb);
+
+/**
+ * @brief Asynchronously mount the MicroSD card in a background FreeRTOS task.
+ *
+ * @return ESP_OK if already mounted or mount task dispatched successfully.
+ */
+esp_err_t h1os_sdcard_mount_async(void);
+
+/**
+ * @brief Unmount the MicroSD card and release SDMMC host peripheral resources.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t h1os_sdcard_unmount(void);
+
+/**
+ * @brief Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3).
+ *
+ * @param[in] period_ms Full breathing cycle period in milliseconds (e.g. 2000 ms).
+ */
+void h1os_led_start_breathing(uint32_t period_ms);
+
+/**
+ * @brief Stop the status LED breathing effect and turn the LED off.
+ */
+void h1os_led_stop_breathing(void);
+
+/**
+ * @brief Set the status LED static state (true = ON, false = OFF).
+ *
+ * @param[in] on True to illuminate LED, false to turn off.
+ */
+void h1os_led_set(bool on);
 
 #ifdef __cplusplus
 }

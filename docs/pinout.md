@@ -25,7 +25,7 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 | **IO14** | `I2S_MCLK` | Audio Codec (ES8311) | I2S0 MCLK Output | Master Clock (256 * Fs) | Driven by I2S driver | Master clock for codec synchronization |
 | **IO15** | `I2S_SCLK` | Audio Codec (ES8311) | I2S0 BCLK Output | Bit / Serial Clock | Driven by I2S driver | Continuous clocking for mono/stereo audio frames |
 | **IO16** | `I2S_ASDOUT` | Audio Codec (ES8311) | I2S0 DIN Input | Serial Audio Data In from Codec | Driven by I2S driver | Codec microphone / ADC data line |
-| **IO17** | `BAT_Control` | Power Management | Digital Output | **Active HIGH** (1 = Hold ON, 0 = OFF) | `1` (Power Latched) | Must be driven HIGH at boot and frozen with `gpio_deep_sleep_hold_en()` |
+| **IO17** | `BAT_Control` | Power Management | Digital Output | **Active HIGH** (1 = Hold ON, 0 = OFF) | `1` (Power Latched) | Driven HIGH in `h1os_boot_hook` and frozen in RTC domain via `rtc_gpio_hold_en(GPIO_NUM_17)` |
 | **IO18** | `BAT_KEY` | Power Management | Digital Input | **Active LOW** (0 = Pressed, 1 = Idle) | External 10kΩ pull-up | Hardware battery power key / wakeup trigger with external 10kΩ pull-up to 3.3V on PCB |
 | **IO19** | `U_N` | USB-JTAG-Serial / D- | USB Native / Output | Differential D- | USB PHY | Native USB negative line |
 | **IO20** | `U_P` | USB-JTAG-Serial / D+ | USB Native / Output | Differential D+ | USB PHY | Native USB positive line |
@@ -49,8 +49,8 @@ Hardware target: **Waveshare ESP32-S3-ePaper-1.54 V2** (ESP32-S3-PICO-1-N8R8)
 ```mermaid
 graph TD;
     subgraph ESP32_S3 ["ESP32-S3-PICO-1-N8R8 (Dual LX7 240MHz)"]
-        CORE0["Core 0: Networking / OS / BLE / MQTT / Time"];
-        CORE1["Core 1: Display / LVGL v9 / Sensors / Audio"];
+        CORE0["Core 0: Lifecycle / on_sync (Wi-Fi/BLE) / Audio Worker / Flow A Sensors (RTC Stub)"];
+        CORE1["Core 1: LVGL v9 UI Engine & SSD1681 Display Refresh (h1os_lvgl)"];
     end
 
     subgraph I2C_BUS ["Shared I2C0 Bus (IO47 SDA, IO48 SCL at 400kHz)"]

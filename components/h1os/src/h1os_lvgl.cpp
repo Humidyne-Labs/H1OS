@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "h1os.h"
@@ -35,21 +36,29 @@ static const char *TAG = "h1os_lvgl";
 #define LVGL_SHUTDOWN_TIMEOUT_MS  6000U /**< Max wait for LVGL task deletion (6s).        */
 #define LVGL_KEYPAD_LONG_PRESS_MS 2000U /**< Keypad long-press actuation time (2.0s).     */
 #define LVGL_PARTIAL_BUFFER_LINES 40U   /**< Lines per partial draw buffer.               */
+#define LVGL_UI_QUEUE_DEPTH       16U   /**< Static UI mutation queue capacity (16 msgs). */
 
-static lv_display_t *s_lv_display       = NULL;
-static lv_indev_t   *s_lv_keypad_indev  = NULL;
+static lv_display_t *s_lv_display      = NULL;
+static lv_indev_t   *s_lv_keypad_indev = NULL;
 
 static volatile TaskHandle_t s_lvgl_task_handle = NULL;
 
 static volatile bool s_lvgl_task_running = false;
 static volatile bool s_flush_in_progress = false;
-static bool s_first_boot_flush           = true;
+static bool          s_first_boot_flush  = true;
 
 static StaticSemaphore_t s_lvgl_stop_sem_buf;
 static SemaphoreHandle_t s_lvgl_stop_sem = NULL;
 
 static StaticSemaphore_t s_lvgl_idle_sem_buf;
 static SemaphoreHandle_t s_lvgl_idle_sem = NULL;
+
+static StaticQueue_t s_ui_queue_struct;
+static uint8_t       s_ui_queue_storage[LVGL_UI_QUEUE_DEPTH * sizeof(h1os_ui_msg_t)];
+static QueueHandle_t s_ui_queue = NULL;
+
+static volatile bool    s_sync_gate_active      = false;
+static volatile int64_t s_sync_gate_deadline_us = 0;
 
 #define LVGL_I1_PALETTE_SIZE 8
 
@@ -103,6 +112,61 @@ void h1os_lvgl_unlock(void)
         if (s_lvgl_api_mutex != NULL) {
             (void)xSemaphoreGiveRecursive(s_lvgl_api_mutex);
         }
+    }
+}
+
+/**
+ * @brief Enqueue an asynchronous UI mutation callback to execute on Core 1 (`h1os_lvgl_port_task`).
+ */
+esp_err_t h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms)
+{
+    if (fn == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_ui_queue == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    h1os_ui_msg_t msg = {
+        .fn  = fn,
+        .arg = arg,
+    };
+
+    if (xQueueSend(s_ui_queue, &msg, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
+        ESP_LOGW(TAG, "h1os_ui_post queue full (timeout=%lu ms)", (unsigned long)timeout_ms);
+        return ESP_ERR_TIMEOUT;
+    }
+
+    TaskHandle_t task = s_lvgl_task_handle;
+    if (task != NULL) {
+        xTaskNotifyGive(task);
+    }
+    return ESP_OK;
+}
+
+/**
+ * @brief Arm a pre-flush inbound synchronization gate on Core 1 for single-refresh coalescing.
+ */
+void h1os_lvgl_set_sync_gate(uint32_t wait_ms)
+{
+    if (wait_ms == 0U) {
+        s_sync_gate_active      = false;
+        s_sync_gate_deadline_us = 0;
+        return;
+    }
+    s_sync_gate_deadline_us = esp_timer_get_time() + ((int64_t)wait_ms * 1000LL);
+    s_sync_gate_active      = true;
+}
+
+/**
+ * @brief Release the pre-flush inbound synchronization gate and wake Core 1 immediately.
+ */
+void h1os_lvgl_release_sync_gate(void)
+{
+    s_sync_gate_active = false;
+    TaskHandle_t task  = s_lvgl_task_handle;
+    if (task != NULL) {
+        xTaskNotifyGive(task);
     }
 }
 
@@ -313,6 +377,12 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle)
     if (s_lvgl_idle_sem == NULL) {
         s_lvgl_idle_sem = xSemaphoreCreateBinaryStatic(&s_lvgl_idle_sem_buf);
     }
+    if (s_ui_queue == NULL) {
+        s_ui_queue = xQueueCreateStatic(LVGL_UI_QUEUE_DEPTH,
+                                        sizeof(h1os_ui_msg_t),
+                                        s_ui_queue_storage,
+                                        &s_ui_queue_struct);
+    }
 
     if (s_lv_display != NULL) {
         return ESP_OK;
@@ -445,6 +515,7 @@ esp_err_t h1os_lvgl_start(int32_t task_priority, int32_t core_id)
  */
 esp_err_t h1os_lvgl_stop(void)
 {
+    s_sync_gate_active = false;
     TaskHandle_t handle = s_lvgl_task_handle;
     if (handle != NULL) {
         s_lvgl_task_running = false;
@@ -479,6 +550,14 @@ bool h1os_lvgl_has_pending_tasks(void)
     }
 
     if (s_flush_in_progress) {
+        return true;
+    }
+
+    if (s_ui_queue != NULL && uxQueueMessagesWaiting(s_ui_queue) > 0) {
+        return true;
+    }
+
+    if (s_sync_gate_active && esp_timer_get_time() < s_sync_gate_deadline_us) {
         return true;
     }
 
@@ -550,19 +629,48 @@ static void h1os_lvgl_port_task(void *pvParameters)
     while (s_lvgl_task_running) {
         uint32_t delay_ms = LV_DEF_REFR_PERIOD;
         if (h1os_lvgl_lock(100)) {
-            delay_ms = lv_timer_handler();
-            bool still_pending = false;
-            if (s_lv_display != NULL) {
-                lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
-                if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
-                    if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
-                        still_pending = true;
+            if (s_ui_queue != NULL) {
+                h1os_ui_msg_t msg;
+                while (xQueueReceive(s_ui_queue, &msg, 0) == pdTRUE) {
+                    if (msg.fn != NULL) {
+                        msg.fn(msg.arg);
+                    }
+                }
+            }
+
+            bool gate_holding = false;
+            if (s_sync_gate_active) {
+                int64_t now_us = esp_timer_get_time();
+                if (now_us < s_sync_gate_deadline_us) {
+                    gate_holding = true;
+                    uint32_t rem_ms = (uint32_t)((s_sync_gate_deadline_us - now_us + 999LL) / 1000LL);
+                    delay_ms = (rem_ms < LV_DEF_REFR_PERIOD) ? rem_ms : LV_DEF_REFR_PERIOD;
+                } else {
+                    s_sync_gate_active = false;
+                }
+            }
+
+            bool still_pending = gate_holding;
+            if (!gate_holding) {
+                delay_ms = lv_timer_handler();
+                if (s_ui_queue != NULL && uxQueueMessagesWaiting(s_ui_queue) > 0) {
+                    still_pending = true;
+                }
+                if (s_lv_display != NULL) {
+                    lv_timer_t *refr_timer = lv_display_get_refr_timer(s_lv_display);
+                    if (refr_timer != NULL && !lv_timer_get_paused(refr_timer)) {
+                        if (s_lv_display->inv_p > 0 || s_lv_display->rendering_in_progress) {
+                            still_pending = true;
+                        }
                     }
                 }
             }
             h1os_lvgl_unlock();
-            if (!still_pending && !s_flush_in_progress && s_lvgl_idle_sem != NULL) {
-                (void)xSemaphoreGive(s_lvgl_idle_sem);
+            if (!still_pending && !s_flush_in_progress) {
+                if (s_lvgl_idle_sem != NULL) {
+                    (void)xSemaphoreGive(s_lvgl_idle_sem);
+                }
+                h1os_display_notify_quiescent();
             }
         }
         if (!s_lvgl_task_running) {

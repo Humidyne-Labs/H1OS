@@ -131,10 +131,11 @@ The on-glass reading must strictly be captured **before** any SPI DMA frame writ
 
 ## 7. Deep Sleep Mode 1 & Wakeup Procedures
 
-### Entry Procedure
-1. Wait for panel idle: `sub_display_wait_busy()`.
-2. Send Command `0x10`, data `0x01` (Deep Sleep Mode 1).
-3. The display enters low-power standby with RAM contents retained.
+### Entry Procedure (`sub_display_enter_deep_sleep()`)
+1. Wait for panel `BUSY` (`GPIO 8`) falling-edge interrupt semaphore: `sub_display_wait_busy(pdMS_TO_TICKS(SUB_DISPLAY_REFRESH_TIMEOUT_MS))`.
+2. Enforce the mandatory **250 ms post-`BUSY` electrophoretic settling delay** (`vTaskDelay(pdMS_TO_TICKS(SUB_DISPLAY_SETTLING_WINDOW_MS))` / `REV-04`) so migrating pigment microcapsules reach optical equilibrium before charge pumps power down.
+3. Send Command `0x10`, data `0x01` (Deep Sleep Mode 1).
+4. The display enters low-power standby with RAM contents retained.
 
 ### Wakeup Procedure
 1. Hardware Reset Pulse on `RST#` (`GPIO 9`): 2 ms LOW (`esp_rom_delay_us(2000)`), 2 ms HIGH (`esp_rom_delay_us(2000)`).

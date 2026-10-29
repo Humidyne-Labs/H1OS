@@ -19,6 +19,21 @@ extern "C" {
 #endif
 
 /**
+ * @brief Asynchronous UI mutation callback signature executed on Core 1 inside the LVGL context.
+ *
+ * @param[in] arg User argument pointer passed to h1os_ui_post().
+ */
+typedef void (*h1os_ui_fn_t)(void *arg);
+
+/**
+ * @brief Message envelope for the Core 0 -> Core 1 asynchronous UI mutation queue.
+ */
+typedef struct {
+    h1os_ui_fn_t fn;  /**< Callback function to execute on Core 1 under LVGL lock. */
+    void        *arg; /**< Opaque payload pointer passed to fn.                    */
+} h1os_ui_msg_t;
+
+/**
  * @brief Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
  *
  * Configures the bilevel draw buffer, registers the display flush callback,
@@ -44,7 +59,7 @@ void h1os_lvgl_set_first_flush_mode(bool full_refresh);
  *
  * Spawns the dedicated presentation task pinned to Core 1 for decoupled UI rendering.
  *
- * @param[in] priority FreeRTOS task priority (e.g. 4).
+ * @param[in] priority FreeRTOS task priority (e.g. 5).
  * @param[in] core_id  CPU core affinity (0 or 1).
  *
  * @return
@@ -83,9 +98,45 @@ bool h1os_lvgl_lock(uint32_t timeout_ms);
 void h1os_lvgl_unlock(void);
 
 /**
+ * @brief Enqueue an asynchronous UI mutation callback to execute on Core 1 (`h1os_lvgl_port_task`).
+ *
+ * @details Thread-safe, lock-free producer API backed by a 16-slot static FreeRTOS queue.
+ *          Immediately wakes the Core 1 LVGL task via `xTaskNotifyGive()` to drain the queue
+ *          inside its `h1os_lvgl_lock()` critical section before `lv_timer_handler()`.
+ *
+ * @param[in] fn         Callback function to execute on Core 1. Must not be NULL.
+ * @param[in] arg        Opaque argument passed to fn.
+ * @param[in] timeout_ms Maximum time to wait if the 16-slot queue is full (0 for non-blocking).
+ *
+ * @return
+ *   - ESP_OK: Mutation successfully queued and Core 1 notified.
+ *   - ESP_ERR_INVALID_ARG: fn is NULL.
+ *   - ESP_ERR_INVALID_STATE: LVGL subsystem not initialized.
+ *   - ESP_ERR_TIMEOUT: Queue full after timeout_ms.
+ */
+esp_err_t h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms);
+
+/**
+ * @brief Arm a pre-flush inbound synchronization gate on Core 1 for single-refresh coalescing.
+ *
+ * @details When `wait_ms > 0`, the Core 1 LVGL task defers `lv_timer_handler()` (and thus physical
+ *          SSD1681 display flushing) for up to `wait_ms` or until `h1os_lvgl_release_sync_gate()`
+ *          is called by `h1os_sync_notify_complete()`, ensuring initial `on_wake()` widgets and
+ *          inbound `on_sync()` mutations coalesce into a single physical e-Paper refresh.
+ *
+ * @param[in] wait_ms Maximum gate hold duration in milliseconds (0 disables the gate).
+ */
+void h1os_lvgl_set_sync_gate(uint32_t wait_ms);
+
+/**
+ * @brief Release the pre-flush inbound synchronization gate and wake Core 1 immediately.
+ */
+void h1os_lvgl_release_sync_gate(void);
+
+/**
  * @brief Check if the LVGL display pipeline has pending render/flush tasks.
  *
- * @return True if display driver is currently flushing or widgets are invalidated.
+ * @return True if display driver is currently flushing, UI queue has items, or widgets are invalidated.
  */
 bool h1os_lvgl_has_pending_tasks(void);
 

@@ -21,13 +21,26 @@ Layer 4 is the top-level public interface of H1OS (`h1os.h`). It isolates develo
 #include "sub_power.h"
 
 /**
- * @brief Structured Wake Context delivered to on_wake handler
+ * @brief Explicit Wake State Classification (v2.4.5-dev / MANDATE-04)
+ */
+typedef enum {
+    H1OS_WAKE_STATE_BOOT = 0,            ///< Cold power-on reset
+    H1OS_WAKE_STATE_INTERACTIVE_SESSION, ///< Tactile button wake (interactive session)
+    H1OS_WAKE_STATE_RTC_FLOW_B           ///< Periodic headless Flow B wake (sync + EPD refresh)
+} h1os_wake_state_t;
+
+/**
+ * @brief Structured Wake Context delivered to on_wake and on_sync handlers
  */
 typedef struct {
     esp_reset_reason_t reset_reason;
     uint32_t           wakeup_causes;      ///< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes)
-    uint32_t           boot_count;
-    uint32_t           deep_sleep_count;
+    uint32_t           boot_count;         ///< Monotonic cold-boot counter
+    uint32_t           wake_count;         ///< Monotonic total deep-sleep wake counter
+    uint32_t           flow_b_count;       ///< Monotonic Flow B application wake counter
+    uint32_t           button_wake_count;  ///< Monotonic tactile button wake counter
+    h1os_wake_state_t  wake_state;         ///< Explicit wake state classification
+    uint8_t            ulp_dispatch_reason;///< orch_ulp_dispatch_t reason code
     bool               woke_from_button;
     uint8_t            wake_button;        ///< h1os_wake_btn_t (0=None, 1=BOOT, 2=POWER)
     uint32_t           sleep_duration_sec;
@@ -46,8 +59,10 @@ typedef enum {
 
 typedef void (*h1os_boot_cb_t)     (void *user_data);
 typedef void (*h1os_wake_cb_t)     (const h1os_wake_context_t *ctx, void *user_data);
+typedef void (*h1os_sync_cb_t)     (const h1os_wake_context_t *ctx, void *user_data);
 typedef void (*h1os_pre_sleep_cb_t)(uint32_t sleep_sec, void *user_data);
 typedef void (*h1os_shutdown_cb_t) (void *user_data);
+typedef void (*h1os_error_cb_t)    (esp_err_t err, const char *stage, void *user_data);
 typedef void (*h1os_splash_cb_t)   (h1os_splash_type_t type, void *user_data);
 typedef void (*h1os_chime_cb_t)    (h1os_chime_type_t type, void *user_data);
 
@@ -57,9 +72,11 @@ typedef void (*h1os_chime_cb_t)    (h1os_chime_type_t type, void *user_data);
 typedef struct {
     /* Core Execution Hooks */
     h1os_boot_cb_t      on_boot;       ///< System boot / power-on reset hook
-    h1os_wake_cb_t      on_wake;       ///< Interactive wake hook (Timer / RTC Alarm / Button Tap)
+    h1os_wake_cb_t      on_wake;       ///< Wake hook (executed before Core 1 LVGL starts)
+    h1os_sync_cb_t      on_sync;       ///< Parallel Core 0 sync hook (runs alongside Core 1 EPD refresh)
     h1os_pre_sleep_cb_t on_pre_sleep;  ///< Hook executed immediately prior to entering deep sleep
     h1os_shutdown_cb_t  on_shutdown;   ///< Hook executed immediately prior to battery cut
+    h1os_error_cb_t     on_error;      ///< Fatal startup error callback prior to battery latch release
 
     /* Presentation Cues */
     struct {
@@ -69,12 +86,14 @@ typedef struct {
         uint8_t          volume_pct;   ///< Acoustic presentation master volume (0..100%)
     } presentation;
 
-    /* Interactive Session Parameters */
+    /* Interactive Session & Concurrency Parameters */
     struct {
         uint32_t       inactivity_timeout_sec; ///< Inactivity sleep timer (e.g. 30s)
         sys_clk_mode_t clk_mode;               ///< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default)
         uint32_t       flow_a_period_sec;      ///< Flow A headless sensor sample burst interval (e.g. 60s)
         uint32_t       flow_b_period_sec;      ///< Flow B main application wake interval (e.g. 300s)
+        uint32_t       sync_wait_ms;           ///< Max pre-flush wait (ms) to coalesce inbound sync data
+        uint32_t       sync_timeout_ms;        ///< Max sleep barrier wait (ms) for async on_sync completion
     } session;
 
     void *user_data;
@@ -98,7 +117,8 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config);
   - If `ORCH_FLOW_B_MAIN_WAKE`:
     - Restores previous EPD frame from flash (`orch_display_sync_restore_to_framebuffer()`) for differential partial refresh.
     - Initializes audio codec only on user button wakes (`button_woke == true`).
-    - Invokes `on_wake()`, starts Core 1 LVGL task (`h1os_lvgl_start(5, 1)`), and either returns to sleep immediately (unattended RTC refresh) or spawns `h1os_session_monitor_task` (user interactive wake).
+    - Invokes `on_wake()` (while Core 1 is still stopped), arms the optional inbound pre-flush gate (`h1os_lvgl_set_sync_gate(sync_wait_ms)`), starts Core 1 LVGL task (`h1os_lvgl_start(5, 1)`), and dispatches `on_sync()` on Core 0 in parallel with Core 1's e-Paper refresh.
+    - On headless RTC wakes (`H1OS_WAKE_STATE_RTC_FLOW_B`), blocks on the static `EventGroup` sleep barrier (`BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE`) and immediately enters deep sleep; on interactive button wakes (`H1OS_WAKE_STATE_INTERACTIVE_SESSION`), arms the one-shot `esp_timer` inactivity timer (`s_session_timer`).
 
 ### 3.2 `h1os_set_flow_periods()`
 Dynamically update Flow A (headless sample) and Flow B (display/cloud wake) intervals at runtime:
@@ -111,7 +131,7 @@ esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec);
   - `H1OS_FLOW_REMAINDER_MIN_SEC` ($60\text{s}$ minimum overlap remainder floor).
 - **Conversion Macros:** `H1OS_MIN_TO_SEC(m)`, `H1OS_HOURS_TO_SEC(h)`, `H1OS_SEC_TO_MIN(s)`, `H1OS_SEC_TO_HOURS(s)`.
 - **Validation Law:** Fails immediately with `ESP_ERR_INVALID_ARG` if out of bounds, if prescaler is unaligned ($> 255\text{s}$ not divisible by 60), if $B \le A$, or if $\text{remainder} > 0 \land \text{remainder} < 60\text{s}$.
-- Both `h1os_start()` and `h1os_set_flow_periods()` funnel through the single internal setter `h1os_set_flow_periods_internal()`.
+- Both `h1os_start()` and `h1os_set_flow_periods()` funnel through `h1os_validate_flow_periods()` and `h1os_apply_flow_periods()`. On cold boot, validation executes before `orch_flow_init()` and application executes *after* `orch_state_reset()` so configured periods are never overwritten by default state initialization (`REV-01`).
 
 ### 3.3 `h1os_sleep()`
 Explicit command to enter deep sleep:
@@ -136,9 +156,11 @@ void h1os_shutdown_for_storage(void);
 typedef struct {
     float ambient_temp_c;
     float ambient_temp_f;
+    float ambient_temp_k;
     float ambient_rh_pct;
     float dew_point_c;
     float dew_point_f;
+    float dew_point_k;
     float vapor_pressure_hpa;
     float absolute_humidity_g;
 
@@ -158,6 +180,11 @@ typedef struct {
 
     bool                    is_thermally_settled;
     uint16_t                valid_trend;
+    uint32_t                boot_count;
+    uint32_t                wake_count;
+    uint32_t                flow_b_count;
+    uint32_t                button_wake_count;
+    uint8_t                 ulp_dispatch_reason;
     uint32_t                sample_count;
     uint32_t                flow_a_period_sec;
     uint32_t                flow_b_period_sec;
@@ -188,9 +215,11 @@ esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_c
   - Maps `HAL_BTN_BOOT` (`GPIO 0`) to `LV_KEY_RIGHT` (`LV_EVENT_KEY` forward carousel navigation) and `HAL_BTN_POWER` (`GPIO 18`) to `LV_KEY_ENTER` (`LV_EVENT_SHORT_CLICKED` reverse carousel navigation).
   - Resets the inactivity session timer on every button press transition.
 - **Dynamic Frequency Scaling (DFS) Power Droop:**
-  - Maintains 80 MHz baseline during idle and during mechanical SSD1681 `EPD_BUSY` polling.
-  - Acquires 240 MHz turbo (`CpuMaxTurboScope` / `h1os_lvgl_lock`) strictly during widget tree updates and 1-bit pixel packing.
-- **Mutex Safety:** Provides `h1os_lvgl_lock()` and `h1os_lvgl_unlock()` around FreeRTOS tasks.
+  - Maintains 80 MHz baseline during idle and during `GPIO 8` (`EPD_BUSY`) falling-edge interrupt semaphore waits (`sub_display_wait_busy()`).
+  - Acquires 240 MHz turbo (`CpuMaxTurboScope`) strictly during widget tree rendering, 1-bit pixel packing, and SPI DMA transfer.
+- **Cross-Core Actor Queue & Mutex Safety (`MANDATE-04` / `REV-02`):**
+  - Provides `h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms)` backed by a 16-slot static FreeRTOS queue (`xQueueCreateStatic`) that wakes Core 1 via `xTaskNotifyGive()` and drains all queued callbacks inside `h1os_lvgl_lock(100)` immediately prior to `lv_timer_handler()`.
+  - Provides recursive mutex guards `h1os_lvgl_lock(uint32_t timeout_ms)` and `h1os_lvgl_unlock()`, plus inbound single-refresh gate controls (`h1os_lvgl_set_sync_gate()`, `h1os_lvgl_release_sync_gate()`).
 
 ---
 

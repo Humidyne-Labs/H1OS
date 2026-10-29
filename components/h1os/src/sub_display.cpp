@@ -25,17 +25,19 @@
 
 static const char *TAG = "sub_display";
 
-#define SUB_DISPLAY_IDLE_POLL_BOUND 60U /**< Maximum poll loops awaiting EPD BUSY assertion (approx 15 ms). */
+#define SUB_DISPLAY_IDLE_POLL_BOUND       60U  /**< Maximum poll loops awaiting EPD BUSY assertion (approx 15 ms). */
+#define SUB_DISPLAY_SETTLING_WINDOW_MS    250U /**< Mandatory post-BUSY electrophoretic settling delay (250 ms).   */
 
 static uint8_t s_current_frame[EPD_BUFFER_SIZE];
 static uint8_t s_previous_frame[EPD_BUFFER_SIZE];
 
-static bool              s_inited                     = false;
-static bool              s_in_deep_sleep              = false;
-static bool              s_busy_isr_installed         = false;
-static int16_t           s_last_glass_temp_centi_c    = 0;
+static bool              s_inited                  = false;
+static bool              s_in_deep_sleep           = false;
+static bool              s_busy_isr_installed      = false;
+static int16_t           s_last_glass_temp_centi_c = 0;
+static volatile int64_t  s_last_refresh_done_us    = 0;
 static StaticSemaphore_t s_busy_idle_sem_buf;
-static SemaphoreHandle_t s_busy_idle_sem              = NULL;
+static SemaphoreHandle_t s_busy_idle_sem           = NULL;
 
 /**
  * @brief Solomon Systech SSD1681 1.54" E-Paper Partial Refresh Waveform Table (WF_PARTIAL_1IN54).
@@ -250,13 +252,15 @@ static void epd_ensure_busy_sync_ready(void)
         s_busy_idle_sem = xSemaphoreCreateBinaryStatic(&s_busy_idle_sem_buf);
     }
     if (!s_busy_isr_installed) {
-        esp_err_t isr_err = gpio_install_isr_service(0);
-        if (isr_err == ESP_OK || isr_err == ESP_ERR_INVALID_STATE) {
-            gpio_set_intr_type(HAL_PIN_EPD_BUSY, GPIO_INTR_NEGEDGE);
-            if (gpio_isr_handler_add(HAL_PIN_EPD_BUSY, epd_busy_falling_isr_handler, NULL) == ESP_OK) {
-                gpio_intr_enable(HAL_PIN_EPD_BUSY);
-                s_busy_isr_installed = true;
-            }
+        gpio_set_intr_type(HAL_PIN_EPD_BUSY, GPIO_INTR_NEGEDGE);
+        esp_err_t add_err = gpio_isr_handler_add(HAL_PIN_EPD_BUSY, epd_busy_falling_isr_handler, NULL);
+        if (add_err == ESP_ERR_INVALID_STATE) {
+            (void)gpio_install_isr_service(0);
+            add_err = gpio_isr_handler_add(HAL_PIN_EPD_BUSY, epd_busy_falling_isr_handler, NULL);
+        }
+        if (add_err == ESP_OK) {
+            gpio_intr_enable(HAL_PIN_EPD_BUSY);
+            s_busy_isr_installed = true;
         }
     }
 }
@@ -557,10 +561,11 @@ esp_err_t sub_display_refresh_full(void)
 
     ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x20), TAG, "SPI cmd 0x20 failed");
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
+    s_last_refresh_done_us = esp_timer_get_time();
 
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
-    int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
+    int64_t t_elapsed_ms = (s_last_refresh_done_us - t_start) / 1000LL;
     ESP_LOGI(TAG, "Full OTP Refresh completed in %lld ms", (long long)t_elapsed_ms);
 
     return ESP_OK;
@@ -646,10 +651,11 @@ esp_err_t sub_display_refresh_partial(void)
 
     ESP_RETURN_ON_ERROR(hal_spi_write_cmd(0x20), TAG, "SPI cmd 0x20 failed");
     sub_display_wait_busy(pdMS_TO_TICKS(2000));
+    s_last_refresh_done_us = esp_timer_get_time();
 
     memcpy(s_previous_frame, s_current_frame, EPD_BUFFER_SIZE);
 
-    int64_t t_elapsed_ms = (esp_timer_get_time() - t_start) / 1000LL;
+    int64_t t_elapsed_ms = (s_last_refresh_done_us - t_start) / 1000LL;
     ESP_LOGI(TAG, "Partial Refresh completed in %lld ms (Target: ~300 ms)", (long long)t_elapsed_ms);
 
     return ESP_OK;
@@ -718,6 +724,9 @@ esp_err_t sub_display_read_glass_temp(float *out_temp_c)
  * @brief Put SSD1681 into Deep Sleep Mode 1 (Command 0x10, Data 0x01 @ 1.0 µA).
  *
  * @details Crucially retains RAM contents while the 3.3V rail remains held.
+ *          Enforces the mandatory 250 ms post-BUSY electrophoretic microcapsule
+ *          physical settling window (AGENTS.md Section 3 Step 4) before issuing
+ *          0x10 = 0x01 if a waveform refresh completed less than 250 ms ago.
  *
  * @return ESP_OK on success.
  */
@@ -728,6 +737,15 @@ esp_err_t sub_display_enter_deep_sleep(void)
     }
 
     sub_display_wait_busy(pdMS_TO_TICKS(5000));
+
+    if (s_last_refresh_done_us > 0) {
+        int64_t elapsed_ms = (esp_timer_get_time() - s_last_refresh_done_us) / 1000LL;
+        if (elapsed_ms >= 0 && elapsed_ms < (int64_t)SUB_DISPLAY_SETTLING_WINDOW_MS) {
+            uint32_t rem_ms = (uint32_t)((int64_t)SUB_DISPLAY_SETTLING_WINDOW_MS - elapsed_ms);
+            vTaskDelay(pdMS_TO_TICKS(rem_ms));
+        }
+        s_last_refresh_done_us = 0;
+    }
 
     uint8_t d_sleep[] = {0x01};
     hal_spi_write_cmd(0x10);

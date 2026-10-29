@@ -10,7 +10,6 @@
 
 #include "driver/gpio.h"
 #include "esp_err.h"
-#include "h1os/orch_state.h"
 
 #include <stdbool.h>
 #include <stddef.h>

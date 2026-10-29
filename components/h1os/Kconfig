@@ -21,7 +21,7 @@ menu "H1OS Operating System Configuration"
             default y
             help
                 When powering down or storing the device, clears the e-Paper panel to pure white
-                via a full refresh to neutralize microcapsule charges and prevent permanent burn-in.
+                via a full refresh to clear and discharge microcapsule charges and prevent permanent burn-in.
 
     endmenu
 

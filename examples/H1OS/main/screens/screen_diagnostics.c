@@ -62,12 +62,15 @@ static const char *get_wake_causes_str(uint32_t causes)
  */
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
-
     uint32_t base_cpu_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
     h1os_lvgl_lock(100);
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "5/5", event_cb);
 
-    volatile orch_persisted_state_t *st = orch_state_get();
+    uint8_t  ulp_reason    = telem ? telem->ulp_dispatch_reason : (uint8_t)ULP_DISPATCH_NONE;
+    uint32_t wake_count    = telem ? telem->wake_count : 0U;
+    uint32_t sample_count  = telem ? telem->sample_count : 0U;
+    uint32_t fails         = telem ? telem->sensor_fail_count : 0U;
+    uint8_t  last_err      = telem ? telem->last_sensor_error : (uint8_t)ORCH_SENSOR_ERR_NONE;
 
     /* Row 1: System Reset Reason */
     lv_obj_t *lbl_k1 = lv_label_create(scr);
@@ -94,7 +97,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     /* Row 3: ULP Coprocessor Dispatch Mode */
     const char *ulp_str = "NONE";
-    switch (st->ulp_dispatch_reason) {
+    switch (ulp_reason) {
     case ULP_DISPATCH_SENSOR_SAMPLE:
         ulp_str = "SENSOR_SAMPLE";
         break;
@@ -157,17 +160,16 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_k6, LV_ALIGN_TOP_LEFT, 6, 128);
 
     lv_obj_t *lbl_v6 = lv_label_create(scr);
-    uint32_t fails = telem ? telem->sensor_fail_count : st->sensor_fail_count;
     if (fails > 0) {
         lv_label_set_text_fmt(lbl_v6, "%lu (Fail %lu)",
-                              (unsigned long)st->wake_count,
+                              (unsigned long)wake_count,
                               (unsigned long)fails);
     } else {
-        uint8_t ring_count = (st->total_samples >= ORCH_RING_CAPACITY) ?
+        uint8_t ring_count = (sample_count >= ORCH_RING_CAPACITY) ?
                               (uint8_t)ORCH_RING_CAPACITY :
-                              (uint8_t)st->total_samples;
+                              (uint8_t)sample_count;
         lv_label_set_text_fmt(lbl_v6, "%lu (Ring %u/32)",
-                              (unsigned long)st->wake_count,
+                              (unsigned long)wake_count,
                               ring_count);
     }
     lv_obj_set_style_text_font(lbl_v6, H1OS_FONT_14, 0);
@@ -180,7 +182,6 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_k7, LV_ALIGN_TOP_LEFT, 6, 148);
 
     lv_obj_t *lbl_v7 = lv_label_create(scr);
-    uint8_t last_err = telem ? telem->last_sensor_error : st->last_sensor_error;
     if (last_err == ORCH_SENSOR_ERR_NONE) {
         lv_label_set_text_fmt(lbl_v7, "%luMHz • SHT:OK", (unsigned long)base_cpu_mhz);
     } else {

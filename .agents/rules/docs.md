@@ -1,6 +1,6 @@
 # Documentation Governance, Historical Memory & OSHW Attribution
 
-This rule governs documentation integrity, living memory tracking, and open-source attribution in **H1OS**.
+This rule governs documentation integrity, living memory tracking, and open-source attribution in **H1OS** (`v2.4.5-dev`).
 
 ---
 
@@ -10,9 +10,9 @@ This rule governs documentation integrity, living memory tracking, and open-sour
 
 1. **Mandatory & Methodical Updates:**
    - Documentation is not an optional afterthought; it is committed alongside code changes.
-   - When APIs, state machines, or pinouts change, the corresponding documentation in `docs/` must be updated in the same patch.
+   - When APIs, state machines, concurrency models, or pinouts change, the corresponding documentation in `docs/` (`docs/architecture/*.md`, `docs/drivers/*.md`, `docs/guide.md`, `docs/pinout.md`) must be updated in the same patch.
 2. **Documenting the Weeds (Failure Analysis):**
-   - Record design dead-ends, silicon hardware bugs, and discarded workarounds in `docs/architecture/08_lessons_learned.md` and `ERRATA.md`.
+   - Record design dead-ends, silicon hardware limitations, and discarded workarounds in `docs/architecture/C2_lessons_learned.md` and `ERRATA.md`.
    - Never erase historical technical rationale—distill it into authoritative digests so future maintainers avoid repeating mistakes.
 
 ---
@@ -28,5 +28,5 @@ This rule governs documentation integrity, living memory tracking, and open-sour
 
 ### Project Engineering Attribution
 - **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-- **Principal Firmware Audit, `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+- **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.5-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 - **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

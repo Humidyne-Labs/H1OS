@@ -85,6 +85,7 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
 
     if (causes & BIT(ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG)) {
         ESP_LOGE(TAG, "[ULP FAULT] Coprocessor trapped/crashed! Causes bitmask: 0x%08lx", (unsigned long)causes);
+        st->flow_b_counter++;
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
@@ -97,9 +98,23 @@ orch_flow_type_t orch_flow_determine_wakeup(void)
             return ORCH_FLOW_BOOTLOADER_JUMP;
         }
 
+        if (ulp_last_wake_cause == ULP_WAKE_CAUSE_LONG_OVERFLOW && st->sample_interval_sec > 0U) {
+            uint32_t flow_a      = st->sample_interval_sec;
+            uint32_t flow_b      = st->flow_b_period_sec;
+            uint32_t rem         = (flow_b > 0U) ? (flow_b % flow_a) : 0U;
+            uint32_t final_slice = (rem > 0U) ? rem : flow_a;
+            st->total_sleep_sec += final_slice;
+        }
+
+        if (ulp_last_wake_btn != 0U) {
+            st->button_wake_count++;
+        } else {
+            st->flow_b_counter++;
+        }
         return ORCH_FLOW_B_MAIN_WAKE;
     }
 
+    st->flow_b_counter++;
     return ORCH_FLOW_B_MAIN_WAKE;
 }
 
@@ -394,6 +409,13 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
         return ESP_ERR_INVALID_STATE;
     }
 
+    /* Account for elapsed active processor runtime and periodically checkpoint to NVS */
+    st->total_app_run_ms += (uint32_t)(esp_timer_get_time() / 1000ULL);
+    if (st->total_sleep_sec - st->last_nvs_commit_sec >= ORCH_NVS_AUTONOMY_COMMIT_INTERVAL_SEC) {
+        orch_state_save_runtimes_to_nvs();
+        st->last_nvs_commit_sec = st->total_sleep_sec;
+    }
+
     uint32_t full_slices = flow_b_sec / flow_a_sec;
     uint32_t remainder   = flow_b_sec % flow_a_sec;
     uint32_t overflow    = full_slices + (remainder > 0 ? 1 : 0);
@@ -417,18 +439,13 @@ static esp_err_t orch_flow_execute_sleep(uint32_t sleep_sec)
     orch_wake_stub_install();
     sub_power_set_sleep_slices(flow_a_sec, flow_b_sec, overflow, remainder);
 
-    uint32_t internal_sleep_sec = 0;
-    if (flow_a_sec < flow_b_sec) {
-        internal_sleep_sec = flow_a_sec;
-    }
-
     ESP_LOGI(TAG, "Entering coordinated deep sleep: External RTC UI timer = %lus (Pure Event Mode: %lu slices x %lus)",
                     (unsigned long)flow_b_sec,
                     (unsigned long)overflow,
                     (unsigned long)flow_a_sec);
 
     uint64_t wake_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER) | (1ULL << HAL_PIN_RTC_INT);
-    return sub_power_enter_deep_sleep(internal_sleep_sec, wake_mask);
+    return sub_power_enter_deep_sleep(flow_a_sec, wake_mask);
 }
 
 /**

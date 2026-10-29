@@ -6,9 +6,9 @@ description: Semantic C/C++ code navigation, type inspection, definition jumps, 
 # Clangd LSP Bridge & Semantic Code Intelligence Skill
 
 ## Overview
-This skill guides the usage of **`clangd-mcp`** (`schuay/clangd-mcp`) for compiler-backed semantic C/C++ codebase analysis on **H1OS** and ESP32-S3 firmware.
+This skill guides the usage of **`clangd-mcp`** (`schuay/clangd-mcp`) for compiler-backed semantic C/C++ codebase analysis on **H1OS** (`v2.4.5-dev`) and ESP32-S3 firmware.
 
-Instead of relying on regex or eager whole-repo LLM extraction (Graphify), `clangd-mcp` connects to LLVM's `clangd` language server directly against `compile_commands.json`. It evaluates the real type system, expands macros, traces exact call hierarchies, and navigates cross-references in milliseconds with zero token overhead.
+Instead of relying on regex or eager whole-repo LLM extraction, `clangd-mcp` connects to LLVM's `clangd` language server directly against `compile_commands.json`. It evaluates the real type system, expands macros, traces exact call hierarchies, and navigates cross-references in milliseconds with zero token overhead.
 
 ---
 
@@ -20,8 +20,8 @@ Instead of relying on regex or eager whole-repo LLM extraction (Graphify), `clan
 * **Workspace Root**: `<workspace_root>`
 
 ### 💡 Compilation Database Linkage Directive
-When opening or indexing the workspace, LLVM `clangd` searches the project root for `compile_commands.json`. 
-**If no root-level `compile_commands.json` exists**, the agent must create an NTFS hardlink from the active build directory:
+When opening or indexing the workspace, LLVM `clangd` searches the project root for `compile_commands.json`.
+**If no root-level `compile_commands.json` exists**, the agent must create an NTFS hardlink from the active build directory (`examples/H1OS/build_dev/compile_commands.json`):
 ```powershell
 if (-not (Test-Path "compile_commands.json")) {
     New-Item -ItemType HardLink -Path "compile_commands.json" -Target "examples/H1OS/build_dev/compile_commands.json"
@@ -38,8 +38,8 @@ if (-not (Test-Path "compile_commands.json")) {
 
 ### 1. Call Hierarchy: Callers (`get_callers`) & Callees (`get_callees`)
 Use to construct instantaneous, compiler-verified call trees upward and downward from any function:
-* **`get_callers`**: Finds all functions that invoke the target function.
-* **`get_callees`**: Finds all functions invoked by the target function.
+* **`get_callers`**: Finds all functions that invoke the target function (essential for verifying 4-layer boundary compliance and ensuring Layer 2 `sub_*` never calls Layer 3/4).
+* **`get_callees`**: Finds all functions invoked by the target function (essential for auditing `RTC_IRAM_ATTR` wake stub functions in `orch_wake_stub.c` to verify zero calls to Flash-resident functions).
 * **Arguments**: `file_path`, `line`, `character`.
 
 ### 2. Jump to Definition (`get_definition`)
@@ -51,7 +51,7 @@ Use when refactoring APIs, modifying struct fields, or verifying call sites acro
 * **Arguments**: `file_path`, `line`, `character`.
 
 ### 4. Type & Struct Inspection (`get_type_info`)
-Inspect inferred types, struct layouts, function prototypes, docstrings, or evaluated preprocessor macro values:
+Inspect inferred types, struct layouts (e.g. `648-byte` `orch_persisted_state_t`), function prototypes, docstrings, or evaluated preprocessor macro values:
 * **Arguments**: `file_path`, `line`, `character`.
 
 ### 5. Symbol Search (`find_symbol` & `list_file_symbols`)
