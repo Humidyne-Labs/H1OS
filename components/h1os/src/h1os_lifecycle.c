@@ -25,6 +25,7 @@
 #include "orch_state.h"
 #include "sdkconfig.h"
 #include "soc/rtc_cntl_reg.h"
+#include "soc/rtc_io_reg.h"
 #include "sub_audio.h"
 #include "sub_display.h"
 #include "sub_nvs.h"
@@ -438,8 +439,18 @@ static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t *config, orch_
         return err;
     }
 
-    /* Ensure ULP GPIO wakeup is gated off while Xtensa CPU owns the system */
+    /* Ensure ULP GPIO wakeup and CPU SW wakeup interrupt are cleared while Xtensa CPU owns the system */
     CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+    CLEAR_PERI_REG_MASK(RTC_CNTL_STATE0_REG, RTC_CNTL_SW_CPU_INT);
+    SET_PERI_REG_MASK(RTC_CNTL_INT_CLR_REG,
+                      RTC_CNTL_SLP_REJECT_INT_CLR |
+                          RTC_CNTL_SLP_WAKEUP_INT_CLR |
+                          RTC_CNTL_COCPU_INT_CLR |
+                          RTC_CNTL_COCPU_TRAP_INT_CLR |
+                          RTC_CNTL_ULP_CP_INT_CLR);
+    REG_SET_BIT(RTC_CNTL_STATE0_REG, RTC_CNTL_SLP_REJECT_CAUSE_CLR);
+    REG_WRITE(RTC_GPIO_STATUS_W1TC_REG, RTC_GPIO_STATUS_INT_W1TC_M);
+    asm volatile("memw" ::: "memory");
 
     orch_flow_type_t flow = orch_flow_determine_wakeup();
 

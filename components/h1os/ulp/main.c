@@ -30,8 +30,9 @@ volatile uint32_t rtc_int_stuck   = 0;
 volatile uint32_t dispatch_reason = 0;
 volatile uint32_t gpio_status_raw = 0;
 
+#define ULP_VBAT_TRIM_OFFSET_MV 80
 volatile uint32_t cal_scale       = 8601;
-volatile int32_t  cal_offset      = 0;
+volatile int32_t  cal_offset      = ULP_VBAT_TRIM_OFFSET_MV;
 volatile uint32_t last_vbat_mv    = 4000;
 volatile uint32_t vbat_raw_adc    = 0;
 volatile uint32_t usb_connected   = 0;
@@ -329,8 +330,7 @@ int main(void)
     }
 
     if (!REG_GET_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)) {
-        /* Main processor is actively running; disarm ULP GPIO wake to prevent wake storm */
-        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        /* Main processor is actively entering sleep; clear trigger latch only and halt, keeping GPIO wake enabled */
         ulp_clear_gpio_wakeup_latch();
         ulp_riscv_halt();
         return 0;
