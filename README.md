@@ -232,7 +232,6 @@ powershell.exe -ExecutionPolicy Bypass -File "tools/usb_ctrl_punk_v2.6/Full/toky
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
 * **Principal Firmware Audit, Dual-Core Concurrency Architecture & `-O2` Wake Stub Hardening (`v2.4.4-dev` – `v2.4.7-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)
-```
 
 ---
 
