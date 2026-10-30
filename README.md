@@ -204,11 +204,35 @@ idf.py -B build_dev -p COMx flash monitor
 
 ---
 
+## ⚡ Hardware Recovery Tooling With Powershell (`usb_ctrl_punk // tokyo_bloodline`)
+
+When developing low-level sleep stubs, ULP coprocessor routines, or high-speed USB-JTAG firmware, the ESP32-S3 native USB peripheral can occasionally stall or wedge into a Windows `Code 43` state. 
+
+H1OS includes **`usb_ctrl_punk // tokyo_bloodline edition`** (`tools/usb_ctrl_punk_v2.6/`), a retro app-phreak hardware bus recovery tool designed to clear stuck DevNodes and force USB hardware resets without touching the dev kit:
+
+* **True SE0 Hardware Replug:** Issues `IOCTL_USB_HUB_CYCLE_PORT` (`0x220444`) to upstream root hubs, pulling both D+ and D- lines to ground for an instant electrical power-cycle and re-enumeration.
+* **Driver & PnP Stack Cleanse:** Quickly cycles driver bindings or purges faulted DevNodes via native Windows PnP subsystem hooks.
+* **Two Operational Editions:**
+  * **Full Edition (`tools/usb_ctrl_punk_v2.6/Full/`):** Self-contained single-file portable script with embedded audio stream.
+  * **Lite Edition (`tools/usb_ctrl_punk_v2.6/Lite/`):** 100% auditable plain-text script with zero binary blobs for corporate/security-conscious environments.
+* **Soundtrack:** Features the native `tokyo_bloodline_synth` soundtrack by Humiditron.
+
+```powershell
+# Launch directly from PowerShell (Full Edition)
+powershell.exe -ExecutionPolicy Bypass -File "tools/usb_ctrl_punk_v2.6/Full/tokyo_bloodline.ps1"
+
+# Or run silent
+powershell.exe -ExecutionPolicy Bypass -File "tools/usb_ctrl_punk_v2.6/Full/tokyo_bloodline.ps1" -NoAudio
+```
+
+---
+
 ## Contributors & Attribution
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
 * **Principal Firmware Audit, Dual-Core Concurrency Architecture & `-O2` Wake Stub Hardening (`v2.4.4-dev` – `v2.4.7-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)
+```
 
 ---
 

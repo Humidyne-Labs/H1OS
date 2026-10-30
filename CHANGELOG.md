@@ -26,6 +26,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Appended Section 9 (`v2.4.6-dev` Post-Audit Bench Verification & `v2.4.7-dev` Remediation) to `TST_005/TST_005_results.md` and generated the formal `v2.4.7-dev` audit report.
   * Synchronized semantic version strings across all four authoritative locations (`h1os_version.h`, `components/h1os/idf_component.yml`, `README.md`, `CHANGELOG.md`) to `2.4.7-dev`.
 
+### 🛠️ Developer Tooling & Hardware Recovery
+
+* **Retro USB Port Recovery Utility (`usb_ctrl_punk // tokyo_bloodline edition`)** (`tools/usb_ctrl_punk_v2.6/`, `tools/usb_ctrl_punk_v2.6/Full/`, `tools/usb_ctrl_punk_v2.6/Lite/`):
+  * Deployed `usb_ctrl_punk` (v2.6) featuring an underground app-phreak aesthetic, decoupled 30 FPS GDI+ runspace rendering, and the integrated `tokyo_bloodline_synth` soundtrack by Humiditron.
+  * **Win32 Kernel Port Cycling:** Drives hardware Single-Ended Zero (SE0) bus resets directly against upstream USB hubs via `IOCTL_USB_HUB_CYCLE_PORT` (`0x220444`), simulating a physical cable re-plug to instantly recover stalled ESP32-S3 USB-JTAG/Serial endpoints, stuck ROM download modes, and faulted DevNodes (`Code 43`) without physical intervention.
+  * **Dual Distribution Model:**
+    * `Full/`: Zero-dependency, single-file portable script (`tokyo_bloodline.ps1`) with in-memory base64 audio payload and one-click elevated UAC launch wrappers (`tokyo_bloodline_full.bat` / `tokyo_bloodline_full_silent.bat`).
+    * `Lite/`: 100% human-auditable UTF-8 script (`tokyo_bloodline_lite.ps1`) stripped of binary blobs for enterprise security auditability, loading `tokyo_bloodline_synth.mp3` dynamically from the local directory.
+  * Integrated multi-tier PnP recovery actions: `[1] PATCH PORT (SE0 REPLUG)`, `[2] RESTART DRIVER (PNP TOGGLE)`, `[3] PURGE FAULTED NODE (CODE 43)`, and `[4] SCAN FOR HARDWARE CHANGES`.
+  * Inspired by [USB Device Tree Viewer](https://www.uwe-sieber.de/usbtreeview_e.html), observed hardware behavior after a `Device Restart` directly inspired the tools creation.
+
 ## [2.4.6-dev] - 2026-10-29
 
 ### 🛡️ Fixed & Hardened (`TST_005` Thermal Offset & Low-Power Sleep Remediation Audit)
