@@ -42,7 +42,7 @@ This document defines the physical measurement procedures, test fixtures, expect
   1. `BAT_CTRL` (GPIO 17) latched HIGH via RTC pad hold (LDO enabled).
   2. `EPD_3V3_EN` (GPIO 6) held LOW via RTC pad hold (display rail active, SSD1681 in Deep Sleep Mode 1 @ $1.0\text{ }\mu\text{A}$).
   3. `PA_EN` (`GPIO 42`) held **LOW (`0`)** (audio rail energized per Errata E4 so the shared I2C bus is never pulled down) and `PA_CTRL` (`GPIO 46`) held **LOW (`0`)** (NS4168 Class-D amplifier muted).
-  4. ES8311 Codec in software standby (`Reg 0x0D = 0xFC`, `Reg 0x0E = 0x6A`, `Reg 0x12 = 0x02`, `Reg 0x00 = 0x1E` @ $<1.0\text{ }\mu\text{A}$), keeping the shared I2C bus (`GPIO 47/48`) un-clamped.
+  4. ES8311 Codec in software standby (`Reg 0x0D = 0xFC`, `Reg 0x0E = 0x6A`, `Reg 0x0F = 0xFF`, `Reg 0x12 = 0x02`, `Reg 0x45 = 0x03`, `Reg 0x00 = 0x1F`, `Reg 0x01 = 0x00` @ $<1.0\text{ }\mu\text{A}$), keeping the shared I2C bus (`GPIO 47/48`) un-clamped.
   5. PCF85063A `COF[2:0] = 111` (CLKOUT pin permanently disabled to prevent parasitic square-wave leakage).
 - **Pass Criterion:** Average standby floor $\le 15.0\text{ }\mu\text{A}$ RMS over a 60-second sleep interval.
 

@@ -24,55 +24,68 @@
 static const char *TAG = "H1OS_BOOT_HOOK";
 
 /**
- * @brief Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
+ * @brief Anchor symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
  */
 void bootloader_hooks_include(void)
 {
-	// Empty
+    /* Empty symbol referenced by linker to pull in bootloader hook object */
 }
 
 /**
  * @brief FIRST HOOK: Executes before any bootloader hardware initialization.
  *
- * @details * Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here).
+ * @details Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here).
  * Immediately latches BAT_CTRL (GPIO 17) HIGH in < 25ms.
- * Explicitly connects SIG_GPIO_OUT_IDX to prevent reliance on reset defaults.
+ * Explicitly connects SIG_GPIO_OUT_IDX and drives output levels BEFORE releasing and
+ * re-latching pad holds so digital/RTC rails never glitch across deep-sleep wakes.
  */
 void bootloader_before_init(void)
 {
-    REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
+    /* 1. Drive GPIO 17 (BAT_CTRL = 1) in peripheral registers while existing pad hold remains active */
     esp_rom_gpio_pad_select_gpio(H1OS_PIN_POWER_HOLD);
-    esp_rom_gpio_connect_out_signal(H1OS_PIN_POWER_HOLD, SIG_GPIO_OUT_IDX, false, false);
+    gpio_ll_pullup_dis(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
+    gpio_ll_pulldown_dis(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
     gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD, 1);
+    esp_rom_gpio_connect_out_signal(H1OS_PIN_POWER_HOLD, SIG_GPIO_OUT_IDX, false, false);
     gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
+    REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
     REG_SET_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
 
-    REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_EPD_3V3_EN));
+    /* 2. Drive GPIO 6 (EPD_3V3_EN = 0, Active LOW) before refreshing RTC pad hold */
     esp_rom_gpio_pad_select_gpio(H1OS_PIN_EPD_3V3_EN);
-    esp_rom_gpio_connect_out_signal(H1OS_PIN_EPD_3V3_EN, SIG_GPIO_OUT_IDX, false, false);
+    gpio_ll_pullup_dis(&GPIO, (gpio_num_t)H1OS_PIN_EPD_3V3_EN);
+    gpio_ll_pulldown_dis(&GPIO, (gpio_num_t)H1OS_PIN_EPD_3V3_EN);
     gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_EPD_3V3_EN, 0);
+    esp_rom_gpio_connect_out_signal(H1OS_PIN_EPD_3V3_EN, SIG_GPIO_OUT_IDX, false, false);
     gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_EPD_3V3_EN);
+    REG_CLR_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_EPD_3V3_EN));
     REG_SET_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_EPD_3V3_EN));
 
-    gpio_ll_hold_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
+    /* 3. Drive GPIO 42 (PA_EN = 0, Active LOW) before refreshing digital pad hold to prevent POR glitch on ES8311 */
     esp_rom_gpio_pad_select_gpio(H1OS_PIN_PA_EN);
-    esp_rom_gpio_connect_out_signal(H1OS_PIN_PA_EN, SIG_GPIO_OUT_IDX, false, false);
+    gpio_ll_pullup_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
+    gpio_ll_pulldown_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
     gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN, 0);
+    esp_rom_gpio_connect_out_signal(H1OS_PIN_PA_EN, SIG_GPIO_OUT_IDX, false, false);
     gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
+    gpio_ll_hold_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
     gpio_ll_hold_en(&GPIO, (gpio_num_t)H1OS_PIN_PA_EN);
 
-    gpio_ll_hold_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
+    /* 4. Drive GPIO 46 (PA_CTRL = 0, NS4150B Shutdown) before refreshing digital pad hold */
     esp_rom_gpio_pad_select_gpio(H1OS_PIN_PA_CTRL);
-    esp_rom_gpio_connect_out_signal(H1OS_PIN_PA_CTRL, SIG_GPIO_OUT_IDX, false, false);
+    gpio_ll_pullup_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
+    gpio_ll_pulldown_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
     gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL, 0);
+    esp_rom_gpio_connect_out_signal(H1OS_PIN_PA_CTRL, SIG_GPIO_OUT_IDX, false, false);
     gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
+    gpio_ll_hold_dis(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
     gpio_ll_hold_en(&GPIO, (gpio_num_t)H1OS_PIN_PA_CTRL);
 }
 
 /**
  * @brief SECOND HOOK: Executes after standard bootloader initialization.
  *
- * @details * Console, SPI Flash cache, and clocks are now valid; ESP_LOG is operational.
+ * @details Console, SPI Flash cache, and clocks are now valid; ESP_LOG is operational.
  */
 void bootloader_after_init(void)
 {
@@ -81,17 +94,17 @@ void bootloader_after_init(void)
     uint32_t g6_hold  = (REG_READ(RTC_CNTL_PAD_HOLD_REG) >> H1OS_PIN_EPD_3V3_EN) & 1U;
 
     if (g17_hold == 0 || g17_out == 0) {
-        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]", 
-						(unsigned long)g17_out, 
-						(unsigned long)g17_hold);
+        ESP_LOGE(TAG, "[FATAL] BAT_CTRL (GPIO 17) power latch failed! [out=%lu, hold=%lu]",
+                 (unsigned long)g17_out,
+                 (unsigned long)g17_hold);
 
         gpio_ll_set_level(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD, 1);
         gpio_ll_output_enable(&GPIO, (gpio_num_t)H1OS_PIN_POWER_HOLD);
         REG_SET_BIT(RTC_CNTL_PAD_HOLD_REG, BIT(H1OS_PIN_POWER_HOLD));
     } else {
         ESP_LOGD(TAG, "Hardware master rails verified [BAT_CTRL=%lu (hold=%lu), EPD_EN_HOLD=%lu]",
-                 (unsigned long)g17_out, 
-				 (unsigned long)g17_hold, 
-				 (unsigned long)g6_hold);
+                 (unsigned long)g17_out,
+                 (unsigned long)g17_hold,
+                 (unsigned long)g6_hold);
     }
 }

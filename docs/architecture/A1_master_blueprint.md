@@ -45,7 +45,7 @@ Self-contained peripheral drivers ("Does the thing"). Expose clean APIs with sta
 - **`sub_display.cpp/.h`**: SSD1681 200x200 1-bit driver (non-touch), Ping-Pong buffer RAM management (`0x24`/`0x26`), partial waveform LUT, panel busy synchronization, pre-display on-glass temperature acquisition (`0x1B`), Deep Sleep Mode 1 (`0x10, 0x01`).
 - **`sub_rtc.c/.h`**: PCF85063A POSIX timekeeping, countdown timer, hardware alarms, interrupt clearing (`GPIO 5`), parasitic CLKOUT disabled (`COF=111`).
 - **`sub_power.c/.h`**: Exclusive ULP quiet-state battery voltage retrieval (`ulp_vbat_ring[8]`), 13-point LiPo OCV lookup curve in tenths of a percent (`0..1000`), Elapsed Runtime Empirical Autonomy Engine (`sub_power_calc_autonomy`), Zero-Volt Cable Guard, Dynamic Frequency Scaling (`sub_power_init_dfs`), and Pure Event Mode deep sleep execution.
-- **`sub_audio.c/.h`**: ES8311 software standby register sequence (`0x00=0x1E`, `0x0D=0xFC`) to prevent pulling down the shared I2C bus, synthesized acoustic chime/tone generator, and asynchronous PCM playback via `sub_audio_play()`.
+- **`sub_audio.c/.h`**: ES8311 software standby register sequence (`0x0D=0xFC`, `0x0E=0x6A`, `0x0F=0xFF`, `0x45=0x03`, `0x00=0x1F`, `0x01=0x00`) to prevent pulling down the shared I2C bus, synthesized acoustic chime/tone generator, and asynchronous PCM playback via `sub_audio_play()`.
 - **`sub_nvs.c/.h`**: Persistent key-value configuration storage for autonomy runtimes and user preferences.
 - **`sub_sdcard.c/.h`**: Asynchronous and synchronous 1-bit SDMMC FATFS manager: mount, unmount, format, and capacity checking.
 
@@ -61,7 +61,7 @@ The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
-- **`h1os_version.h`**: Semantic version macros (`2.4.5-dev`) and inline getters.
+- **`h1os_version.h`**: Semantic version macros (`2.4.7-dev`) and inline getters.
 - **`h1os_lifecycle.c`**: Declarative lifecycle & dual-core concurrency engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_sync_hold()`, `h1os_sync_notify_complete()`, `h1os_display_notify_quiescent()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`, plus Layer 4 peripheral wrappers (`h1os_sdcard_mount_async()`, `h1os_sdcard_unmount()`, `h1os_led_start_breathing()`, `h1os_led_stop_breathing()`, `h1os_led_set()`).
 - **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, 16-slot static `h1os_ui_post()` cross-core actor queue drained inside `h1os_lvgl_lock(100)`, inbound `sync_wait_ms` single-refresh coalescing gate, keypad indev binding, and 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.

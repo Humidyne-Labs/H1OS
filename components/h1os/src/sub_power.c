@@ -18,7 +18,6 @@
 #include "esp_rom_sys.h"
 #include "esp_attr.h"
 #include "esp_sleep.h"
-#include "h1os/orch_state.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -359,8 +358,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
             return err;
         }
 
-        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN);
-        SET_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
+        /* Keep both internal ULP sleep timer (ERR-001) and ULP GPIO wakeup disarmed while main CPU is awake (Rule 5);
+         * sub_power_enter_deep_sleep_mode() arms RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA immediately prior to sleep entry. */
+        CLEAR_PERI_REG_MASK(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN | RTC_CNTL_ULP_CP_GPIO_WAKEUP_ENA);
 
         rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
         rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
@@ -410,11 +410,11 @@ esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_
         (void)sub_power_init();
     }
 
-    if (s_cached_flow_a_sec == 0U) {
-        s_cached_flow_a_sec = orch_state_get()->sample_interval_sec;
+    if (s_cached_flow_a_sec == 0U && sleep_seconds > 0U) {
+        s_cached_flow_a_sec = sleep_seconds;
     }
-    if (s_cached_flow_b_sec == 0U) {
-        s_cached_flow_b_sec = orch_state_get()->flow_b_period_sec;
+    if (s_cached_flow_b_sec == 0U && s_cached_flow_a_sec > 0U && ulp_overflow_limit > 0U) {
+        s_cached_flow_b_sec = (s_cached_flow_a_sec * ulp_overflow_limit) + ulp_remainder_sec;
     }
     uint32_t flow_a_sec  = (sleep_seconds > 0U) ? sleep_seconds : s_cached_flow_a_sec;
     uint32_t flow_b_sec  = s_cached_flow_b_sec;
