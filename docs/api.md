@@ -50,6 +50,18 @@ Default compound literal macro for standard lifecycle session configuration.
 
 ---
 
+{#ulp_vbat_trim_offset_mv}
+
+### ULP_VBAT_TRIM_OFFSET_MV
+
+```cpp
+#define ULP_VBAT_TRIM_OFFSET_MV 80
+```
+
+Defined in main.c:33
+
+---
+
 {#ulp_vbat_ring_size}
 
 ### ULP_VBAT_RING_SIZE
@@ -58,7 +70,7 @@ Default compound literal macro for standard lifecycle session configuration.
 #define ULP_VBAT_RING_SIZE 8
 ```
 
-Defined in main.c:39
+Defined in main.c:40
 
 ---
 
@@ -70,7 +82,7 @@ Defined in main.c:39
 #define RTC_INT_PIN GPIO_NUM_5
 ```
 
-Defined in main.c:44
+Defined in main.c:45
 
 ---
 
@@ -82,7 +94,7 @@ Defined in main.c:44
 #define RTC_INT_TIMEOUT_US 50000
 ```
 
-Defined in main.c:45
+Defined in main.c:46
 
 ---
 
@@ -94,7 +106,7 @@ Defined in main.c:45
 #define RTC_INT_POLL_US 100
 ```
 
-Defined in main.c:46
+Defined in main.c:47
 
 ---
 
@@ -106,7 +118,7 @@ Defined in main.c:46
 #define BUTTON_DEBOUNCE_US 30000
 ```
 
-Defined in main.c:48
+Defined in main.c:49
 
 ---
 
@@ -118,7 +130,7 @@ Defined in main.c:48
 #define BUTTON_HOLD_US 2500000
 ```
 
-Defined in main.c:49
+Defined in main.c:50
 
 ---
 
@@ -130,7 +142,7 @@ Defined in main.c:49
 #define BUTTON_TAP_MIN_MS 30
 ```
 
-Defined in main.c:50
+Defined in main.c:51
 
 ---
 
@@ -142,7 +154,7 @@ Defined in main.c:50
 #define BUTTON_TAP_MAX_MS 2500
 ```
 
-Defined in main.c:51
+Defined in main.c:52
 
 ---
 
@@ -154,7 +166,7 @@ Defined in main.c:51
 #define BUTTON_POLL_US 5000
 ```
 
-Defined in main.c:52
+Defined in main.c:53
 
 ---
 
@@ -166,7 +178,7 @@ Defined in main.c:52
 #define BUTTON_RELEASE_TIMEOUT_US 50000
 ```
 
-Defined in main.c:53
+Defined in main.c:54
 
 ---
 
@@ -178,7 +190,7 @@ Defined in main.c:53
 #define PMU_RDY_SPIN_MAX 50000
 ```
 
-Defined in main.c:55
+Defined in main.c:56
 
 ---
 
@@ -190,7 +202,7 @@ Defined in main.c:55
 #define ADC_CONV_SPIN_MAX 10000
 ```
 
-Defined in main.c:56
+Defined in main.c:57
 
 ---
 
@@ -202,7 +214,7 @@ Defined in main.c:56
 #define SAR1_XPD_SETTLE_US 40
 ```
 
-Defined in main.c:57
+Defined in main.c:58
 
 ---
 
@@ -214,7 +226,7 @@ Defined in main.c:57
 #define SAR1_START_PULSE_US 2
 ```
 
-Defined in main.c:58
+Defined in main.c:59
 
 ---
 
@@ -254,7 +266,7 @@ Tactile button debounce window (15 ms).
 #define HAL_LEDC_TIMER LEDC_TIMER_0
 ```
 
-Defined in hal_io.c:222
+Defined in hal_io.c:292
 
 ---
 
@@ -266,7 +278,7 @@ Defined in hal_io.c:222
 #define HAL_LEDC_MODE LEDC_LOW_SPEED_MODE
 ```
 
-Defined in hal_io.c:223
+Defined in hal_io.c:293
 
 ---
 
@@ -278,7 +290,7 @@ Defined in hal_io.c:223
 #define HAL_LEDC_CHANNEL LEDC_CHANNEL_0
 ```
 
-Defined in hal_io.c:224
+Defined in hal_io.c:294
 
 ---
 
@@ -290,7 +302,7 @@ Defined in hal_io.c:224
 #define HAL_LEDC_DUTY_RES LEDC_TIMER_10_BIT
 ```
 
-Defined in hal_io.c:225
+Defined in hal_io.c:295
 
 ---
 
@@ -302,7 +314,7 @@ Defined in hal_io.c:225
 #define HAL_LEDC_FREQUENCY 5000
 ```
 
-Defined in hal_io.c:226
+Defined in hal_io.c:296
 
 ---
 
@@ -1158,6 +1170,20 @@ SPIFFS / LittleFS non-volatile file storage partition.
 
 ---
 
+{#sub_power_vbat_trim_offset_mv}
+
+### SUB_POWER_VBAT_TRIM_OFFSET_MV
+
+```cpp
+#define SUB_POWER_VBAT_TRIM_OFFSET_MV 80
+```
+
+Defined in h1os/sub_power.h:18
+
+Empirical ADC calibration trim offset in millivolts (+76..+80 mV).
+
+---
+
 {#orch_historical_ewma_alpha}
 
 ### ORCH_HISTORICAL_EWMA_ALPHA
@@ -1228,7 +1254,7 @@ Defined in orch_math.c:16
 #define M_PI 3.14159265358979323846f
 ```
 
-Defined in sub_audio.c:27
+Defined in sub_audio.c:28
 
 ---
 
@@ -1240,7 +1266,7 @@ Defined in sub_audio.c:27
 #define SUB_AUDIO_TASK_STACK_WORKER 4096U
 ```
 
-Defined in sub_audio.c:33
+Defined in sub_audio.c:34
 
 Audio worker task stack depth (4 KB floor).
 
@@ -1254,7 +1280,7 @@ Audio worker task stack depth (4 KB floor).
 #define SUB_AUDIO_TASK_PRIO_WORKER 6
 ```
 
-Defined in sub_audio.c:34
+Defined in sub_audio.c:35
 
 High-priority audio DMA pump priority.
 
@@ -1268,9 +1294,9 @@ High-priority audio DMA pump priority.
 #define SUB_AUDIO_AMP_POWER_ON_DELAY_MS 120U
 ```
 
-Defined in sub_audio.c:35
+Defined in sub_audio.c:36
 
-Class-D amplifier power-up settling delay.
+Class-D amplifier power-up settling delay (120ms).
 
 ---
 
@@ -1282,9 +1308,9 @@ Class-D amplifier power-up settling delay.
 #define SUB_AUDIO_AMP_POWER_OFF_DELAY_MS 80U
 ```
 
-Defined in sub_audio.c:36
+Defined in sub_audio.c:37
 
-Class-D amplifier power-down muting delay.
+Class-D amplifier power-down muting delay (80ms).
 
 ---
 
@@ -1296,7 +1322,7 @@ Class-D amplifier power-down muting delay.
 #define SUB_AUDIO_DEFAULT_WAIT_TIMEOUT_MS 500U
 ```
 
-Defined in sub_audio.c:37
+Defined in sub_audio.c:38
 
 Default playback completion wait timeout.
 
@@ -1310,9 +1336,51 @@ Default playback completion wait timeout.
 #define SUB_AUDIO_QUEUE_DEPTH 8U
 ```
 
-Defined in sub_audio.c:38
+Defined in sub_audio.c:39
 
 Static audio command queue depth (8 slots).
+
+---
+
+{#sub_audio_dma_desc_num}
+
+### SUB_AUDIO_DMA_DESC_NUM
+
+```cpp
+#define SUB_AUDIO_DMA_DESC_NUM 4U
+```
+
+Defined in sub_audio.c:40
+
+Number of I2S DMA descriptors (4 x 256 = 64 ms).
+
+---
+
+{#sub_audio_csm_settle_timeout_ms}
+
+### SUB_AUDIO_CSM_SETTLE_TIMEOUT_MS
+
+```cpp
+#define SUB_AUDIO_CSM_SETTLE_TIMEOUT_MS 100U
+```
+
+Defined in sub_audio.c:41
+
+Maximum wait for ES8311 CSM to exit state S0.
+
+---
+
+{#sub_audio_csm_quiesce_delay_us}
+
+### SUB_AUDIO_CSM_QUIESCE_DELAY_US
+
+```cpp
+#define SUB_AUDIO_CSM_QUIESCE_DELAY_US 2000U
+```
+
+Defined in sub_audio.c:42
+
+Post-suspend CSM power-down hold before clk stop.
 
 ---
 
@@ -1324,7 +1392,177 @@ Static audio command queue depth (8 slots).
 #define ES8311_REG_RESET 0x00
 ```
 
-Defined in sub_audio.c:40
+Defined in sub_audio.c:45
+
+Reset control (Default 0x1F: CSM_ON=0, all RST_*=1).
+
+---
+
+{#es8311_reg_clk_mgr1}
+
+### ES8311_REG_CLK_MGR1
+
+```cpp
+#define ES8311_REG_CLK_MGR1 0x01
+```
+
+Defined in sub_audio.c:46
+
+Clock manager 1 (Default 0x00: all clocks gated off).
+
+---
+
+{#es8311_reg_clk_mgr2}
+
+### ES8311_REG_CLK_MGR2
+
+```cpp
+#define ES8311_REG_CLK_MGR2 0x02
+```
+
+Defined in sub_audio.c:47
+
+Clock manager 2 (Pre-divider & pre-multiplier).
+
+---
+
+{#es8311_reg_clk_mgr3}
+
+### ES8311_REG_CLK_MGR3
+
+```cpp
+#define ES8311_REG_CLK_MGR3 0x03
+```
+
+Defined in sub_audio.c:48
+
+Clock manager 3 (ADC oversampling ratio).
+
+---
+
+{#es8311_reg_clk_mgr4}
+
+### ES8311_REG_CLK_MGR4
+
+```cpp
+#define ES8311_REG_CLK_MGR4 0x04
+```
+
+Defined in sub_audio.c:49
+
+Clock manager 4 (DAC oversampling ratio).
+
+---
+
+{#es8311_reg_clk_mgr5}
+
+### ES8311_REG_CLK_MGR5
+
+```cpp
+#define ES8311_REG_CLK_MGR5 0x05
+```
+
+Defined in sub_audio.c:50
+
+Clock manager 5 (ADC/DAC digital clock dividers).
+
+---
+
+{#es8311_reg_clk_mgr6}
+
+### ES8311_REG_CLK_MGR6
+
+```cpp
+#define ES8311_REG_CLK_MGR6 0x06
+```
+
+Defined in sub_audio.c:51
+
+Clock manager 6 (BCLK divider).
+
+---
+
+{#es8311_reg_clk_mgr7}
+
+### ES8311_REG_CLK_MGR7
+
+```cpp
+#define ES8311_REG_CLK_MGR7 0x07
+```
+
+Defined in sub_audio.c:52
+
+Clock manager 7 (Bit 5 TRI_BLRCK, Bit 4 TRI_ADCDAT).
+
+---
+
+{#es8311_reg_clk_mgr8}
+
+### ES8311_REG_CLK_MGR8
+
+```cpp
+#define ES8311_REG_CLK_MGR8 0x08
+```
+
+Defined in sub_audio.c:53
+
+Clock manager 8 (LRCK divider low byte).
+
+---
+
+{#es8311_reg_sdpin}
+
+### ES8311_REG_SDPIN
+
+```cpp
+#define ES8311_REG_SDPIN 0x09
+```
+
+Defined in sub_audio.c:54
+
+Serial data port input (Bit 6 SDPIN_MUTE).
+
+---
+
+{#es8311_reg_sdpout}
+
+### ES8311_REG_SDPOUT
+
+```cpp
+#define ES8311_REG_SDPOUT 0x0A
+```
+
+Defined in sub_audio.c:55
+
+Serial data port output (Bit 6 SDPOUT_MUTE).
+
+---
+
+{#es8311_reg_sys_pwr_a}
+
+### ES8311_REG_SYS_PWR_A
+
+```cpp
+#define ES8311_REG_SYS_PWR_A 0x0B
+```
+
+Defined in sub_audio.c:56
+
+System power-up time control 1 (CSM_COUNT1).
+
+---
+
+{#es8311_reg_sys_pwr_b}
+
+### ES8311_REG_SYS_PWR_B
+
+```cpp
+#define ES8311_REG_SYS_PWR_B 0x0C
+```
+
+Defined in sub_audio.c:57
+
+System power-up time control 2 (CSM_COUNT2).
 
 ---
 
@@ -1336,7 +1574,23 @@ Defined in sub_audio.c:40
 #define ES8311_REG_SYS_PWR_ANA 0x0D
 ```
 
-Defined in sub_audio.c:41
+Defined in sub_audio.c:58
+
+System analog/bias/reference power-down (Default 0xFC).
+
+---
+
+{#es8311_reg_sys_pdn_mod}
+
+### ES8311_REG_SYS_PDN_MOD
+
+```cpp
+#define ES8311_REG_SYS_PDN_MOD 0x0E
+```
+
+Defined in sub_audio.c:59
+
+System PGA/ADC modulator power-down (Default 0x6A).
 
 ---
 
@@ -1348,7 +1602,37 @@ Defined in sub_audio.c:41
 #define ES8311_REG_SYS_LP_MOD 0x0F
 ```
 
-Defined in sub_audio.c:42
+Defined in sub_audio.c:60
+
+System low-power mode enables (0xFF = all LP blocks active).
+
+---
+
+{#es8311_reg_sys_ibias}
+
+### ES8311_REG_SYS_IBIAS
+
+```cpp
+#define ES8311_REG_SYS_IBIAS 0x10
+```
+
+Defined in sub_audio.c:61
+
+System master/DAC bias current control (Default 0x13).
+
+---
+
+{#es8311_reg_sys_int11}
+
+### ES8311_REG_SYS_INT11
+
+```cpp
+#define ES8311_REG_SYS_INT11 0x11
+```
+
+Defined in sub_audio.c:62
+
+System internal bias control (Default 0x7C).
 
 ---
 
@@ -1360,7 +1644,121 @@ Defined in sub_audio.c:42
 #define ES8311_REG_DAC_PWR 0x12
 ```
 
-Defined in sub_audio.c:43
+Defined in sub_audio.c:63
+
+DAC power control (Default 0x02: PDN_DAC=1, ENREFR=0).
+
+---
+
+{#es8311_reg_sys_hpsw}
+
+### ES8311_REG_SYS_HPSW
+
+```cpp
+#define ES8311_REG_SYS_HPSW 0x13
+```
+
+Defined in sub_audio.c:64
+
+System headphone driver switch (Default 0x00: HPSW=0).
+
+---
+
+{#es8311_reg_sys_mic_pga}
+
+### ES8311_REG_SYS_MIC_PGA
+
+```cpp
+#define ES8311_REG_SYS_MIC_PGA 0x14
+```
+
+Defined in sub_audio.c:65
+
+System DMIC/analog MIC mux & PGA gain (Default 0x10).
+
+---
+
+{#es8311_reg_adc_ramp}
+
+### ES8311_REG_ADC_RAMP
+
+```cpp
+#define ES8311_REG_ADC_RAMP 0x15
+```
+
+Defined in sub_audio.c:66
+
+ADC soft-ramp rate & DMIC sense (Default 0x00).
+
+---
+
+{#es8311_reg_adc_scale}
+
+### ES8311_REG_ADC_SCALE
+
+```cpp
+#define ES8311_REG_ADC_SCALE 0x16
+```
+
+Defined in sub_audio.c:67
+
+ADC microphone gain scale (Default 0x04).
+
+---
+
+{#es8311_reg_adc_vol}
+
+### ES8311_REG_ADC_VOL
+
+```cpp
+#define ES8311_REG_ADC_VOL 0x17
+```
+
+Defined in sub_audio.c:68
+
+ADC digital volume (Default 0x00: -95.5 dB).
+
+---
+
+{#es8311_reg_adc_hpf}
+
+### ES8311_REG_ADC_HPF
+
+```cpp
+#define ES8311_REG_ADC_HPF 0x1B
+```
+
+Defined in sub_audio.c:69
+
+ADC high-pass filter coefficient S2 (Default 0x0C).
+
+---
+
+{#es8311_reg_adc_eq}
+
+### ES8311_REG_ADC_EQ
+
+```cpp
+#define ES8311_REG_ADC_EQ 0x1C
+```
+
+Defined in sub_audio.c:70
+
+ADC equalizer bypass & HPF S1 (Default 0x4C: EQ bypassed).
+
+---
+
+{#es8311_reg_dac_mute}
+
+### ES8311_REG_DAC_MUTE
+
+```cpp
+#define ES8311_REG_DAC_MUTE 0x31
+```
+
+Defined in sub_audio.c:71
+
+DAC digital mute control (0x60 = DSM & DEM muted).
 
 ---
 
@@ -1372,7 +1770,51 @@ Defined in sub_audio.c:43
 #define ES8311_REG_DAC_VOL 0x32
 ```
 
-Defined in sub_audio.c:44
+Defined in sub_audio.c:72
+
+DAC digital volume (Default 0x00: -95.5 dB).
+
+---
+
+{#es8311_reg_dac_ramp_eq}
+
+### ES8311_REG_DAC_RAMP_EQ
+
+```cpp
+#define ES8311_REG_DAC_RAMP_EQ 0x37
+```
+
+Defined in sub_audio.c:73
+
+DAC ramp rate & EQ bypass (Default 0x08: DAC_EQBYPASS=1).
+
+---
+
+{#es8311_reg_gpio_cfg}
+
+### ES8311_REG_GPIO_CFG
+
+```cpp
+#define ES8311_REG_GPIO_CFG 0x44
+```
+
+Defined in sub_audio.c:74
+
+GPIO & ADCDAT loopback mux (Default 0x00).
+
+---
+
+{#es8311_reg_gp_ctrl}
+
+### ES8311_REG_GP_CTRL
+
+```cpp
+#define ES8311_REG_GP_CTRL 0x45
+```
+
+Defined in sub_audio.c:75
+
+GP pull-up/pull-down control (Bit 0 PULLUP_SE: 1=pullup off).
 
 ---
 
@@ -1384,7 +1826,9 @@ Defined in sub_audio.c:44
 #define ES8311_REG_FLAG 0xFC
 ```
 
-Defined in sub_audio.c:45
+Defined in sub_audio.c:76
+
+CSM & clock status flag register (Bits 6:4 FLAG_CSM_CHIP).
 
 ---
 
@@ -1396,7 +1840,9 @@ Defined in sub_audio.c:45
 #define ES8311_REG_CHIP_ID1 0xFD
 ```
 
-Defined in sub_audio.c:46
+Defined in sub_audio.c:77
+
+Chip ID high byte (0x83).
 
 ---
 
@@ -1408,7 +1854,9 @@ Defined in sub_audio.c:46
 #define ES8311_REG_CHIP_ID2 0xFE
 ```
 
-Defined in sub_audio.c:47
+Defined in sub_audio.c:78
+
+Chip ID low byte (0x11).
 
 ---
 
@@ -1420,7 +1868,7 @@ Defined in sub_audio.c:47
 #define FRAME_SIZE 0x100
 ```
 
-Defined in sub_audio.c:49
+Defined in sub_audio.c:80
 
 ---
 
@@ -1429,10 +1877,10 @@ Defined in sub_audio.c:49
 ### S_ES8311_INIT_PRE_CHARGE_SIZE
 
 ```cpp
-#define S_ES8311_INIT_PRE_CHARGE_SIZE (sizeof(s_es8311_init_pre_charge)  / sizeof(s_es8311_init_pre_charge[0]) )
+#define S_ES8311_INIT_PRE_CHARGE_SIZE (sizeof(s_es8311_init_pre_charge)  / sizeof(s_es8311_init_pre_charge[0]))
 ```
 
-Defined in sub_audio.c:259
+Defined in sub_audio.c:309
 
 Pre Charge Table Size Macro.
 
@@ -1446,7 +1894,7 @@ Pre Charge Table Size Macro.
 #define S_ES8311_INIT_POST_CHARGE_SIZE (sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]))
 ```
 
-Defined in sub_audio.c:260
+Defined in sub_audio.c:310
 
 Post Charge Table Size Macro.
 
@@ -1457,10 +1905,10 @@ Post Charge Table Size Macro.
 ### S_ES8311_DEINIT_SIZE
 
 ```cpp
-#define S_ES8311_DEINIT_SIZE (sizeof(s_es8311_deinit)           / sizeof(s_es8311_deinit[0])          )
+#define S_ES8311_DEINIT_SIZE (sizeof(s_es8311_deinit)           / sizeof(s_es8311_deinit[0]))
 ```
 
-Defined in sub_audio.c:261
+Defined in sub_audio.c:311
 
 Deinit Table Size Macro.
 
@@ -1474,7 +1922,7 @@ Deinit Table Size Macro.
 #define SUB_POWER_RTC_INT_DRAIN_TIMEOUT_US 50000U
 ```
 
-Defined in sub_power.c:38
+Defined in sub_power.c:39
 
 Timeout awaiting PCF85063A INT release (50 ms).
 
@@ -1488,7 +1936,7 @@ Timeout awaiting PCF85063A INT release (50 ms).
 #define SUB_POWER_RTC_INT_DRAIN_STEP_US 500U
 ```
 
-Defined in sub_power.c:39
+Defined in sub_power.c:40
 
 Step delay polling PCF85063A INT pin (500 µs).
 
@@ -1502,7 +1950,7 @@ Step delay polling PCF85063A INT pin (500 µs).
 #define SUB_POWER_VBAT_ZERO_VOLT_GUARD_MV 3300U
 ```
 
-Defined in sub_power.c:40
+Defined in sub_power.c:41
 
 Lower floor below which USB assumes charged.
 
@@ -1516,7 +1964,7 @@ Lower floor below which USB assumes charged.
 #define SUB_POWER_VBAT_ASSUMED_CHARGED_MV 4200U
 ```
 
-Defined in sub_power.c:41
+Defined in sub_power.c:42
 
 Assumed full cell potential on bench power.
 
@@ -1530,7 +1978,7 @@ Assumed full cell potential on bench power.
 #define SUB_POWER_VBAT_NOMINAL_FALLBACK_MV 4000U
 ```
 
-Defined in sub_power.c:42
+Defined in sub_power.c:43
 
 Default nominal potential when out of range.
 
@@ -1544,7 +1992,7 @@ Default nominal potential when out of range.
 #define SUB_POWER_VBAT_FULL_CHARGE_THRESHOLD_MV 4180U
 ```
 
-Defined in sub_power.c:43
+Defined in sub_power.c:44
 
 Full charge detection voltage (4.18V).
 
@@ -1558,7 +2006,7 @@ Full charge detection voltage (4.18V).
 #define SUB_POWER_CHARGING_RAMP_DELTA_MV 15U
 ```
 
-Defined in sub_power.c:44
+Defined in sub_power.c:45
 
 Voltage rise confirming active charging (15 mV).
 
@@ -1572,7 +2020,7 @@ Voltage rise confirming active charging (15 mV).
 #define SUB_POWER_CHARGING_FLOAT_DELTA_MV 5U
 ```
 
-Defined in sub_power.c:45
+Defined in sub_power.c:46
 
 Maximum float delta at CV confirming charged.
 
@@ -1586,7 +2034,7 @@ Maximum float delta at CV confirming charged.
 #define LIPO_TABLE_SIZE (sizeof(s_lipo_table) / sizeof(s_lipo_table[0]))
 ```
 
-Defined in sub_power.c:70
+Defined in sub_power.c:71
 
 ---
 
@@ -1999,7 +2447,7 @@ Minor version number (backward-compatible features).
 ### H1OS_VERSION_PATCH
 
 ```cpp
-#define H1OS_VERSION_PATCH 5
+#define H1OS_VERSION_PATCH 7
 ```
 
 Defined in h1os/h1os_version.h:19
@@ -2027,7 +2475,7 @@ Pre-release release track tag.
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.4.5-dev"
+#define H1OS_VERSION_STRING "2.4.7-dev"
 ```
 
 Defined in h1os/h1os_version.h:21
@@ -2170,7 +2618,7 @@ Mandatory post-BUSY electrophoretic settling delay (250 ms).
 #define LIFECYCLE_LVGL_DRAIN_TIMEOUT_MS 6000U
 ```
 
-Defined in h1os_lifecycle.c:41
+Defined in h1os_lifecycle.c:42
 
 Max wait to drain LVGL rendering (6s).
 
@@ -2184,7 +2632,7 @@ Max wait to drain LVGL rendering (6s).
 #define LIFECYCLE_DEFAULT_SYNC_TIMEOUT_MS 5000U
 ```
 
-Defined in h1os_lifecycle.c:42
+Defined in h1os_lifecycle.c:43
 
 Default max wait for parallel on_sync (5s).
 
@@ -2198,7 +2646,7 @@ Default max wait for parallel on_sync (5s).
 #define LIFECYCLE_BATTERY_CRITICAL_CUTOFF_MV 3250U
 ```
 
-Defined in h1os_lifecycle.c:43
+Defined in h1os_lifecycle.c:44
 
 Critical brownout warning voltage (3.25V).
 
@@ -2212,7 +2660,7 @@ Critical brownout warning voltage (3.25V).
 #define LIFECYCLE_BATTERY_REBOUND_GATE_TENTHS 30U
 ```
 
-Defined in h1os_lifecycle.c:44
+Defined in h1os_lifecycle.c:45
 
 Minimum 3.0% SoC rebound to reset lap.
 
@@ -2226,7 +2674,7 @@ Minimum 3.0% SoC rebound to reset lap.
 #define LIFECYCLE_POWER_KEY_POLL_CYCLES 200U
 ```
 
-Defined in h1os_lifecycle.c:45
+Defined in h1os_lifecycle.c:46
 
 Power key debounce loop iterations.
 
@@ -2240,7 +2688,7 @@ Power key debounce loop iterations.
 #define LIFECYCLE_POWER_KEY_STABLE_THRESHOLD 4U
 ```
 
-Defined in h1os_lifecycle.c:46
+Defined in h1os_lifecycle.c:47
 
 Stable HIGH consecutive read count.
 
@@ -2254,7 +2702,7 @@ Stable HIGH consecutive read count.
 #define BARRIER_SYNC_DONE (1U << 0)
 ```
 
-Defined in h1os_lifecycle.c:48
+Defined in h1os_lifecycle.c:49
 
 EventGroup bit: Core 0 sync phase complete.
 
@@ -2268,7 +2716,7 @@ EventGroup bit: Core 0 sync phase complete.
 #define BARRIER_DISPLAY_DONE (1U << 1)
 ```
 
-Defined in h1os_lifecycle.c:49
+Defined in h1os_lifecycle.c:50
 
 EventGroup bit: Core 1 LVGL/EPD pipeline quiescent.
 
@@ -2282,7 +2730,7 @@ EventGroup bit: Core 1 LVGL/EPD pipeline quiescent.
 #define BARRIER_ALL_READY (BARRIER_SYNC_DONE | BARRIER_DISPLAY_DONE)
 ```
 
-Defined in h1os_lifecycle.c:50
+Defined in h1os_lifecycle.c:51
 
 ---
 
@@ -2886,7 +3334,7 @@ Acoustic payload type for consolidated sub_audio_play dispatch.
 enum sub_power_sleep_mode_t
 ```
 
-Defined in h1os/sub_power.h:24
+Defined in h1os/sub_power.h:28
 
 Deep sleep cycle execution modes.
 
@@ -2905,7 +3353,7 @@ Deep sleep cycle execution modes.
 enum h1os_battery_state_t
 ```
 
-Defined in h1os/sub_power.h:32
+Defined in h1os/sub_power.h:36
 
 Battery operational state machine.
 
@@ -2925,7 +3373,7 @@ Battery operational state machine.
 enum audio_cmd_type_t
 ```
 
-Defined in sub_audio.c:51
+Defined in sub_audio.c:82
 
 | Value | Description |
 |-------|-------------|
@@ -3280,7 +3728,7 @@ Defined in h1os/h1os.h:258
 Get the H1OS semantic version string.
 
 #### Returns
-Null-terminated semantic version string (e.g. "2.4.5-dev").
+Null-terminated semantic version string (e.g. "2.4.7-dev").
 
 ---
 
@@ -3851,7 +4299,7 @@ Set the status LED static state (true = ON, false = OFF).
 static inline void ulp_reg_barrier(void)
 ```
 
-Defined in main.c:69
+Defined in main.c:70
 
 Full RISC-V device I/O and memory fence barrier (`fence iorw, iorw`).
 
@@ -3869,7 +4317,7 @@ ESP-IDF compiles the ULP-RISC-V target with `-Os`. Issuing `fence iorw, iorw` wi
 static inline uint32_t ulp_raw_to_mv(int32_t raw)
 ```
 
-Defined in main.c:81
+Defined in main.c:82
 
 Converts raw ADC tick value to battery voltage in millivolts.
 
@@ -3894,7 +4342,7 @@ Calibrated voltage in millivolts.
 static inline void ulp_clear_gpio_wakeup_latch(void)
 ```
 
-Defined in main.c:97
+Defined in main.c:98
 
 Clear latched RTC GPIO status and ULP wakeup flip-flop.
 
@@ -3910,7 +4358,7 @@ Clear latched RTC GPIO status and ULP wakeup flip-flop.
 static inline void ulp_disarm_and_wake_main(void)
 ```
 
-Defined in main.c:111
+Defined in main.c:112
 
 Disarm ULP GPIO wakeup and trigger main Xtensa processor wakeup once PMU is ready.
 
@@ -3926,7 +4374,7 @@ Disarm ULP GPIO wakeup and trigger main Xtensa processor wakeup once PMU is read
 static bool __attribute__((noinline))
 ```
 
-Defined in main.c:132
+Defined in main.c:133
 
 Perform a timeout-bounded SAR ADC1 read on ADC1_CHANNEL_3 (GPIO 4).
 
@@ -3945,7 +4393,7 @@ true if conversion completed within timeout, false if timed out.
 static void ulp_dispatch_and_wake(uint32_t rtcio_int_st, int32_t boot_btn, int32_t pwr_btn, int32_t rtc_int, uint32_t vbat_mv)
 ```
 
-Defined in main.c:201
+Defined in main.c:202
 
 Evaluates wakeup triggers and arbitrates wake/shutdown dispatch.
 
@@ -3971,7 +4419,7 @@ Handles button debounce, long-press detection, RTC countdown slicing, and critic
 int main(void)
 ```
 
-Defined in main.c:324
+Defined in main.c:325
 
 Main ULP-RISC-V entry point.
 
@@ -3993,6 +4441,11 @@ Defined in h1os/hal_io.h:37
 Early boot initialization of non-latched application pins and GPIO ISR service.
 
 Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader ([h1os_boot_hook.c](#h1os_boot_hookc)).
+
+#### Returns
+ESP_OK on success, or driver error code.
+
+Reinforces master power rail states (GPIO 17 BAT_CTRL = 1, GPIO 6 EPD_3V3_EN = 0, GPIO 42 PA_EN = 0) before releasing dynamic sleep pad holds, configures amplifier mute (GPIO 46 = 0), parks I2S lines without pull-up contention, and initializes status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters), and RTC INT (GPIO 5).
 
 #### Returns
 ESP_OK on success, or driver error code.
@@ -4283,7 +4736,7 @@ Configures and locks dynamic peripheral lines prior to deep sleep.
 #### Returns
 ESP_OK on success.
 
-* Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en(). Holds amplifier mute GPIO 46 (PA_CTRL) LOW. Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18). Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
+Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en(). Holds amplifier mute GPIO 46 (PA_CTRL) LOW with pull-up disabled. Parks I2S lines without internal pull-up contention and avoids driving ASDOUT (ES8311 Pin 7). Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
 
 #### Returns
 ESP_OK on success.
@@ -4329,6 +4782,30 @@ true if USB host connection detected, false otherwise.
 
 ---
 
+{#hal_io_quiesce_i2s_pads}
+
+### hal_io_quiesce_i2s_pads
+
+`static`
+
+```cpp
+static void hal_io_quiesce_i2s_pads(bool enable_hold)
+```
+
+Defined in hal_io.c:50
+
+Park I2S bus pins in a zero-leakage quiescent state without internal pull-up contention.
+
+Avoids gpio_reset_pin(), which enables internal ~45 kOhm pull-ups on ESP32-S3 and creates ~367 uA of continuous pad leakage when driven LOW. Configures MCU-to-codec inputs (MCLK, SCLK, LRCK, DSDIN) as push-pull outputs driven LOW with pull-ups and pull-downs disabled, and configures the codec-to-MCU output (ASDOUT, GPIO 16) as an input with pull-down enabled to prevent push-pull driver contention against ES8311 Pin 7.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `enable_hold` | `bool` | True to engage per-pin GPIO pad holds after parking. |
+
+---
+
 {#hal_io_sample_raw_buttons}
 
 ### hal_io_sample_raw_buttons
@@ -4339,7 +4816,7 @@ true if USB host connection detected, false otherwise.
 static inline hal_btn_mask_t hal_io_sample_raw_buttons(void)
 ```
 
-Defined in hal_io.c:42
+Defined in hal_io.c:104
 
 Sample instantaneous raw GPIO levels of BOOT and POWER tactile buttons.
 
@@ -4355,7 +4832,7 @@ Sample instantaneous raw GPIO levels of BOOT and POWER tactile buttons.
 static void hal_io_btn_debounce_timer_cb(void * arg)
 ```
 
-Defined in hal_io.c:57
+Defined in hal_io.c:119
 
 One-shot esp_timer debounce callback for tactile button state transitions.
 
@@ -4371,7 +4848,7 @@ One-shot esp_timer debounce callback for tactile button state transitions.
 static void IRAM_ATTR hal_io_btn_gpio_isr_handler(void * arg)
 ```
 
-Defined in hal_io.c:72
+Defined in hal_io.c:134
 
 IRAM GPIO edge interrupt handler for BOOT (GPIO 0) and POWER (GPIO 18) buttons.
 
@@ -4385,7 +4862,7 @@ IRAM GPIO edge interrupt handler for BOOT (GPIO 0) and POWER (GPIO 18) buttons.
 esp_err_t hal_io_register_button_cb(hal_io_button_cb_t cb, void * arg)
 ```
 
-Defined in hal_io.c:84
+Defined in hal_io.c:146
 
 Register an asynchronous callback invoked when tactile buttons change state after 15 ms esp_timer debounce.
 
@@ -4409,9 +4886,14 @@ ESP_OK on success.
 esp_err_t hal_io_early_init(void)
 ```
 
-Defined in hal_io.c:101
+Defined in hal_io.c:164
 
 Early boot initialization of non-latched application pins and GPIO ISR service.
+
+Reinforces master power rail states (GPIO 17 BAT_CTRL = 1, GPIO 6 EPD_3V3_EN = 0, GPIO 42 PA_EN = 0) before releasing dynamic sleep pad holds, configures amplifier mute (GPIO 46 = 0), parks I2S lines without pull-up contention, and initializes status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters), and RTC INT (GPIO 5).
+
+#### Returns
+ESP_OK on success, or driver error code.
 
 Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46), status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters), and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN) are strictly latched in the 2nd-stage bootloader ([h1os_boot_hook.c](#h1os_boot_hookc)).
 
@@ -4428,7 +4910,7 @@ ESP_OK on success, or driver error code.
 esp_err_t hal_io_release_power_latch(void)
 ```
 
-Defined in hal_io.c:213
+Defined in hal_io.c:283
 
 Releases the battery LDO power latch (GPIO 17 LOW, pad hold disabled) for physical power-down.
 
@@ -4447,7 +4929,7 @@ ESP_OK on success.
 esp_err_t hal_led_pwm_init(void)
 ```
 
-Defined in hal_io.c:241
+Defined in hal_io.c:311
 
 Initializes LEDC hardware PWM controller for user LED on GPIO 3.
 
@@ -4466,7 +4948,7 @@ ESP_OK on success.
 esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
 ```
 
-Defined in hal_io.c:295
+Defined in hal_io.c:365
 
 Sets user LED brightness percentage using hardware PWM (0..100%).
 
@@ -4489,7 +4971,7 @@ ESP_OK on success.
 esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
 ```
 
-Defined in hal_io.c:322
+Defined in hal_io.c:392
 
 Smoothly fades user LED to target brightness using hardware fade engine.
 
@@ -4517,7 +4999,7 @@ ESP_OK on success.
 static void hal_led_breath_timer_cb(void * arg)
 ```
 
-Defined in hal_io.c:342
+Defined in hal_io.c:412
 
 Periodic esp_timer callback driving hardware LEDC fade-in / fade-out half-cycles.
 
@@ -4531,7 +5013,7 @@ Periodic esp_timer callback driving hardware LEDC fade-in / fade-out half-cycles
 esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 ```
 
-Defined in hal_io.c:361
+Defined in hal_io.c:431
 
 Starts an asynchronous periodic esp_timer to "breathe" (fade in and fade out) the status LED.
 
@@ -4561,7 +5043,7 @@ ESP_OK on success, or error code if timer creation fails.
 esp_err_t hal_led_stop_breathing(void)
 ```
 
-Defined in hal_io.c:406
+Defined in hal_io.c:476
 
 Stops the asynchronous LED breathing timer and turns the LED off immediately.
 
@@ -4578,7 +5060,7 @@ ESP_OK on success.
 bool hal_led_is_breathing(void)
 ```
 
-Defined in hal_io.c:423
+Defined in hal_io.c:493
 
 Queries whether the asynchronous LED breathing timer is actively running.
 
@@ -4595,7 +5077,7 @@ True if breathing timer is active, false otherwise.
 esp_err_t hal_led_pwm_deinit(void)
 ```
 
-Defined in hal_io.c:433
+Defined in hal_io.c:503
 
 Deinitializes LEDC hardware PWM and restores GPIO 3 to static GPIO mode.
 
@@ -4612,7 +5094,7 @@ ESP_OK on success.
 esp_err_t hal_io_set_led(bool on)
 ```
 
-Defined in hal_io.c:471
+Defined in hal_io.c:541
 
 Controls user status LED (GPIO 3, Active LOW).
 
@@ -4635,7 +5117,7 @@ ESP_OK on success.
 hal_btn_mask_t hal_io_read_buttons(void)
 ```
 
-Defined in hal_io.c:488
+Defined in hal_io.c:558
 
 Samples instantaneous state of hardware tactile buttons.
 
@@ -4659,11 +5141,11 @@ Bitmask of currently depressed buttons (HAL_BTN_BOOT | HAL_BTN_POWER).
 esp_err_t hal_io_isolate_sleep_pads(void)
 ```
 
-Defined in hal_io.c:505
+Defined in hal_io.c:575
 
 Configures and locks dynamic peripheral lines prior to deep sleep.
 
-* Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en(). Holds amplifier mute GPIO 46 (PA_CTRL) LOW. Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18). Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
+Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en(). Holds amplifier mute GPIO 46 (PA_CTRL) LOW with pull-up disabled. Parks I2S lines without internal pull-up contention and avoids driving ASDOUT (ES8311 Pin 7). Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
 
 #### Returns
 ESP_OK on success.
@@ -4686,7 +5168,7 @@ ESP_OK on success.
 esp_err_t hal_io_release_pad_holds(void)
 ```
 
-Defined in hal_io.c:572
+Defined in hal_io.c:640
 
 Releases sleep pad holds on dynamic peripheral/wake pins upon waking from deep sleep.
 
@@ -4703,7 +5185,7 @@ ESP_OK on success.
 bool hal_check_usb_ll(void)
 ```
 
-Defined in hal_io.c:606
+Defined in hal_io.c:674
 
 Check if USB Serial/JTAG is connected to an active host via SOF packets.
 
@@ -7418,7 +7900,7 @@ Defined in h1os/sub_audio.h:40
 
 Initialize ES8311 audio codec and NS4168 amplifier hardware.
 
-Initialize ES8311 codec and NS4168 amplifier.
+Initialize ES8311 codec and NS4150B/NS4168 amplifier for an interactive session.
 
 Configures I2S master bus (16-bit 16kHz mono), performs codec register initialization over shared I2C, and sets up the asynchronous FreeRTOS audio worker task.
 
@@ -7427,7 +7909,7 @@ ESP_OK on success, or driver error code.
 
 Initialize ES8311 audio codec and NS4168 amplifier hardware.
 
-Configures I2S audio bus and sets codec to active run mode.
+Called exclusively on Cold Boot or interactive Button Wake (never on unattended Flow A or Flow B wakes). Configures the I2S master bus, powers down the unused microphone ADC/PGA (0x0E=0x62, 0x14=0x00, 0x17=0x00), enables codec low-power operating mode (0x0F=0xFF) with soft-start ramp disabled (0x37=0x08), waits for the ES8311 CSM to exit state S0, and powers on the Class-D amplifier (120 ms settling) BEFORE returning so the boot chime and all 50 ms button chirps play instantaneously without leading or trailing truncation. When the 30-second interactive session times out, orch_flow_quiesce_peripherals() calls [sub_audio_standby()](#sub_audio_standby) to place the codec and amplifier into <1 uA deep standby across all subsequent sleep cycles.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -7436,7 +7918,7 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `volume_pct` | `uint8_t` | Output volume (0 = Mute, 100 = 0 dB Max). |
+| `volume_pct` | `uint8_t` | Initial master volume percentage (0..100%). |
 
 ---
 
@@ -7452,7 +7934,7 @@ Defined in h1os/sub_audio.h:50
 
 Put audio subsystem into low-power hardware standby.
 
-Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
+Put ES8311 codec into ultra-low-power software standby (<1.0 uA) and pull PA_CTRL LOW.
 
 Mutes amplifier (GPIO 46 LOW), maintains class-D power gate energized (GPIO 42 LOW per ERRATA E4), and enters software power-down on ES8311.
 
@@ -7461,7 +7943,11 @@ ESP_OK on success.
 
 Put audio subsystem into low-power hardware standby.
 
-Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes. On unattended deep-sleep wakes where the codec is already in verified standby, bypasses redundant I2C register writes to keep the codec completely undisturbed.
+Follows Espressif es8311_suspend() (_3rd_party_ref_codec/es8311.c:222-240) and ES8311 Datasheet Rev 1.6 Page 8 Note 4 & Note 5:
+
+1. Mutes the external Class-D amplifier (GPIO 46 = 0, 80 ms mute settling).
+1. On unattended deep-sleep wakes (Flow B) where [sub_audio_init()](#sub_audio_init) was bypassed and s_rtc_codec_in_standby is already true, returns ESP_OK immediately without touching I2C or disturbing the persisted codec sleep state.
+1. Ensures input clocks (MCLK/LRCK) are running during the suspend sequence, writes s_es8311_deinit (ordering 0x0D=0xFC AFTER 0x00=0x1F and 0x01=0x00), waits 2 ms, and then disables the I2S TX channel.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -7504,7 +7990,7 @@ Defined in h1os/sub_audio.h:66
 
 Block until audio subsystem initialization completes.
 
-Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
+Poll ES8311 over I2C to confirm Chip ID (0x8311) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit state S0.
 
 #### Returns
 ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
@@ -7575,7 +8061,7 @@ ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM. |
-| `data` | `const void *` | Parameter data. |
+| `data` | `const void *` | Pointer to payload parameters or PCM buffer. |
 | `len` | `size_t` | Length of data payload in bytes. |
 
 ---
@@ -7709,7 +8195,7 @@ ESP_OK on success.
 
 Enable or disable aggressive codec low-power mode.
 
-In low-power mode (default upon init), ES8311 operates with LPDAC enabled (Reg 0x0F bit 7 = 1), significantly reducing active DAC bias current. Normal mode provides standard bias.
+In low-power mode (default upon init), ES8311 operates with LPDAC and all low-power reference modes enabled (Reg 0x0F = 0xFF), significantly reducing active DAC bias current. Normal mode sets Reg 0x0F = 0x00 for standard bias.
 
 #### Returns
 ESP_OK on success.
@@ -7754,7 +8240,7 @@ true if Low-Power Mode is active, false if Normal Power Mode.
 esp_err_t sub_power_get_battery_status(uint16_t * out_mv, uint8_t * out_pct, h1os_battery_state_t * out_state)
 ```
 
-Defined in h1os/sub_power.h:56
+Defined in h1os/sub_power.h:60
 
 Retrieve calibrated resting battery voltage, SoC percentage, and charge state.
 
@@ -7786,7 +8272,7 @@ ESP_OK on success, or an error code.
 uint16_t sub_power_mv_to_soc_tenths(uint16_t mv)
 ```
 
-Defined in h1os/sub_power.h:67
+Defined in h1os/sub_power.h:71
 
 Map battery terminal voltage to State-of-Charge in tenths of a percent (0..1000 = 0.0%..100.0%).
 
@@ -7809,7 +8295,7 @@ State of charge in tenths of a percent (0 to 1000).
 void sub_power_calc_autonomy(uint16_t initial_soc_x10, uint16_t current_soc_x10, uint32_t total_sleep_sec, uint32_t total_app_ms, h1os_autonomy_metrics_t * out_metrics)
 ```
 
-Defined in h1os/sub_power.h:78
+Defined in h1os/sub_power.h:82
 
 Calculate empirical battery autonomy metrics over total elapsed runtime.
 
@@ -7837,7 +8323,7 @@ Calculate empirical battery autonomy metrics over total elapsed runtime.
 esp_err_t sub_power_init(void)
 ```
 
-Defined in h1os/sub_power.h:91
+Defined in h1os/sub_power.h:95
 
 Initialize battery ADC channel and calibration engine.
 
@@ -7863,7 +8349,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_power_deinit(void)
 ```
 
-Defined in h1os/sub_power.h:98
+Defined in h1os/sub_power.h:102
 
 Deinitialize battery ADC driver.
 
@@ -7887,7 +8373,7 @@ ESP_OK on success.
 esp_err_t sub_power_read_battery(uint16_t * out_mv, uint8_t * out_pct)
 ```
 
-Defined in h1os/sub_power.h:108
+Defined in h1os/sub_power.h:112
 
 Sample current battery terminal voltage and calculate state-of-charge.
 
@@ -7911,7 +8397,7 @@ ESP_OK on success.
 esp_err_t sub_power_get_ulp_cal_params(uint32_t * out_scale, int32_t * out_offset_mv)
 ```
 
-Defined in h1os/sub_power.h:118
+Defined in h1os/sub_power.h:122
 
 Retrieve two-point calibration parameters for ULP coprocessor ADC readings.
 
@@ -7942,7 +8428,7 @@ ESP_OK on success.
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 ```
 
-Defined in h1os/sub_power.h:127
+Defined in h1os/sub_power.h:131
 
 Initialize ULP-RISC-V coprocessor firmware for background monitoring.
 
@@ -7972,7 +8458,7 @@ ESP_OK on success, or an error code.
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 ```
 
-Defined in h1os/sub_power.h:137
+Defined in h1os/sub_power.h:141
 
 Configure ULP slice parameters prior to entering deep sleep.
 
@@ -7995,7 +8481,7 @@ Configure ULP slice parameters prior to entering deep sleep.
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 ```
 
-Defined in h1os/sub_power.h:148
+Defined in h1os/sub_power.h:152
 
 Enter target deep sleep mode with wake pin configuration.
 
@@ -8027,7 +8513,7 @@ Does not return on success (enters deep sleep).
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in h1os/sub_power.h:158
+Defined in h1os/sub_power.h:162
 
 Enter full cycle deep sleep with wake pin configuration.
 
@@ -8051,7 +8537,7 @@ ESP_OK on success.
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in h1os/sub_power.h:163
+Defined in h1os/sub_power.h:167
 
 Cut master power latch (releases GPIO 17 BAT_CTRL).
 
@@ -8065,7 +8551,7 @@ Cut master power latch (releases GPIO 17 BAT_CTRL).
 bool sub_power_connected_usb(void)
 ```
 
-Defined in h1os/sub_power.h:170
+Defined in h1os/sub_power.h:174
 
 Check if USB VBUS connection is actively present.
 
@@ -8082,7 +8568,7 @@ True if connected to USB power.
 esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 ```
 
-Defined in h1os/sub_power.h:179
+Defined in h1os/sub_power.h:183
 
 Initialize Dynamic Frequency Scaling (DFS) power management.
 
@@ -8105,7 +8591,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_acquire(void)
 ```
 
-Defined in h1os/sub_power.h:186
+Defined in h1os/sub_power.h:190
 
 Acquire CPU frequency lock at 240 MHz for compute/display intensive operations.
 
@@ -8122,7 +8608,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_release(void)
 ```
 
-Defined in h1os/sub_power.h:193
+Defined in h1os/sub_power.h:197
 
 Release CPU frequency lock, allowing DFS to downclock to 80 MHz.
 
@@ -8908,7 +9394,7 @@ True if |initial - current| <= gate_threshold.
 static inline void audio_cpu_max_acquire(void)
 ```
 
-Defined in sub_audio.c:117
+Defined in sub_audio.c:148
 
 Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 
@@ -8924,7 +9410,7 @@ Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 static inline void audio_cpu_max_release(void)
 ```
 
-Defined in sub_audio.c:132
+Defined in sub_audio.c:163
 
 Release 240 MHz CPU frequency lock.
 
@@ -8940,18 +9426,18 @@ Release 240 MHz CPU frequency lock.
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 ```
 
-Defined in sub_audio.c:270
+Defined in sub_audio.c:320
 
-Volume pct to es8311 reg.
+Convert perceptual volume percentage (0..100%) to ES8311 DAC_VOLUME register byte.
 
 #### Returns
-Return value of type static inline uint8_t.
+ES8311 Register 0x32 value.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `pct` | `uint8_t` | Parameter pct. |
+| `pct` | `uint8_t` | Volume percentage (0..100). |
 
 ---
 
@@ -8965,18 +9451,17 @@ Return value of type static inline uint8_t.
 static void audio_worker_task(void * pvParameters)
 ```
 
-Defined in sub_audio.c:885
+Defined in sub_audio.c:999
 
-Audio worker task.
+Background FreeRTOS audio worker task.
 
-#### Returns
-Return value of type static void.
+Streams synthesized tones, chimes, and PCM buffers at 240 MHz CPU clock and flushes the full 4-descriptor I2S DMA ring when the queue drains empty so short 50 ms button chirps are never clipped. The codec and Class-D amplifier remain warm during the active 30-second interactive session and enter <1 uA standby when the session ends.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `pvParameters` | `void *` | Parameter pvParameters. |
+| `pvParameters` | `void *` | Creator task handle for startup synchronization. |
 
 ---
 
@@ -8987,17 +9472,21 @@ Return value of type static void.
 `static`
 
 ```cpp
-static esp_err_t sub_audio_park_warm(bool enable)
+static esp_err_t sub_audio_park_warm(bool park_mute)
 ```
 
-Defined in sub_audio.c:601
+Defined in sub_audio.c:693
 
-Control NS4168 Class-D amplifier hardware mute state (HAL_PIN_PA_CTRL / GPIO 46).
-
-NS4168 hardware requires minimum 120 ms startup when unmuting (PA_CTRL -> 1) and minimum 80 ms shutdown when muting (PA_CTRL -> 0).
+Control Class-D amplifier hardware mute/shutdown state (HAL_PIN_PA_CTRL / GPIO 46).
 
 #### Returns
 ESP_OK on success.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `park_mute` | `bool` | true to mute/shutdown amplifier (PA_CTRL=0, 80ms), false to enable (PA_CTRL=1, 120ms). |
 
 ---
 
@@ -9011,9 +9500,9 @@ ESP_OK on success.
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_audio.c:289
+Defined in sub_audio.c:339
 
-Es8311 write reg.
+Write a single 8-bit value to an ES8311 control register over shared I2C.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9022,8 +9511,8 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `reg` | `uint8_t` | Parameter reg. |
-| `val` | `uint8_t` | Parameter val. |
+| `reg` | `uint8_t` | Register address. |
+| `val` | `uint8_t` | Register value. |
 
 ---
 
@@ -9037,9 +9526,9 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t * val)
 ```
 
-Defined in sub_audio.c:303
+Defined in sub_audio.c:353
 
-Es8311 read reg.
+Read a single 8-bit value from an ES8311 control register over shared I2C.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9048,8 +9537,8 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `reg` | `uint8_t` | Parameter reg. |
-| `val` | `uint8_t *` | Parameter val. |
+| `reg` | `uint8_t` | Register address. |
+| `val` | `uint8_t *` | Pointer to receive register value. |
 
 ---
 
@@ -9063,9 +9552,9 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_read_chip_id(uint16_t * chip_id)
 ```
 
-Defined in sub_audio.c:315
+Defined in sub_audio.c:365
 
-Sub audio read chip id.
+Read and validate the 16-bit ES8311 Chip ID (0xFD=0x83, 0xFE=0x11).
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9088,9 +9577,11 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_flush_frame(void)
 ```
 
-Defined in sub_audio.c:340
+Defined in sub_audio.c:395
 
-Sub audio flush frame (single zero-frame write serving as valid I2S transfer pipeline indicator).
+Drain the full 4-descriptor (64 ms) I2S DMA ring with silent PCM frames so short chirps play completely.
+
+Because the I2S TX channel uses 4 DMA descriptors of 256 samples each (1024 samples = 64 ms at 16 kHz), a 50 ms button chirp (800 samples) is copied into the empty DMA descriptors instantaneously (<1 ms). Writing SUB_AUDIO_DMA_DESC_NUM (4) zero-filled frames forces the I2S DMA engine to clock out all preceding tone descriptors before returning, guaranteeing 100% of every 50 ms chirp is heard.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9105,16 +9596,16 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:364
+Defined in sub_audio.c:429
 
-Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
+Poll ES8311 over I2C to confirm Chip ID (0x8311) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit state S0.
 
 Block until audio subsystem initialization completes.
 
 #### Returns
 ESP_OK if codec is verified and in active CSM state, or error.
 
-Poll ES8311 over I2C to confirm Chip ID (0xFD=0x83, 0xFE=0x11) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit power-down state S0.
+Poll ES8311 over I2C to confirm Chip ID (0x8311) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit state S0.
 
 #### Returns
 ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
@@ -9135,7 +9626,7 @@ ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
 bool sub_audio_is_ready(void)
 ```
 
-Defined in sub_audio.c:395
+Defined in sub_audio.c:460
 
 Quick status check of whether ES8311 codec is ready.
 
@@ -9161,9 +9652,9 @@ True if audio worker is operational, false otherwise.
 static esp_err_t es8311_write_table(const es8311_reg_entry_t * table, size_t count)
 ```
 
-Defined in sub_audio.c:408
+Defined in sub_audio.c:473
 
-Es8311 write table.
+Write a table of register/value pairs to the ES8311 over I2C.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9172,8 +9663,8 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `table` | const [`es8311_reg_entry_t`](#es8311_reg_entry_t) * | Parameter table. |
-| `count` | `size_t` | Parameter count. |
+| `table` | const [`es8311_reg_entry_t`](#es8311_reg_entry_t) * | Pointer to register entry array. |
+| `count` | `size_t` | Number of entries in table. |
 
 ---
 
@@ -9187,9 +9678,9 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_init_dac_registers(void)
 ```
 
-Defined in sub_audio.c:422
+Defined in sub_audio.c:487
 
-Initialize es8311_init_dac_registers module resources.
+Initialize ES8311 DAC registers for active playback (requires I2S MCLK/LRCK running per Note 5).
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9204,18 +9695,18 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_init(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:446
+Defined in sub_audio.c:520
 
-Initialize ES8311 codec and NS4168 amplifier.
+Initialize ES8311 codec and NS4150B/NS4168 amplifier for an interactive session.
 
 Initialize ES8311 audio codec and NS4168 amplifier hardware.
 
-Configures I2S audio bus and sets codec to active run mode.
+Called exclusively on Cold Boot or interactive Button Wake (never on unattended Flow A or Flow B wakes). Configures the I2S master bus, powers down the unused microphone ADC/PGA (0x0E=0x62, 0x14=0x00, 0x17=0x00), enables codec low-power operating mode (0x0F=0xFF) with soft-start ramp disabled (0x37=0x08), waits for the ES8311 CSM to exit state S0, and powers on the Class-D amplifier (120 ms settling) BEFORE returning so the boot chime and all 50 ms button chirps play instantaneously without leading or trailing truncation. When the 30-second interactive session times out, orch_flow_quiesce_peripherals() calls [sub_audio_standby()](#sub_audio_standby-1) to place the codec and amplifier into <1 uA deep standby across all subsequent sleep cycles.
 
 #### Returns
 ESP_OK on success, or an error code.
 
-Initialize ES8311 codec and NS4168 amplifier.
+Initialize ES8311 codec and NS4150B/NS4168 amplifier for an interactive session.
 
 Configures I2S master bus (16-bit 16kHz mono), performs codec register initialization over shared I2C, and sets up the asynchronous FreeRTOS audio worker task.
 
@@ -9238,18 +9729,22 @@ ESP_OK on success, or driver error code.
 esp_err_t sub_audio_standby(void)
 ```
 
-Defined in sub_audio.c:628
+Defined in sub_audio.c:724
 
-Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
+Put ES8311 codec into ultra-low-power software standby (<1.0 uA) and pull PA_CTRL LOW.
 
 Put audio subsystem into low-power hardware standby.
 
-Keeps power rails on so I2C bus is NOT clamped by unpowered chip protection diodes. On unattended deep-sleep wakes where the codec is already in verified standby, bypasses redundant I2C register writes to keep the codec completely undisturbed.
+Follows Espressif es8311_suspend() (_3rd_party_ref_codec/es8311.c:222-240) and ES8311 Datasheet Rev 1.6 Page 8 Note 4 & Note 5:
+
+1. Mutes the external Class-D amplifier (GPIO 46 = 0, 80 ms mute settling).
+1. On unattended deep-sleep wakes (Flow B) where [sub_audio_init()](#sub_audio_init-1) was bypassed and s_rtc_codec_in_standby is already true, returns ESP_OK immediately without touching I2C or disturbing the persisted codec sleep state.
+1. Ensures input clocks (MCLK/LRCK) are running during the suspend sequence, writes s_es8311_deinit (ordering 0x0D=0xFC AFTER 0x00=0x1F and 0x01=0x00), waits 2 ms, and then disables the I2S TX channel.
 
 #### Returns
 ESP_OK on success, or an error code.
 
-Put ES8311 codec into ultra-low-power software standby (Reg 0x0D = 0xFC @ <1.0 µA) and pull NS4168 PA_CTRL LOW.
+Put ES8311 codec into ultra-low-power software standby (<1.0 uA) and pull PA_CTRL LOW.
 
 Mutes amplifier (GPIO 46 LOW), maintains class-D power gate energized (GPIO 42 LOW per ERRATA E4), and enters software power-down on ES8311.
 
@@ -9268,19 +9763,16 @@ ESP_OK on success.
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:659
+Defined in sub_audio.c:768
 
-Sub audio render tone samples.
-
-#### Returns
-Return value of type static void.
+Synthesize and stream sine wave tone samples to I2S DMA.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `frequency_hz` | `uint32_t` | Parameter frequency_hz. |
-| `duration_ms` | `uint32_t` | Parameter duration_ms. |
+| `frequency_hz` | `uint32_t` | Tone frequency in Hz. |
+| `duration_ms` | `uint32_t` | Tone duration in milliseconds. |
 
 ---
 
@@ -9294,19 +9786,16 @@ Return value of type static void.
 static void sub_audio_render_pcm_samples(const int16_t * samples, size_t sample_count)
 ```
 
-Defined in sub_audio.c:714
+Defined in sub_audio.c:821
 
-Sub audio render pcm samples.
-
-#### Returns
-Return value of type static void.
+Stream raw 16-bit mono PCM samples to I2S DMA.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `samples` | `const int16_t *` | Parameter samples. |
-| `sample_count` | `size_t` | Parameter sample_count. |
+| `samples` | `const int16_t *` | Pointer to PCM sample buffer. |
+| `sample_count` | `size_t` | Number of 16-bit samples. |
 
 ---
 
@@ -9320,9 +9809,9 @@ Return value of type static void.
 static esp_err_t sub_audio_prepare_and_unmute(void)
 ```
 
-Defined in sub_audio.c:746
+Defined in sub_audio.c:853
 
-Sub audio prepare and unmute.
+Ensure I2S clocks, ES8311 DAC registers, and Class-D amplifier are active prior to playback.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9339,9 +9828,9 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:785
+Defined in sub_audio.c:896
 
-Sub audio exec tone.
+Execute synthesized tone playback command.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9350,8 +9839,8 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `frequency_hz` | `uint32_t` | Parameter frequency_hz. |
-| `duration_ms` | `uint32_t` | Parameter duration_ms. |
+| `frequency_hz` | `uint32_t` | Tone frequency in Hz. |
+| `duration_ms` | `uint32_t` | Tone duration in ms. |
 
 ---
 
@@ -9365,9 +9854,9 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:807
+Defined in sub_audio.c:918
 
-Sub audio exec pcm.
+Execute raw PCM buffer playback command.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9376,9 +9865,9 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `samples` | `const int16_t *` | Parameter samples. |
-| `sample_count` | `size_t` | Parameter sample_count. |
-| `sample_rate_hz` | `uint32_t` | Parameter sample_rate_hz. |
+| `samples` | `const int16_t *` | Pointer to 16-bit signed mono PCM samples. |
+| `sample_count` | `size_t` | Number of samples. |
+| `sample_rate_hz` | `uint32_t` | Sample rate in Hz. |
 
 ---
 
@@ -9392,9 +9881,9 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:826
+Defined in sub_audio.c:937
 
-Sub audio exec chime.
+Execute predefined acoustic presentation chime pattern.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9403,7 +9892,7 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `type` | `uint8_t` | Parameter type. |
+| `type` | `uint8_t` | Chime pattern enumerator. |
 
 ---
 
@@ -9417,9 +9906,9 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_send_command(const audio_cmd_t * cmd, bool is_sync, uint32_t wait_ms)
 ```
 
-Defined in sub_audio.c:958
+Defined in sub_audio.c:1072
 
-Sub audio send command.
+Enqueue an audio command to the background worker task.
 
 #### Returns
 ESP_OK on success, or an error code.
@@ -9428,9 +9917,9 @@ ESP_OK on success, or an error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `cmd` | const [`audio_cmd_t`](#audio_cmd_t) * | Parameter cmd. |
-| `is_sync` | `bool` | Parameter is_sync. |
-| `wait_ms` | `uint32_t` | Parameter wait_ms. |
+| `cmd` | const [`audio_cmd_t`](#audio_cmd_t) * | Pointer to command descriptor. |
+| `is_sync` | `bool` | True to block until playback completes. |
+| `wait_ms` | `uint32_t` | Queue send / completion timeout in ms. |
 
 ---
 
@@ -9442,7 +9931,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_play(sub_audio_type_t type, const void * data, size_t len)
 ```
 
-Defined in sub_audio.c:1010
+Defined in sub_audio.c:1124
 
 Unified asynchronous audio playback dispatcher.
 
@@ -9476,7 +9965,7 @@ ESP_OK if command was queued to worker, or error code.
 bool sub_audio_is_busy(void)
 ```
 
-Defined in sub_audio.c:1059
+Defined in sub_audio.c:1173
 
 Check if audio playback is currently active or queue has pending items.
 
@@ -9500,7 +9989,7 @@ True if amplifier is active and audio samples are playing.
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:1079
+Defined in sub_audio.c:1193
 
 Wait until background audio worker completes all playback and enters standby.
 
@@ -9530,7 +10019,7 @@ ESP_OK when playback is idle, ESP_ERR_TIMEOUT on expiration.
 esp_err_t sub_audio_deinit(void)
 ```
 
-Defined in sub_audio.c:1106
+Defined in sub_audio.c:1220
 
 Teardown audio subsystem, stop background worker task cleanly, and delete I2S channel.
 
@@ -9554,7 +10043,7 @@ ESP_OK on success.
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:1162
+Defined in sub_audio.c:1276
 
 Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
 
@@ -9586,7 +10075,7 @@ ESP_OK on success.
 uint8_t sub_audio_get_volume(void)
 ```
 
-Defined in sub_audio.c:1186
+Defined in sub_audio.c:1300
 
 Get currently configured output volume percentage (0 - 100).
 
@@ -9610,13 +10099,13 @@ Current volume level (0..100%).
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 ```
 
-Defined in sub_audio.c:1200
+Defined in sub_audio.c:1316
 
 Configure ES8311 DAC power mode (Low-Power vs Normal).
 
 Enable or disable aggressive codec low-power mode.
 
-In low-power mode (default upon init), ES8311 operates with LPDAC enabled (Reg 0x0F bit 7 = 1), significantly reducing active DAC bias current. Normal mode provides standard bias.
+In low-power mode (default upon init), ES8311 operates with LPDAC and all low-power reference modes enabled (Reg 0x0F = 0xFF), significantly reducing active DAC bias current. Normal mode sets Reg 0x0F = 0x00 for standard bias.
 
 #### Returns
 ESP_OK on success.
@@ -9642,7 +10131,7 @@ ESP_OK on success.
 bool sub_audio_get_low_power_mode(void)
 ```
 
-Defined in sub_audio.c:1214
+Defined in sub_audio.c:1330
 
 Query whether audio subsystem is in Low-Power Mode.
 
@@ -9666,7 +10155,7 @@ True if low-power mode is active.
 const uint8_t ulp_h1os_bin_start[] asm("_binary_ulp_h1os_bin_start")
 ```
 
-Defined in sub_power.c:33
+Defined in sub_power.c:34
 
 ---
 
@@ -9678,7 +10167,7 @@ Defined in sub_power.c:33
 const uint8_t ulp_h1os_bin_end[] asm("_binary_ulp_h1os_bin_end")
 ```
 
-Defined in sub_power.c:34
+Defined in sub_power.c:35
 
 ---
 
@@ -9690,7 +10179,7 @@ Defined in sub_power.c:34
 uint16_t sub_power_mv_to_soc_tenths(uint16_t mv)
 ```
 
-Defined in sub_power.c:72
+Defined in sub_power.c:73
 
 Map battery terminal voltage to State-of-Charge in tenths of a percent (0..1000 = 0.0%..100.0%).
 
@@ -9715,7 +10204,7 @@ State of charge in tenths of a percent (0 to 1000).
 static uint8_t mv_to_percent(uint16_t mv)
 ```
 
-Defined in sub_power.c:92
+Defined in sub_power.c:93
 
 ---
 
@@ -9727,7 +10216,7 @@ Defined in sub_power.c:92
 esp_err_t sub_power_init(void)
 ```
 
-Defined in sub_power.c:102
+Defined in sub_power.c:103
 
 Initialize Battery ADC subsystem (ADC1 Channel 3 on GPIO 4 with 12 dB atten and eFuse cal).
 
@@ -9753,7 +10242,7 @@ ESP_OK on success.
 esp_err_t sub_power_deinit(void)
 ```
 
-Defined in sub_power.c:151
+Defined in sub_power.c:152
 
 Deinitialize ADC handles.
 
@@ -9777,7 +10266,7 @@ ESP_OK on success.
 esp_err_t sub_power_get_battery_status(uint16_t * out_mv, uint8_t * out_pct, h1os_battery_state_t * out_state)
 ```
 
-Defined in sub_power.c:177
+Defined in sub_power.c:178
 
 Retrieve calibrated resting battery voltage, SoC %, and charge state from ULP ring buffer.
 
@@ -9809,7 +10298,7 @@ ESP_OK on success.
 esp_err_t sub_power_read_battery(uint16_t * out_mv, uint8_t * out_pct)
 ```
 
-Defined in sub_power.c:234
+Defined in sub_power.c:235
 
 Sample current battery terminal voltage and calculate state-of-charge.
 
@@ -9833,7 +10322,7 @@ ESP_OK on success.
 void sub_power_calc_autonomy(uint16_t initial_soc_x10, uint16_t current_soc_x10, uint32_t total_sleep_sec, uint32_t total_app_ms, h1os_autonomy_metrics_t * out_metrics)
 ```
 
-Defined in sub_power.c:243
+Defined in sub_power.c:244
 
 Compute empirical battery autonomy metrics over total elapsed runtime.
 
@@ -9861,7 +10350,7 @@ Compute empirical battery autonomy metrics over total elapsed runtime.
 esp_err_t sub_power_get_ulp_cal_params(uint32_t * out_scale, int32_t * out_offset_mv)
 ```
 
-Defined in sub_power.c:290
+Defined in sub_power.c:291
 
 Extract linear calibration coefficients (scale and offset) for ULP coprocessor hand-off.
 
@@ -9892,7 +10381,7 @@ ESP_OK on success.
 esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
 ```
 
-Defined in sub_power.c:325
+Defined in sub_power.c:326
 
 Initialize and start the ULP-RISC-V Coprocessor Reactive Monitor.
 
@@ -9922,7 +10411,7 @@ ESP_OK on success.
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 ```
 
-Defined in sub_power.c:383
+Defined in sub_power.c:385
 
 Configure ULP slice parameters prior to entering deep sleep.
 
@@ -9945,7 +10434,7 @@ Configure ULP slice parameters prior to entering deep sleep.
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 ```
 
-Defined in sub_power.c:400
+Defined in sub_power.c:402
 
 Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
 
@@ -9977,7 +10466,7 @@ ESP_OK on success.
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in sub_power.c:499
+Defined in sub_power.c:526
 
 Enter full cycle deep sleep with wake pin configuration.
 
@@ -10001,7 +10490,7 @@ ESP_OK on success.
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in sub_power.c:504
+Defined in sub_power.c:531
 
 Cut master power latch (releases GPIO 17 BAT_CTRL).
 
@@ -10015,7 +10504,7 @@ Cut master power latch (releases GPIO 17 BAT_CTRL).
 bool sub_power_connected_usb(void)
 ```
 
-Defined in sub_power.c:510
+Defined in sub_power.c:537
 
 Check if USB VBUS connection is actively present.
 
@@ -10032,7 +10521,7 @@ True if connected to USB power.
 esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 ```
 
-Defined in sub_power.c:521
+Defined in sub_power.c:548
 
 Initialize Dynamic Frequency Scaling (DFS) power management.
 
@@ -10055,7 +10544,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_acquire(void)
 ```
 
-Defined in sub_power.c:562
+Defined in sub_power.c:589
 
 Acquire CPU frequency lock at 240 MHz for compute/display intensive operations.
 
@@ -10072,7 +10561,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_release(void)
 ```
 
-Defined in sub_power.c:572
+Defined in sub_power.c:599
 
 Release CPU frequency lock, allowing DFS to downclock to 80 MHz.
 
@@ -11615,7 +12104,7 @@ Defined in h1os/h1os_version.h:85
 Get complete version string.
 
 #### Returns
-Full version string (e.g. "2.4.5-dev").
+Full version string (e.g. "2.4.7-dev").
 
 ---
 
@@ -12122,7 +12611,7 @@ ESP_OK on success.
 static esp_err_t h1os_validate_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t * out_overflow, uint32_t * out_remainder)
 ```
 
-Defined in h1os_lifecycle.c:694
+Defined in h1os_lifecycle.c:705
 
 Validate Flow A and Flow B periods against all 6 MANDATE-02 silicon and slicing invariants.
 
@@ -12138,7 +12627,7 @@ Validate Flow A and Flow B periods against all 6 MANDATE-02 silicon and slicing 
 static esp_err_t h1os_apply_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec, bool reset_slice_counter)
 ```
 
-Defined in h1os_lifecycle.c:763
+Defined in h1os_lifecycle.c:774
 
 Atomically commit validated Flow A and Flow B periods to RTC Slow SRAM and ULP slice registers.
 
@@ -12154,7 +12643,7 @@ Atomically commit validated Flow A and Flow B periods to RTC Slow SRAM and ULP s
 static void h1os_barrier_init_and_reset(void)
 ```
 
-Defined in h1os_lifecycle.c:76
+Defined in h1os_lifecycle.c:77
 
 Initialize and clear the static FreeRTOS EventGroup sleep barrier.
 
@@ -12168,7 +12657,7 @@ Initialize and clear the static FreeRTOS EventGroup sleep barrier.
 void h1os_sync_hold(void)
 ```
 
-Defined in h1os_lifecycle.c:88
+Defined in h1os_lifecycle.c:89
 
 Hold the deep-sleep barrier open for an asynchronous synchronization task.
 
@@ -12184,7 +12673,7 @@ When called inside on_sync(), prevents unattended RTC Flow B wakes from entering
 void h1os_sync_notify_complete(void)
 ```
 
-Defined in h1os_lifecycle.c:96
+Defined in h1os_lifecycle.c:97
 
 Signal that Core 0 data synchronization is complete (`[BARRIER_SYNC_DONE](#barrier_sync_done)`).
 
@@ -12200,7 +12689,7 @@ Releases the pre-flush inbound sync gate (if `session.sync_wait_ms > 0`) so Core
 void h1os_display_notify_quiescent(void)
 ```
 
-Defined in h1os_lifecycle.c:108
+Defined in h1os_lifecycle.c:109
 
 Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`[BARRIER_DISPLAY_DONE](#barrier_display_done)`).
 
@@ -12216,7 +12705,7 @@ Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`[BARRIER_D
 static void h1os_handle_fatal_startup_error(const h1os_lifecycle_t * config, esp_err_t err, const char * stage)
 ```
 
-Defined in h1os_lifecycle.c:123
+Defined in h1os_lifecycle.c:124
 
 Fatal startup / lifecycle error handler with battery latch protection (MANDATE-06).
 
@@ -12234,7 +12723,7 @@ Invokes the user `on_error` hook (if registered), places audio and display subsy
 static void h1os_session_timeout_timer_cb(void * arg)
 ```
 
-Defined in h1os_lifecycle.c:149
+Defined in h1os_lifecycle.c:150
 
 One-shot esp_timer callback fired when the interactive session inactivity window expires.
 
@@ -12248,7 +12737,7 @@ One-shot esp_timer callback fired when the interactive session inactivity window
 void h1os_reset_session_timer(void)
 ```
 
-Defined in h1os_lifecycle.c:189
+Defined in h1os_lifecycle.c:190
 
 Reset the interactive session inactivity timer (extends session by timeout_sec).
 
@@ -12270,7 +12759,7 @@ Extends the interactive user session by inactivity_timeout_sec, preventing prema
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os_lifecycle.c:226
+Defined in h1os_lifecycle.c:227
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -12292,7 +12781,7 @@ True if running in an interactive user session, false during unattended wakes.
 static void h1os_trigger_chime(h1os_chime_type_t type)
 ```
 
-Defined in h1os_lifecycle.c:238
+Defined in h1os_lifecycle.c:239
 
 H1os trigger chime.
 
@@ -12317,7 +12806,7 @@ Return value of type static void.
 static void h1os_trigger_splash(h1os_splash_type_t type)
 ```
 
-Defined in h1os_lifecycle.c:258
+Defined in h1os_lifecycle.c:259
 
 H1os trigger splash under scoped LVGL lock.
 
@@ -12342,7 +12831,7 @@ Return value of type static void.
 static void h1os_quiesce_lvgl_pipeline(void)
 ```
 
-Defined in h1os_lifecycle.c:271
+Defined in h1os_lifecycle.c:272
 
 Drain pending LVGL render/flush tasks using event-driven semaphore wait and stop the Core 1 LVGL worker task.
 
@@ -12358,7 +12847,7 @@ Drain pending LVGL render/flush tasks using event-driven semaphore wait and stop
 static void debug_dump_ulp_telemetry(void)
 ```
 
-Defined in h1os_lifecycle.c:294
+Defined in h1os_lifecycle.c:295
 
 Diagnostic dump of ULP wake telemetry.
 
@@ -12379,7 +12868,7 @@ Return value of type static void.
 static void h1os_log_flow_banner(orch_flow_type_t flow)
 ```
 
-Defined in h1os_lifecycle.c:330
+Defined in h1os_lifecycle.c:331
 
 Logs a prominent, framed ASCII console banner identifying the active lifecycle flow.
 
@@ -12404,7 +12893,7 @@ Return value of type static void.
 static esp_err_t h1os_early_system_bringup(const h1os_lifecycle_t * config, orch_flow_type_t * out_flow)
 ```
 
-Defined in h1os_lifecycle.c:392
+Defined in h1os_lifecycle.c:393
 
 H1os early system bringup.
 
@@ -12430,7 +12919,7 @@ ESP_OK on success, or an error code.
 static bool h1os_handle_non_ui_flows(orch_flow_type_t flow)
 ```
 
-Defined in h1os_lifecycle.c:502
+Defined in h1os_lifecycle.c:513
 
 H1os handle non ui flows.
 
@@ -12455,7 +12944,7 @@ True on success, false otherwise.
 static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
 ```
 
-Defined in h1os_lifecycle.c:529
+Defined in h1os_lifecycle.c:540
 
 H1os launch interactive or unattended Flow B session with dual-core parallel sync barrier.
 
@@ -12478,7 +12967,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec)
 ```
 
-Defined in h1os_lifecycle.c:798
+Defined in h1os_lifecycle.c:809
 
 Dynamically configure Flow A and Flow B sleep intervals at runtime.
 
@@ -12506,7 +12995,7 @@ Enforces all silicon constraints, ordering invariants, and remainder slice floor
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os_lifecycle.c:809
+Defined in h1os_lifecycle.c:820
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -12534,7 +13023,7 @@ Configures hardware subsystems, determines boot/wake flow, initializes FreeRTOS 
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os_lifecycle.c:856
+Defined in h1os_lifecycle.c:867
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -12564,7 +13053,7 @@ Copies the latest validated psychrometric invariants, sensor readings, and batte
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:956
+Defined in h1os_lifecycle.c:967
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -12596,7 +13085,7 @@ Arms the PCF85063A countdown timer, isolates GPIO sleep pads, holds power latch,
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:995
+Defined in h1os_lifecycle.c:1006
 
 Execute system shutdown.
 
@@ -12619,7 +13108,7 @@ Return value of type static void.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:1055
+Defined in h1os_lifecycle.c:1066
 
 Orderly system shutdown and physical battery power cut.
 
@@ -12635,7 +13124,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:1069
+Defined in h1os_lifecycle.c:1080
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -12657,7 +13146,7 @@ Performs pure white full OTP refresh on electrophoretic display before cutting p
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:1081
+Defined in h1os_lifecycle.c:1092
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -12691,7 +13180,7 @@ Controls ES8311 DAC gain and NS4168 power state. 0% volume automatically mutes t
 esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t * out_samples, size_t max_samples, size_t * out_count)
 ```
 
-Defined in h1os_lifecycle.c:1089
+Defined in h1os_lifecycle.c:1100
 
 Retrieve historical Tri-Node telemetry samples from the RTC Slow SRAM ring buffer in chronological order.
 
@@ -12720,7 +13209,7 @@ Designed for batch wireless telemetry publishing (Wi-Fi MQTT / BLE GATT) and loc
 esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct)
 ```
 
-Defined in h1os_lifecycle.c:1100
+Defined in h1os_lifecycle.c:1111
 
 Configure relative humidity target alert thresholds in centi-percent (1% = 100, e.g.
 
@@ -12752,7 +13241,7 @@ Persisted in RTC Slow SRAM so humidor out-of-bounds excursions are evaluated det
 esp_err_t h1os_display_force_clear(void)
 ```
 
-Defined in h1os_lifecycle.c:1117
+Defined in h1os_lifecycle.c:1128
 
 Force a driver-level electrophoretic display clear and full waveform scrub.
 
@@ -12772,7 +13261,7 @@ ESP_OK on success, or an error code from the display driver.
 esp_err_t h1os_audio_play_raw(const int16_t * ptr, size_t len, size_t * bytes_written)
 ```
 
-Defined in h1os_lifecycle.c:1131
+Defined in h1os_lifecycle.c:1142
 
 Play raw 16-bit signed Mono PCM audio asynchronously from memory (C header arrays or RAM buffer).
 
@@ -12797,7 +13286,7 @@ ESP_OK on success, ESP_ERR_INVALID_ARG on NULL ptr, or I2S/DMA driver error code
 esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
 ```
 
-Defined in h1os_lifecycle.c:1143
+Defined in h1os_lifecycle.c:1154
 
 Synthesize and play a pure sine tone asynchronously at specified frequency and duration.
 
@@ -12821,7 +13310,7 @@ ESP_OK on success, or driver error code.
 esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
 ```
 
-Defined in h1os_lifecycle.c:1152
+Defined in h1os_lifecycle.c:1163
 
 Play a predefined acoustic presentation chime asynchronously.
 
@@ -12844,7 +13333,7 @@ ESP_OK on success, or driver error code.
 bool h1os_sdcard_is_mounted(void)
 ```
 
-Defined in h1os_lifecycle.c:1158
+Defined in h1os_lifecycle.c:1169
 
 Check if a MicroSD card is actively mounted in the FATFS filesystem.
 
@@ -12861,7 +13350,7 @@ true if mounted and ready for file I/O, false otherwise.
 esp_err_t h1os_sdcard_get_capacity_mb(uint32_t * out_capacity_mb)
 ```
 
-Defined in h1os_lifecycle.c:1163
+Defined in h1os_lifecycle.c:1174
 
 Retrieve total capacity of the mounted MicroSD card in megabytes.
 
@@ -12884,7 +13373,7 @@ ESP_OK on success, ESP_ERR_INVALID_STATE if card is not mounted, or ESP_ERR_INVA
 esp_err_t h1os_sdcard_mount_async(void)
 ```
 
-Defined in h1os_lifecycle.c:1168
+Defined in h1os_lifecycle.c:1179
 
 Asynchronously mount the MicroSD card in a background FreeRTOS task.
 
@@ -12901,7 +13390,7 @@ ESP_OK if already mounted or mount task dispatched successfully.
 esp_err_t h1os_sdcard_unmount(void)
 ```
 
-Defined in h1os_lifecycle.c:1173
+Defined in h1os_lifecycle.c:1184
 
 Unmount the MicroSD card and release SDMMC host peripheral resources.
 
@@ -12918,7 +13407,7 @@ ESP_OK on success.
 void h1os_led_start_breathing(uint32_t period_ms)
 ```
 
-Defined in h1os_lifecycle.c:1178
+Defined in h1os_lifecycle.c:1189
 
 Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3).
 
@@ -12938,7 +13427,7 @@ Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3
 void h1os_led_stop_breathing(void)
 ```
 
-Defined in h1os_lifecycle.c:1183
+Defined in h1os_lifecycle.c:1194
 
 Stop the status LED breathing effect and turn the LED off.
 
@@ -12952,7 +13441,7 @@ Stop the status LED breathing effect and turn the LED off.
 void h1os_led_set(bool on)
 ```
 
-Defined in h1os_lifecycle.c:1188
+Defined in h1os_lifecycle.c:1199
 
 Set the status LED static state (true = ON, false = OFF).
 
@@ -12974,7 +13463,7 @@ void bootloader_hooks_include(void)
 
 Defined in h1os_boot_hook.c:29
 
-Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
+Anchor symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
 
 ---
 
@@ -12986,11 +13475,11 @@ Dummy symbol to enforce linker inclusion of 2nd-stage bootloader hooks.
 void bootloader_before_init(void)
 ```
 
-Defined in h1os_boot_hook.c:41
+Defined in h1os_boot_hook.c:42
 
 FIRST HOOK: Executes before any bootloader hardware initialization.
 
-* Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here). Immediately latches BAT_CTRL (GPIO 17) HIGH in < 25ms. Explicitly connects SIG_GPIO_OUT_IDX to prevent reliance on reset defaults.
+Flash cache is DOWN, console is not configured (do NOT call ESP_LOG here). Immediately latches BAT_CTRL (GPIO 17) HIGH in < 25ms. Explicitly connects SIG_GPIO_OUT_IDX and drives output levels BEFORE releasing and re-latching pad holds so digital/RTC rails never glitch across deep-sleep wakes.
 
 ---
 
@@ -13002,11 +13491,11 @@ FIRST HOOK: Executes before any bootloader hardware initialization.
 void bootloader_after_init(void)
 ```
 
-Defined in h1os_boot_hook.c:77
+Defined in h1os_boot_hook.c:90
 
 SECOND HOOK: Executes after standard bootloader initialization.
 
-* Console, SPI Flash cache, and clocks are now valid; ESP_LOG is operational.
+Console, SPI Flash cache, and clocks are now valid; ESP_LOG is operational.
 
 ---
 
@@ -13328,7 +13817,7 @@ Executes fast sub-3ms Flow A sensor bursts using bitbanged I2C without booting t
 void orch_wake_stub_install(void)
 ```
 
-Defined in orch_wake_stub.c:685
+Defined in orch_wake_stub.c:703
 
 Install the RTC deep sleep wake stub.
 
@@ -13800,7 +14289,7 @@ Defined in main.c:31
 volatile uint32_t cal_scale = 8601
 ```
 
-Defined in main.c:33
+Defined in main.c:34
 
 ---
 
@@ -13809,10 +14298,10 @@ Defined in main.c:33
 ### cal_offset
 
 ```cpp
-volatile int32_t cal_offset = 0
+volatile int32_t cal_offset = 80
 ```
 
-Defined in main.c:34
+Defined in main.c:35
 
 ---
 
@@ -13824,7 +14313,7 @@ Defined in main.c:34
 volatile uint32_t last_vbat_mv = 4000
 ```
 
-Defined in main.c:35
+Defined in main.c:36
 
 ---
 
@@ -13836,7 +14325,7 @@ Defined in main.c:35
 volatile uint32_t vbat_raw_adc = 0
 ```
 
-Defined in main.c:36
+Defined in main.c:37
 
 ---
 
@@ -13848,7 +14337,7 @@ Defined in main.c:36
 volatile uint32_t usb_connected = 0
 ```
 
-Defined in main.c:37
+Defined in main.c:38
 
 ---
 
@@ -13860,7 +14349,7 @@ Defined in main.c:37
 volatile uint32_t vbat_ring[8]
 ```
 
-Defined in main.c:40
+Defined in main.c:41
 
 ---
 
@@ -13872,7 +14361,7 @@ Defined in main.c:40
 volatile uint32_t vbat_ring_head = 0
 ```
 
-Defined in main.c:41
+Defined in main.c:42
 
 ---
 
@@ -13884,7 +14373,7 @@ Defined in main.c:41
 volatile uint32_t vbat_ring_count = 0
 ```
 
-Defined in main.c:42
+Defined in main.c:43
 
 ---
 
@@ -14014,7 +14503,7 @@ Defined in hal_io.c:37
 bool s_led_pwm_active = false
 ```
 
-Defined in hal_io.c:228
+Defined in hal_io.c:298
 
 ---
 
@@ -14028,7 +14517,7 @@ Defined in hal_io.c:228
 esp_timer_handle_t s_breath_timer = NULL
 ```
 
-Defined in hal_io.c:229
+Defined in hal_io.c:299
 
 ---
 
@@ -14042,7 +14531,7 @@ Defined in hal_io.c:229
 volatile bool s_breathing_running = false
 ```
 
-Defined in hal_io.c:230
+Defined in hal_io.c:300
 
 ---
 
@@ -14056,7 +14545,7 @@ Defined in hal_io.c:230
 volatile bool s_breath_phase_high = false
 ```
 
-Defined in hal_io.c:231
+Defined in hal_io.c:301
 
 ---
 
@@ -14070,7 +14559,7 @@ Defined in hal_io.c:231
 volatile uint32_t s_breath_half_ms = 2000U / 2U
 ```
 
-Defined in hal_io.c:232
+Defined in hal_io.c:302
 
 Default LED breath period in ms (2s).
 
@@ -14382,7 +14871,7 @@ Defined in orch_flow.c:31
 const char * TAG = "sub_audio"
 ```
 
-Defined in sub_audio.c:31
+Defined in sub_audio.c:32
 
 ---
 
@@ -14396,7 +14885,7 @@ Defined in sub_audio.c:31
 i2s_chan_handle_t s_tx_chan = NULL
 ```
 
-Defined in sub_audio.c:84
+Defined in sub_audio.c:115
 
 ---
 
@@ -14410,7 +14899,7 @@ Defined in sub_audio.c:84
 bool s_audio_inited = false
 ```
 
-Defined in sub_audio.c:86
+Defined in sub_audio.c:117
 
 ---
 
@@ -14424,7 +14913,7 @@ Defined in sub_audio.c:86
 bool s_i2s_chan_enabled = false
 ```
 
-Defined in sub_audio.c:87
+Defined in sub_audio.c:118
 
 ---
 
@@ -14438,7 +14927,7 @@ Defined in sub_audio.c:87
 bool s_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:88
+Defined in sub_audio.c:119
 
 ---
 
@@ -14452,7 +14941,7 @@ Defined in sub_audio.c:88
 bool s_pa_enabled = false
 ```
 
-Defined in sub_audio.c:89
+Defined in sub_audio.c:120
 
 ---
 
@@ -14466,7 +14955,7 @@ Defined in sub_audio.c:89
 bool s_low_power_mode = true
 ```
 
-Defined in sub_audio.c:90
+Defined in sub_audio.c:121
 
 ---
 
@@ -14480,7 +14969,7 @@ Defined in sub_audio.c:90
 RTC_DATA_ATTR bool s_rtc_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:92
+Defined in sub_audio.c:123
 
 ---
 
@@ -14494,7 +14983,7 @@ Defined in sub_audio.c:92
 StaticQueue_t s_audio_queue_struct
 ```
 
-Defined in sub_audio.c:94
+Defined in sub_audio.c:125
 
 ---
 
@@ -14508,7 +14997,7 @@ Defined in sub_audio.c:94
 uint8_t s_audio_queue_storage[8U *sizeof(audio_cmd_t)]
 ```
 
-Defined in sub_audio.c:95
+Defined in sub_audio.c:126
 
 ---
 
@@ -14522,7 +15011,7 @@ Defined in sub_audio.c:95
 QueueHandle_t s_audio_queue = NULL
 ```
 
-Defined in sub_audio.c:96
+Defined in sub_audio.c:127
 
 ---
 
@@ -14536,7 +15025,7 @@ Defined in sub_audio.c:96
 volatile TaskHandle_t s_audio_task_handle = NULL
 ```
 
-Defined in sub_audio.c:97
+Defined in sub_audio.c:128
 
 ---
 
@@ -14550,7 +15039,7 @@ Defined in sub_audio.c:97
 volatile bool s_audio_is_busy = false
 ```
 
-Defined in sub_audio.c:98
+Defined in sub_audio.c:129
 
 ---
 
@@ -14564,7 +15053,7 @@ Defined in sub_audio.c:98
 uint8_t s_volume_pct = 0
 ```
 
-Defined in sub_audio.c:100
+Defined in sub_audio.c:131
 
 ---
 
@@ -14578,7 +15067,7 @@ Defined in sub_audio.c:100
 StaticSemaphore_t s_cmd_sync_sem_buffer
 ```
 
-Defined in sub_audio.c:102
+Defined in sub_audio.c:133
 
 ---
 
@@ -14592,7 +15081,7 @@ Defined in sub_audio.c:102
 SemaphoreHandle_t s_cmd_sync_sem = NULL
 ```
 
-Defined in sub_audio.c:103
+Defined in sub_audio.c:134
 
 ---
 
@@ -14606,7 +15095,7 @@ Defined in sub_audio.c:103
 StaticSemaphore_t s_audio_idle_sem_buffer
 ```
 
-Defined in sub_audio.c:104
+Defined in sub_audio.c:135
 
 ---
 
@@ -14620,7 +15109,7 @@ Defined in sub_audio.c:104
 SemaphoreHandle_t s_audio_idle_sem = NULL
 ```
 
-Defined in sub_audio.c:105
+Defined in sub_audio.c:136
 
 ---
 
@@ -14634,7 +15123,7 @@ Defined in sub_audio.c:105
 StaticSemaphore_t s_audio_stop_sem_buffer
 ```
 
-Defined in sub_audio.c:106
+Defined in sub_audio.c:137
 
 ---
 
@@ -14648,7 +15137,7 @@ Defined in sub_audio.c:106
 SemaphoreHandle_t s_audio_stop_sem = NULL
 ```
 
-Defined in sub_audio.c:107
+Defined in sub_audio.c:138
 
 ---
 
@@ -14662,7 +15151,7 @@ Defined in sub_audio.c:107
 int16_t s_audio_work_buffer[0x100]
 ```
 
-Defined in sub_audio.c:108
+Defined in sub_audio.c:139
 
 ---
 
@@ -14676,7 +15165,7 @@ Defined in sub_audio.c:108
 const uint8_t es8311_perceptual_vol_table[101]
 ```
 
-Defined in sub_audio.c:141
+Defined in sub_audio.c:172
 
 ---
 
@@ -14690,7 +15179,7 @@ Defined in sub_audio.c:141
 const es8311_reg_entry_t s_es8311_init_pre_charge[]
 ```
 
-Defined in sub_audio.c:170
+Defined in sub_audio.c:201
 
 ---
 
@@ -14704,7 +15193,7 @@ Defined in sub_audio.c:170
 const es8311_reg_entry_t s_es8311_init_post_charge[]
 ```
 
-Defined in sub_audio.c:214
+Defined in sub_audio.c:247
 
 ---
 
@@ -14718,7 +15207,7 @@ Defined in sub_audio.c:214
 const es8311_reg_entry_t s_es8311_deinit[]
 ```
 
-Defined in sub_audio.c:236
+Defined in sub_audio.c:272
 
 ---
 
@@ -14732,7 +15221,7 @@ Defined in sub_audio.c:236
 const char * TAG = "sub_power"
 ```
 
-Defined in sub_power.c:36
+Defined in sub_power.c:37
 
 ---
 
@@ -14746,7 +15235,7 @@ Defined in sub_power.c:36
 bool s_ulp_adc_inited = false
 ```
 
-Defined in sub_power.c:47
+Defined in sub_power.c:48
 
 ---
 
@@ -14760,7 +15249,7 @@ Defined in sub_power.c:47
 adc_cali_handle_t s_cali_handle = NULL
 ```
 
-Defined in sub_power.c:48
+Defined in sub_power.c:49
 
 ---
 
@@ -14774,7 +15263,7 @@ Defined in sub_power.c:48
 bool s_cali_valid = false
 ```
 
-Defined in sub_power.c:49
+Defined in sub_power.c:50
 
 ---
 
@@ -14788,7 +15277,7 @@ Defined in sub_power.c:49
 const struct @103206253010331351125062271206070174360205162247 s_lipo_table[]
 ```
 
-Defined in sub_power.c:68
+Defined in sub_power.c:69
 
 ---
 
@@ -14799,10 +15288,10 @@ Defined in sub_power.c:68
 `static`
 
 ```cpp
-uint32_t s_cached_flow_a_sec = 0
+RTC_DATA_ATTR uint32_t s_cached_flow_a_sec = 0
 ```
 
-Defined in sub_power.c:372
+Defined in sub_power.c:374
 
 ---
 
@@ -14813,10 +15302,10 @@ Defined in sub_power.c:372
 `static`
 
 ```cpp
-uint32_t s_cached_flow_b_sec = 0
+RTC_DATA_ATTR uint32_t s_cached_flow_b_sec = 0
 ```
 
-Defined in sub_power.c:373
+Defined in sub_power.c:375
 
 ---
 
@@ -15389,7 +15878,7 @@ Differential Ping-Pong LUT Semantics (Display Mode 2, Command 0x37 = 0x40):
 const char * TAG = "h1os_lifecycle"
 ```
 
-Defined in h1os_lifecycle.c:39
+Defined in h1os_lifecycle.c:40
 
 ---
 
@@ -15405,7 +15894,7 @@ h1os_lifecycle_t s_app_lifecycle = {0}
 
 Type: [`h1os_lifecycle_t`](#h1os_lifecycle_t)
 
-Defined in h1os_lifecycle.c:52
+Defined in h1os_lifecycle.c:53
 
 ---
 
@@ -15419,7 +15908,7 @@ Defined in h1os_lifecycle.c:52
 esp_timer_handle_t s_session_timer = NULL
 ```
 
-Defined in h1os_lifecycle.c:53
+Defined in h1os_lifecycle.c:54
 
 ---
 
@@ -15433,7 +15922,7 @@ Defined in h1os_lifecycle.c:53
 volatile bool s_session_running = false
 ```
 
-Defined in h1os_lifecycle.c:54
+Defined in h1os_lifecycle.c:55
 
 ---
 
@@ -15447,7 +15936,7 @@ Defined in h1os_lifecycle.c:54
 bool s_audio_initialized = false
 ```
 
-Defined in h1os_lifecycle.c:55
+Defined in h1os_lifecycle.c:56
 
 ---
 
@@ -15461,7 +15950,7 @@ Defined in h1os_lifecycle.c:55
 portMUX_TYPE s_session_mux = portMUX_INITIALIZER_UNLOCKED
 ```
 
-Defined in h1os_lifecycle.c:56
+Defined in h1os_lifecycle.c:57
 
 ---
 
@@ -15475,7 +15964,7 @@ Defined in h1os_lifecycle.c:56
 StaticEventGroup_t s_sleep_barrier_buf
 ```
 
-Defined in h1os_lifecycle.c:58
+Defined in h1os_lifecycle.c:59
 
 ---
 
@@ -15489,7 +15978,7 @@ Defined in h1os_lifecycle.c:58
 EventGroupHandle_t s_sleep_barrier_group = NULL
 ```
 
-Defined in h1os_lifecycle.c:59
+Defined in h1os_lifecycle.c:60
 
 ---
 
@@ -15503,7 +15992,7 @@ Defined in h1os_lifecycle.c:59
 volatile bool s_sync_held = false
 ```
 
-Defined in h1os_lifecycle.c:60
+Defined in h1os_lifecycle.c:61
 
 ---
 
@@ -15519,7 +16008,7 @@ RTC_DATA_ATTR h1os_battery_state_t s_prev_bat_state = H1OS_BATTERY_DISCHARGING
 
 Type: RTC_DATA_ATTR [`h1os_battery_state_t`](#h1os_battery_state_t)
 
-Defined in h1os_lifecycle.c:63
+Defined in h1os_lifecycle.c:64
 
 ---
 
@@ -15571,7 +16060,7 @@ Defined in orch_display_sync.c:25
 struct audio_cmd_t
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:89
 
 ### Public Attributes
 
@@ -15594,7 +16083,7 @@ audio_cmd_type_t type
 
 Type: [`audio_cmd_type_t`](#audio_cmd_type_t)
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:90
 
 ---
 
@@ -15606,7 +16095,7 @@ Defined in sub_audio.c:59
 union audio_cmd_t::@075142260334247171354103021266123360172342241057 params
 ```
 
-Defined in sub_audio.c:73
+Defined in sub_audio.c:104
 
 ---
 
@@ -15618,7 +16107,7 @@ Defined in sub_audio.c:73
 SemaphoreHandle_t done_sem
 ```
 
-Defined in sub_audio.c:75
+Defined in sub_audio.c:106
 
 ---
 
@@ -15630,7 +16119,7 @@ Defined in sub_audio.c:75
 esp_err_t * result
 ```
 
-Defined in sub_audio.c:76
+Defined in sub_audio.c:107
 
 {#unionparams}
 
@@ -15640,7 +16129,7 @@ Defined in sub_audio.c:76
 union [union].params
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:91
 
 ### Public Attributes
 
@@ -15660,7 +16149,7 @@ Defined in sub_audio.c:60
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:95
 
 ---
 
@@ -15672,7 +16161,7 @@ Defined in sub_audio.c:64
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:67
+Defined in sub_audio.c:98
 
 ---
 
@@ -15684,7 +16173,7 @@ Defined in sub_audio.c:67
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:72
+Defined in sub_audio.c:103
 
 {#structparamstone}
 
@@ -15694,7 +16183,7 @@ Defined in sub_audio.c:72
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:92
 
 ### Public Attributes
 
@@ -15713,7 +16202,7 @@ Defined in sub_audio.c:61
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:93
 
 ---
 
@@ -15725,7 +16214,7 @@ Defined in sub_audio.c:62
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:94
 
 {#structparamschime}
 
@@ -15735,7 +16224,7 @@ Defined in sub_audio.c:63
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:96
 
 ### Public Attributes
 
@@ -15753,7 +16242,7 @@ Defined in sub_audio.c:65
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:97
 
 {#structparamspcm}
 
@@ -15763,7 +16252,7 @@ Defined in sub_audio.c:66
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:68
+Defined in sub_audio.c:99
 
 ### Public Attributes
 
@@ -15783,7 +16272,7 @@ Defined in sub_audio.c:68
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:100
 
 ---
 
@@ -15795,7 +16284,7 @@ Defined in sub_audio.c:69
 size_t sample_count
 ```
 
-Defined in sub_audio.c:70
+Defined in sub_audio.c:101
 
 ---
 
@@ -15807,7 +16296,7 @@ Defined in sub_audio.c:70
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:71
+Defined in sub_audio.c:102
 
 {#h1os_ui_msg_t}
 
@@ -16890,7 +17379,7 @@ Defined in h1os_lvgl.cpp:70
 struct es8311_reg_entry_t
 ```
 
-Defined in sub_audio.c:79
+Defined in sub_audio.c:110
 
 ### Public Attributes
 
@@ -16909,7 +17398,7 @@ Defined in sub_audio.c:79
 uint8_t reg
 ```
 
-Defined in sub_audio.c:80
+Defined in sub_audio.c:111
 
 ---
 
@@ -16921,7 +17410,7 @@ Defined in sub_audio.c:80
 uint8_t val
 ```
 
-Defined in sub_audio.c:81
+Defined in sub_audio.c:112
 
 {#h1os_wake_context_t}
 
@@ -17808,7 +18297,7 @@ Upper RH alert threshold in centi-% (0 = disabled).
 struct h1os_autonomy_metrics_t
 ```
 
-Defined in h1os/sub_power.h:41
+Defined in h1os/sub_power.h:45
 
 Empirical battery autonomy metrics over total elapsed runtime.
 
@@ -17830,7 +18319,7 @@ Empirical battery autonomy metrics over total elapsed runtime.
 float avg_draw_ma
 ```
 
-Defined in h1os/sub_power.h:42
+Defined in h1os/sub_power.h:46
 
 Average current draw over total elapsed runtime in mA.
 
@@ -17844,7 +18333,7 @@ Average current draw over total elapsed runtime in mA.
 float autonomy_days
 ```
 
-Defined in h1os/sub_power.h:43
+Defined in h1os/sub_power.h:47
 
 Remaining days at current duty cycle (-1.0f if calibrating).
 
@@ -17858,7 +18347,7 @@ Remaining days at current duty cycle (-1.0f if calibrating).
 float mah_spent_lap
 ```
 
-Defined in h1os/sub_power.h:44
+Defined in h1os/sub_power.h:48
 
 Total mAh consumed since initial_soc_x10.
 
@@ -18077,7 +18566,7 @@ Defined in h1os/orch_state.h:98
 struct [struct].s_lipo_table
 ```
 
-Defined in sub_power.c:51
+Defined in sub_power.c:52
 
 ### Public Attributes
 
@@ -18096,7 +18585,7 @@ Defined in sub_power.c:51
 uint16_t mv
 ```
 
-Defined in sub_power.c:52
+Defined in sub_power.c:53
 
 ---
 
@@ -18108,7 +18597,7 @@ Defined in sub_power.c:52
 uint16_t soc_x10
 ```
 
-Defined in sub_power.c:53
+Defined in sub_power.c:54
 
 {#structparamspcm}
 
@@ -18118,7 +18607,7 @@ Defined in sub_power.c:53
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:68
+Defined in sub_audio.c:99
 
 ### Public Attributes
 
@@ -18138,7 +18627,7 @@ Defined in sub_audio.c:68
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:100
 
 ---
 
@@ -18150,7 +18639,7 @@ Defined in sub_audio.c:69
 size_t sample_count
 ```
 
-Defined in sub_audio.c:70
+Defined in sub_audio.c:101
 
 ---
 
@@ -18162,7 +18651,7 @@ Defined in sub_audio.c:70
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:71
+Defined in sub_audio.c:102
 
 {#structparamstone}
 
@@ -18172,7 +18661,7 @@ Defined in sub_audio.c:71
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:92
 
 ### Public Attributes
 
@@ -18191,7 +18680,7 @@ Defined in sub_audio.c:61
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:93
 
 ---
 
@@ -18203,7 +18692,7 @@ Defined in sub_audio.c:62
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:94
 
 {#structsession}
 
@@ -18320,7 +18809,7 @@ Max barrier wait for async on_sync completion before sleep.
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:96
 
 ### Public Attributes
 
@@ -18338,7 +18827,7 @@ Defined in sub_audio.c:65
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:97
 
 {#structpresentation}
 
@@ -18427,7 +18916,7 @@ Acoustic presentation master volume (0..100%).
 union [union].params
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:91
 
 ### Public Attributes
 
@@ -18447,7 +18936,7 @@ Defined in sub_audio.c:60
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:95
 
 ---
 
@@ -18459,7 +18948,7 @@ Defined in sub_audio.c:64
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:67
+Defined in sub_audio.c:98
 
 ---
 
@@ -18471,7 +18960,7 @@ Defined in sub_audio.c:67
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:72
+Defined in sub_audio.c:103
 
 {#structparamstone}
 
@@ -18481,7 +18970,7 @@ Defined in sub_audio.c:72
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:92
 
 ### Public Attributes
 
@@ -18500,7 +18989,7 @@ Defined in sub_audio.c:61
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:93
 
 ---
 
@@ -18512,7 +19001,7 @@ Defined in sub_audio.c:62
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:94
 
 {#structparamschime}
 
@@ -18522,7 +19011,7 @@ Defined in sub_audio.c:63
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:96
 
 ### Public Attributes
 
@@ -18540,7 +19029,7 @@ Defined in sub_audio.c:65
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:97
 
 {#structparamspcm}
 
@@ -18550,7 +19039,7 @@ Defined in sub_audio.c:66
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:68
+Defined in sub_audio.c:99
 
 ### Public Attributes
 
@@ -18570,7 +19059,7 @@ Defined in sub_audio.c:68
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:100
 
 ---
 
@@ -18582,7 +19071,7 @@ Defined in sub_audio.c:69
 size_t sample_count
 ```
 
-Defined in sub_audio.c:70
+Defined in sub_audio.c:101
 
 ---
 
@@ -18594,6 +19083,6 @@ Defined in sub_audio.c:70
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:71
+Defined in sub_audio.c:102
 
 Generated by [Moxygen](https://0state.com/moxygen)

@@ -1,2 +1,0 @@
-- Test ended after 12h due to suspected thermal issue.
-- will exam. with the thermal can during run time.

@@ -2,7 +2,7 @@
 
 > **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with, sponsored by, or endorsed by Waveshare Electronics)*
 >
-> **Applicable Firmware:** H1OS `v2.4.5-dev` (E-Class Environmental Operating System)
+> **Applicable Firmware:** H1OS `v2.4.7-dev` (E-Class Environmental Operating System)
 >
 > **Purpose:** Document physical PCB layout defects, electrical hazards, and architectural limitations discovered during driver bring-up, and provide engineering schematics/layout guidelines for a hardware **Rev B** redesign.
 
@@ -193,7 +193,7 @@ graph TD;
 #### 3. Current H1OS Firmware Mitigations
 
 * **Bootloader & Runtime Rail Power Hold:** `PA_EN` is asserted LOW (`GPIO 42 = 0`) and held via pad hold in both the 2nd-stage bootloader (`h1os_boot_hook.c`) and runtime HAL (`hal_io.c`) across all active and deep sleep states. The audio power rail is never cut during operation.
-* **Register-Level Standby:** Instead of cutting rail power, the ES8311 is placed into a software deep standby register sequence (`0x0D = 0xFC, 0x0E = 0x6A, 0x12 = 0x02, 0x00 = 0x1E`), and the NS4168 amplifier is muted via `PA_CTRL` (`GPIO 46 = 0`). This places the audio subsystem into $<1.0\,\mu\text{A}$ standby without disturbing the shared I2C bus.
+* **Register-Level Standby:** Instead of cutting rail power, the ES8311 is placed into a software deep standby register sequence (`0x0D = 0xFC, 0x0E = 0x6A, 0x0F = 0xFF, 0x12 = 0x02, 0x45 = 0x03, 0x00 = 0x1F, 0x01 = 0x00`), and the NS4168 amplifier is muted via `PA_CTRL` (`GPIO 46 = 0`). This places the audio subsystem into $<1.0\,\mu\text{A}$ standby without disturbing the shared I2C bus.
 
 #### 4. Rev B Hardware Redesign Recommendations
 
@@ -926,3 +926,60 @@ At $V_{\text{BAT}} = 4.10\text{–}4.20\text{ V}$, the physical tap voltage at `
    In `ulp_read_vbat_adc_bounded()`, explicitly assert `SENS_FORCE_XPD_SAR = 0x3`, `SET_PERI_REG_BITS(SENS_SAR_ATTEN1_REG, 0x3U, 0x3U, (ADC_CHANNEL_3 * 2))`, `SENS_SAR1_EN_PAD_FORCE = 1`, and `SENS_MEAS1_START_FORCE = 1` separated by explicit RISC-V device I/O fences (`ulp_reg_barrier()` / `asm volatile("fence iorw, iorw" ::: "memory")`) and a `40 µs` analog reference settling delay (`SAR1_XPD_SETTLE_US`) prior to pulsing `SENS_MEAS1_START_SAR` (with a `2 µs` strobe hold under `-Os` compilation), and restore `SENS_FORCE_XPD_SAR = 0x0` immediately after reading `SENS_MEAS1_DATA_SAR`.
 3. **Permanent Analog Pad Isolation (`sub_power.c`, `hal_io.c`):**
    Never call `rtc_gpio_init(HAL_PIN_BATTERY_ADC)` after `ulp_adc_init()` or `rtc_gpio_deinit(HAL_PIN_BATTERY_ADC)` on Flow B wake; only call `rtc_gpio_hold_dis(HAL_PIN_BATTERY_ADC)` so `GPIO 4` remains continuously configured in low-leakage analog mode.
+
+
+### ERR-S7: ES8311 Standby Register Map Corruption, I2S Pull-Up Contention & Bootloader `PA_EN` Wake Glitch (`v2.4.6-dev` / `TST_005`)
+
+* **Component:** Everest Semiconductor ES8311 Audio Codec (`U10`), ESP32-S3 I2S/GPIO Sleep Pad Driver (`hal_io.c`), and 2nd-Stage Bootloader Hook (`h1os_boot_hook.c`)
+* **Subsystem:** Audio Subsystem Low-Power Standby (`sub_audio.c`) & Deep Sleep Pad Isolation
+* **Severity:** Critical (`+3.5°C to +4.5°C` localized thermal hotspot on `U10` at `26.8°C–28.9°C`, `+0.84°C` / `-6.5% RH` chamber offset at `U6` SHTC3, and `4.58 mA` continuous average current draw across 12.0 hours in `TST_005`)
+
+#### Description & Root Cause Analysis
+
+During the 12-hour sealed chamber qualification **Run #5** (`TST_005`, `715` total wakes = `143` Flow B + `572` Flow A, `0` sensor errors), radiometric thermal imaging (`TST_005_IMGS_THERMAL/IMG261029145614.bmp`) identified the ES8311 audio codec (`U10`) operating at `26.8°C–28.9°C` (`+4.4°C` above the `22.4°C` board floor) during idle and deep sleep, consuming `55.2 mAh` (`4.58 mA` average draw vs. $\le 0.45\text{ mA}$ target). Forensic correlation against the ES8311 Datasheet (`es8311_pb_v16.pdf` p. 8 Note 4 & Note 5) and User Guide (`es8311_user_guide_v8.pdf` pp. 14–29) isolated four interacting hardware/firmware mechanisms:
+
+1. **Corrupted `s_es8311_deinit[]` Register Map (`sub_audio.c`):**
+   * `Reg 0x0E` was written as `0xFF` instead of POR default `0x6A` (p. 18), forcing undocumented internal analog control bits `[7]` and `[0]` HIGH and asserting `RST_MOD = 1`.
+   * `Reg 0x45` was written as `0x00` (`PULLUP_SE = 0`, p. 28–29), leaving the ES8311 internal `BCLK` (Pin 6) and `LRCK` (Pin 8) pull-ups to `PVDD` (`3.3V`) enabled while `hal_io_isolate_sleep_pads()` drove `GPIO 15` (`SCLK`) and `GPIO 38` (`LRCK`) LOW (`0V`), establishing a continuous DC current path through `U10`.
+   * `Reg 0x00` was written as `0x1E` instead of `0x1F` (p. 14), leaving Bit 0 (`RST_DAC_DIG`) un-reset (`0`), while pre-charge high-bias registers (`0x10 = 0x1F`, `0x11 = 0x7F`, `0x1C = 0x00` ADC EQ enabled) were never restored to POR defaults (`0x0F = 0xFF`, `0x10 = 0x13`, `0x11 = 0x7C`, `0x1C = 0x4C`).
+2. **Datasheet Note 4/5 Clock Sequencing & Active Session Idle Drain (`sub_audio.c`):**
+   * `sub_audio_init()` left `PA_CTRL = 1` (NS4150B 400 kHz switching, `3–4 mA`), the ES8311 (`4.5–8 mA`), and 4.096 MHz I2S clocks running across the entire 30-second interactive session even when no audio was playing, and `sub_audio_standby()` disabled `MCLK` without a pre-clock-stop CSM state `S0` settling delay.
+3. **ESP32-S3 `gpio_reset_pin()` Pull-Up Leakage & `ASDOUT` Contention (`hal_io.c`):**
+   * Calling `gpio_reset_pin()` on all 5 I2S pins enabled ESP32-S3 internal `~45 kΩ` pull-ups before driving those pins LOW (`~367 µA` continuous pad leakage) and drove `GPIO 16` (`ASDOUT`) as a push-pull output LOW against ES8311 Pin 7 (`ASDOUT` output).
+4. **2nd-Stage Bootloader `PA_EN` (`GPIO 42`) Hold-Release Glitch on Flow B Wakes (`h1os_boot_hook.c`):**
+   * Once `PIT-02`/`PIT-03` enabled Flow B wakes every 300 seconds, `bootloader_before_init()` called `gpio_ll_hold_dis(&GPIO, 42)` *before* driving `GPIO 42` LOW and enabling its output driver. Because Deep Sleep resets `GPIO 42` to JTAG `MTMS` input with pull-up HIGH, releasing the hold first glitched `PA_EN` HIGH on every Flow B wake, POR-resetting `U10` out of standby while `sub_audio_standby()` skipped re-initialization because `s_rtc_codec_in_standby` remained `true`.
+
+#### Firmware Mitigation (`v2.4.6-dev`)
+
+* Corrected `s_es8311_deinit[]` to restore all registers to verified `<1.0 µA` standby defaults (`0x0E = 0x6A`, `0x0F = 0xFF`, `0x10 = 0x13`, `0x11 = 0x7C`, `0x1C = 0x4C`, `0x07 = 0x30`, `0x45 = 0x03`, `0x0D = 0xFC`, `0x00 = 0x1F`, `0x01 = 0x00`) with a `2 ms` CSM settling window while `MCLK` is present before calling `i2s_channel_disable()`, and parked the codec/PA in `<1 µA` standby immediately after `sub_audio_init()` and after each worker queue drain.
+* Updated `bootloader_before_init()` to configure output levels, disable pull-ups, and enable output drivers *before* refreshing pad holds, and added I2C readback verification (`Reg 0x0D == 0xFC && Reg 0x45 == 0x03`) in `sub_audio_standby()` on unattended deep-sleep wakes.
+* Replaced the `gpio_reset_pin()` I2S loop in `hal_io.c` with `hal_io_quiesce_i2s_pads()`, disabling internal pull-ups on `MCLK`/`SCLK`/`LRCK`/`DSDIN` and configuring `ASDOUT` (`GPIO 16`) as an input with pull-down enabled.
+
+### ERR-S8: ES8311 CSM Reset (`0x00 = 0x1F`) Reverting `Reg 0x0D` to `0xFA` & 64 ms I2S DMA Ring Truncation on Short Chirps (`v2.4.7-dev` / `TST_005_IMGS_POST-AUDIT-THERMAL`)
+
+* **Component:** Everest Semiconductor ES8311 Audio Codec (`U10`), Nsiway NS4150B Class-D Amplifier (`U11`), and ESP32-S3 I2S TX DMA Subsystem (`sub_audio.c`)
+* **Subsystem:** Interactive Session Audio Playback & Post-Timeout Deep Sleep Suspend
+* **Severity:** Critical (`U10` remaining awake at `30.2°C–32.1°C` after a button-wake 30s timeout and across subsequent Flow B cycles; `50 ms` button chirps and the `70 ms` first note of the Cold Boot chime acoustically truncated)
+
+#### Description & Root Cause Analysis
+
+Post-audit bench verification (`TST_005_IMGS_POST-AUDIT-THERMAL/IMG261029161206.bmp` – `IMG261029161752.bmp` and `internal_thermal_note.md`) on `v2.4.6-dev` revealed two distinct hardware/driver anomalies:
+1. **Post-Button-Wake Codec Persistent Awake State (`U10` at `30.2°C–32.1°C`):**
+   * After Cold Boot, the codec entered low-power sleep (`28.5°C -> 26.2°C` floor) and remained cool across unattended Flow B wakes (`IMG261029161213.bmp` – `IMG261029161442.bmp`).
+   * However, after waking the device via a tactile button press (`IMG261029161450.bmp`), the ES8311 (`U10`) remained awake (`30.2°C–32.1°C`) after the 30-second inactivity timeout and across subsequent Flow B cycles (`IMG261029161517.bmp` – `IMG261029161752.bmp`).
+   * **Silicon Mechanism (Cross-Referenced Against Official Espressif Reference Driver `_3rd_party_ref_codec/es8311.c:222-240`):**
+     In `es8311_suspend()`, the official Everest/Espressif sequence explicitly writes `{0x0D, 0xFA}` first, executes the CSM reset and clock gating handshake (`0x02 = 0x10` $ightarrow$ `0x00 = 0x00` $ightarrow$ `0x00 = 0x1F` $ightarrow$ `0x01 = 0x30` $ightarrow$ `0x01 = 0x00`), and writes **`{0x0D, 0xFC}` AFTER `{0x00, 0x1F}` and `{0x01, 0x00}`**. In `v2.4.6-dev`, `s_es8311_deinit[]` wrote `{0x0D, 0xFC}` *before* `{0x00, 0x1F}`. When `REG00` was `0x80` (`CSM_ON = 1`), asserting `0x00 = 0x1F` (`RST_DIG = 1`) caused the internal CSM reset transition to revert `REG0D` back to its pre-charge state (`0xFA`, `PDN_VREF = 0`, `VMIDSEL = 10b` normal VMID operation!). Furthermore, when `orch_flow_quiesce_peripherals()` called `sub_audio_standby()` at the 30-second timeout, `sub_audio_standby()` re-enabled `s_tx_chan` for `500 µs` and re-issued the reversed `{0x0D, 0xFC} -> {0x00, 0x1F}` sequence, locking `Reg 0x0D = 0xFA` into deep sleep. On the very next unattended Flow B wake, `sub_audio_standby()` read back `Reg 0x0D == 0xFA != 0xFC`, logged a false *"standby register drift"* warning while `s_tx_chan == NULL` (no `MCLK`), and attempted an unclocked I2C write across every subsequent Flow B cycle.
+2. **Acoustic Truncation of `50 ms` Button Chirps & First Note of Cold Boot Chime:**
+   * **Trailing Chirp Truncation (`64 ms` I2S DMA Ring Buffer vs. `50 ms` Chirp):** The I2S TX channel is configured with `dma_desc_num = 4` and `dma_frame_num = 256` (`1024 samples = 64 ms` at `16 kHz`). A `50 ms` button chirp (`800 samples`) fits completely inside the empty `1024-sample` DMA ring, so `i2s_channel_write()` returns in `< 1 ms` as soon as the samples are copied into RAM—before the I2S serializer has shifted the audio out to the codec. In `v2.4.6-dev`, `sub_audio_flush_frame()` wrote only **1** zero frame (`256 samples = 16 ms`) + `20 ms` delay (`36 ms` total drain out of `64 ms`) and `audio_worker_task()` immediately called `sub_audio_standby()`, pulling `PA_CTRL` (`GPIO 46`) LOW (`0`) after only `~36 ms` and cutting off the remaining `14–30 ms` of every `50 ms` button chirp mid-play.
+   * **Leading Note Truncation (Cold-Start VMID Ramp on First Note):** In `v2.4.6-dev`, `sub_audio_init()` parked the codec in `0x0D = 0xFC` (`VMID = 0V`) and woke it on-demand inside `sub_audio_prepare_and_unmute()` using `{0x0D, 0x31}` (`VMIDSEL = 01b` slow normal-speed charge on `C114 = 1 µF`) instead of `{0x0D, 0x01}` and `{0x44, 0x58}`, without waiting for `sub_audio_wait_until_ready()` (`CSM != S0`) before streaming the `70 ms` first note (`523 Hz`) of `H1OS_CHIME_BOOT`.
+
+#### Firmware Mitigation (`v2.4.7-dev`)
+
+1. **Authoritative Espressif `es8311_suspend()` Register Ordering (`sub_audio.c`):**
+   * Re-ordered `s_es8311_deinit[]` to match `_3rd_party_ref_codec/es8311.c` (`es8311_suspend`): writes `{0x0D, 0xFA}`, executes `{0x02, 0x10} -> {0x00, 0x00} -> {0x00, 0x1F} -> {0x01, 0x30} -> {0x01, 0x00}`, and writes `{0x45, 0x03}`, **`{0x0D, 0xFC}`**, and `{0x02, 0x00}` **after** `{0x00, 0x1F}` and `{0x01, 0x00}` while `MCLK` is active, followed by a `2 ms` hold before `i2s_channel_disable()`.
+2. **Complete Unattended Flow B Bypass (`sub_audio.c`, `h1os_lifecycle.c`):**
+   * On unattended Flow B wakes (`!s_audio_inited && s_rtc_codec_in_standby && esp_reset_reason() == ESP_RST_DEEPSLEEP`), `sub_audio_standby()` returns `ESP_OK` immediately with zero I2C register traffic, preserving the codec's `<1.0 µA` sleep state undisturbed across all Flow A and Flow B cycles.
+3. **Session-Scoped Warm Readiness & Full 4-Descriptor (`64 ms`) DMA Drain (`sub_audio.c`):**
+   * During Cold Boot or interactive Button Wakes (`is_user_wake == true`), `sub_audio_init()` initializes the ES8311 in low-power mode (`0x0F = 0xFF`) with the unused microphone powered off (`0x0E = 0x62`, `0x14 = 0x00`, `0x17 = 0x00`, `0x0A = 0x4C`), soft-ramp disabled (`0x37 = 0x08`), and `{0x44, 0x58}` / `{0x0D, 0x01}` active, waits for `sub_audio_wait_until_ready(100)` (`CSM != S0`), and enables `PA_CTRL = 1` (`120 ms` settling) before returning.
+   * Removed premature per-tone `sub_audio_standby()` calls from `audio_worker_task()` so the codec and amplifier stay warm throughout the 30-second interactive session and enter `<1.0 µA` standby once when the 30-second session times out (`orch_flow_quiesce_peripherals()` $ightarrow$ `sub_audio_standby()`).
+   * Upgraded `sub_audio_flush_frame()` to write all `4` zero-filled DMA descriptors (`SUB_AUDIO_DMA_DESC_NUM = 4`, `4 × 256 = 1024 samples = 64 ms`) plus a `20 ms` serializer drain delay whenever the queue empties, ensuring 100% of every `50 ms` button chirp and chime note is physically played before completion.

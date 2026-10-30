@@ -108,3 +108,4 @@ Development follows the **Four Canonical Stages of Construction**:
 | **Dual-Core Parallel `on_sync` & Sleep Barrier (`v2.4.5-dev`)** | Parallel Core 0 `on_sync` + Core 1 EPD refresh gated by static `EventGroup` (`BARRIER_SYNC_DONE \| BARRIER_DISPLAY_DONE`) | VERIFIED |
 | **Cross-Core UI Actor Queue (`v2.4.5-dev`)** | 16-slot static `h1os_ui_post()` queue drained inside `h1os_lvgl_lock(100)` with `sync_wait_ms` coalescing | VERIFIED |
 | **Fatal Startup Battery Protection (`v2.4.5-dev`)** | `on_error` hook + `h1os_handle_fatal_startup_error()` releasing `GPIO 17` (`BAT_CTRL`) on battery fault | VERIFIED |
+| **ES8311 Zero-Offset Sleep & I2S Pad Isolation (`v2.4.6-dev`)** | Datasheet Note 4/5 clock-sequenced standby (`0x0E=0x6A`, `0x0F=0xFF`, `0x45=0x03`, `0x0D=0xFC`, `0x00=0x1F`), on-demand session parking, glitch-free `PA_EN` boot hold, and zero-leakage I2S sleep pads | VERIFIED |

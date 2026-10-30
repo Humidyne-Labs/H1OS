@@ -28,13 +28,75 @@ static const char *TAG = "HAL_IO";
 #define HAL_IO_DEFAULT_BREATH_PERIOD_MS 2000U  /**< Default LED breath period in ms (2s).        */
 #define HAL_IO_BTN_DEBOUNCE_US          15000U /**< Tactile button debounce window (15 ms).      */
 
-static esp_timer_handle_t        s_btn_debounce_timer = NULL;
-static gpio_glitch_filter_handle_t s_boot_glitch_flt  = NULL;
-static gpio_glitch_filter_handle_t s_pwr_glitch_flt   = NULL;
-static volatile hal_btn_mask_t   s_debounced_btn_mask = HAL_BTN_NONE;
-static volatile bool             s_btn_isr_installed  = false;
-static hal_io_button_cb_t        s_btn_user_cb        = NULL;
-static void                     *s_btn_user_arg       = NULL;
+static esp_timer_handle_t          s_btn_debounce_timer = NULL;
+static gpio_glitch_filter_handle_t s_boot_glitch_flt    = NULL;
+static gpio_glitch_filter_handle_t s_pwr_glitch_flt     = NULL;
+static volatile hal_btn_mask_t     s_debounced_btn_mask = HAL_BTN_NONE;
+static volatile bool               s_btn_isr_installed  = false;
+static hal_io_button_cb_t          s_btn_user_cb        = NULL;
+static void                       *s_btn_user_arg       = NULL;
+
+/**
+ * @brief Park I2S bus pins in a zero-leakage quiescent state without internal pull-up contention.
+ *
+ * @details Avoids gpio_reset_pin(), which enables internal ~45 kOhm pull-ups on ESP32-S3 and
+ *          creates ~367 uA of continuous pad leakage when driven LOW. Configures MCU-to-codec
+ *          inputs (MCLK, SCLK, LRCK, DSDIN) as push-pull outputs driven LOW with pull-ups and
+ *          pull-downs disabled, and configures the codec-to-MCU output (ASDOUT, GPIO 16) as an
+ *          input with pull-down enabled to prevent push-pull driver contention against ES8311 Pin 7.
+ *
+ * @param[in]    enable_hold     True to engage per-pin GPIO pad holds after parking.
+ */
+static void hal_io_quiesce_i2s_pads(bool enable_hold)
+{
+    const gpio_num_t i2s_out_pins[] = {
+        HAL_PIN_I2S_MCLK,
+        HAL_PIN_I2S_SCLK,
+        HAL_PIN_I2S_LRCK,
+        HAL_PIN_I2S_DSDIN,
+    };
+
+    (void)gpio_hold_dis(HAL_PIN_I2S_MCLK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_SCLK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_LRCK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_DSDIN);
+    (void)gpio_hold_dis(HAL_PIN_I2S_ASDOUT);
+
+    for (size_t i = 0; i < sizeof(i2s_out_pins) / sizeof(i2s_out_pins[0]); i++) {
+        (void)gpio_set_level(i2s_out_pins[i], 0);
+    }
+
+    const gpio_config_t i2s_out_cfg = {
+        .pin_bit_mask = (1ULL << HAL_PIN_I2S_MCLK) |
+                        (1ULL << HAL_PIN_I2S_SCLK) |
+                        (1ULL << HAL_PIN_I2S_LRCK) |
+                        (1ULL << HAL_PIN_I2S_DSDIN),
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    (void)gpio_config(&i2s_out_cfg);
+
+    for (size_t i = 0; i < sizeof(i2s_out_pins) / sizeof(i2s_out_pins[0]); i++) {
+        (void)gpio_set_level(i2s_out_pins[i], 0);
+        if (enable_hold) {
+            (void)gpio_hold_en(i2s_out_pins[i]);
+        }
+    }
+
+    const gpio_config_t i2s_in_cfg = {
+        .pin_bit_mask = (1ULL << HAL_PIN_I2S_ASDOUT),
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    (void)gpio_config(&i2s_in_cfg);
+    if (enable_hold) {
+        (void)gpio_hold_en(HAL_PIN_I2S_ASDOUT);
+    }
+}
 
 /**
  * @brief Sample instantaneous raw GPIO levels of BOOT and POWER tactile buttons.
@@ -57,8 +119,8 @@ static inline hal_btn_mask_t hal_io_sample_raw_buttons(void)
 static void hal_io_btn_debounce_timer_cb(void *arg)
 {
     (void)arg;
-    hal_btn_mask_t prev = s_debounced_btn_mask;
-    hal_btn_mask_t curr = hal_io_sample_raw_buttons();
+    hal_btn_mask_t prev  = s_debounced_btn_mask;
+    hal_btn_mask_t curr  = hal_io_sample_raw_buttons();
     s_debounced_btn_mask = curr;
 
     if (curr != prev && s_btn_user_cb != NULL) {
@@ -91,10 +153,11 @@ esp_err_t hal_io_register_button_cb(hal_io_button_cb_t cb, void *arg)
 /**
  * @brief Early boot initialization of non-latched application pins and GPIO ISR service.
  *
- * @details Releases sleep pad holds on dynamic peripheral/wake pins, configures amplifier mute (GPIO 46),
- *          status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch filters),
- *          and RTC INT (GPIO 5). Note: Master power rails (GPIO 17 BAT_CTRL, GPIO 6 EPD_3V3_EN, GPIO 42 PA_EN)
- *          are strictly latched in the 2nd-stage bootloader (h1os_boot_hook.c).
+ * @details Reinforces master power rail states (GPIO 17 BAT_CTRL = 1, GPIO 6 EPD_3V3_EN = 0,
+ *          GPIO 42 PA_EN = 0) before releasing dynamic sleep pad holds, configures amplifier
+ *          mute (GPIO 46 = 0), parks I2S lines without pull-up contention, and initializes
+ *          status LED (GPIO 3), buttons (GPIO 0/18 with edge interrupts and hardware glitch
+ *          filters), and RTC INT (GPIO 5).
  *
  * @return ESP_OK on success, or driver error code.
  */
@@ -113,8 +176,12 @@ esp_err_t hal_io_early_init(void)
     esp_log_level_set("sub_display", ESP_LOG_DEBUG);
     esp_log_level_set("h1os_demo", ESP_LOG_DEBUG);
 
-    gpio_set_level(HAL_PIN_PA_CTRL, 0);
-    hal_io_release_pad_holds();
+    /* Reinforce master rail levels in GPIO peripheral before releasing global deep-sleep autohold */
+    (void)gpio_set_level(HAL_PIN_POWER_HOLD, 1);
+    (void)gpio_set_level(HAL_PIN_EPD_3V3_EN, 0);
+    (void)gpio_set_level(HAL_PIN_PA_EN, 0);
+    (void)gpio_set_level(HAL_PIN_PA_CTRL, 0);
+    (void)hal_io_release_pad_holds();
 
     /* Install global per-pin GPIO ISR dispatcher (safe if already installed) */
     esp_err_t isr_err = gpio_install_isr_service(0);
@@ -129,8 +196,11 @@ esp_err_t hal_io_early_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    gpio_config(&pa_cfg);
-    gpio_set_level(HAL_PIN_PA_CTRL, 0);
+    (void)gpio_config(&pa_cfg);
+    (void)gpio_set_level(HAL_PIN_PA_CTRL, 0);
+
+    /* Park I2S lines in deterministic low-power state for unattended wakes where sub_audio_init is skipped */
+    hal_io_quiesce_i2s_pads(false);
 
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
@@ -139,8 +209,8 @@ esp_err_t hal_io_early_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    gpio_config(&led_cfg);
-    gpio_set_level(HAL_PIN_STATUS_LED, 1);
+    (void)gpio_config(&led_cfg);
+    (void)gpio_set_level(HAL_PIN_STATUS_LED, 1);
 
     gpio_config_t btn_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_BUTTON_BOOT) | (1ULL << HAL_PIN_BUTTON_POWER),
@@ -149,7 +219,7 @@ esp_err_t hal_io_early_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_ANYEDGE,
     };
-    gpio_config(&btn_cfg);
+    (void)gpio_config(&btn_cfg);
 
     /* Enable ESP32-S3 hardware pin glitch filters on tactile button inputs */
     if (s_boot_glitch_flt == NULL) {
@@ -175,10 +245,10 @@ esp_err_t hal_io_early_init(void)
 
     if (s_btn_debounce_timer == NULL) {
         const esp_timer_create_args_t timer_args = {
-            .callback        = &hal_io_btn_debounce_timer_cb,
-            .arg             = NULL,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name            = "hal_btn_dbnc",
+            .callback              = &hal_io_btn_debounce_timer_cb,
+            .arg                   = NULL,
+            .dispatch_method       = ESP_TIMER_TASK,
+            .name                  = "hal_btn_dbnc",
             .skip_unhandled_events = true,
         };
         (void)esp_timer_create(&timer_args, &s_btn_debounce_timer);
@@ -197,7 +267,7 @@ esp_err_t hal_io_early_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    gpio_config(&rtc_int_cfg);
+    (void)gpio_config(&rtc_int_cfg);
 
     ESP_LOGD(TAG, "Early IO configuration complete (GPIO ISR service and button glitch filters active).");
     return ESP_OK;
@@ -213,9 +283,9 @@ esp_err_t hal_io_early_init(void)
 esp_err_t hal_io_release_power_latch(void)
 {
     gpio_deep_sleep_hold_dis();
-    gpio_hold_dis(HAL_PIN_POWER_HOLD);
-    gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
-    gpio_set_level(HAL_PIN_POWER_HOLD, 0);
+    (void)gpio_hold_dis(HAL_PIN_POWER_HOLD);
+    (void)gpio_set_direction(HAL_PIN_POWER_HOLD, GPIO_MODE_OUTPUT);
+    (void)gpio_set_level(HAL_PIN_POWER_HOLD, 0);
     return ESP_OK;
 }
 
@@ -246,7 +316,7 @@ esp_err_t hal_led_pwm_init(void)
 
     esp_log_level_set("ledc", ESP_LOG_WARN);
 
-    gpio_reset_pin(HAL_PIN_STATUS_LED);
+    (void)gpio_reset_pin(HAL_PIN_STATUS_LED);
 
     ledc_timer_config_t timer_cfg = {
         .speed_mode      = HAL_LEDC_MODE,
@@ -279,7 +349,7 @@ esp_err_t hal_led_pwm_init(void)
         return err;
     }
 
-    ledc_fade_func_install(0);
+    (void)ledc_fade_func_install(0);
     s_led_pwm_active = true;
     ESP_LOGD(TAG, "LEDC PWM initialized on GPIO 3 (Active LOW).");
     return ESP_OK;
@@ -305,7 +375,7 @@ esp_err_t hal_led_set_brightness(uint8_t brightness_pct)
         brightness_pct = 100;
     }
     uint32_t duty = ((uint32_t)brightness_pct * 1023U) / 100U;
-    ledc_set_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, duty);
+    (void)ledc_set_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, duty);
     return ledc_update_duty(HAL_LEDC_MODE, HAL_LEDC_CHANNEL);
 }
 
@@ -332,7 +402,7 @@ esp_err_t hal_led_fade_to(uint8_t target_pct, uint32_t duration_ms)
         target_pct = 100;
     }
     uint32_t target_duty = ((uint32_t)target_pct * 1023U) / 100U;
-    ledc_set_fade_with_time(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, target_duty, duration_ms);
+    (void)ledc_set_fade_with_time(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, target_duty, duration_ms);
     return ledc_fade_start(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
@@ -378,10 +448,10 @@ esp_err_t hal_led_start_breathing(uint32_t cycle_period_ms)
 
     if (s_breath_timer == NULL) {
         const esp_timer_create_args_t timer_args = {
-            .callback        = &hal_led_breath_timer_cb,
-            .arg             = NULL,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name            = "hal_led_breath",
+            .callback              = &hal_led_breath_timer_cb,
+            .arg                   = NULL,
+            .dispatch_method       = ESP_TIMER_TASK,
+            .name                  = "hal_led_breath",
             .skip_unhandled_events = true,
         };
         esp_err_t err = esp_timer_create(&timer_args, &s_breath_timer);
@@ -410,7 +480,7 @@ esp_err_t hal_led_stop_breathing(void)
         (void)esp_timer_stop(s_breath_timer);
     }
     if (s_led_pwm_active) {
-        hal_led_set_brightness(0);
+        (void)hal_led_set_brightness(0);
     }
     return ESP_OK;
 }
@@ -432,7 +502,7 @@ bool hal_led_is_breathing(void)
  */
 esp_err_t hal_led_pwm_deinit(void)
 {
-    hal_led_stop_breathing();
+    (void)hal_led_stop_breathing();
 
     if (s_breath_timer != NULL) {
         (void)esp_timer_delete(s_breath_timer);
@@ -443,11 +513,11 @@ esp_err_t hal_led_pwm_deinit(void)
         return ESP_OK;
     }
 
-    ledc_stop(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, 0);
+    (void)ledc_stop(HAL_LEDC_MODE, HAL_LEDC_CHANNEL, 0);
     ledc_fade_func_uninstall();
     s_led_pwm_active = false;
 
-    gpio_reset_pin(HAL_PIN_STATUS_LED);
+    (void)gpio_reset_pin(HAL_PIN_STATUS_LED);
 
     gpio_config_t led_cfg = {
         .pin_bit_mask = (1ULL << HAL_PIN_STATUS_LED),
@@ -456,8 +526,8 @@ esp_err_t hal_led_pwm_deinit(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    gpio_config(&led_cfg);
-    gpio_set_level(HAL_PIN_STATUS_LED, 1);
+    (void)gpio_config(&led_cfg);
+    (void)gpio_set_level(HAL_PIN_STATUS_LED, 1);
     return ESP_OK;
 }
 
@@ -471,7 +541,7 @@ esp_err_t hal_led_pwm_deinit(void)
 esp_err_t hal_io_set_led(bool on)
 {
     if (s_breathing_running) {
-        hal_led_stop_breathing();
+        (void)hal_led_stop_breathing();
     }
     if (s_led_pwm_active) {
         return hal_led_set_brightness(on ? 100 : 0);
@@ -487,7 +557,7 @@ esp_err_t hal_io_set_led(bool on)
  */
 hal_btn_mask_t hal_io_read_buttons(void)
 {
-    hal_btn_mask_t raw = hal_io_sample_raw_buttons();
+    hal_btn_mask_t raw   = hal_io_sample_raw_buttons();
     s_debounced_btn_mask = raw;
     return raw;
 }
@@ -495,9 +565,9 @@ hal_btn_mask_t hal_io_read_buttons(void)
 /**
  * @brief Configures and locks dynamic peripheral lines prior to deep sleep.
  *
- * @details * Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en().
- * Holds amplifier mute GPIO 46 (PA_CTRL) LOW.
- * Configures RTC IO pull-ups on wake inputs (GPIO 0, GPIO 5, GPIO 18).
+ * @details Latches GPIO 11 (EPD_CS), GPIO 9 (EPD_RST), and GPIO 10 (EPD_DC) HIGH via gpio_hold_en().
+ * Holds amplifier mute GPIO 46 (PA_CTRL) LOW with pull-up disabled.
+ * Parks I2S lines without internal pull-up contention and avoids driving ASDOUT (ES8311 Pin 7).
  * Preserves 2nd-stage bootloader holds on GPIO 17 (BAT_CTRL), GPIO 6 (EPD_3V3_EN), and GPIO 42 (PA_EN).
  *
  * @return ESP_OK on success.
@@ -524,41 +594,39 @@ esp_err_t hal_io_isolate_sleep_pads(void)
         s_pwr_glitch_flt = NULL;
     }
 
-    gpio_set_level(HAL_PIN_EPD_CS, 1);
-    gpio_hold_en(HAL_PIN_EPD_CS);
+    (void)gpio_set_level(HAL_PIN_EPD_CS, 1);
+    (void)gpio_hold_en(HAL_PIN_EPD_CS);
 
-    gpio_set_level(HAL_PIN_EPD_RST, 1);
-    gpio_hold_en(HAL_PIN_EPD_RST);
+    (void)gpio_set_level(HAL_PIN_EPD_RST, 1);
+    (void)gpio_hold_en(HAL_PIN_EPD_RST);
 
-    gpio_set_level(HAL_PIN_EPD_DC, 1);
-    gpio_hold_en(HAL_PIN_EPD_DC);
+    (void)gpio_set_level(HAL_PIN_EPD_DC, 1);
+    (void)gpio_hold_en(HAL_PIN_EPD_DC);
 
-    gpio_set_level(HAL_PIN_PA_CTRL, 0);
-    gpio_hold_en(HAL_PIN_PA_CTRL);
+    /* Ensure PA_EN (GPIO 42 = 0) and PA_CTRL (GPIO 46 = 0) have pull-ups disabled and holds engaged */
+    (void)gpio_pullup_dis(HAL_PIN_PA_EN);
+    (void)gpio_pulldown_dis(HAL_PIN_PA_EN);
+    (void)gpio_set_level(HAL_PIN_PA_EN, 0);
+    (void)gpio_hold_en(HAL_PIN_PA_EN);
 
-    /* Deinit i2s pins and latch to known state */
-    const gpio_num_t i2s_pins[] = {
-        HAL_PIN_I2S_MCLK, HAL_PIN_I2S_SCLK,
-        HAL_PIN_I2S_LRCK, HAL_PIN_I2S_DSDIN,
-        HAL_PIN_I2S_ASDOUT
-    };
+    (void)gpio_pullup_dis(HAL_PIN_PA_CTRL);
+    (void)gpio_pulldown_dis(HAL_PIN_PA_CTRL);
+    (void)gpio_set_level(HAL_PIN_PA_CTRL, 0);
+    (void)gpio_hold_en(HAL_PIN_PA_CTRL);
 
-    for (size_t i = 0; i < sizeof(i2s_pins) / sizeof(i2s_pins[0]); i++) {
-        gpio_reset_pin(i2s_pins[i]); /**< Reset State Before Sleep */
-        gpio_set_direction(i2s_pins[i], GPIO_MODE_OUTPUT);
-        gpio_set_level(i2s_pins[i], 0);
-        gpio_hold_en(i2s_pins[i]);
-    }
+    /* Park I2S bus lines with internal pull-ups disabled and ASDOUT configured as input */
+    hal_io_quiesce_i2s_pads(true);
 
     if (s_led_pwm_active) {
-        hal_led_pwm_deinit();
+        (void)hal_led_pwm_deinit();
     }
-    gpio_set_level(HAL_PIN_STATUS_LED, 1);
-    gpio_hold_en(HAL_PIN_STATUS_LED);
+    (void)gpio_pullup_dis(HAL_PIN_STATUS_LED);
+    (void)gpio_set_level(HAL_PIN_STATUS_LED, 1);
+    (void)gpio_hold_en(HAL_PIN_STATUS_LED);
 
     gpio_deep_sleep_hold_en();
 
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+    (void)esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
     ESP_LOGD(TAG, "Static sleep pads isolated and latched.");
     return ESP_OK;
@@ -573,23 +641,23 @@ esp_err_t hal_io_release_pad_holds(void)
 {
     gpio_deep_sleep_hold_dis();
 
-    rtc_gpio_deinit(HAL_PIN_RTC_INT);
-    rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
-    rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
+    (void)rtc_gpio_deinit(HAL_PIN_RTC_INT);
+    (void)rtc_gpio_deinit(HAL_PIN_BUTTON_BOOT);
+    (void)rtc_gpio_deinit(HAL_PIN_BUTTON_POWER);
     /* Keep HAL_PIN_BATTERY_ADC (GPIO 4) in analog/RTC mode; never connect digital input buffer to 2.08V divider tap */
 
-    gpio_hold_dis(HAL_PIN_EPD_CS);
-    gpio_hold_dis(HAL_PIN_EPD_RST);
-    gpio_hold_dis(HAL_PIN_EPD_DC);
-    gpio_hold_dis(HAL_PIN_PA_CTRL);
-    gpio_hold_dis(HAL_PIN_STATUS_LED);
+    (void)gpio_hold_dis(HAL_PIN_EPD_CS);
+    (void)gpio_hold_dis(HAL_PIN_EPD_RST);
+    (void)gpio_hold_dis(HAL_PIN_EPD_DC);
+    (void)gpio_hold_dis(HAL_PIN_PA_CTRL);
+    (void)gpio_hold_dis(HAL_PIN_STATUS_LED);
 
     /* Remove IO Latch on Wake */
-    gpio_hold_dis(HAL_PIN_I2S_MCLK);
-    gpio_hold_dis(HAL_PIN_I2S_SCLK);
-    gpio_hold_dis(HAL_PIN_I2S_LRCK);
-    gpio_hold_dis(HAL_PIN_I2S_DSDIN);
-    gpio_hold_dis(HAL_PIN_I2S_ASDOUT);
+    (void)gpio_hold_dis(HAL_PIN_I2S_MCLK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_SCLK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_LRCK);
+    (void)gpio_hold_dis(HAL_PIN_I2S_DSDIN);
+    (void)gpio_hold_dis(HAL_PIN_I2S_ASDOUT);
 
     return ESP_OK;
 }
@@ -605,12 +673,12 @@ esp_err_t hal_io_release_pad_holds(void)
  */
 bool hal_check_usb_ll(void)
 {
-    uint32_t f1 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
+    uint32_t f1 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FFU;
     REG_WRITE(USB_SERIAL_JTAG_INT_CLR_REG, USB_SERIAL_JTAG_SOF_INT_CLR);
     esp_rom_delay_us(1100);
     if ((REG_READ(USB_SERIAL_JTAG_INT_RAW_REG) & USB_SERIAL_JTAG_SOF_INT_RAW) != 0) {
         return true;
     }
-    uint32_t f2 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FF;
+    uint32_t f2 = REG_READ(USB_SERIAL_JTAG_FRAM_NUM_REG) & 0x7FFU;
     return (f1 != f2);
 }
