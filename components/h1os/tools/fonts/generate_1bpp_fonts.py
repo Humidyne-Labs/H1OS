@@ -156,7 +156,7 @@ def copy_licenses(font_dir: Path, out_dir: Path):
     print(f"[+] Successfully copied font license files to {lic_dst}")
 
 def main():
-    default_font_dir = (Path(__file__).parent / "fonts").resolve()
+    default_font_dir = (Path(__file__).parent / "static_assets").resolve()
 
     parser = argparse.ArgumentParser(description="Generate 1-bpp monochrome fonts for H1OS from vendored font assets")
     parser.add_argument("--font-dir", type=str, default=str(default_font_dir), help="Path to font assets directory (contains TTF/WOFF fonts and licenses)")

@@ -280,7 +280,7 @@ esp_err_t h1os_start(const h1os_lifecycle_t *config);
  *
  * Enforces all silicon constraints, ordering invariants, and remainder slice floors.
  * Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown
- * timer with the new Flow A cadence.
+ * timer with the new Flow A period.
  *
  * @param[in] flow_a_sec Headless sensor acquisition interval (60s .. 14400s / 4h).
  *                       Must be an exact multiple of 60 seconds if > 255s.

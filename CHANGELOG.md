@@ -4,20 +4,47 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.7-dev] - 2026-10-29
+## [2.4.7-dev] - 2026-10-31
+
+### 🔬 Environmental Chamber Qualification (`TST_006`) & Chemical Baseline
+* **TST_006 Sealed Acrylic Chamber Qualification Pass** (`docs/logs/shtc3_accuracy_bench/environmental_chamber/TST_006/`):
+  * Successfully concluded a 23.5-hour continuous sealed chamber test campaign with an equilibrated 69.0% Boveda primary reference standard.
+  * Verified 100% elimination of the `+4.4°C` ES8311 codec sleep self-heating hotspot identified in TST_005; SHTC3 tracked chamber ambient at `22.7°C` (`-0.19°C` vs reference Klaro Valet).
+  * Confirmed thermodynamic relative humidity equilibration at `68.7% RH` (within `0.3% RH` of nominal 69.0% setpoint), resting dead center within the manufacturer's $\pm 1.0\%\text{ RH}$ hermetic tolerance band.
+  * Verified 1,396 consecutive synchronous wake cycles (1,115 Flow A sample bursts + 281 Flow B dual-core UI flushes) with 0 missed wakes, 0 bus timeouts, and 0 I2C bus errors (`SHT:OK`).
+  * Measured terminal battery voltage settling at `4.08V` (`92%` SoC) after 23.5 hours, validating true sub-milliamp quiescent draw and projecting over 23 days of standalone autonomy.
+* **Primary Standard Chemical Material Datasheets** (`docs/hardware_docs/material_datasheets/`):
+  * Integrated official Boveda 69% RH chemical formulations (`MSDS69.pdf`, `69_SDS_EU2020878_040822_FINAL.pdf`), water activity equilibrium equations ($a_w = 0.690$), and $\pm 1.0\%\text{ RH}$ hermetic operating tolerances into the metrology documentation suite.
+
+### 🛡️ Firmware & Tooling Hardening
+* **Native USB Flasher Robustness & Watchdog Disarm** (`dist/h1os-v2.4.7/flasher.ps1`):
+  * Resolved 32-bit unsigned integer argument transformation overflow exceptions during full factory scrubs by binding offset maximum to `[uint32]::MaxValue`.
+  * Implemented `DisableWatchdogs()` register sequence in the native USB SLIP engine, unlocking and disarming the ESP32-S3 RTC Watchdog (`RTC_CNTL_WDTCONFIG0_REG`) and enabling SWD auto-feed to prevent host USB resets during multi-megabyte SPI flash erase operations.
+  * Reduced erase chunk size to 256KB (`maxStep = 256u * 1024u`) for smooth execution without timeout drops.
+* **Component Font Asset Self-Containment & Metric Tool Decoupling** (`components/h1os/tools/fonts/`, `tools/agent/check_string_width.py`, `tools/agent/extract_font_metrics.py`):
+  * Re-established component static assets in `components/h1os/tools/fonts/static_assets/` and precomputed metric tables in `tools/fonts/` for offline inspection.
+  * Rewrote `tools/agent/check_string_width.py` to evaluate UI layout constraints directly against static CSV metrics without requiring a local project build directory (all 63 screen templates PASS).
+* **Engineering Lexicon Hardening (`cadence` Ban)** (`AGENTS.md`, `.agents/rules/lexicon.md`):
+  * Permanently banned informal rhythmic term "cadence" across all repository documentation and source files, codifying required IEEE/embedded engineering equivalents (`interval`, `period`, `frequency`, `cycle timing`).
 
 ### 🛡️ Fixed & Hardened (Post-Audit `TST_005` Codec Sleep Persistence & Acoustic Playback Truncation Remediation)
 
 * **Authoritative Espressif `es8311_suspend()` Register Sequence & Post-Button-Wake Deep Standby Persistence (`ERR-S8` / `S0`)** (`sub_audio.c`, `docs/drivers/03_audio.md`, `ERRATA.md`):
-  * Resolved the post-audit hardware defect observed in `TST_005_IMGS_POST-AUDIT-THERMAL` (`IMG261029161459.bmp` – `IMG261029161752.bmp` and `internal_thermal_note.md`) where the ES8311 codec (`U10`) entered low-power sleep after Cold Boot (`28.5°C` $ightarrow$ `26.2°C` floor) but remained awake at `30.2°C–32.1°C` after a tactile button wake's 30-second inactivity timeout and across subsequent Flow B cycles.
-  * **Root Cause 1 (CSM Reset `0x00 = 0x1F` Reverting `Reg 0x0D` to `0xFA`):** Cross-referencing `s_es8311_deinit[]` against the official Espressif reference driver (`_3rd_party_ref_codec/es8311.c:222-240`, `es8311_suspend()`) revealed that when `REG00` is `0x80` (`CSM_ON = 1`), writing `{0x0D, 0xFC}` *before* `{0x00, 0x1F}` causes the internal Chip State Machine (`CSM`) reset transition (`0x00 = 0x1F`, `RST_DIG = 1`) to revert `Reg 0x0D` back to its pre-charge state (`0xFA`: `PDN_VREF = 0`, `VMIDSEL = 10b` active VMID reference). `s_es8311_deinit[]` now strictly follows `es8311_suspend()`: it writes `{0x0D, 0xFA}`, executes the CSM reset and clock gating handshake (`{0x02, 0x10}` $ightarrow$ `{0x00, 0x00}` $ightarrow$ `{0x00, 0x1F}` $ightarrow$ `{0x01, 0x30}` $ightarrow$ `{0x01, 0x00}`), and writes `{0x45, 0x03}`, **`{0x0D, 0xFC}`**, and `{0x02, 0x00}` **after** `{0x00, 0x1F}` and `{0x01, 0x00}`, holds `MCLK` for `2 ms`, and then disables `s_tx_chan`.
+  * Resolved the post-audit hardware defect observed in `TST_005_IMGS_POST-AUDIT-THERMAL` (`IMG261029161459.bmp` – `IMG261029161752.bmp` and `internal_thermal_note.md`) where the ES8311 codec (`U10`) entered low-power sleep after Cold Boot (`28.5°C` $
+ightarrow$ `26.2°C` floor) but remained awake at `30.2°C–32.1°C` after a tactile button wake's 30-second inactivity timeout and across subsequent Flow B cycles.
+  * **Root Cause 1 (CSM Reset `0x00 = 0x1F` Reverting `Reg 0x0D` to `0xFA`):** Cross-referencing `s_es8311_deinit[]` against the official Espressif reference driver (`_3rd_party_ref_codec/es8311.c:222-240`, `es8311_suspend()`) revealed that when `REG00` is `0x80` (`CSM_ON = 1`), writing `{0x0D, 0xFC}` *before* `{0x00, 0x1F}` causes the internal Chip State Machine (`CSM`) reset transition (`0x00 = 0x1F`, `RST_DIG = 1`) to revert `Reg 0x0D` back to its pre-charge state (`0xFA`: `PDN_VREF = 0`, `VMIDSEL = 10b` active VMID reference). `s_es8311_deinit[]` now strictly follows `es8311_suspend()`: it writes `{0x0D, 0xFA}`, executes the CSM reset and clock gating handshake (`{0x02, 0x10}` $
+ightarrow$ `{0x00, 0x00}` $
+ightarrow$ `{0x00, 0x1F}` $
+ightarrow$ `{0x01, 0x30}` $
+ightarrow$ `{0x01, 0x00}`), and writes `{0x45, 0x03}`, **`{0x0D, 0xFC}`**, and `{0x02, 0x00}` **after** `{0x00, 0x1F}` and `{0x01, 0x00}`, holds `MCLK` for `2 ms`, and then disables `s_tx_chan`.
   * **Root Cause 2 (Unattended Flow B Bypass & Unclocked Re-Init Elimination):** Removed the I2C readback re-init trigger in `sub_audio_standby()` on unattended Flow B wakes (`!s_audio_inited && s_rtc_codec_in_standby && esp_reset_reason() == ESP_RST_DEEPSLEEP`). When `Reg 0x0D` reverted to `0xFA` in `v2.4.6-dev`, `sub_audio_standby()` attempted to re-write `s_es8311_deinit[]` on every unattended Flow B wake while `s_tx_chan == NULL` (no `MCLK`). Unattended Flow B wakes now completely bypass both `sub_audio_init()` and `sub_audio_standby()` I2C traffic, allowing the `<1.0 µA` codec sleep state to persist undisturbed across all sleep cycles (`internal_thermal_note.md` Item B).
   * **Default Low-Power Mode & Unused Microphone Power-Down (`internal_thermal_note.md` Item C):** Verified that `sub_audio_init()` starts the ES8311 in low-power operating mode (`s_low_power_mode = true`, `Reg 0x0F = 0xFF`) with the unused analog/digital microphone path powered off and muted (`Reg 0x0E = 0x62` [`PDN_PGA = 1, PDN_MOD = 1`], `Reg 0x14 = 0x00` [`LINSEL = 0, DMIC_ON = 0, PGAGAIN = 0`], `Reg 0x17 = 0x00`, `Reg 0x0A = 0x4C` [`SDPOUT_MUTE = 1`]).
 * **Elimination of `50 ms` Button Chirp & Cold Boot Chime Acoustic Truncation (`ERR-S8` / `S0`)** (`sub_audio.c`):
   * Resolved the objective audio truncation reported in `internal_thermal_note.md` where `50 ms` tactile button chirps (`1046 Hz`) were cut off mid-tone and the first note (`523 Hz, 70 ms`) of the Cold Boot chime was clipped at the start.
   * **Root Cause 1 (`64 ms` I2S DMA Ring Buffer vs. `50 ms` Chirp & Premature `PA_CTRL` Shutdown):** The I2S TX channel uses `4` DMA descriptors of `256` samples each (`1024 samples = 64 ms` at `16 kHz`). A `50 ms` chirp (`800 samples`) is copied into the empty DMA descriptors in `< 1 ms`. In `v2.4.6-dev`, `sub_audio_flush_frame()` queued only `1` silent frame (`16 ms`) + `20 ms` delay (`36 ms` total drain) before `audio_worker_task()` called `sub_audio_standby()`, which pulled `PA_CTRL` (`GPIO 46`) LOW after only `~36 ms` and severed the final `14–30 ms` of every `50 ms` chirp still in the DMA buffer.
   * **Root Cause 2 (On-Demand Cold-Start VMID Ramp Latency):** Waking the codec from `0x0D = 0xFC` (`VMID = 0V`) inside `sub_audio_prepare_and_unmute()` using `{0x0D, 0x31}` (`VMIDSEL = 1` slow normal-speed charge on `C114 = 1 µF`) without `{0x44, 0x58}` or `sub_audio_wait_until_ready()` clipped the leading edge of the `70 ms` first note of `H1OS_CHIME_BOOT`.
-  * **Fix 1 (Session-Scoped Warm Readiness):** `sub_audio_init()` now configures `s_es8311_init_pre_charge` (including `{0x44, 0x58}` internal reference routing) and `s_es8311_init_post_charge` (`{0x0D, 0x01}` fast VMID reference enable and `{0x37, 0x08}` `DAC_RAMPRATE = 0` soft-start ramp OFF, `DAC_EQBYPASS = 1`), waits for `sub_audio_wait_until_ready(100)` (`CSM != S0`), sets the perceptual volume (`Reg 0x32`), and enables the NS4150B Class-D amplifier (`PA_CTRL = 1`, `120 ms` turn-on delay) *before* returning from `sub_audio_init()`. Removed the per-tone `sub_audio_standby()` call from `audio_worker_task()` so the codec and amplifier stay warm for zero-latency chirps during the 30-second interactive session and enter `<1.0 µA` standby when the 30-second session expires (`orch_flow_quiesce_peripherals()` $ightarrow$ `sub_audio_standby()`).
+  * **Fix 1 (Session-Scoped Warm Readiness):** `sub_audio_init()` now configures `s_es8311_init_pre_charge` (including `{0x44, 0x58}` internal reference routing) and `s_es8311_init_post_charge` (`{0x0D, 0x01}` fast VMID reference enable and `{0x37, 0x08}` `DAC_RAMPRATE = 0` soft-start ramp OFF, `DAC_EQBYPASS = 1`), waits for `sub_audio_wait_until_ready(100)` (`CSM != S0`), sets the perceptual volume (`Reg 0x32`), and enables the NS4150B Class-D amplifier (`PA_CTRL = 1`, `120 ms` turn-on delay) *before* returning from `sub_audio_init()`. Removed the per-tone `sub_audio_standby()` call from `audio_worker_task()` so the codec and amplifier stay warm for zero-latency chirps during the 30-second interactive session and enter `<1.0 µA` standby when the 30-second session expires (`orch_flow_quiesce_peripherals()` $
+ightarrow$ `sub_audio_standby()`).
   * **Fix 2 (Full 4-Descriptor `64 ms` I2S DMA Drain):** Updated `sub_audio_flush_frame()` to write `SUB_AUDIO_DMA_DESC_NUM` (`4`) zero-filled `256-sample` frames (`1024 samples = 64 ms`) through `i2s_channel_write()` followed by a `20 ms` serializer drain delay, guaranteeing that 100% of all queued tone samples physically exit the I2S peripheral and DAC interpolator before playback completes or `sub_audio_standby()` is called on sleep entry.
 
 ### 📄 Documentation & Qualification Archives
@@ -269,7 +296,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Replaced defensive ternary fallbacks in `orch_flow_execute_sleep()` and `sub_power_init_ulp()` with strict boundary validation that logs errors and fails fast (`ESP_ERR_INVALID_STATE` / `ESP_ERR_INVALID_ARG`) if unconfigured (`0`) flow intervals are passed.
   * Simplified `orch_state_reset()` to strict memory zeroing retaining only the `ORCH_RTC_MAGIC` word and `H1OS_TSENS_DEFAULT_INTERCEPT_CENTI_C`.
 * **Elapsed-Time Autonomy NVS Wear Gating** (`sub_power.c`, `orch_state.h`):
-  * Replaced cycle-modulo NVS commits (`wake_count % 12`) with monotonic elapsed deep-sleep tracking via `st->last_nvs_commit_sec`. Commits to NVS only execute after at least `H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` (3600 seconds) of sleep have elapsed, rendering wear-leveling independent of custom user flow cadences.
+  * Replaced cycle-modulo NVS commits (`wake_count % 12`) with monotonic elapsed deep-sleep tracking via `st->last_nvs_commit_sec`. Commits to NVS only execute after at least `H1OS_NVS_AUTONOMY_COMMIT_INTERVAL_SEC` (3600 seconds) of sleep have elapsed, rendering wear-leveling independent of custom user flow intervals.
 * **Dead Macro Elimination & Constant Linting** (`orch_state.h`):
   * Removed unreferenced legacy macros `ORCH_DEFAULT_FLOW_A_PERIOD_SEC` and `ORCH_DEFAULT_FLOW_B_PERIOD_SEC` following the elimination of runtime ternary fallbacks.
 * **Codebase Literal Integer Extraction & 3-Degree Risk Classifier** (`tools/scan_hardcoded_integers.py`, `tools/audit_literals_degrees.py`, `docs/agent_notes/audits/literal_integers_degree_audit.md`):
@@ -825,7 +852,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🛠️ Fixed & Refactored
 
-* **Deterministic Two-Flow Cadence & Sleep Freeze Remediation** ([bsp_power.c](https://www.google.com/search?q=components/esp32-s3_bsp/src/bsp_power.c), [bsp_common.c](https://www.google.com/search?q=components/esp32-s3_bsp/src/bsp_common.c)):
+* **Deterministic Two-Flow Timing & Sleep Freeze Remediation** ([bsp_power.c](https://www.google.com/search?q=components/esp32-s3_bsp/src/bsp_power.c), [bsp_common.c](https://www.google.com/search?q=components/esp32-s3_bsp/src/bsp_common.c)):
 
   * **Eliminated Unbounded Button Release Loop**: Fixed the 5-minute device hang where `bsp_enter_sleep()` executed an unbounded `while (gpio_get_level(BOOT) == 0 || gpio_get_level(POWER) == 0)` loop on headless sprints without configured digital input buffers. Bypassed button checking completely for Flow A (`BSP_INIT_MODE_MINIMAL`) and bounded Flow B checking to a hard 200 ms timeout (max 4 iterations $\times$ 50 ms).
 

@@ -3772,7 +3772,7 @@ Defined in h1os/h1os.h:295
 
 Dynamically configure Flow A and Flow B sleep intervals at runtime.
 
-Enforces all silicon constraints, ordering invariants, and remainder slice floors. Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown timer with the new Flow A cadence.
+Enforces all silicon constraints, ordering invariants, and remainder slice floors. Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown timer with the new Flow A period.
 
 #### Returns
 
@@ -12971,7 +12971,7 @@ Defined in h1os_lifecycle.c:809
 
 Dynamically configure Flow A and Flow B sleep intervals at runtime.
 
-Enforces all silicon constraints, ordering invariants, and remainder slice floors. Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown timer with the new Flow A cadence.
+Enforces all silicon constraints, ordering invariants, and remainder slice floors. Updates active RTC Slow Memory state and immediately arms the hardware RTC countdown timer with the new Flow A period.
 
 #### Returns
 

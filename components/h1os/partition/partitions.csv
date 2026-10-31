@@ -1,4 +1,4 @@
-# ESP32-S3 8MB Flash Custom Dual-Slot OTA Partition Table
+# ESP32-S3 8MB Flash Dual-Slot OTA Partition Table
 # Name,     Type, SubType, Offset, Size,     Flags
 nvs,        data, nvs,           , 0x14000,
 otadata,    data, ota,           , 0x2000,

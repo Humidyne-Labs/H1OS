@@ -9,44 +9,21 @@
     {
       "name": "dev",
       "displayName": "Development Profile",
-      "description": "Builds using the dev configuration into build_dev/",
+      "description": "Debug symbols and development configurations (build_dev)",
       "generator": "Ninja",
       "binaryDir": "build_dev",
-      "environment": {
-        "IDF_PATH": "C:/esp/v6.1/esp-idf"
-      },
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.dev"
-      },
-      "vendor": {
-        "espressif/vscode-esp-idf": {
-          "schemaVersion": 1,
-          "settings": [
-            {
-              "type": "openOCD",
-              "value": {
-                "debugLevel": 2,
-                "configs": [
-                  "board/esp32s3-builtin.cfg"
-                ],
-                "args": []
-              }
-            }
-          ]
-        }
       }
     },
     {
       "name": "prod",
       "displayName": "Production Profile",
-      "description": "Builds using the prod configuration into build_prod/",
+      "description": "Size-optimized production release profile (build_prod)",
       "generator": "Ninja",
       "binaryDir": "build_prod",
-      "environment": {
-        "IDF_PATH": "C:/esp/v6.1/esp-idf"
-      },
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
@@ -56,12 +33,9 @@
     {
       "name": "ci",
       "displayName": "CI Profile",
-      "description": "Builds using the ci configuration into build_ci/",
+      "description": "Continuous Integration headless profile (build_ci)",
       "generator": "Ninja",
       "binaryDir": "build_ci",
-      "environment": {
-        "IDF_PATH": "C:/esp/v6.1/esp-idf"
-      },
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,

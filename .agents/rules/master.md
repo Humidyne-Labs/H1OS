@@ -43,7 +43,7 @@ Proactively spawn subagents using `invoke_subagent` whenever:
 
 ## 4. Compiler Diagnostics & Two-Strike Resolution Protocol
 
-* **Verification Mandate:** Never declare success without compilation verification via the canonical profile command (`C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`) inside `examples/public`. Keep `.h` declarations and `.c`/`.cpp` definitions atomically synchronized.
+* **Verification Mandate:** Never declare success without compilation verification via the canonical profile command (C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1) inside examples/H1OS. If CMakePresets.json exists, always pass both -B and --preset (e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build). Keep .h declarations and .c/.cpp definitions atomically synchronized.
 * **Two-Strike Protocol:**
   1. If compilation fails, isolate the exact diagnostic line from compiler output.
   2. Propose exactly one targeted syntactic or signature fix.

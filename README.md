@@ -195,10 +195,10 @@ Build and flash using ESP-IDF v6.1 and Ninja:
 cd examples/H1OS
 
 # Build
-idf.py -B build_dev build
+idf.py -B build_dev --preset dev build
 
 # Flash and Monitor
-idf.py -B build_dev -p COMx flash monitor
+idf.py -B build_dev --preset dev -p COMx flash monitor
 
 ```
 
