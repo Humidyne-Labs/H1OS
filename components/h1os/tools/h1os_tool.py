@@ -653,11 +653,12 @@ def spawn_serial_monitor(
         profile_script = r"C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"
         bat_file = config.app_root / "run_monitor.bat"
 
+        # 1. Write standalone launcher script so user can also double-click or run from CLI
         bat_lines = [
             "@echo off\r\n",
             "title H1OS Serial Monitor\r\n",
             "cd /d \"%~dp0\"\r\n",
-            "powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
+            "start \"H1OS Serial Monitor\" powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
             f'"& {{ '
             f'if (Test-Path \'{profile_script}\') {{ . \'{profile_script}\' }}; '
             f'Write-Host \'[H1OS] Serial Monitor Active on {eff_port or "auto-detect"} (baud {eff_baud})\' -ForegroundColor Cyan; '
@@ -668,14 +669,22 @@ def spawn_serial_monitor(
         ]
         bat_file.write_text("".join(bat_lines), encoding="utf-8")
 
-        try:
-            if hasattr(os, "startfile"):
-                os.startfile(str(bat_file))
-                return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} via {bat_file.name}."
+        # 2. Directly spawn dedicated console window via cmd.exe start + CREATE_NEW_CONSOLE
+        ps_cmd = (
+            f"& {{ "
+            f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
+            f"Set-Location '{config.app_root}'; "
+            f"Write-Host '[H1OS] Serial Monitor Active on {eff_port or 'auto-detect'} (baud {eff_baud})' -ForegroundColor Cyan; "
+            f"Write-Host '[H1OS] Press Ctrl+] to disconnect monitor session.' -ForegroundColor Gray; "
+            f"Write-Host ''; "
+            f"idf.py {args_str} "
+            f"}}"
+        )
 
+        try:
             subprocess.Popen(
-                ["cmd.exe", "/c", "start", "H1OS Serial Monitor", str(bat_file)],
-                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+                ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
         except Exception as e:
