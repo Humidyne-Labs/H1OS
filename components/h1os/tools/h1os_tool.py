@@ -193,6 +193,8 @@ class H1OSConfig:
         except Exception:
             print(f"\n[ERROR] Mandatory setting 'baud' missing or invalid under [target] in {self.ini_path}.", file=sys.stderr)
             sys.exit(1)
+        conf_log_dir = self.parser.get("target", "log_dir", fallback="").strip()
+        self.log_dir = (self.app_root / conf_log_dir).resolve() if conf_log_dir else None
 
         # 5. Validate & Resolve Partitions Table (No guessing)
         part_conf = (
@@ -667,7 +669,12 @@ def spawn_serial_monitor(
 
     eff_baud = baud or config.baud or 115200
     eff_chip = config.chip or "esp32s3"
-    target_log_dir = prof.audit_log_dir if prof else (config.app_root / "build_prod" / "logs")
+    if config.log_dir:
+        target_log_dir = config.log_dir
+    elif prof and prof.audit_log_dir:
+        target_log_dir = prof.audit_log_dir
+    else:
+        target_log_dir = (config.app_root / "build_prod" / "logs").resolve()
 
     py_exe = get_idf_python_exe()
 
