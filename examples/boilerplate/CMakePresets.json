@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development Profile",
+      "description": "Debug symbols and development configurations (build_dev)",
+      "generator": "Ninja",
+      "binaryDir": "build_dev",
+      "cacheVariables": {
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG": "${sourceDir}/build_dev/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.dev"
+      }
+    },
+    {
+      "name": "prod",
+      "displayName": "Production Profile",
+      "description": "Size-optimized production release profile (build_prod)",
+      "generator": "Ninja",
+      "binaryDir": "build_prod",
+      "cacheVariables": {
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG": "${sourceDir}/build_prod/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.prod"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI Profile",
+      "description": "Continuous Integration headless profile (build_ci)",
+      "generator": "Ninja",
+      "binaryDir": "build_ci",
+      "cacheVariables": {
+        "IDF_TARGET": "esp32s3",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "SDKCONFIG": "${sourceDir}/build_ci/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.ci"
+      }
+    }
+  ]
+}
