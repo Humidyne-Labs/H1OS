@@ -128,6 +128,22 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
         res = subprocess.run(cmd)
         sys.exit(res.returncode)
 
+    # 9. h1os_clean: Clean build directory without rebuilding
+    def callback_clean(action: str, ctx: Any, global_args: Any, **action_args: Any) -> None:
+        cmd = [sys.executable, str(tool_script), "-C", project_path, "clean"]
+        if action_args.get("all"):
+            cmd.append("--all")
+        elif action_args.get("profile"):
+            cmd.extend(["-P", action_args["profile"]])
+        else:
+            b_dir = getattr(global_args, "build_dir", None)
+            if b_dir:
+                cmd.extend(["-B", str(b_dir)])
+            else:
+                cmd.append("--all")
+        res = subprocess.run(cmd)
+        sys.exit(res.returncode)
+
     pack_options = [
         {
             "names": ["--no-zip"],
@@ -186,6 +202,24 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
             "short_help": "Erase target SPI flash die using esptool.",
             "help": "Scrub entire target flash die to 0xFF using esptool erase-flash.",
             "aliases": ["erase-chip"],
+        },
+        "h1os_clean": {
+            "callback": callback_clean,
+            "options": [
+                {
+                    "names": ["-P", "--profile"],
+                    "help": "Target build profile to clean",
+                },
+                {
+                    "names": ["--all"],
+                    "is_flag": True,
+                    "default": False,
+                    "help": "Clean all configured build directories and dependencies",
+                },
+            ],
+            "short_help": "Erase target build directory without rebuilding.",
+            "help": "Clean profile build directory or all build artifacts and dependencies without rebuilding.",
+            "aliases": ["clean-profile", "h1os-clean"],
         },
         "h1os_part": {
             "callback": callback_part,

@@ -32,6 +32,7 @@ except ImportError:
 from h1os_tool import (
     H1OSConfig,
     run_build,
+    run_clean,
     run_erase,
     run_flash,
     run_pack,
@@ -276,6 +277,13 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
         })
         menu_items.append({
             "key": next_key(),
+            "label": "Clean Build Directory",
+            "target": target_label,
+            "engine": "rmtree",
+            "action": "clean",
+        })
+        menu_items.append({
+            "key": next_key(),
             "label": "Clean & Full Rebuild",
             "target": target_label,
             "engine": "nuke & rebuild",
@@ -321,6 +329,13 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
             "target": target_dir,
             "engine": "idf.py reconfigure",
             "action": f"reconfig:{single_name}",
+        })
+        menu_items.append({
+            "key": next_key(),
+            "label": f"Clean {single_name.upper()} Build Directory",
+            "target": target_dir,
+            "engine": "rmtree",
+            "action": f"clean:{single_name}",
         })
         menu_items.append({
             "key": next_key(),
@@ -461,6 +476,8 @@ def run_profile_selection_menu(
     console: Optional["Console"],
     title: str = "Select Build Profile",
     subtitle: str = "Choose an auto-populated profile to execute",
+    allow_all: bool = False,
+    all_label: str = "All Profiles & Dependencies",
 ) -> Optional[str]:
     """Interactive pop-up sub-menu to select an auto-populated build profile."""
     prof_list = list(config.profiles.values())
@@ -480,6 +497,16 @@ def run_profile_selection_menu(
             "status": status,
         })
 
+    if allow_all:
+        items.append({
+            "key": "A",
+            "profile": "__ALL__",
+            "label": all_label,
+            "target": "build_*/deps",
+            "preset": "-",
+            "status": "-",
+        })
+
     # Plain fallback if rich is absent or non-interactive
     if not console or not sys.stdin.isatty():
         print(f"\n--- {title} ---")
@@ -490,7 +517,7 @@ def run_profile_selection_menu(
         print("  [B] Back to Main Menu")
         print("-" * 60)
         try:
-            choice = input(f"Select profile [1-{len(items)}, B=Back, Enter=1]: ").strip().upper()
+            choice = input(f"Select option [1-{len(prof_list)}, B=Back, Enter=1]: ").strip().upper()
         except (KeyboardInterrupt, EOFError):
             return None
 
@@ -635,6 +662,32 @@ def main():
         elif action.startswith("reconfig:"):
             prof = action.split(":", 1)[1]
             run_build(config, profile=prof, clean=False, reconfig_only=True)
+
+        elif action == "clean":
+            sel_prof = run_profile_selection_menu(
+                config,
+                console,
+                title="Clean Build Directory",
+                subtitle="Select a profile to erase its build directory (without rebuilding)",
+                allow_all=True,
+                all_label="Clean All Profiles & Dependencies",
+            )
+            if sel_prof == "__ALL__":
+                run_clean(config, clean_all=True)
+            elif sel_prof:
+                run_clean(config, profile=sel_prof)
+            else:
+                if console:
+                    console.print("[dim]Clean cancelled.[/]")
+                else:
+                    print("Clean cancelled.")
+
+        elif action.startswith("clean:"):
+            prof = action.split(":", 1)[1]
+            if prof.upper() in ("__ALL__", "ALL"):
+                run_clean(config, clean_all=True)
+            else:
+                run_clean(config, profile=prof)
 
         elif action == "clean_rebuild":
             sel_prof = run_profile_selection_menu(

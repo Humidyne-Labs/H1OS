@@ -553,6 +553,52 @@ def run_build(
     return res.returncode
 
 
+def run_clean(
+    config: H1OSConfig,
+    profile: Optional[str] = None,
+    build_dir: Optional[str] = None,
+    clean_all: bool = False,
+) -> int:
+    """Erase target build directory, dependencies, or all profiles without rebuilding."""
+    import shutil
+
+    if clean_all:
+        print("\n[*] Executing Clean on ALL configured profiles and dependencies...")
+        for prof in config.profiles.values():
+            if prof.build_dir.exists():
+                shutil.rmtree(str(prof.build_dir), ignore_errors=True)
+                print(f"    [+] Erased build directory: {prof.build_dir}")
+        dep_lock = config.app_root / "dependencies.lock"
+        if dep_lock.is_file():
+            dep_lock.unlink()
+            print(f"    [+] Erased: {dep_lock}")
+        mg_comp = config.app_root / "managed_components"
+        if mg_comp.is_dir():
+            shutil.rmtree(str(mg_comp), ignore_errors=True)
+            print(f"    [+] Erased: {mg_comp}")
+        print("[+] Clean All complete.\n")
+        return 0
+
+    prof = config.resolve_profile(profile, build_dir)
+    if build_dir:
+        b_dir = Path(build_dir).resolve()
+    elif prof:
+        b_dir = prof.build_dir
+    else:
+        print("[ERROR] No build directory or profile configured or provided.", file=sys.stderr)
+        return 1
+
+    print(f"\n[*] Executing Clean on: {b_dir}")
+    if b_dir.exists():
+        shutil.rmtree(str(b_dir), ignore_errors=True)
+        print(f"    [+] Erased build directory: {b_dir}")
+    else:
+        print(f"    [*] Directory already clean (does not exist): {b_dir}")
+
+    print(f"[+] Clean complete for '{prof.name if prof else b_dir.name}'.\n")
+    return 0
+
+
 def run_menu(config: H1OSConfig) -> int:
     """Launch interactive Rich developer tooling console."""
     menu_script = config.comp_dir / "tools" / "menu" / "h1os_menu.py"
@@ -610,6 +656,12 @@ def main():
     reconf_p.add_argument("-B", "--build-dir", dest="build_dir", default=None, help="Explicit build directory")
     reconf_p.add_argument("--preset", dest="preset", default=None, help="CMake preset to reconfigure")
 
+    # clean subcommand (isolated clean without rebuilding)
+    clean_p = subparsers.add_parser("clean", help="Erase target build directory without rebuilding")
+    clean_p.add_argument("-P", "--profile", dest="profile", default=None, help="Target build profile (defined in h1os.ini)")
+    clean_p.add_argument("-B", "--build-dir", dest="build_dir", default=None, help="Explicit build directory")
+    clean_p.add_argument("--all", action="store_true", default=False, help="Clean all configured build directories and dependencies")
+
     # flash subcommand
     flash_p = subparsers.add_parser("flash", help="Flash firmware binaries to hardware via esptool")
     flash_p.add_argument("-P", "--profile", dest="profile", default=None, help="Target build profile (defined in h1os.ini)")
@@ -652,6 +704,8 @@ def main():
         sys.exit(run_build(config, profile=args.profile, build_dir=args.build_dir, preset=args.preset, clean=args.clean, reconfig_only=False))
     elif args.command == "reconfigure":
         sys.exit(run_build(config, profile=args.profile, build_dir=args.build_dir, preset=args.preset, clean=False, reconfig_only=True))
+    elif args.command == "clean":
+        sys.exit(run_clean(config, profile=args.profile, build_dir=args.build_dir, clean_all=args.all))
     elif args.command == "flash":
         sys.exit(run_flash(config, profile=args.profile, build_dir=args.build_dir, port=args.port, baud=args.baud, chip=args.chip))
     elif args.command == "erase":
