@@ -658,7 +658,7 @@ def spawn_serial_monitor(
             "@echo off\r\n",
             "title H1OS Serial Monitor\r\n",
             "cd /d \"%~dp0\"\r\n",
-            "start \"H1OS Serial Monitor\" powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
+            "start \"H1OS Serial Monitor\" conhost.exe powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
             f'"& {{ '
             f'if (Test-Path \'{profile_script}\') {{ . \'{profile_script}\' }}; '
             f'Write-Host \'[H1OS] Serial Monitor Active on {eff_port or "auto-detect"} (baud {eff_baud})\' -ForegroundColor Cyan; '
@@ -669,7 +669,7 @@ def spawn_serial_monitor(
         ]
         bat_file.write_text("".join(bat_lines), encoding="utf-8")
 
-        # 2. Directly spawn dedicated console window via cmd.exe start + CREATE_NEW_CONSOLE
+        # 2. Directly spawn dedicated console window via conhost.exe (bypasses Windows Terminal swallowing)
         ps_cmd = (
             f"& {{ "
             f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
@@ -683,12 +683,19 @@ def spawn_serial_monitor(
 
         try:
             subprocess.Popen(
-                ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                ["conhost.exe", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
-        except Exception as e:
-            return False, f"Failed to spawn external monitor window: {e}"
+        except Exception:
+            try:
+                subprocess.Popen(
+                    ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                )
+                return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
+            except Exception as e:
+                return False, f"Failed to spawn external monitor window: {e}"
 
     elif sys.platform == "darwin":
         args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
