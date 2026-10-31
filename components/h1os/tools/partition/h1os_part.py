@@ -228,19 +228,20 @@ def render_partition_bar(
     pct_unalloc = (unallocated / flash_size_bytes) * 100.0
 
     bar_items = []
-    # Add bootloader & partition table block
-    bar_items.append("[BOOT+PART: 36KB]")
+    # Add bootloader & partition table block with non-breaking spaces
+    bar_items.append("[BOOT+PART:\u00A036KB]")
     for p in partitions:
-        bar_items.append(f"[{p.name.upper()}: {p.formatted_size}]")
+        formatted = p.formatted_size.replace(" ", "\u00A0")
+        bar_items.append(f"[{p.name.upper()}:\u00A0{formatted}]")
     if unallocated > 0:
-        bar_items.append(f"[FREE: {unallocated // 1024} KB]")
+        bar_items.append(f"[FREE:\u00A0{unallocated // 1024}\u00A0KB]")
 
     summary = (
-        f"Flash Die Span: {total_used / (1024*1024):.3f} MB / {flash_size_bytes / (1024*1024):.3f} MB "
-        f"({pct_used:.1f}% Allocated, {pct_unalloc:.1f}% Free)"
+        f"Flash Die Coverage: {total_used / (1024*1024):.3f} MB / {flash_size_bytes / (1024*1024):.3f} MB "
+        f"({pct_used:.1f}% Partitioned, {unallocated // 1024} KB Unallocated)"
     )
 
-    return "".join(bar_items), summary
+    return " ".join(bar_items), summary
 
 
 def render_partition_table_rich(
@@ -299,17 +300,17 @@ def render_partition_table_rich(
     console.print(panel)
 
 
-def render_pct_bar(pct: float, width: int = 10) -> str:
-    """Render a clean bilevel unicode utilization progress bar."""
+def render_pct_bar(pct: float, width: int = 6) -> str:
+    """Render a clean bilevel ASCII utilization progress bar."""
     clamped = max(0.0, min(100.0, pct))
     filled = int(round(width * (clamped / 100.0)))
-    bar = "?" * filled + "?" * (width - filled)
+    bar = "#" * filled + "-" * (width - filled)
     if clamped >= 90.0:
-        return f"[bold red][{bar}] {clamped:.0f}%[/]"
+        return f"[bold red][{bar}][/] {clamped:.0f}%"
     elif clamped >= 75.0:
-        return f"[yellow][{bar}] {clamped:.0f}%[/]"
+        return f"[yellow][{bar}][/] {clamped:.0f}%"
     elif clamped > 0.0:
-        return f"[green][{bar}] {clamped:.0f}%[/]"
+        return f"[green][{bar}][/] {clamped:.0f}%"
     return f"[dim][{bar}] 0%[/]"
 
 
@@ -397,9 +398,11 @@ def run_live_partition_usage_audit(
         print("=" * 78 + "\n")
         return
 
+    term_w = console.width if (console and console.width) else None
+
     table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
+        width=term_w,
         header_style="bold bright_cyan",
         title=(
             f"[bold white]Live Partition Flash Usage & Firmware Audit[/]\n"
@@ -410,24 +413,24 @@ def run_live_partition_usage_audit(
         show_lines=False,
         pad_edge=False,
     )
-    table.add_column("Partition", style="bold white", width=11)
-    table.add_column("Type/Sub", width=11)
-    table.add_column("Installed Payload", width=18)
-    table.add_column("Compile Time", width=15)
-    table.add_column("Used / Capacity", justify="right", width=16)
-    table.add_column("Utilization", width=15)
-    table.add_column("Status", width=16)
+    table.add_column("Partition", style="bold white")
+    table.add_column("Type/Sub")
+    table.add_column("Installed Payload")
+    table.add_column("Compile Time")
+    table.add_column("Used / Cap", justify="right")
+    table.add_column("Util", justify="center")
+    table.add_column("Status")
 
     for p in partitions:
         if not device_online:
             if p.type == "app":
-                bar = render_pct_bar(0.0, width=8)
+                bar = render_pct_bar(0.0)
                 table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline / Unread[/]", "-", f"- / {p.formatted_size}", bar, "[dim]Device Offline[/]")
             elif p.subtype == "ota":
-                bar = render_pct_bar(0.0, width=8)
+                bar = render_pct_bar(0.0)
                 table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline[/]", "-", f"- / {p.formatted_size}", bar, "[dim]Device Offline[/]")
             else:
-                bar = render_pct_bar(100.0, width=8)
+                bar = render_pct_bar(100.0)
                 table.add_row(p.name, f"{p.type}/{p.subtype}", "[cyan]Configured[/]", "-", f"{p.formatted_size} / {p.formatted_size}", bar, "[green]Allocated[/]")
             continue
 
@@ -447,8 +450,8 @@ def run_live_partition_usage_audit(
                         used_bytes = desc.get("payload_size", 0)
 
                     pct = (used_bytes / p.size * 100.0) if used_bytes > 0 else 0.0
-                    bar = render_pct_bar(pct, width=8)
-                    used_str = f"{used_bytes / 1024:.1f} KB / {p.formatted_size}" if used_bytes > 0 else f"Firmware / {p.formatted_size}"
+                    bar = render_pct_bar(pct)
+                    used_str = f"{used_bytes / 1024:.0f} KB / {p.formatted_size}" if used_bytes > 0 else f"Image / {p.formatted_size}"
 
                     slot_num = 0 if "0" in p.subtype else (1 if "1" in p.subtype else -1)
                     if slot_num == ota_info.get("active_slot"):
@@ -460,7 +463,7 @@ def run_live_partition_usage_audit(
                         p.name,
                         f"{p.type}/{p.subtype}",
                         payload_str,
-                        desc.get("compile_time", "-")[:15],
+                        desc.get("compile_time", "-")[:14],
                         used_str,
                         bar,
                         stat,
@@ -469,25 +472,27 @@ def run_live_partition_usage_audit(
                     table.add_row(p.name, f"{p.type}/{p.subtype}", "[yellow]Corrupt Header[/]", "-", f"- / {p.formatted_size}", "-", "[yellow]Invalid Image[/]")
             else:
                 if ok_hdr and all(b == 0xFF for b in hdr_bytes[:256]):
-                    bar = render_pct_bar(0.0, width=8)
+                    bar = render_pct_bar(0.0)
                     table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Unwritten (0%)[/]", "-", f"0 B / {p.formatted_size}", bar, "[dim]Blank / Erased[/]")
                 else:
                     table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline / Unread[/]", "-", f"- / {p.formatted_size}", "-", "[red]Read Failed[/]")
 
         elif p.subtype == "ota":
-            bar = render_pct_bar(100.0, width=8)
-            seq_str = f"{ota_info.get('slot0_seq', '-')[:8]}|{ota_info.get('slot1_seq', '-')[:8]}"
+            bar = render_pct_bar(100.0)
+            s0_val = ota_info.get('slot0_seq', '-')
+            s1_val = ota_info.get('slot1_seq', '-')
+            seq_display = f"S0:{s0_val[:4]} S1:{s1_val[:4]}"
             table.add_row(
                 p.name,
                 f"{p.type}/{p.subtype}",
-                f"[dim]Seq: {seq_str}[/]",
+                f"[dim]{seq_display}[/]",
                 "-",
                 f"{p.formatted_size} / {p.formatted_size}",
                 bar,
                 f"[bold green]Booting ota_{ota_info.get('active_slot', 0)}[/]",
             )
         else:
-            bar = render_pct_bar(100.0, width=8)
+            bar = render_pct_bar(100.0)
             table.add_row(p.name, f"{p.type}/{p.subtype}", "[cyan]Configured[/]", "-", f"{p.formatted_size} / {p.formatted_size}", bar, "[green]Allocated[/]")
 
     console.print(table)
