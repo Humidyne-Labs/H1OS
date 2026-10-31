@@ -150,4 +150,40 @@ All tools are registered as first-class extensions in `idf.py`:
 | **`idf.py h1os_size`** | `size-audit`, `h1os-size` | Deep binary size and partition headroom audit. |
 | **`idf.py h1os_flash`** | `flash-now` | Flashes firmware using `esptool write-flash`. |
 | **`idf.py h1os_erase`** | `erase-chip` | Scrubs full 8 MB flash using `esptool erase-flash`. |
+| **`idf.py h1os_part`** | `part`, `partitions`, `h1os-part` | Flash Partition Manager, memory map, and alignment auditor. |
 | **`idf.py monitor-ts`** | - | Serial monitor with line-by-line timestamps. |
+
+---
+
+## 6. Flash Partition Manager (`h1os_part.py`)
+
+The H1OS Flash Partition Manager operates directly from the interactive console (`h1os_menu.py` option `[P]`) or via command-line:
+
+```powershell
+# Display visual partition memory map and physical flash die allocation bar
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --map
+# or via idf.py:
+idf.py h1os_part --map
+
+# Audit 4KB sector alignment, 64KB MMU app alignment, and zero overlaps
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --audit
+
+# Query OTA state machine and active boot slot
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --ota-info
+
+# Switch active OTA boot slot
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --ota-switch 1
+
+# Erase a specific partition (e.g. nvs, epd_frame, storage, otadata)
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --erase nvs
+
+# Dump a partition in canonical formatted hex log, raw binary, or console view
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --dump nvs --format hex
+python components/h1os/tools/partition/h1os_part.py -C examples/H1OS --dump epd_frame --format bin
+```
+
+### Key Features:
+* **Zero Hardcoded Partitions**: All partitions are dynamically auto-discovered from `partitions.csv` (or retrieved live from connected hardware).
+* **Dual-Format Dumps & Live Inspector**: Export raw binary byte streams (`.bin`), canonical 16-byte formatted hex logs (`.hex`), or browse an interactive, paginated terminal hex viewer directly inside the console.
+* **Granular Erase Safety**: Prompts for confirmation and displays exact offsets and capacities before issuing `parttool.py erase_partition`.
+* **OTA A/B Slot Switching**: Rapidly toggle active boot slots between `ota_0` and `ota_1` via `otatool.py` to validate firmware regressions.

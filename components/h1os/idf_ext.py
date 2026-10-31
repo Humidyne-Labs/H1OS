@@ -40,6 +40,7 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
     comp_dir = find_h1os_comp_dir(project_path, __file__)
     tool_script = comp_dir / "tools" / "h1os_tool.py"
     menu_script = comp_dir / "tools" / "menu" / "h1os_menu.py"
+    part_script = comp_dir / "tools" / "partition" / "h1os_part.py"
 
     # Capture native monitor without modifying base_actions
     orig_monitor = base_actions.get("actions", {}).get("monitor", {})
@@ -115,6 +116,18 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
         res = subprocess.run(cmd)
         sys.exit(res.returncode)
 
+    # 8. h1os_part: Interactive Flash Partition Manager
+    def callback_part(action: str, ctx: Any, global_args: Any, **action_args: Any) -> None:
+        cmd = [sys.executable, str(part_script), "-C", project_path]
+        if action_args.get("map"):
+            cmd.append("--map")
+        if action_args.get("audit"):
+            cmd.append("--audit")
+        if action_args.get("ota_info"):
+            cmd.append("--ota-info")
+        res = subprocess.run(cmd)
+        sys.exit(res.returncode)
+
     pack_options = [
         {
             "names": ["--no-zip"],
@@ -173,6 +186,32 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
             "short_help": "Erase target SPI flash die using esptool.",
             "help": "Scrub entire target flash die to 0xFF using esptool erase-flash.",
             "aliases": ["erase-chip"],
+        },
+        "h1os_part": {
+            "callback": callback_part,
+            "options": [
+                {
+                    "names": ["--map"],
+                    "is_flag": True,
+                    "default": False,
+                    "help": "Display physical flash partition map and allocation table",
+                },
+                {
+                    "names": ["--audit"],
+                    "is_flag": True,
+                    "default": False,
+                    "help": "Audit 4KB sector and 64KB MMU alignment invariants",
+                },
+                {
+                    "names": ["--ota-info"],
+                    "is_flag": True,
+                    "default": False,
+                    "help": "Query otadata state machine and active boot slot",
+                },
+            ],
+            "short_help": "Run H1OS Flash Partition Manager and memory map inspector.",
+            "help": "Interactive partition manager for viewing memory map, dumping, erasing, and switching OTA slots.",
+            "aliases": ["part", "partitions", "h1os-part"],
         },
         "monitor-ts": {
             "callback": callback_monitor_ts,

@@ -37,6 +37,7 @@ from h1os_tool import (
     run_pack,
     run_size,
 )
+from partition.h1os_part import run_partition_manager_menu
 
 TERM_WIDTH = 78
 
@@ -326,7 +327,15 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
             "action": f"flash:{single_name}",
         })
 
-    # Hardware maintenance & Exit
+    # Hardware maintenance & Partition Management
+    part_target = config.partition_file.name if config.partition_file else "partitions.csv"
+    menu_items.append({
+        "key": "P",
+        "label": "Flash Partition Manager",
+        "target": part_target,
+        "engine": "parttool/otatool",
+        "action": "partition_menu",
+    })
     menu_items.append({
         "key": "E",
         "label": "Erase Entire Flash Die",
@@ -650,6 +659,9 @@ def main():
         elif action.startswith("flash:"):
             prof = action.split(":", 1)[1]
             run_flash(config, profile=prof)
+
+        elif action == "partition_menu":
+            run_partition_manager_menu(config, console)
 
         elif action == "erase":
             confirmed = False
