@@ -613,6 +613,31 @@ def run_clean(
     return 0
 
 
+def auto_detect_serial_port() -> Optional[str]:
+    """Auto-detect connected ESP or active serial port without resetting target."""
+    try:
+        import serial.tools.list_ports
+        ports = list(serial.tools.list_ports.comports())
+        if not ports:
+            return None
+        # Prioritize Espressif USB-JTAG / USB CDC / UART bridges
+        for p in ports:
+            desc = (p.description or "").lower()
+            hwid = (p.hwid or "").lower()
+            mfg = (p.manufacturer or "").lower()
+            if "303a" in hwid or "espressif" in desc or "espressif" in mfg:
+                return p.device
+            if any(k in desc or k in hwid for k in ("jtag", "usb serial", "uart", "ch340", "cp210", "ftdi")):
+                return p.device
+        # Exclude legacy motherboard COM1 if other ports exist
+        non_com1 = [p.device for p in ports if p.device.upper() != "COM1"]
+        if non_com1:
+            return non_com1[0]
+        return ports[0].device
+    except Exception:
+        return None
+
+
 def spawn_serial_monitor(
     config: H1OSConfig,
     profile: Optional[str] = None,
@@ -631,6 +656,9 @@ def spawn_serial_monitor(
         b_dir = first_prof.build_dir if first_prof else None
 
     eff_port = port or config.port
+    if not eff_port:
+        eff_port = auto_detect_serial_port()
+
     eff_baud = baud or config.baud or 115200
 
     idf_args = []
@@ -645,6 +673,9 @@ def spawn_serial_monitor(
     if eff_baud:
         idf_args.extend(["-b", str(eff_baud)])
     idf_args.append("monitor")
+    idf_args.append("--timestamps")
+    if eff_port:
+        idf_args.append("--no-reset")
 
     app_root_str = str(config.app_root)
     args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
@@ -658,13 +689,23 @@ def spawn_serial_monitor(
             "@echo off\r\n",
             "title H1OS Serial Monitor\r\n",
             "cd /d \"%~dp0\"\r\n",
+            "set ESPTOOL_OPEN_PORT_ATTEMPTS=0\r\n",
             "start \"H1OS Serial Monitor\" conhost.exe powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
             f'"& {{ '
             f'if (Test-Path \'{profile_script}\') {{ . \'{profile_script}\' }}; '
+            f"$env:ESPTOOL_OPEN_PORT_ATTEMPTS = '0'; "
             f'Write-Host \'[H1OS] Serial Monitor Active on {eff_port or "auto-detect"} (baud {eff_baud})\' -ForegroundColor Cyan; '
+            f'Write-Host \'[H1OS] Timestamps: ON | Reset on Connect: OFF | Auto-Reconnect: ON\' -ForegroundColor DarkGray; '
             f'Write-Host \'[H1OS] Press Ctrl+] to disconnect monitor session.\' -ForegroundColor Gray; '
             f'Write-Host \'\'; '
-            f'idf.py {args_str} '
+            f'do {{ '
+            f'idf.py {args_str}; '
+            f'$code = $LASTEXITCODE; '
+            f'if ($code -ne 0) {{ '
+            f'Write-Host \"`n[H1OS] Target sleeping or disconnected (exit code $code). Waiting to reconnect...\" -ForegroundColor Yellow; '
+            f'Start-Sleep -Seconds 1; '
+            f'}} '
+            f'}} while ($code -ne 0) '
             f'}}"\r\n',
         ]
         bat_file.write_text("".join(bat_lines), encoding="utf-8")
@@ -673,11 +714,20 @@ def spawn_serial_monitor(
         ps_cmd = (
             f"& {{ "
             f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
+            f"$env:ESPTOOL_OPEN_PORT_ATTEMPTS = '0'; "
             f"Set-Location '{config.app_root}'; "
             f"Write-Host '[H1OS] Serial Monitor Active on {eff_port or 'auto-detect'} (baud {eff_baud})' -ForegroundColor Cyan; "
+            f"Write-Host '[H1OS] Timestamps: ON | Reset on Connect: OFF | Auto-Reconnect: ON' -ForegroundColor DarkGray; "
             f"Write-Host '[H1OS] Press Ctrl+] to disconnect monitor session.' -ForegroundColor Gray; "
             f"Write-Host ''; "
-            f"idf.py {args_str} "
+            f"do {{ "
+            f"idf.py {args_str}; "
+            f"$code = $LASTEXITCODE; "
+            f"if ($code -ne 0) {{ "
+            f'Write-Host "`n[H1OS] Target sleeping or disconnected (exit code $code). Waiting to reconnect..." -ForegroundColor Yellow; '
+            f"Start-Sleep -Seconds 1; "
+            f"}} "
+            f"}} while ($code -ne 0) "
             f"}}"
         )
 
@@ -699,7 +749,7 @@ def spawn_serial_monitor(
 
     elif sys.platform == "darwin":
         args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
-        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && idf.py {args_str}"'
+        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}"'
         try:
             subprocess.Popen(["osascript", "-e", osa_script])
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in macOS Terminal."
@@ -712,9 +762,9 @@ def spawn_serial_monitor(
             if shutil.which(term):
                 try:
                     if term == "gnome-terminal":
-                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && idf.py {args_str}; exec bash"]
+                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}; exec bash"]
                     else:
-                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && idf.py {args_str}; exec bash'"]
+                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}; exec bash'"]
                     subprocess.Popen(cmd)
                     return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in {term}."
                 except Exception as e:
