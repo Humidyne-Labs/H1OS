@@ -126,6 +126,17 @@ add_dependencies(${COMPONENT_LIB} generate_h1os_fonts)
 target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS})
 
 # -----------------------------------------------------------------------------
+# Wire H1OS Custom 1-BPP Font as LVGL Default Font
+# -----------------------------------------------------------------------------
+idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
+if(TARGET ${lvgl_lib})
+    target_compile_definitions(${lvgl_lib} PUBLIC "LV_FONT_DEFAULT=&h1os_font_montserrat_14_1bpp")
+    target_include_directories(${lvgl_lib} PUBLIC "${GEN_FONT_DIR}")
+    add_dependencies(${lvgl_lib} generate_h1os_fonts)
+endif()
+target_compile_definitions(${COMPONENT_LIB} PUBLIC "LV_FONT_DEFAULT=&h1os_font_montserrat_14_1bpp")
+
+# -----------------------------------------------------------------------------
 # ULP CoProc
 # -----------------------------------------------------------------------------
 
