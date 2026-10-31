@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 H1OS Dedicated Serial Monitor & Telemetry Console (h1os_monitor)
-Version: 1.1.0
+Version: 1.2.0
 License: Apache-2.0
 
-High-performance, zero-dot serial monitor for ESP32-S3 firmware development.
+High-performance, beautifully styled serial monitor for ESP32-S3 firmware development.
 Features:
-- Static pinned header window with independent scrollable terminal region.
-- Zero scrollback pollution during deep sleep (in-place status spinner).
-- Clean ANSI color decoding on console & clean plain-text disk logging (no malformed [0;32m tags).
-- Millisecond-precision timestamps (toggled via 'T', default: OFF).
-- Dual live Rich console display + persistent disk logging (toggled via 'L', default: OFF).
-- Hardware reset on demand (key 'R') using the proven Windows usbser.sys DTR/RTS pulse.
-- Working terminal clear (key 'C').
+- Gorgeous Rich UI with rounded borders and columnar alignment inspired by Rich inspection panels.
+- Intelligent ESP-IDF and LVGL log parser: converts raw tags into colored pills, aligned uptime, and module tags.
+- Zero scrollback pollution during deep sleep (in-place status spinner with elapsed time).
+- 100% millisecond-precision timestamps (toggled via 'T', default: OFF).
+- Dual live Rich console display + pristine ANSI-stripped plain-text disk logging (toggled via 'L', default: OFF).
+- Hardware reset on demand (key 'R') using the proven Windows usbser.sys DTR/RTS sequence.
+- Native console blank on clear (key 'C').
 - Auto-reconnect on deep-sleep wake with zero DTR/RTS glitching.
 """
 
@@ -20,7 +20,6 @@ import argparse
 import datetime
 import os
 import re
-import shutil
 import sys
 import threading
 import time
@@ -36,21 +35,49 @@ except ImportError:
     sys.exit(1)
 
 try:
+    from rich import box
     from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
     from rich.text import Text
 except ImportError:
-    Console = None
-    Text = None
+    print("[ERROR] rich is required. Install via 'pip install rich'.", file=sys.stderr)
+    sys.exit(1)
 
-# Regex to strip ANSI escape sequences for pristine plain-text disk logging
+# Regex to strip ANSI escape codes for clean disk logging
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+# Pattern matchers for ESP-IDF and LVGL logging protocols
+ESP_LOG_RE = re.compile(r"^([EWIDV])\s*\(([0-9]+)\)\s*([a-zA-Z0-9_]+):\s*(.*)$")
+LVGL_LOG_RE = re.compile(r"^\[(Info|Warn|Error|Trace|User)\]\s*\(([0-9.]+,\s*[+\-0-9]+)\)\s*([a-zA-Z0-9_]+):\s*(.*)$")
+
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+# Known H1OS component module colors
+TAG_STYLES = {
+    "h1os_lvgl": "bold bright_cyan",
+    "h1os_demo": "bold cyan",
+    "h1os_lifecycle": "bold magenta",
+    "h1os_main": "bold bright_white",
+    "orch_flow": "bold bright_green",
+    "orch_display_sync": "bold green",
+    "orch_math": "bold green",
+    "sub_display": "bold bright_yellow",
+    "sub_power": "bold yellow",
+    "sub_audio": "bold bright_magenta",
+    "sub_sdcard": "bold blue",
+    "sub_rtc": "bold cyan",
+    "sub_nvs": "bold bright_blue",
+    "hal_io": "bold white",
+    "hal_i2c": "bold white",
+    "main_task": "dim white",
+}
 
 
 def set_rts_with_windows_quirk(port: serial.Serial, state: bool) -> None:
     """Set RTS pin state with the Windows usbser.sys CDC workaround."""
     port.setRTS(state)
-    # Windows usbser.sys only sends SET_CONTROL_LINE_STATE when both lines are touched
+    # Windows usbser.sys only flushes SET_CONTROL_LINE_STATE when both lines are touched
     port.setDTR(port.dtr)
 
 
@@ -99,7 +126,7 @@ def auto_detect_serial_port() -> Optional[str]:
 
 
 class H1OSMonitor:
-    """Zero-dot, dual-stream serial monitor with pinned static header and deep-sleep supervisor."""
+    """Zero-dot, dual-stream serial monitor with beautiful Rich formatting."""
 
     def __init__(
         self,
@@ -123,7 +150,7 @@ class H1OSMonitor:
         self.log_file = None
         self.log_path: Optional[Path] = None
 
-        self.console = Console(highlight=False) if Console else None
+        self.console = Console(highlight=False)
 
         if self.enable_logging:
             self._open_log_file()
@@ -162,30 +189,31 @@ class H1OSMonitor:
         self.enable_logging = not self.enable_logging
         if self.enable_logging:
             self._open_log_file()
-            self._print_notice(f"Logging ENABLED -> {self.log_path.name if self.log_path else 'log'}", style="bold green")
+            self._print_badge("LOGGING", f"Active session recording to [bold white]{self.log_path.name if self.log_path else 'log'}[/]", "green")
         else:
             saved_name = self.log_path.name if self.log_path else "log"
             self._close_log_file()
-            self._print_notice(f"Logging DISABLED (saved: {saved_name})", style="bold yellow")
-        self.render_static_header()
+            self._print_badge("LOGGING", f"Session saved and closed [dim]({saved_name})[/]", "yellow")
+        self._update_window_title()
 
     def toggle_timestamps(self):
         """Toggle millisecond timestamps on/off interactively."""
         self.enable_timestamps = not self.enable_timestamps
-        state_str = "ENABLED" if self.enable_timestamps else "DISABLED"
-        style = "bold green" if self.enable_timestamps else "bold yellow"
-        self._print_notice(f"Timestamps {state_str}", style=style)
-        self.render_static_header()
+        if self.enable_timestamps:
+            self._print_badge("TIMESTAMPS", "Millisecond timestamps enabled [dim]([HH:MM:SS.mmm])[/]", "cyan")
+        else:
+            self._print_badge("TIMESTAMPS", "Timestamps disabled", "yellow")
+        self._update_window_title()
 
     def trigger_hardware_reset(self):
         """Pulse DTR/RTS lines to perform a clean hardware reset on ESP32-S3."""
         if not self.ser or not self.ser.is_open:
-            self._print_notice("Cannot reset: Serial port not open.", style="bold red")
+            self._print_badge("RESET", "Cannot reset: Serial port not open.", "red")
             return
 
         try:
+            self._print_badge("RESET", "Pulsing EN low for 200 ms via DTR/RTS...", "yellow")
             execute_hardware_reset(self.ser, hold_delay=0.2, settle_delay=0.2)
-            self._print_notice("Hardware RESET triggered via DTR/RTS pulse.", style="bold yellow")
         except (serial.SerialException, OSError):
             # Native USB-Serial-JTAG drops connection immediately upon reset assertion
             if self.ser:
@@ -194,82 +222,152 @@ class H1OSMonitor:
                 except Exception:
                     pass
             self.ser = None
-            self._print_notice("Hardware RESET triggered (device re-enumerating)...", style="bold yellow")
+            self._print_badge("RESET", "Target reset triggered (device re-enumerating)...", "yellow")
         except Exception as e:
-            self._print_notice(f"Hardware reset failed: {e}", style="bold red")
+            self._print_badge("RESET", f"Hardware reset failed: {e}", "red")
 
-    def _print_notice(self, text: str, style: str = "bold yellow"):
-        """Print an in-band monitor diagnostic notice."""
-        if self.console:
-            self.console.print(f"[{style}][H1OS] {text}[/{style}]")
-        else:
-            print(f"[H1OS] {text}")
+    def _print_badge(self, tag: str, message: str, color: str = "cyan"):
+        """Print a sleek inline badge notice."""
+        t = Text()
+        t.append(f" {tag} ", style=f"bold black on {color}")
+        t.append(" ")
+        t.append_text(Text.from_markup(message))
+        self.console.print(t)
+
+    def _update_window_title(self):
+        """Keep the console window title bar synchronized with live session state."""
+        port_label = self.port or "Auto-detect"
+        ts_state = "ON" if self.enable_timestamps else "OFF"
+        log_state = f"ON ({self.log_path.name})" if (self.enable_logging and self.log_path) else "OFF"
+
+        title_str = (
+            f"H1OS Monitor: {port_label} @ {self.baud} | "
+            f"Chip: {self.chip.upper()} | "
+            f"Time: {ts_state} | "
+            f"Log: {log_state} | "
+            f"[R] Reset [T] Time [L] Log [C] Clear [Q] Quit"
+        )
+        sys.stdout.write(f"\033]0;{title_str}\007")
+        sys.stdout.flush()
+
+    def render_header_panel(self):
+        """Render the primary Rich rounded panel banner."""
+        port_label = self.port or "Auto-detect"
+        ts_badge = "[bold green]ON[/]" if self.enable_timestamps else "[dim]OFF[/]"
+        log_badge = f"[bold green]RECORDING[/] [dim]({self.log_path.name if self.log_path else ''})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
+        status_badge = "[bold green]● ONLINE[/]" if (self.ser and self.ser.is_open) else "[bold yellow]⏳ SLEEPING[/]"
+
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column()
+        grid.add_column()
+        grid.add_column()
+        grid.add_column()
+
+        grid.add_row(
+            status_badge,
+            f"[dim]Port:[/] [bold cyan]{port_label}[/] [dim]@{self.baud}[/]",
+            f"[dim]Chip:[/] [bold bright_white]{self.chip.upper()}[/]",
+            f"[dim]Log:[/] {log_badge}",
+        )
+        grid.add_row(
+            "[dim]Keys:[/] [bold yellow]R[/] [dim]Reset[/]",
+            f"[bold cyan]T[/] [dim]Time[/] ({ts_badge})",
+            f"[bold green]L[/] [dim]Log[/] [dim]({self.log_dir.name}/)[/]",
+            "[bold white]C[/] [dim]Clear[/]  •  [bold red]Q[/] [dim]Quit[/]",
+        )
+
+        p = Panel(
+            grid,
+            title="[bold bright_white]H1OS[/] [bold cyan]Serial Telemetry Console[/]",
+            subtitle=f"[dim]Session UID: {self.session_uid[:8]}[/]",
+            box=box.ROUNDED,
+            border_style="bright_blue",
+            padding=(0, 1),
+        )
+        self.console.print(p)
+        self._update_window_title()
 
     def clear_screen(self):
-        """Perform native console blank and re-lock static header."""
+        """Perform native console blank and redraw the header panel."""
         if os.name == "nt":
             os.system("cls")
         else:
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
-        self.render_static_header()
+        self.render_header_panel()
 
-    def render_static_header(self):
-        """Render a static pinned header on lines 1..3 and set VT100 scroll margin."""
-        cols, lines = shutil.get_terminal_size((80, 24))
-        port_desc = self.port or "Auto-detect"
-        ts_state = "ON" if self.enable_timestamps else "OFF"
-        log_state = f"ON ({self.log_path.name})" if (self.enable_logging and self.log_path) else "OFF"
+    def format_log_line(self, raw_line: str) -> Text:
+        """Parse raw serial line and convert into a styled Rich telemetry entry."""
+        # 1. Strip raw ANSI sequences to extract unpolluted line text
+        clean = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
+        text = Text()
 
-        # Update terminal window title bar
-        title_str = (
-            f"H1OS Monitor: {port_desc} @ {self.baud} | "
-            f"Chip: {self.chip.upper()} | "
-            f"Logging: {log_state} | "
-            f"Timestamps: {ts_state} | "
-            f"[R] Reset [T] Time [L] Log [C] Clear [Q] Quit"
-        )
-        sys.stdout.write(f"\033]0;{title_str}\007")
+        # Optional timestamp prefix
+        if self.enable_timestamps:
+            now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            text.append(f"{now_ms} ", style="dim cyan")
 
-        # Static 3-line header text
-        divider = "─" * min(cols, 100)
-        h1 = f" H1OS Serial Monitor │ Port: {port_desc} @ {self.baud} │ Target: {self.chip.upper()} │ Timestamps: {ts_state} │ Log: {log_state}"
-        h2 = f" Hotkeys: [R] Reset Target │ [T] Timestamps │ [L] Log to File │ [C] Clear │ [Q] Quit │ Log Dir: {self.log_dir.name}"
+        # 2. Match standard ESP-IDF log lines: e.g. "I (5418) h1os_lvgl: Button pressed"
+        m_esp = ESP_LOG_RE.match(clean)
+        if m_esp:
+            lvl, tick, tag, msg = m_esp.groups()
+            badge_text = f" {lvl} "
+            badge_style = {
+                "E": "bold white on red",
+                "W": "bold black on yellow",
+                "I": "bold black on bright_green",
+                "D": "dim cyan",
+                "V": "dim bright_black",
+            }.get(lvl, "dim")
 
-        # Draw pinned lines 1..3
-        sys.stdout.write("\033[s")  # Save cursor
-        sys.stdout.write("\033[1;1H\033[2K")
-        sys.stdout.write(f"\033[1;36m{h1[:cols]}\033[0m\n")
-        sys.stdout.write("\033[2;1H\033[2K")
-        sys.stdout.write(f"\033[0;37m{h2[:cols]}\033[0m\n")
-        sys.stdout.write("\033[3;1H\033[2K")
-        sys.stdout.write(f"\033[0;36m{divider[:cols]}\033[0m\n")
+            text.append(badge_text, style=badge_style)
+            text.append(f" {tick:>5}ms ", style="dim")
 
-        # Configure VT100 scrolling margin from line 4 to bottom
-        sys.stdout.write(f"\033[4;{lines}r")
-        sys.stdout.write("\033[u")  # Restore cursor
-        sys.stdout.flush()
+            tag_style = TAG_STYLES.get(tag, "bold cyan")
+            text.append(f"{tag:<18}", style=tag_style)
+            text.append(": ", style="dim")
 
-    def reset_scroll_region(self):
-        """Restore standard full-screen scrolling region on exit."""
-        sys.stdout.write("\033[r")
-        sys.stdout.flush()
+            # Style numbers, hex, and key metrics in the message body
+            msg_text = self._highlight_metrics(msg)
+            text.append_text(msg_text)
+            return text
 
-    def _format_styled_line(self, raw_line: str) -> Text:
-        """Parse raw serial line, decode ANSI escapes into Rich styles, and add optional timestamp."""
-        clean = raw_line.rstrip("\r\n")
-        styled_body = Text.from_ansi(clean) if Text else clean
+        # 3. Match LVGL log lines: e.g. "[Info] (4.606, +3465) lv_label_create: begin"
+        m_lvgl = LVGL_LOG_RE.match(clean)
+        if m_lvgl:
+            lvl, timing, fn, msg = m_lvgl.groups()
+            text.append(" LVGL ", style="bold black on bright_cyan")
+            text.append(f" {timing:<14} ", style="dim")
+            text.append(f"{fn:<18}", style="dim white")
+            text.append(": ", style="dim")
+            text.append_text(self._highlight_metrics(msg))
+            return text
 
-        if not self.enable_timestamps:
-            return styled_body
+        # 4. Fallback for unformatted system lines (bootloader, psychrometrics, dumps)
+        text.append_text(Text.from_ansi(raw_line.rstrip("\r\n")))
+        return text
 
-        now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        if Text:
-            ts_text = Text()
-            ts_text.append(f"[{now_ms}] ", style="dim cyan")
-            ts_text.append_text(styled_body)
-            return ts_text
-        return f"[{now_ms}] {styled_body}"
+    def _highlight_metrics(self, msg: str) -> Text:
+        """Highlight hex numbers, milliseconds, and measurements in log messages."""
+        t = Text()
+        # Highlight hex (0x..), numbers with units (ms, Hz, %, C), and status codes
+        pattern = re.compile(r"(0x[0-9a-fA-F]+|[0-9.]+\s*(?:ms|Hz|%|C|KB|MB)|ESP_[A-Z_]+)")
+        last_idx = 0
+        for match in pattern.finditer(msg):
+            start, end = match.span()
+            if start > last_idx:
+                t.append(msg[last_idx:start])
+            val = match.group(0)
+            if val.startswith("0x"):
+                t.append(val, style="bold bright_yellow")
+            elif "ESP_" in val:
+                t.append(val, style="bold red" if "TIMEOUT" in val or "FAIL" in val else "bold yellow")
+            else:
+                t.append(val, style="bold cyan")
+            last_idx = end
+        if last_idx < len(msg):
+            t.append(msg[last_idx:])
+        return t
 
     def run(self):
         """Main execution loop supervising serial streaming, deep sleep, and keyboard input."""
@@ -283,114 +381,103 @@ class H1OSMonitor:
         sleep_start_time: Optional[float] = None
         spinner_idx = 0
 
-        try:
-            while self.running:
-                # 1. Port Connection / Deep Sleep Supervisor
-                if self.ser is None or not self.ser.is_open:
-                    target_port = self.port or auto_detect_serial_port()
+        while self.running:
+            # 1. Port Connection / Deep Sleep Supervisor
+            if self.ser is None or not self.ser.is_open:
+                target_port = self.port or auto_detect_serial_port()
 
-                    if sleep_start_time is None:
-                        sleep_start_time = time.time()
-
-                    # Calculate elapsed time in sleep
-                    elapsed_sec = int(time.time() - sleep_start_time)
-                    mins = elapsed_sec // 60
-                    secs = elapsed_sec % 60
-                    time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
-
-                    # In-place spinner update (ZERO DOTS, NO SCROLL POLLUTION)
-                    spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
-                    spinner_idx += 1
-
-                    port_label = target_port or "active port"
-                    status_msg = f"\r  {spin_char} Target in deep sleep (elapsed: {time_str}). Listening on {port_label}...   "
-                    sys.stdout.write(status_msg)
-                    sys.stdout.flush()
-
-                    # Attempt to open port with DTR/RTS held LOW (zero-reset)
-                    if target_port:
-                        try:
-                            self.ser = serial.Serial(
-                                port=target_port,
-                                baudrate=self.baud,
-                                timeout=0.1,
-                                dsrdtr=False,
-                                rtscts=False,
-                            )
-                            # Explicitly hold lines low so MCU is not reset
-                            set_dtr_pin(self.ser, False)
-                            set_rts_with_windows_quirk(self.ser, False)
-
-                            # Clear in-place spinner line
-                            sys.stdout.write("\r" + " " * 85 + "\r")
-                            sys.stdout.flush()
-
-                            self.port = target_port
-                            reconn_msg = f"Target connected on {self.port} (slept {time_str})."
-                            self._print_notice(reconn_msg, style="bold green")
-                            self.render_static_header()
-                            sleep_start_time = None
-                            line_buffer.clear()
-                        except (serial.SerialException, OSError):
-                            self.ser = None
-
-                    time.sleep(0.15)
-                    continue
-
-                # 2. Read Serial Stream
-                try:
-                    available = self.ser.in_waiting
-                    if available > 0:
-                        chunk = self.ser.read(available)
-                        for b in chunk:
-                            if b == ord("\n"):
-                                try:
-                                    raw_line = line_buffer.decode("utf-8", errors="replace")
-                                except Exception:
-                                    raw_line = line_buffer.decode("latin-1", errors="replace")
-                                line_buffer.clear()
-
-                                # Live display with native Rich ANSI color decoding
-                                if self.console:
-                                    styled = self._format_styled_line(raw_line)
-                                    self.console.print(styled)
-                                else:
-                                    clean_line = raw_line.rstrip("\r\n")
-                                    if self.enable_timestamps:
-                                        now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                                        print(f"[{now_ms}] {clean_line}")
-                                    else:
-                                        print(clean_line)
-
-                                # Persistent disk logging (ANSI stripped for 100% clean plain text)
-                                if self.enable_logging and self.log_file:
-                                    clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line.rstrip("\r\n"))
-                                    if self.enable_timestamps:
-                                        now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                                        self.log_file.write(f"[{now_ms}] {clean_for_log}\n")
-                                    else:
-                                        self.log_file.write(f"{clean_for_log}\n")
-                                    self.log_file.flush()
-
-                            elif b != ord("\r"):
-                                line_buffer.append(b)
-                    else:
-                        time.sleep(0.01)
-
-                except (serial.SerialException, OSError):
-                    # Target entered deep sleep and dropped USB serial PHY
-                    if self.ser:
-                        try:
-                            self.ser.close()
-                        except Exception:
-                            pass
-                    self.ser = None
+                if sleep_start_time is None:
                     sleep_start_time = time.time()
-                    sys.stdout.write("\n")
-                    self._print_notice("Target entered deep sleep / USB suspended.", style="yellow")
 
-        finally:
-            self.reset_scroll_region()
+                # Calculate elapsed time in sleep
+                elapsed_sec = int(time.time() - sleep_start_time)
+                mins = elapsed_sec // 60
+                secs = elapsed_sec % 60
+                time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
+
+                # In-place spinner update (ZERO DOTS, NO SCROLL POLLUTION)
+                spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
+                spinner_idx += 1
+
+                port_label = target_port or "active port"
+                status_msg = f"\r  {spin_char} Target in deep sleep (elapsed: {time_str}). Listening on {port_label}...   "
+                sys.stdout.write(status_msg)
+                sys.stdout.flush()
+
+                # Attempt to open port with DTR/RTS held LOW (zero-reset)
+                if target_port:
+                    try:
+                        self.ser = serial.Serial(
+                            port=target_port,
+                            baudrate=self.baud,
+                            timeout=0.1,
+                            dsrdtr=False,
+                            rtscts=False,
+                        )
+                        # Explicitly hold lines low so MCU is not reset on connect
+                        set_dtr_pin(self.ser, False)
+                        set_rts_with_windows_quirk(self.ser, False)
+
+                        # Clear in-place spinner line
+                        sys.stdout.write("\r" + " " * 85 + "\r")
+                        sys.stdout.flush()
+
+                        self.port = target_port
+                        reconn_msg = f"Target connected on {self.port} [dim](slept {time_str})[/]"
+                        self._print_badge("ONLINE", reconn_msg, "green")
+                        self._update_window_title()
+                        sleep_start_time = None
+                        line_buffer.clear()
+                    except (serial.SerialException, OSError):
+                        self.ser = None
+
+                time.sleep(0.15)
+                continue
+
+            # 2. Read Serial Stream
+            try:
+                available = self.ser.in_waiting
+                if available > 0:
+                    chunk = self.ser.read(available)
+                    for b in chunk:
+                        if b == ord("\n"):
+                            try:
+                                raw_line = line_buffer.decode("utf-8", errors="replace")
+                            except Exception:
+                                raw_line = line_buffer.decode("latin-1", errors="replace")
+                            line_buffer.clear()
+
+                            # Render styled telemetry line on console
+                            styled = self.format_log_line(raw_line)
+                            self.console.print(styled)
+
+                            # Persistent disk logging (ANSI stripped for 100% clean plain text)
+                            if self.enable_logging and self.log_file:
+                                clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
+                                if self.enable_timestamps:
+                                    now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                    self.log_file.write(f"[{now_ms}] {clean_for_log}\n")
+                                else:
+                                    self.log_file.write(f"{clean_for_log}\n")
+                                self.log_file.flush()
+
+                        elif b != ord("\r"):
+                            line_buffer.append(b)
+                else:
+                    time.sleep(0.01)
+
+            except (serial.SerialException, OSError):
+                # Target entered deep sleep and dropped USB serial PHY
+                if self.ser:
+                    try:
+                        self.ser.close()
+                    except Exception:
+                        pass
+                self.ser = None
+                sleep_start_time = time.time()
+                sys.stdout.write("\n")
+                self._print_badge("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
+                self._update_window_title()
 
     def _keyboard_listener(self):
         """Poll keyboard asynchronously for hotkeys without blocking serial stream."""
@@ -449,17 +536,13 @@ class H1OSMonitor:
     def close(self):
         """Clean shutdown and resource release."""
         self.running = False
-        self.reset_scroll_region()
         if self.ser and self.ser.is_open:
             try:
                 self.ser.close()
             except Exception:
                 pass
         self._close_log_file()
-        if self.console:
-            self.console.print("\n[bold cyan]H1OS Serial Monitor closed.[/bold cyan]")
-        else:
-            print("\nH1OS Serial Monitor closed.")
+        self.console.print("\n[bold cyan]H1OS Serial Monitor closed.[/bold cyan]")
 
 
 def main():
