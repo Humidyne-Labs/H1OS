@@ -251,38 +251,42 @@ class H1OSMonitor:
         sys.stdout.flush()
 
     def render_header_panel(self):
-        """Render the primary Rich rounded panel banner."""
+        """Render the primary Rich rounded panel banner styled identically to h1os_menu."""
         port_label = self.port or "Auto-detect"
         ts_badge = "[bold green]ON[/]" if self.enable_timestamps else "[dim]OFF[/]"
-        log_badge = f"[bold green]RECORDING[/] [dim]({self.log_path.name if self.log_path else ''})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
-        status_badge = "[bold green]● ONLINE[/]" if (self.ser and self.ser.is_open) else "[bold yellow]⏳ SLEEPING[/]"
+        log_badge = f"[bold green]ACTIVE[/] [dim]({self.log_path.name})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
+        status_badge = "[bold green]ONLINE[/]" if (self.ser and self.ser.is_open) else "[bold yellow]SLEEPING[/]"
 
-        grid = Table.grid(padding=(0, 2))
-        grid.add_column()
-        grid.add_column()
-        grid.add_column()
-        grid.add_column()
+        log_dir_str = str(self.log_dir)
+        if len(log_dir_str) > 28:
+            log_dir_str = "..." + log_dir_str[-25:]
 
-        grid.add_row(
-            status_badge,
-            f"[dim]Port:[/] [bold cyan]{port_label}[/] [dim]@{self.baud}[/]",
-            f"[dim]Chip:[/] [bold bright_white]{self.chip.upper()}[/]",
-            f"[dim]Log:[/] {log_badge}",
+        header_table = Table.grid(padding=(0, 1))
+        header_table.add_column("K1", style="bold cyan", width=9)
+        header_table.add_column("V1", width=29)
+        header_table.add_column("K2", style="bold cyan", width=9)
+        header_table.add_column("V2", width=25)
+
+        header_table.add_row(
+            "Target :", f"[bold white]{self.chip.upper()}[/]",
+            "Status :", status_badge,
         )
-        grid.add_row(
-            "[dim]Keys:[/] [bold yellow]R[/] [dim]Reset[/]",
-            f"[bold cyan]T[/] [dim]Time[/] ({ts_badge})",
-            f"[bold green]L[/] [dim]Log[/] [dim]({self.log_dir.name}/)[/]",
-            "[bold white]C[/] [dim]Clear[/]  •  [bold red]Q[/] [dim]Quit[/]",
+        header_table.add_row(
+            "Serial :", f"[bold cyan]{port_label}[/] [dim]@{self.baud}[/]",
+            "Log Dir:", f"[white]{log_dir_str}[/]",
+        )
+        header_table.add_row(
+            "Time   :", f"{ts_badge} [dim](key 'T')[/]",
+            "Logging:", f"{log_badge} [dim](key 'L')[/]",
         )
 
         p = Panel(
-            grid,
-            title="[bold bright_white]H1OS[/] [bold cyan]Serial Telemetry Console[/]",
-            subtitle=f"[dim]Session UID: {self.session_uid[:8]}[/]",
+            header_table,
+            title="[bold white]H1OS Serial Monitor & Telemetry Console[/]",
+            subtitle=f"[dim]UID: {self.session_uid[:8]}  |  [R] Reset  [C] Clear  [Q/Esc] Quit[/]",
+            border_style="cyan",
             box=box.ROUNDED,
-            border_style="bright_blue",
-            padding=(0, 1),
+            width=78,
         )
         self.console.print(p)
         self._update_window_title()
@@ -428,8 +432,12 @@ class H1OSMonitor:
                         self._update_window_title()
                         sleep_start_time = None
                         line_buffer.clear()
-                    except (serial.SerialException, OSError):
+                    except (serial.SerialException, OSError) as exc:
                         self.ser = None
+                        exc_msg = str(exc).lower()
+                        if "access is denied" in exc_msg or "permissionerror" in exc_msg:
+                            sys.stdout.write(f"\r  ⚠️  Port {target_port} locked by another session (Access Denied). Retrying...   ")
+                            sys.stdout.flush()
 
                 time.sleep(0.15)
                 continue
