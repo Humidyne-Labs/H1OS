@@ -286,7 +286,7 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
             "key": next_key(),
             "label": "Clean & Full Rebuild",
             "target": target_label,
-            "engine": "nuke & rebuild",
+            "engine": "erase & rebuild",
             "action": "clean_rebuild",
         })
         menu_items.append({
@@ -341,7 +341,7 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
             "key": next_key(),
             "label": f"Clean & Full Rebuild ({single_name.upper()})",
             "target": target_dir,
-            "engine": "nuke & rebuild",
+            "engine": "erase & rebuild",
             "action": f"clean_rebuild:{single_name}",
         })
         menu_items.append({
@@ -694,7 +694,7 @@ def main():
                 config,
                 console,
                 title="Clean & Full Rebuild",
-                subtitle="WARNING: Nukes build directory, dependencies.lock & managed_components before rebuilding",
+                subtitle="WARNING: Erases build directory, dependencies.lock & managed_components before rebuilding",
             )
             if sel_prof:
                 run_build(config, profile=sel_prof, clean=True, reconfig_only=False)
