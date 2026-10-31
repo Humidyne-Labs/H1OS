@@ -125,6 +125,8 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
             cmd.append("--audit")
         if action_args.get("ota_info"):
             cmd.append("--ota-info")
+        if action_args.get("live_usage"):
+            cmd.append("--live-usage")
         res = subprocess.run(cmd)
         sys.exit(res.returncode)
 
@@ -241,6 +243,12 @@ def action_extensions(base_actions: dict, project_path: str) -> dict:
                     "is_flag": True,
                     "default": False,
                     "help": "Query otadata state machine and active boot slot",
+                },
+                {
+                    "names": ["--live-usage", "--usage"],
+                    "is_flag": True,
+                    "default": False,
+                    "help": "Audit live flash partition usage and installed firmware metadata",
                 },
             ],
             "short_help": "Run H1OS Flash Partition Manager and memory map inspector.",

@@ -305,6 +305,19 @@ class H1OSConfig:
             return next(iter(self.profiles.values()))
         return None
 
+    @property
+    def audit_log_dir(self) -> Path:
+        """Destination directory for size audit diagnostic logs."""
+        prof = self.resolve_profile()
+        if prof and prof.audit_log_dir:
+            return prof.audit_log_dir
+        return (self.app_root / "build" / "logs").resolve()
+
+    @property
+    def dumps_dir(self) -> Path:
+        """Destination directory for raw flash partition dumps and hex logs."""
+        return (self.dist_dir / "dumps").resolve()
+
 
 def run_pack(
     config: H1OSConfig,

@@ -28,6 +28,9 @@ from partition.part_backend import (
     execute_parttool_write,
     execute_otatool_read,
     execute_otatool_switch,
+    parse_otadata_info,
+    read_flash_header,
+    parse_app_descriptor,
 )
 from partition.part_hexdump import (
     format_canonical_hexdump,
@@ -296,6 +299,200 @@ def render_partition_table_rich(
     console.print(panel)
 
 
+def render_pct_bar(pct: float, width: int = 10) -> str:
+    """Render a clean bilevel unicode utilization progress bar."""
+    clamped = max(0.0, min(100.0, pct))
+    filled = int(round(width * (clamped / 100.0)))
+    bar = "?" * filled + "?" * (width - filled)
+    if clamped >= 90.0:
+        return f"[bold red][{bar}] {clamped:.0f}%[/]"
+    elif clamped >= 75.0:
+        return f"[yellow][{bar}] {clamped:.0f}%[/]"
+    elif clamped > 0.0:
+        return f"[green][{bar}] {clamped:.0f}%[/]"
+    return f"[dim][{bar}] 0%[/]"
+
+
+def pause_or_usage_prompt(console: Optional["Console"]) -> str:
+    """Pause before clearing with option to run live usage audit."""
+    if console:
+        console.print("\n[bold cyan][U][/] [white]Audit Live Usage from Device[/]   [dim]Press Enter to continue...[/] ", end="")
+    else:
+        print("\n[U] Audit Live Usage from Device   Press Enter to continue... ", end="")
+    try:
+        val = input().strip().upper()
+        return val
+    except (KeyboardInterrupt, EOFError):
+        return ""
+
+
+def run_live_partition_usage_audit(
+    config: H1OSConfig,
+    partitions: List[PartitionEntry],
+    console: Optional["Console"],
+) -> None:
+    """Query connected device over serial to audit real-time partition utilization and app metadata."""
+    target_p = config.port or "Auto-detect"
+    if console:
+        console.print(f"\n[cyan]Probing device over {target_p} (baud {config.baud or 460800})...[/]")
+    else:
+        print(f"\nProbing device over {target_p}...")
+
+    # 1. Query OTA state machine to identify the active boot target
+    ok_ota, raw_ota = execute_otatool_read(config)
+    ota_info = parse_otadata_info(raw_ota) if ok_ota else {"active_slot": -1}
+
+    # Check if target hardware is reachable over serial
+    is_offline = (not ok_ota) and any(err in raw_ota for err in (
+        "Failed to connect", "Connecting...", "No serial data received",
+        "could not open port", "FileNotFoundError", "not found"
+    ))
+    device_online = ok_ota and not is_offline
+
+    if not device_online:
+        if console:
+            console.print(f"[bold yellow]Notice:[/] Device is not responding on {target_p}. Showing offline partition configuration.\n")
+        else:
+            print(f"Notice: Device is not responding on {target_p}. Showing offline partition configuration.\n")
+
+    # 2. Build local profile lookup by SHA256 and name
+    local_bins = {}
+    for prof in config.profiles.values():
+        cand = prof.build_dir / f"{config.app_name}.bin" if config.app_name else None
+        if not cand or not cand.is_file():
+            for b in prof.build_dir.glob("*.bin"):
+                if b.name not in ("bootloader.bin", "partition-table.bin", "ota_data_initial.bin"):
+                    cand = b
+                    break
+        if cand and cand.is_file():
+            try:
+                data = cand.read_bytes()
+                desc = parse_app_descriptor(data)
+                if desc and desc.get("sha256"):
+                    local_bins[desc["sha256"]] = (prof.name, cand, len(data))
+            except Exception:
+                pass
+
+    if not HAVE_RICH or not console:
+        print("\n" + "=" * 78)
+        print("  H1OS Live Partition Flash Usage & Firmware Audit")
+        print(f"  Target: {config.chip.upper()} | Port: {target_p} | State: {'Online' if device_online else 'Offline'}")
+        print("=" * 78)
+        for p in partitions:
+            if not device_online:
+                stat_str = "Offline / Unread" if p.type == "app" else p.formatted_size
+                print(f"  {p.name:<11} {stat_str}")
+            elif p.type == "app":
+                ok_h, h_bytes = read_flash_header(config, p.offset, 1024)
+                desc = parse_app_descriptor(h_bytes) if ok_h else None
+                if desc:
+                    sha = desc.get("sha256", "")
+                    matched = local_bins.get(sha)
+                    m_label = f" ({matched[0]})" if matched else ""
+                    print(f"  {p.name:<11} {desc['project']}{m_label} v{desc['version']} [{desc['compile_time']}]")
+                else:
+                    print(f"  {p.name:<11} Empty / Unwritten")
+            else:
+                print(f"  {p.name:<11} {p.formatted_size}")
+        print("=" * 78 + "\n")
+        return
+
+    table = Table(
+        box=box.ROUNDED,
+        width=TERM_WIDTH,
+        header_style="bold bright_cyan",
+        title=(
+            f"[bold white]Live Partition Flash Usage & Firmware Audit[/]\n"
+            f"[dim]Device: {ota_info.get('chip') or config.chip.upper()} | "
+            f"Port: {target_p} | "
+            f"Active Boot Target: {'ota_' + str(ota_info['active_slot']) if device_online and ota_info.get('active_slot', -1) >= 0 else 'Unknown / Offline'}[/]"
+        ),
+        show_lines=False,
+        pad_edge=False,
+    )
+    table.add_column("Partition", style="bold white", width=11)
+    table.add_column("Type/Sub", width=11)
+    table.add_column("Installed Payload", width=18)
+    table.add_column("Compile Time", width=15)
+    table.add_column("Used / Capacity", justify="right", width=16)
+    table.add_column("Utilization", width=15)
+    table.add_column("Status", width=16)
+
+    for p in partitions:
+        if not device_online:
+            if p.type == "app":
+                bar = render_pct_bar(0.0, width=8)
+                table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline / Unread[/]", "-", f"- / {p.formatted_size}", bar, "[dim]Device Offline[/]")
+            elif p.subtype == "ota":
+                bar = render_pct_bar(0.0, width=8)
+                table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline[/]", "-", f"- / {p.formatted_size}", bar, "[dim]Device Offline[/]")
+            else:
+                bar = render_pct_bar(100.0, width=8)
+                table.add_row(p.name, f"{p.type}/{p.subtype}", "[cyan]Configured[/]", "-", f"{p.formatted_size} / {p.formatted_size}", bar, "[green]Allocated[/]")
+            continue
+
+        if p.type == "app":
+            ok_hdr, hdr_bytes = read_flash_header(config, p.offset, 1024)
+            if ok_hdr and len(hdr_bytes) >= 288 and hdr_bytes[0] == 0xE9:
+                desc = parse_app_descriptor(hdr_bytes)
+                if desc:
+                    sha = desc.get("sha256", "")
+                    matched = local_bins.get(sha)
+                    if matched:
+                        prof_name, _, b_size = matched
+                        payload_str = f"[bold cyan]{desc['project']}[/] [dim]({prof_name})[/]"
+                        used_bytes = b_size
+                    else:
+                        payload_str = f"[cyan]{desc['project']}[/] [dim]{desc['version'][:8]}[/]"
+                        used_bytes = desc.get("payload_size", 0)
+
+                    pct = (used_bytes / p.size * 100.0) if used_bytes > 0 else 0.0
+                    bar = render_pct_bar(pct, width=8)
+                    used_str = f"{used_bytes / 1024:.1f} KB / {p.formatted_size}" if used_bytes > 0 else f"Firmware / {p.formatted_size}"
+
+                    slot_num = 0 if "0" in p.subtype else (1 if "1" in p.subtype else -1)
+                    if slot_num == ota_info.get("active_slot"):
+                        stat = "[bold green]Active Target[/]"
+                    else:
+                        stat = "[cyan]Standby Image[/]"
+
+                    table.add_row(
+                        p.name,
+                        f"{p.type}/{p.subtype}",
+                        payload_str,
+                        desc.get("compile_time", "-")[:15],
+                        used_str,
+                        bar,
+                        stat,
+                    )
+                else:
+                    table.add_row(p.name, f"{p.type}/{p.subtype}", "[yellow]Corrupt Header[/]", "-", f"- / {p.formatted_size}", "-", "[yellow]Invalid Image[/]")
+            else:
+                if ok_hdr and all(b == 0xFF for b in hdr_bytes[:256]):
+                    bar = render_pct_bar(0.0, width=8)
+                    table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Unwritten (0%)[/]", "-", f"0 B / {p.formatted_size}", bar, "[dim]Blank / Erased[/]")
+                else:
+                    table.add_row(p.name, f"{p.type}/{p.subtype}", "[dim]Offline / Unread[/]", "-", f"- / {p.formatted_size}", "-", "[red]Read Failed[/]")
+
+        elif p.subtype == "ota":
+            bar = render_pct_bar(100.0, width=8)
+            seq_str = f"{ota_info.get('slot0_seq', '-')[:8]}|{ota_info.get('slot1_seq', '-')[:8]}"
+            table.add_row(
+                p.name,
+                f"{p.type}/{p.subtype}",
+                f"[dim]Seq: {seq_str}[/]",
+                "-",
+                f"{p.formatted_size} / {p.formatted_size}",
+                bar,
+                f"[bold green]Booting ota_{ota_info.get('active_slot', 0)}[/]",
+            )
+        else:
+            bar = render_pct_bar(100.0, width=8)
+            table.add_row(p.name, f"{p.type}/{p.subtype}", "[cyan]Configured[/]", "-", f"{p.formatted_size} / {p.formatted_size}", bar, "[green]Allocated[/]")
+
+    console.print(table)
+
+
 def select_partition_interactive(
     partitions: List[PartitionEntry],
     console: Optional["Console"],
@@ -439,6 +636,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
         {"key": "5", "label": "Inspect OTA Status & Active Slot", "desc": "Read otadata rollback state and active boot slot"},
         {"key": "6", "label": "Switch Active OTA Boot Slot", "desc": "Toggle active boot slot between ota_0 and ota_1"},
         {"key": "7", "label": "Audit Sector Alignment Invariants", "desc": "Verify 4KB sector and 64KB MMU alignment rules"},
+        {"key": "8", "label": "Audit Live Flash Usage & Firmware", "desc": "Query device over serial to inspect installed app versions and usage"},
         {"key": "B", "label": "Back to Main Menu", "desc": "Return to main developer console"},
     ]
 
@@ -549,7 +747,10 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                 console=console,
                 source_label=str(part_file),
             )
-            pause_prompt(console)
+            choice = pause_or_usage_prompt(console)
+            if choice == "U":
+                run_live_partition_usage_audit(config, partitions, console)
+                pause_prompt(console)
 
         elif action_key == "2":
             # Erase Specific Partition
@@ -584,7 +785,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
             if target:
                 dump_mode = prompt_dump_mode(console)
                 if dump_mode:
-                    dumps_dir = config.audit_log_dir / "dumps"
+                    dumps_dir = config.dumps_dir
                     dumps_dir.mkdir(parents=True, exist_ok=True)
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     temp_bin = dumps_dir / f"tmp_{target.name}_{timestamp}.bin"
@@ -654,7 +855,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                         if confirmed:
                             if console:
                                 console.print(f"[cyan]Flashing {image_path.name} to '{target.name}'...[/]")
-                            ok, msg = execute_parttool_write(config, target.name, image_path)
+                            ok, msg = execute_parttool_write(config, target.name, image_path, stream=True)
                             if ok:
                                 if console:
                                     console.print(f"[bold green]SUCCESS:[/] {msg}")
@@ -672,14 +873,47 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
 
         elif action_key == "5":
             # Inspect OTA Status
+            target_p = config.port or "Auto-detect"
             if console:
-                console.print(f"\n[cyan]Querying otadata status from {config.port}...[/]")
+                console.print(f"\n[cyan]Querying otadata status from {target_p}...[/]")
+            else:
+                print(f"\nQuerying otadata status from {target_p}...")
             ok, msg = execute_otatool_read(config)
             if ok:
-                if console:
-                    console.print(Panel(msg, title="[bold green]OTA State Machine[/]", border_style="green", width=TERM_WIDTH))
+                info = parse_otadata_info(msg)
+                if HAVE_RICH and console:
+                    ota_table = Table(
+                        box=box.ROUNDED,
+                        width=TERM_WIDTH,
+                        header_style="bold bright_cyan",
+                        title=(
+                            f"[bold white]OTA Boot State Machine[/]\n"
+                            f"[dim]Device: {info['chip'] or config.chip.upper()} | "
+                            f"MAC: {info['mac'] or 'N/A'} | "
+                            f"Active Boot Target: [bold green]ota_{info['active_slot']} (Slot {info['active_slot']})[/][/]"
+                        ),
+                        show_lines=False,
+                        pad_edge=False,
+                    )
+                    ota_table.add_column("Slot", style="bold white", width=10)
+                    ota_table.add_column("Partition", width=12)
+                    ota_table.add_column("Sequence", justify="center", width=14)
+                    ota_table.add_column("CRC32", justify="center", width=14)
+                    ota_table.add_column("Boot State", width=24)
+
+                    is_s0 = (info["active_slot"] == 0)
+                    s0_stat = "[bold green]Active (Boot Target)[/]" if is_s0 else ("[cyan]Valid / Standby[/]" if info["slot0_valid"] else "[dim]Unwritten / Invalid[/]")
+                    s1_stat = "[bold green]Active (Boot Target)[/]" if not is_s0 else ("[cyan]Valid / Standby[/]" if info["slot1_valid"] else "[dim]Unwritten / Invalid[/]")
+
+                    ota_table.add_row("Slot 0", "ota_0", info["slot0_seq"], info["slot0_crc"], s0_stat)
+                    ota_table.add_row("Slot 1", "ota_1", info["slot1_seq"], info["slot1_crc"], s1_stat)
+                    console.print(ota_table)
                 else:
-                    print(f"\n--- OTA State Machine ---\n{msg}\n")
+                    print("\n--- OTA State Machine ---")
+                    print(f"Device: {info['chip'] or config.chip.upper()} | MAC: {info['mac'] or 'N/A'}")
+                    print(f"Active Boot Target: ota_{info['active_slot']}")
+                    print(f"  Slot 0 (ota_0): Seq {info['slot0_seq']} CRC {info['slot0_crc']}")
+                    print(f"  Slot 1 (ota_1): Seq {info['slot1_seq']} CRC {info['slot1_crc']}\n")
             else:
                 if console:
                     console.print(f"[bold red]ERROR:[/] {msg}")
@@ -725,6 +959,11 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                     console.print(Panel(warn_text, title="[bold red]Alignment Warnings Detected[/]", border_style="red", width=TERM_WIDTH))
                 else:
                     print(f"\nALIGNMENT WARNINGS:\n" + "\n".join(warnings) + "\n")
+            pause_prompt(console)
+
+        elif action_key == "8":
+            # Audit Live Partition Usage
+            run_live_partition_usage_audit(config, partitions, console)
             pause_prompt(console)
 
 
@@ -835,6 +1074,7 @@ def main():
     parser.add_argument("-c", "--config", dest="config", default=None, help="Explicit path to h1os.ini")
     parser.add_argument("--map", action="store_true", help="Display partition map and memory layout table")
     parser.add_argument("--audit", action="store_true", help="Audit sector and MMU alignment invariants")
+    parser.add_argument("--live-usage", action="store_true", help="Audit live flash partition usage and firmware metadata")
     parser.add_argument("--erase", dest="erase_part", metavar="PARTITION", help="Erase a specific partition on device")
     parser.add_argument("--dump", dest="dump_part", metavar="PARTITION", help="Dump a specific partition from device")
     parser.add_argument("--format", dest="dump_format", choices=["bin", "hex", "view"], default="hex", help="Dump format")
@@ -853,6 +1093,10 @@ def main():
 
     if args.map:
         render_partition_table_rich(partitions, console=console, source_label=str(part_file))
+        return
+
+    if args.live_usage:
+        run_live_partition_usage_audit(config, partitions, console)
         return
 
     if args.audit:
