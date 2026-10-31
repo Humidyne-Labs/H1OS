@@ -7,6 +7,7 @@ sdkconfig
 sdkconfig.*
 !sdkconfig.defaults*
 compile_commands.json
+CMakeUserPresets.json
 
 # Python Artifacts
 __pycache__/

@@ -1,0 +1,74 @@
+# ==============================================================================
+# H1OS Developer Tooling & Packaging Configuration
+# ==============================================================================
+
+[project]
+# Base application directory relative to this file (default: .)
+project_dir = .
+# Optional explicit application binary name (e.g. h1os.bin).
+# If blank, resolved strictly from project_description.json without guessing.
+app_name = 
+
+[dist]
+# Target output folder for release bundles and standalone binaries
+dist_dir = dist
+
+# ------------------------------------------------------------------------------
+# Build Profiles
+# Each section defines a distinct build profile (e.g. [prod], [dev], [test]).
+# The developer menu and CLI dispatch auto-populate dynamically from these profiles.
+# ------------------------------------------------------------------------------
+
+[prod]
+# CMake preset name defined in CMakePresets.json
+preset = prod
+# Build directory
+build_dir = build_prod
+# Destination directory for size audit diagnostic logs (zero-fallback)
+audit_log = build_prod/logs
+# Release bundle naming prefix / suffix
+pack_prefix = prod_
+pack_suffix = 
+
+[dev]
+# CMake preset name defined in CMakePresets.json
+preset = dev
+# Build directory
+build_dir = build_dev
+# Destination directory for size audit diagnostic logs (zero-fallback)
+audit_log = build_dev/logs
+# Release bundle naming prefix / suffix
+pack_prefix = debug_
+pack_suffix = 
+
+# Optional custom profile example (auto-populates in menu and CLI):
+# [test]
+# preset = test
+# build_dir = build_test
+# audit_log = build_test/logs
+# pack_prefix = test_
+# pack_suffix = 
+
+[version]
+# Explicit semantic version override (e.g. 2.4.7).
+# If set, supersedes version_file extraction.
+version = 
+
+# File to extract version from (relative to project_dir or component root)
+version_file = ../../components/h1os/include/h1os/h1os_version.h
+
+# Regular expression with exactly one capture group to parse the version
+version_regex = #define\s+H1OS_VERSION_STRING\s+"([^"]+)"
+
+[partitions]
+# Custom partition table CSV path.
+# If omitted or blank, defaults strictly to standard project root partitions.csv provisioned by CMake.
+partition_file_location = partitions.csv
+
+[target]
+# Target silicon chip (passed to esptool --chip)
+chip = esp32s3
+# Serial port for flashing/erasing (leave blank for esptool auto-discovery, or specify e.g. COM3)
+port = 
+# Flashing communication baud rate
+baud = 460800

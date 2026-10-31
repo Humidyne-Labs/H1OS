@@ -1,33 +1,20 @@
 #!/usr/bin/env python3
 """
 H1OS Firmware Release Packaging Engine (h1os_pack)
-Version: 2.3.0
+Version: 2.4.0
 License: Apache-2.0
 """
 import argparse
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
-VERSION = "2.3.0"
-
-# Canonical H1OS 8MB Dual-OTA layout fallback if partitions.csv is absent
-DEFAULT_PARTITIONS_CSV = """# ESP-IDF Partition Table (H1OS Dual-Slot 8MB OTA)
-# Name,     Type, SubType, Offset, Size,     Flags
-nvs,        data, nvs,     0x9000,   0x14000,
-otadata,    data, ota,     0x1D000,  0x2000,
-phy_init,   data, phy,     0x1F000,  0x1000,
-ota_0,      app,  ota_0,   0x20000,  0x300000,
-ota_1,      app,  ota_1,   0x320000, 0x300000,
-storage,    data, spiffs,  0x620000, 0x1DC000,
-epd_frame,  data, undefined, 0x7FC000, 0x4000,
-"""
+VERSION = "2.4.0"
 
 
 def resolve_project_and_component_dirs(script_dir: Path, explicit_proj: str = None) -> tuple:
@@ -37,13 +24,12 @@ def resolve_project_and_component_dirs(script_dir: Path, explicit_proj: str = No
     else:
         app_root = Path.cwd().resolve()
 
-    # Component root: script_dir is components/h1os/tools/pack_build
     comp_dir = script_dir.parent.parent
     return app_root, comp_dir
 
 
 def detect_app_bin_in_dir(build_dir: Path) -> Path:
-    """Locate primary application binary inside build directory."""
+    """Locate primary application binary inside build directory without guesswork."""
     if not build_dir or not build_dir.is_dir():
         return None
 
@@ -65,17 +51,22 @@ def detect_app_bin_in_dir(build_dir: Path) -> Path:
 
 
 def resolve_version(app_root: Path, comp_dir: Path) -> str:
-    """Resolve semantic version string from h1os_version.h or git describe."""
-    header = comp_dir / "include" / "h1os" / "h1os_version.h"
-    if header.exists():
-        try:
-            for line in header.read_text(encoding="utf-8").splitlines():
-                if "H1OS_VERSION_STR" in line:
-                    m = re.search(r'"([^"]+)"', line)
-                    if m:
-                        return m.group(1).lstrip("v")
-        except Exception:
-            pass
+    """Resolve semantic version string from h1os_version.h or git describe without guesswork."""
+    header_candidates = [
+        comp_dir / "include" / "h1os" / "h1os_version.h",
+        app_root / "include" / "h1os" / "h1os_version.h",
+    ]
+    for header in header_candidates:
+        if header.exists():
+            try:
+                for line in header.read_text(encoding="utf-8").splitlines():
+                    if "H1OS_VERSION_STRING" in line or "H1OS_VERSION_STR" in line:
+                        import re
+                        m = re.search(r'"([^"]+)"', line)
+                        if m:
+                            return m.group(1).lstrip("v")
+            except Exception:
+                pass
 
     try:
         res = subprocess.run(
@@ -90,7 +81,9 @@ def resolve_version(app_root: Path, comp_dir: Path) -> str:
             return tag
     except Exception:
         pass
-    return "1.0.0"
+
+    print("\n[ERROR] Unable to resolve semantic version. Specify -V <version> or define H1OS_VERSION_STRING in h1os_version.h.", file=sys.stderr)
+    sys.exit(1)
 
 
 def get_git_commit(working_dir: Path) -> str:
@@ -175,9 +168,9 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=f"H1OS Firmware Release Packaging Engine v{VERSION}",
         epilog="Examples:\n"
-               "  python h1os_pack.py -B build_prod\n"
-               "  python h1os_pack.py -B build_dev --dev\n"
-               "  python h1os_pack.py -C examples/H1OS -B examples/H1OS/build_prod",
+               "  python h1os_pack.py -B build\n"
+               "  python h1os_pack.py -B my_custom_dir --prefix prod_\n"
+               "  python h1os_pack.py -C examples/H1OS -B examples/H1OS/build",
     )
     parser.add_argument(
         "-B", "--build-dir",
@@ -207,19 +200,25 @@ def parse_args():
         "-V", "--version",
         dest="version",
         default=None,
-        help="Explicit version string override (e.g. 2.4.7)",
+        help="Explicit version string override (e.g. 2.4.7-dev)",
     )
     parser.add_argument(
-        "--prod",
-        action="store_true",
-        default=False,
-        help="Force production naming (strip -dev tag)",
+        "--prefix",
+        dest="prefix",
+        default=None,
+        help="Custom prefix for the release zip file (e.g. prod_)",
     )
     parser.add_argument(
-        "--dev",
-        action="store_true",
-        default=False,
-        help="Force dev naming (keep -dev tag)",
+        "--suffix",
+        dest="suffix",
+        default=None,
+        help="Custom suffix for the release zip file",
+    )
+    parser.add_argument(
+        "--partition-file",
+        dest="partition_file",
+        default=None,
+        help="Explicit path to partition table CSV (defaults to project root partitions.csv)",
     )
     return parser.parse_args()
 
@@ -232,7 +231,7 @@ def main():
     build_dir_raw = Path(args.build_dir)
     if not build_dir_raw.is_dir():
         print(f"\n[ERROR] Target build directory does not exist: {args.build_dir}", file=sys.stderr)
-        print("Please compile first or provide a valid path via -B <build_dir> (e.g. -B build_prod).", file=sys.stderr)
+        print("Please compile first or provide a valid path via -B <build_dir>.", file=sys.stderr)
         sys.exit(1)
 
     build_dir = build_dir_raw.resolve()
@@ -241,7 +240,7 @@ def main():
     app_bin_path = detect_app_bin_in_dir(build_dir)
     if not app_bin_path:
         print(f"\n[ERROR] Could not find application binary in build directory: {build_dir}", file=sys.stderr)
-        print("Please compile firmware first (e.g. 'idf.py -B build_prod build').", file=sys.stderr)
+        print("Please compile firmware first.", file=sys.stderr)
         sys.exit(1)
 
     app_bin_name = app_bin_path.name
@@ -250,19 +249,10 @@ def main():
 
     git_commit = get_git_commit(app_root)
     raw_version = resolve_version(app_root, comp_dir)
-    is_prod_build = "prod" in build_dir.name.lower()
-
-    if args.version:
-        version = args.version.lstrip("v")
-    elif args.prod or (is_prod_build and not args.dev):
-        version = re.sub(r"-(dev|alpha|beta|rc\d*)$", "", raw_version, flags=re.IGNORECASE)
-    else:
-        version = raw_version
-
-    build_flavor = "Production" if is_prod_build else "Development"
+    version = args.version.lstrip("v") if args.version else raw_version
 
     print(f"\n{'='*72}")
-    print(f"  {app_title} {build_flavor} Firmware Packager v{VERSION}")
+    print(f"  {app_title} Firmware Packager v{VERSION}")
     print(f"  App Root      : {app_root}")
     print(f"  Build Dir     : {build_dir}")
     print(f"  Target Release: v{version} (Commit: {git_commit})")
@@ -299,14 +289,19 @@ def main():
     factory_bin_path.write_bytes(buf)
     print(f"    [+] Created: {factory_bin_name} ({len(buf)/1024.0:.1f} KB)")
 
-    # Step 3: Provision partitions.csv (canonical component path, app root, or hardcoded layout)
-    canonical_part_csv = comp_dir / "partition" / "partitions.csv"
-    if canonical_part_csv.exists():
-        shutil.copy2(canonical_part_csv, dist_root / "partitions.csv")
-    elif (app_root / "partitions.csv").exists():
-        shutil.copy2(app_root / "partitions.csv", dist_root / "partitions.csv")
+    # Step 3: Provision partitions.csv strictly from project root or explicit partition_file
+    if args.partition_file:
+        part_csv = Path(args.partition_file).resolve()
     else:
-        (dist_root / "partitions.csv").write_text(DEFAULT_PARTITIONS_CSV, encoding="utf-8")
+        part_csv = (app_root / "partitions.csv").resolve()
+
+    if not part_csv.is_file():
+        print(f"\n[ERROR] Partition table file not found: {part_csv}", file=sys.stderr)
+        print("Please ensure partitions.csv is in project root or configured via partition_file_location in h1os.ini.\n", file=sys.stderr)
+        sys.exit(1)
+
+    shutil.copy2(part_csv, dist_root / "partitions.csv")
+    print(f"    [+] Bundled partition table: {part_csv.name} (from {part_csv.parent})")
 
     # Step 4: Copy flasher.ps1 from script_dir
     flasher_ps1 = script_dir / "flasher.ps1"
@@ -316,7 +311,7 @@ def main():
     else:
         print("    [!] Warning: flasher.ps1 not found in script directory.")
 
-    # Step 5: Copy all modular Control-Vector batch files directly from disk (purged hardcoded strings)
+    # Step 5: Copy modular Control-Vector batch files from disk
     print("[*] Copying modular Control-Vector batch scripts from disk...")
     bat_files = [
         "flash_update_keep_nvs.bat",
@@ -329,8 +324,6 @@ def main():
         src_bat = script_dir / bat_name
         if src_bat.exists():
             shutil.copy2(src_bat, dist_root / bat_name)
-        else:
-            print(f"    [!] Warning: Batch script {bat_name} not found on disk in {script_dir}")
 
     # Step 6: Copy README.md from disk
     readme_src = script_dir / "README.md"
@@ -350,7 +343,14 @@ def main():
 
     # Step 8: Create Release Zip Archive in app_root/dist/
     if not args.no_zip:
-        zip_path = dist_base / f"{app_stem}-v{version}-bundle.zip"
+        prefix_val = args.prefix if args.prefix is not None else ""
+        suffix_val = args.suffix if args.suffix is not None else ""
+        if prefix_val or suffix_val:
+            zip_filename = f"{prefix_val}{version}{suffix_val}.zip"
+        else:
+            zip_filename = f"{app_stem}-v{version}.zip"
+
+        zip_path = dist_base / zip_filename
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             for p in sorted(dist_root.rglob("*")):
                 if p.is_file():

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 H1OS Firmware Binary Size & Memory Footprint Diagnostic Inspector (h1os_size)
-Version: 2.3.1
+Version: 2.3.3
 License: Apache-2.0
 """
 import argparse
@@ -13,8 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "2.3.1"
-TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+VERSION = "2.3.3"
 OUTPUT_STREAMS = {}
 LOG_FILE_PATH = None
 
@@ -179,9 +178,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=f"H1OS Firmware Binary Size & Memory Footprint Diagnostic Inspector v{VERSION}",
         epilog="Examples:\n"
-               "  python h1os_size.py -B build_prod\n"
-               "  python h1os_size.py -B build_dev --rebuild\n"
-               "  python h1os_size.py -C examples/H1OS -B examples/H1OS/build_prod",
+               "  python h1os_size.py -B build_prod --log-file build_prod/logs/prod_20261031_140500.log\n"
+               "  python h1os_size.py -C examples/H1OS -B examples/H1OS/build_dev --log-file examples/H1OS/build_dev/logs/debug_20261031_140500.log",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -207,12 +205,28 @@ def parse_args():
         default=False,
         help="Force rebuilding firmware via 'idf.py build' before running size diagnostics",
     )
+    parser.add_argument(
+        "--log-file",
+        dest="log_file",
+        required=True,
+        help="Explicit destination log file path for audit diagnostic output (mandatory; zero-fallback)",
+    )
     return parser.parse_args()
 
 
 def main():
     global LOG_FILE_PATH
     args = parse_args()
+
+    # Strict zero-fallback log destination validation
+    if not args.log_file:
+        print("\n[ERROR] No audit log file destination provided via --log-file.", file=sys.stderr)
+        print("Zero-fallback policy requires an explicit log destination configured in h1os.ini.\n", file=sys.stderr)
+        sys.exit(1)
+
+    log_path = Path(args.log_file).resolve()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    LOG_FILE_PATH = log_path
 
     # Strict build path validation - zero auto-searching allowed
     build_dir_raw = Path(args.build_dir)
@@ -231,69 +245,74 @@ def main():
     else:
         project_root = Path.cwd().resolve()
 
-    LOG_FILE_PATH = project_root / f"size_diagnostic_{TIMESTAMP}.log"
-
-    log_write(f"H1OS Binary Size Diagnostic v{VERSION} (Windows)\n")
-    log_write(f"Timestamp: {datetime.datetime.now()}\n")
-    log_write(f"Target Build Directory: {build_dir_path}\n")
-    log_write(f"Project Root Directory: {project_root}\n")
-
     py_exe = get_idf_python_exe()
-    log_write(f"Active Python: {py_exe}\n")
-
     idf_py = get_idf_py_path()
     check_sizes_script = get_check_sizes_path()
 
     idf_cmd = f'"{py_exe}" "{idf_py}" -C "{project_root}" -B "{build_dir_path}"'
 
-    # 1. Optional explicit rebuild
+    # 1. Optional explicit rebuild (only when explicitly requested via --rebuild)
     if args.rebuild:
         log_write("\n[REBUILD] Executing full firmware build as requested...\n")
         run_command("build", "0. REBUILD FIRMWARE", f"{idf_cmd} build", cwd=str(project_root))
 
-    # 2. Check for existing map and bin artifacts
+    # 2. Strict Artifact Sanity Check: Never guess or trigger an implicit build
     map_path, bin_path = find_target_artifacts(build_dir_path)
     part_bin = build_dir_path / "partition_table" / "partition-table.bin"
 
-    # Fast Mode: directly parse map and bin files without invoking Ninja
-    if map_path and not args.rebuild:
-        log_write("\n[MODE] Instant Direct Inspection (0% CPU, no Ninja dependency check)\n")
+    missing_artifacts = []
+    if not map_path or not map_path.is_file():
+        missing_artifacts.append("Firmware linker map file (*.map)")
+    if not bin_path or not bin_path.is_file():
+        missing_artifacts.append("Application firmware binary (*.bin)")
+    if not part_bin.is_file():
+        missing_artifacts.append("Partition table binary (partition_table/partition-table.bin)")
 
-        # Step A: Partition table check
-        if check_sizes_script and part_bin.exists() and bin_path:
-            cmd = f'"{py_exe}" "{check_sizes_script}" --offset 0x8000 partition --type app "{part_bin}" "{bin_path}"'
-            run_command("partition", "1. APP PARTITION HEADROOM CHECK", cmd)
+    if missing_artifacts:
+        err_msg = f"\n[ERROR] Build artifacts not found in: {build_dir_path}\n"
+        for m in missing_artifacts:
+            err_msg += f"  - Missing: {m}\n"
+        err_msg += (
+            "\nZero-fallback policy prohibits silent background compilation during size audit.\n"
+            "Please compile firmware first via 'idf.py build' or CMakePresets (or pass --rebuild).\n"
+        )
+        print(err_msg, file=sys.stderr)
+        if LOG_FILE_PATH:
+            try:
+                with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+                    f.write(err_msg)
+            except Exception:
+                pass
+        sys.exit(1)
 
-        # Step B: Overall memory breakdown
-        cmd_size = f'"{py_exe}" -m esp_idf_size "{map_path}"'
-        run_command("size", "2. OVERALL MEMORY BREAKDOWN", cmd_size)
+    log_write(f"H1OS Binary Size Diagnostic v{VERSION} (Windows)\n")
+    log_write(f"Timestamp: {datetime.datetime.now()}\n")
+    log_write(f"Target Build Directory: {build_dir_path}\n")
+    log_write(f"Project Root Directory: {project_root}\n")
+    log_write(f"Destination Log File  : {LOG_FILE_PATH}\n")
+    log_write(f"Active Python: {py_exe}\n")
+    log_write("\n[MODE] Instant Direct Inspection (0% CPU, no Ninja dependency check)\n")
 
-        # Step C: Per-component breakdown
-        cmd_comp = f'"{py_exe}" -m esp_idf_size --archives "{map_path}"'
-        run_command("components", "3. PER-COMPONENT BREAKDOWN", cmd_comp)
+    # Step A: Partition table check
+    if check_sizes_script and part_bin.exists() and bin_path:
+        cmd = f'"{py_exe}" "{check_sizes_script}" --offset 0x8000 partition --type app "{part_bin}" "{bin_path}"'
+        run_command("partition", "1. APP PARTITION HEADROOM CHECK", cmd)
 
-        # Step D: Per-file breakdown
-        cmd_files = f'"{py_exe}" -m esp_idf_size --files "{map_path}"'
-        run_command("files", "4. PER-FILE BREAKDOWN", cmd_files)
+    # Step B: Overall memory breakdown (esp_idf_size)
+    cmd_size = f'"{py_exe}" -m esp_idf_size "{map_path}"'
+    run_command("size", "2. OVERALL MEMORY BREAKDOWN", cmd_size)
 
-        # Step E: Binary image headers
-        if bin_path:
-            cmd_hdr = f'"{py_exe}" -m esptool image-info "{bin_path}"'
-            run_command("headers", "5. BINARY IMAGE HEADERS (esptool)", cmd_hdr)
-        else:
-            log_write(f"\n[WARNING] No application binary found in {build_dir_path}\n")
+    # Step C: Per-component breakdown (esp_idf_size --archives)
+    cmd_comp = f'"{py_exe}" -m esp_idf_size --archives "{map_path}"'
+    run_command("components", "3. PER-COMPONENT BREAKDOWN", cmd_comp)
 
-    else:
-        # Fallback Mode: idf.py commands
-        log_write("\n[MODE] Full idf.py Execution Mode\n")
-        run_command("size", "1. OVERALL MEMORY BREAKDOWN", f"{idf_cmd} size", cwd=str(project_root))
-        run_command("components", "2. PER-COMPONENT BREAKDOWN", f"{idf_cmd} size-components", cwd=str(project_root))
-        run_command("files", "3. PER-FILE BREAKDOWN", f"{idf_cmd} size-files", cwd=str(project_root))
+    # Step D: Per-file breakdown (esp_idf_size --files)
+    cmd_files = f'"{py_exe}" -m esp_idf_size --files "{map_path}"'
+    run_command("files", "4. PER-FILE BREAKDOWN", cmd_files)
 
-        if bin_path:
-            run_command("headers", "4. BINARY IMAGE HEADERS (esptool)", f'"{py_exe}" -m esptool image-info "{bin_path}"')
-        else:
-            log_write(f"\n[WARNING] No main application binary found in {build_dir_path}\n")
+    # Step E: Binary image headers (esptool image-info)
+    cmd_hdr = f'"{py_exe}" -m esptool image-info "{bin_path}"'
+    run_command("headers", "5. BINARY IMAGE HEADERS (esptool)", cmd_hdr)
 
     # Render metrics dashboard
     summary_text = render_summary()

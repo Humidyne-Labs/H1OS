@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------
-# Application Layer: H1OS Showcase Instrument (Production Profile)
-# Inherits hardware baseline from: components/h1os/sdkconfig.defaults
+# Application Layer: H1OS Showcase Instrument
+# Inherits hardware & flash storage baseline from: components/h1os/sdkconfig.defaults
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
@@ -39,24 +39,6 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
-
-# -------------------------------------------------------------------------
-# Filesystem Configuration
-# -------------------------------------------------------------------------
-# Minimal FATFS allocation (1 volume)
-CONFIG_FATFS_VOLUME_COUNT=1
-
-# 1 partition for 'storage' defined in partitions.csv
-CONFIG_SPIFFS_MAX_PARTITIONS=1
-CONFIG_SPIFFS_CACHE=y
-CONFIG_SPIFFS_CACHE_WR=y
-
-# -------------------------------------------------------------------------
-# Custom Partitioning
-# -------------------------------------------------------------------------
-CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
 # -------------------------------------------------------------------------
 # Application UI Additions (Canvas & Unscii Typography)

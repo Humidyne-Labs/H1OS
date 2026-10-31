@@ -11,6 +11,8 @@ h1os_tools.bat
 # Auto-provisioned component artifacts
 partitions.csv
 idf_ext.py
+h1os.ini
+CMakeUserPresets.json
 
 # Build packaging & diagnostics
 dist/

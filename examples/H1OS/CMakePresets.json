@@ -15,7 +15,8 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.dev"
+        "SDKCONFIG": "${sourceDir}/build_dev/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.dev"
       }
     },
     {
@@ -27,7 +28,8 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.prod"
+        "SDKCONFIG": "${sourceDir}/build_prod/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.prod"
       }
     },
     {
@@ -39,7 +41,8 @@
       "cacheVariables": {
         "IDF_TARGET": "esp32s3",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "SDKCONFIG_DEFAULTS": "../../components/h1os/sdkconfig.defaults;sdkconfig.defaults;sdkconfig.defaults.ci"
+        "SDKCONFIG": "${sourceDir}/build_ci/sdkconfig",
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults;sdkconfig.defaults.ci"
       }
     }
   ]

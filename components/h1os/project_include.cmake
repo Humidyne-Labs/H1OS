@@ -33,8 +33,8 @@ unset(_h1os_build_dir)
 
 # ==============================================================================
 # H1OS Partition & CLI Tool Extension Provisioning
-# Auto-provisions canonical `partitions.csv` and `idf_ext.py` into ${CMAKE_SOURCE_DIR}
-# for all applications (in-tree examples and external components).
+# Auto-provisions canonical `partitions.csv`, `idf_ext.py`, and `h1os.ini` into
+# ${CMAKE_SOURCE_DIR} for all applications (in-tree examples and external components).
 # ==============================================================================
 set(H1OS_PARTITION_DIR "${CMAKE_CURRENT_LIST_DIR}/partition")
 
@@ -51,5 +51,25 @@ if(NOT EXISTS "${CMAKE_SOURCE_DIR}/idf_ext.py" AND EXISTS "${CMAKE_CURRENT_LIST_
     message(STATUS "[H1OS] Auto-provisioning idf_ext.py -> ${CMAKE_SOURCE_DIR}/idf_ext.py")
     configure_file("${CMAKE_CURRENT_LIST_DIR}/idf_ext.py" "${CMAKE_SOURCE_DIR}/idf_ext.py" COPYONLY)
 endif()
+
+# 2. Auto-provision h1os.ini into the app root if missing.
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/h1os.ini" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/h1os.ini.template")
+    message(STATUS "[H1OS] Auto-provisioning h1os.ini -> ${CMAKE_SOURCE_DIR}/h1os.ini")
+    configure_file("${CMAKE_CURRENT_LIST_DIR}/h1os.ini.template" "${CMAKE_SOURCE_DIR}/h1os.ini" COPYONLY)
+endif()
+
+# 3. Dynamic H1OS Hardware SDKConfig Defaults Injection
+# Automatically prepends H1OS hardware defaults relative to wherever the
+# component is currently installed (in-tree, extra_components, or managed_components).
+set(_h1os_hw_defaults "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+if(EXISTS "${_h1os_hw_defaults}")
+    idf_build_get_property(_current_defaults SDKCONFIG_DEFAULTS)
+    if(NOT "${_h1os_hw_defaults}" IN_LIST _current_defaults)
+        idf_build_set_property(SDKCONFIG_DEFAULTS "${_h1os_hw_defaults}" PREPEND)
+        message(STATUS "[H1OS] Prepended hardware defaults -> ${_h1os_hw_defaults}")
+    endif()
+    unset(_current_defaults)
+endif()
+unset(_h1os_hw_defaults)
 
 unset(H1OS_PARTITION_DIR)

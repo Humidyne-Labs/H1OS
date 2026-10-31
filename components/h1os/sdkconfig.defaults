@@ -103,3 +103,15 @@ CONFIG_LV_USE_OBSERVER=n
 CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1
 CONFIG_LV_OS_FREERTOS=y
+
+
+# -------------------------------------------------------------------------
+# Flash Partition Table & Storage Invariants (ESP32-S3-PICO-1)
+# -------------------------------------------------------------------------
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+CONFIG_FATFS_VOLUME_COUNT=1
+CONFIG_SPIFFS_MAX_PARTITIONS=1
+CONFIG_SPIFFS_CACHE=y
+CONFIG_SPIFFS_CACHE_WR=y

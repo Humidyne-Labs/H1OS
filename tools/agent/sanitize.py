@@ -227,6 +227,7 @@ class SanitizerEngine:
         "release",
         "releases",
         "managed_components",
+        "logs",
     }
 
     IGNORED_FILES = {
@@ -704,7 +705,7 @@ class SanitizerEngine:
                 if self.config.config_path and file_path.resolve() == self.config.config_path.resolve():
                     continue
 
-                if file_name in self.IGNORED_FILES:
+                if file_name in self.IGNORED_FILES or (file_name.endswith('.log')):
                     continue
 
                 ext = file_path.suffix.lower()
