@@ -282,8 +282,8 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 Execute clean builds for both development and production targets:
 
 ```
-idf.py -B build_dev build
-idf.py -B build_prod build
+idf.py -B build_dev --preset dev build
+idf.py -B build_prod --preset prod build
 
 ```
 

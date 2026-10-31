@@ -24,7 +24,7 @@ This file constitutes the authoritative, always-active engineering and behaviora
      - **Awake FreeRTOS Domain (`hal_*`, `sub_*`, `orch_flow.c`, `h1os_*`):** Never spawn dedicated polling tasks or `vTaskDelay()` spin-wait loops to monitor timeouts, task exits, or hardware `BUSY`/button pins. Always use `esp_timer` (`esp_timer_start_once` / `esp_timer_start_periodic` / `esp_timer_restart`) for asynchronous timeouts and periodic state machines, GPIO edge interrupts (`gpio_isr_handler_add`) + hardware glitch filters (`gpio_new_pin_glitch_filter`) + `xSemaphoreTake` / `ulTaskNotifyTake` for hardware ready/busy/button lines, static `EventGroup` barriers (`xEventGroupCreateStatic`) for multi-subsystem sleep synchronization, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) for cross-task teardown synchronization.
      - **Bare-Metal Sleep Domain (`orch_wake_stub.c` & `ulp/main.c`):** FreeRTOS, `esp_timer`, and `gptimer` interrupt vectors reside in Flash/IRAM and are unmapped or powered down during deep sleep. Inside `RTC_IRAM_ATTR` and ULP code, straight-line bounded `ccount`/register polling with `rtc_reg_barrier()` (`memw` / `fence`) and `__attribute__((noinline))` loop barriers is mandatory.
 5. **Compiler Diagnostics & Two-Strike Resolution Protocol:**
-   - Always verify compilation with the canonical ESP-IDF profile (`C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`).
+   - Always verify compilation with the canonical ESP-IDF profile (C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1). If CMakePresets.json exists in the application directory (e.g. examples/H1OS), always pass both -B and --preset (e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build).
    - Keep header (`.h`) declarations and source (`.c`/`.cpp`) definitions atomically synchronized so the project compiles cleanly after every logical change.
    - If a build fails, isolate the exact diagnostic line and propose one targeted fix. If it fails a second time, **STOP IMMEDIATELY**, state the diagnostic verbatim, and request confirmation.
 
@@ -53,6 +53,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
 | **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic. |
 | **doctrine / dogma** | **standard / architecture / principle / specification**| Non-technical, cultish, or ideological framing. |
 | **bones / muscle / vanity** | **contracts / subsystems / presentation layer** | Anatomical slang / informal construction metaphors. |
+| **cadence** | **interval / period / frequency / cycle timing** | Timer, sleep cycle, refresh rate, or polling timing. |
 
 ### The Tone & Professionalism Clause
 1. **Eliminate Hostile / Adversarial Phrasing:** Prohibit violent idioms (*"nuke"*, *"blow away"*, *"destroy"*, *"wipe out"*, *"strangle"*). Use standard engineering terms (*"reset"*, *"erase"*, *"clear"*, *"abort"*).
@@ -161,7 +162,7 @@ If an ID is cited or if auditing a domain, read `docs/architecture/D0_std_audit_
 Direct commits to `main` are strictly prohibited. Before merging any branch into `main`:
 1. **Identity & Name Sanitization Audit:** Run `python tools/agent/sanitize.py --check` (or `--fix`) to verify zero personal identities, workstation usernames, or local filesystem paths leak into committed repository files or release archives.
 2. **Asset Optimization & Metadata Invariant (`/shrink` or `/quant`):** Execute the repository asset shrink pipeline (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) prior to staging or committing changes. All photographic evidence must be stamped with all-caps EXIF attribution (`HUMIDITRON/HUMADYNE_LABS`) and progressive JPEG quantization. PDFs are strictly preserved in their original compressed format with lossless metadata harmonization.
-3. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via `idf.py -B build_dev build`. You must build the examples inside `examples/H1OS` (the showcase project directory) to avoid polluting the repository root.
+3. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via idf.py -B build_dev --preset dev build (if CMakePresets.json exists, always pass both -B and --preset, e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build). You must build the examples inside examples/H1OS (the showcase project directory) to avoid polluting the repository root.
 4. **Mandatory `sdkconfig` Removal Invariant:** Always remove `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
 5. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
 6. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.

@@ -186,7 +186,7 @@ If $\Delta\text{SoC} < 1.0\%$ (i.e. $\text{initial\_soc\_x10} - \text{current\_s
 Mirroring battery telemetry and operational metrics into non-volatile storage (SPI NOR Flash via `sub_nvs`) ensures that cumulative autonomy calculations survive battery replacements, accidental power interruptions, and firmware reflashing. However, committing to Flash on every periodic wake cycle represents a serious hardware reliability hazard:
 
 1. **Flash Endurance Limit:** Standard SPI NOR Flash (such as the Winbond W25Q series commonly paired with ESP32-S3 modules) is physically rated for approximately $100{,}000$ Program/Erase (P/E) cycles per sector.
-2. **Headless Cadence Flash Churn:** In headless Flow A monitoring, the device awakens every $60\text{ s}$ to sample sensors:
+2. **Headless Cycle Timing Flash Churn:** In headless Flow A monitoring, the device awakens every $60\text{ s}$ to sample sensors:
 
 $$\text{Unthrottled Writes} = \frac{86{,}400\text{ s/day}}{60\text{ s/wake}} = 1{,}440\text{ commits/day} \implies 525{,}600\text{ commits/year}$$
 

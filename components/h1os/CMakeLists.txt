@@ -80,8 +80,8 @@ idf_component_register(
 # -----------------------------------------------------------------------------
 
 # Point to vendored font assets self-contained within the component tools directory
-set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts")
-set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/generate_1bpp_fonts.py")
+set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/static_assets")
+set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/generate_1bpp_fonts.py")
 
 if(NOT EXISTS "${FONT_GEN_SCRIPT}" OR NOT EXISTS "${FONT_SRC_DIR}/Montserrat-Bold.ttf")
     message(FATAL_ERROR

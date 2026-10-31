@@ -1,8 +1,17 @@
 /__pycache__/
-*.py
+*.py[cod]
 # Removes Build Directories.
 build*/
 sdkconfig
 sdkconfig.old
 managed_components/
 dependencies.lock
+h1os_tools.bat
+
+# Auto-provisioned component artifacts
+partitions.csv
+idf_ext.py
+
+# Build packaging & diagnostics
+dist/
+size_diagnostic_*.log

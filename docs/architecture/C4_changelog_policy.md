@@ -1,6 +1,6 @@
 # Document 10: Changelog Policy & SemVer Management
 
-This document defines the release cadence, versioning policy, and modification tracking standard for **H1OS**.
+This document defines the release schedule, versioning policy, and modification tracking standard for **H1OS**.
 
 ---
 

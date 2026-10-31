@@ -14,7 +14,7 @@ This skill automates the compression and EXIF attribution of photographic eviden
 | Command | Purpose | Tools Involved |
 | :--- | :--- | :--- |
 | **`/shrink` or `/quant`** | Run full repository image & PDF harmonization pass | `optimize_images.py`, `optimize_pdf.py` |
-| **`python tools/agent/optimize_images.py docs/logs/`** | Progressive JPEG encode & EXIF tagging | Pillow, EXIF tags 0x013B/0x8298/0x0131/0x010E |
+| **`python tools/agent/optimize_images.py --quality 80 docs/logs/`** | Progressive JPEG encode & EXIF tagging | Pillow, EXIF tags 0x013B/0x8298/0x0131/0x010E |
 | **`python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets`** | Losslessly stamp author/creator metadata on PDFs | PyMuPDF (`fitz`), zero stream modification |
 
 ---
@@ -32,8 +32,8 @@ This skill automates the compression and EXIF attribution of photographic eviden
 Run the complete pipeline from the repository root:
 
 ```powershell
-# Step 1: Optimize and stamp test chamber photos
-python tools/agent/optimize_images.py docs/logs/
+# Step 1: Optimize and stamp test chamber photos, use a compression quality of 80% for a sizable file reduction on disk.
+python tools/agent/optimize_images.py --quality 80 docs/logs/
 
 # Step 2: Losslessly harmonize PDF metadata
 python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets

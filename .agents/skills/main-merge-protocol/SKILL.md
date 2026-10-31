@@ -16,7 +16,7 @@ This skill provides step-by-step procedures, one-liner automation commands, and 
 | **0a. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check` | Zero leaks in code, archives, or git logs |
 | **0b. Asset Shrink Gate** | Quantize Docs & Images | `/shrink` or `tools/agent/optimize_*.py` | Lossless PDF meta, EXIF stamped |
 | **1. Invariant Check** | Firmware Safety Audit | `.agents/rules/coding.md`, `.agents/skills/h1os-firmware-standards` | 14 Safety Invariants validated |
-| **2. Clean Build** | Compile firmware | `idf.py -B build_dev build` in `examples\H1OS` | Exit code 0, 0 warnings/errors |
+| **2. Clean Build** | Compile firmware | `idf.py -B build_dev --preset dev build` in `examples\H1OS` | Exit code 0, 0 warnings/errors |
 | **3. Memory Audit** | Profile memory regions | `murdock_memory_budget` (`embedded-ops`) | DIRAM $\le 85\%$, RTC Slow $\le 4\text{ KB}$ |
 | **4. Rev Version** | Bump semantic version | `h1os_version.h`, `idf_component.yml`, `README.md`, `CHANGELOG.md` | All 4 files synchronized |
 | **5. Regen API Docs** | Doxygen + Moxygen | `doxygen Doxyfile`, `moxygen` $\rightarrow$ `docs/api.md` | `docs/api.md` updated |
@@ -99,7 +99,7 @@ Insert the new release ledger block directly above the previous release in `CHAN
 Run incremental build via canonical profile inside `examples\H1OS`:
 
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"; idf.py -B build_dev build
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"; idf.py -B build_dev --preset dev build
 ```
 
 Then query MCP memory profiling tool:

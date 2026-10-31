@@ -31,16 +31,20 @@ This skill defines the canonical build procedures, paths, and environment activa
 
 All commands must be executed in `examples\H1OS` using PowerShell:
 
+> [!IMPORTANT]
+> **CMakePresets Mandate:**
+> When `CMakePresets.json` exists in the application directory (e.g. `examples/H1OS`), always use the `--preset` argument (`--preset prod` or `--preset dev`). `idf.py` automatically binds the preset's target binary directory (`build_prod` or `build_dev`) and Kconfig defaults files.
+
 ### Production Build (Default)
-Compiles `bootloader.bin`, `ulp_h1os.bin`, and `h1os.bin` into `build_prod`:
+Compiles `bootloader.bin`, `ulp_h1os.bin`, and `h1os.bin` into `build_prod` via the `prod` preset:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod build
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod build
 ```
 
 ### Development Build
-Compiles with debug symbols into `build_dev`:
+Compiles with debug symbols into `build_dev` via the `dev` preset:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev build
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev build
 ```
 
 ### Reconfigure / CMake Refresh & Preset Switching
@@ -70,17 +74,23 @@ Reports DRAM, IRAM, DIRAM, and Flash footprint:
 & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod size
 ```
 
-### Comprehensive Size Diagnostic (`inspect_size.py` v2.2.0)
+### Comprehensive Size Diagnostic (`h1os_size`)
 Generates deep per-component, per-file, binary header breakdown and partition headroom summary without triggering Ninja builds (instant, 0% CPU):
 ```powershell
-# Instant direct inspection (default - parses map/bin artifacts without rebuilding):
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python inspect_size.py -B build_prod
+# Instant direct inspection via idf.py CLI extension:
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_size
 
-# From project root tools/:
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python tools/inspect_size.py -B examples/H1OS/build_prod
+# Direct script execution from application root:
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod
 
 # Optional: Force a full firmware rebuild before measuring:
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python inspect_size.py -B build_prod --rebuild
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod --rebuild
+```
+
+### Packaging Production Release Bundle (`h1os_pack`)
+Generates the monolithic factory binary and bundles modular batch control vectors and flasher into `dist/`:
+```powershell
+& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_pack
 ```
 
 ### Full Clean
@@ -103,5 +113,5 @@ Flashes the bootloader, partition table, and application over USB-Serial:
 | :--- | :--- |
 | `examples\H1OS` | **Main CMake showcase project root**. All `idf.py` commands run from here. |
 | `components\h1os` | **Core H1OS component library** (HAL, subsystems, orchestrator, lifecycle, ULP). |
-| `examples\H1OS\build_prod` | **Production build output** (`h1os.bin`, `ulp_h1os.bin`, `bootloader.bin`). |
-| `examples\H1OS\build_dev` | **Development build output**. |
+| `examples\H1OS\build_prod` | **Production build output** (`h1os.bin`, `ulp_h1os.bin`, `bootloader.bin`). Target for `--preset prod`. |
+| `examples\H1OS\build_dev` | **Development build output**. Target for `--preset dev`. |

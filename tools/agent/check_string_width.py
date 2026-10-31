@@ -12,145 +12,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GENERATED_DIR = REPO_ROOT / "examples" / "H1OS" / "build_dev" / "esp-idf" / "h1os" / "generated_fonts"
-OUTPUT_DIR = REPO_ROOT / "tools" / "fonts"
+METRICS_DIR = REPO_ROOT / "tools" / "fonts"
 SCREEN_DIR = REPO_ROOT / "examples" / "H1OS" / "main" / "screens"
 MAX_USABLE_WIDTH_PX = 188.0  # 200px width - 6px left margin - 6px right margin
 
-class LVGLFontMetrics:
-    def __init__(self, font_name: str, c_file: Path):
-        self.font_name = font_name
-        self.chars = {}            # char_code -> dict(glyph)
-        self.glyph_to_code = {}    # glyph_id -> char_code
-        self.kern_pairs = {}       # (code_left, code_right) -> kern_px
-        self._load_from_c_file(c_file)
-
-    def _load_from_c_file(self, c_path: Path):
-        with open(c_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        # Parse glyph_dsc
-        marker = "static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {"
-        start = content.find(marker)
-        if start == -1:
-            raise ValueError(f"glyph_dsc not found in {c_path}")
-        end = content.find("};\n\n/*---------------------", start)
-        if end == -1:
-            end = content.find("};", start)
-        glyph_block = content[start + len(marker):end]
-
-        glyph_entries = []
-        entry_pat = re.compile(r"\{\.bitmap_index\s*=\s*(\d+),\s*\.adv_w\s*=\s*(\d+),\s*\.box_w\s*=\s*(\d+),\s*\.box_h\s*=\s*(\d+),\s*\.ofs_x\s*=\s*(-?\d+),\s*\.ofs_y\s*=\s*(-?\d+)\}")
-        for m in entry_pat.finditer(glyph_block):
-            glyph_entries.append({
-                "adv_w": int(m.group(2)),
-                "box_w": int(m.group(3)),
-                "box_h": int(m.group(4)),
-                "ofs_x": int(m.group(5)),
-                "ofs_y": int(m.group(6)),
-            })
-
-        # Parse unicode_list_1
-        unicode_list = []
-        u_marker = "static const uint16_t unicode_list_1[] = {"
-        u_start = content.find(u_marker)
-        if u_start != -1:
-            u_end = content.find("};", u_start)
-            u_block = content[u_start + len(u_marker):u_end]
-            for val in re.findall(r"0x[0-9a-fA-F]+", u_block):
-                unicode_list.append(int(val, 16))
-
-        # Build cmap
-        for code in range(32, 127):
-            glyph_id = code - 32 + 1
-            if glyph_id < len(glyph_entries):
-                self.chars[code] = glyph_entries[glyph_id]
-                self.glyph_to_code[glyph_id] = code
-
-        for i, offset in enumerate(unicode_list):
-            code = 176 + offset
-            glyph_id = 96 + i
-            if glyph_id < len(glyph_entries):
-                self.chars[code] = glyph_entries[glyph_id]
-                self.glyph_to_code[glyph_id] = code
-
-        # Parse kerning classes
-        self._parse_kerning(content)
-
-    def _parse_kerning(self, content: str):
-        # Extract kern_left_class_mapping
-        left_match = re.search(r"static const uint8_t kern_left_class_mapping\[\]\s*=\s*\{([^}]+)\};", content)
-        right_match = re.search(r"static const uint8_t kern_right_class_mapping\[\]\s*=\s*\{([^}]+)\};", content)
-        vals_match = re.search(r"static const int8_t kern_class_values\[\]\s*=\s*\{([^}]+)\};", content)
-
-        if not (left_match and right_match and vals_match):
-            return
-
-        left_map = [int(x.strip()) for x in left_match.group(1).split(",") if x.strip()]
-        right_map = [int(x.strip()) for x in right_match.group(1).split(",") if x.strip()]
-        kern_vals = [int(x.strip()) for x in vals_match.group(1).split(",") if x.strip()]
-
-        if not left_map or not right_map or not kern_vals:
-            return
-
-        right_class_cnt = max(right_map) + 1
-        left_class_cnt = max(left_map) + 1
-
-        # Build map for all valid pairs
-        for g_left, c_left in enumerate(left_map):
-            if c_left == 0 or g_left not in self.glyph_to_code:
-                continue
-            code_l = self.glyph_to_code[g_left]
-            for g_right, c_right in enumerate(right_map):
-                if c_right == 0 or g_right not in self.glyph_to_code:
-                    continue
-                code_r = self.glyph_to_code[g_right]
-                idx = (c_left * right_class_cnt) + c_right
-                if idx < len(kern_vals):
-                    kv = kern_vals[idx]
-                    if kv != 0:
-                        self.kern_pairs[(code_l, code_r)] = kv / 16.0
-
-    def calc_width(self, text: str):
-        total_px = 0.0
-        details = []
-        prev_code = None
-
-        for ch in text:
-            code = ord(ch)
-            adv = self.chars[code]["adv_w"] / 16.0 if code in self.chars else 8.0
-            kern = 0.0
-            if prev_code is not None and (prev_code, code) in self.kern_pairs:
-                kern = self.kern_pairs[(prev_code, code)]
-
-            char_w = adv + kern
-            total_px += char_w
-            details.append({
-                "char": ch,
-                "code": code,
-                "adv_px": adv,
-                "kern_px": kern,
-                "total_char_px": char_w
-            })
-            prev_code = code
-
-        return round(total_px, 2), details
-
-    def export_kerning_csv(self, out_path: Path):
-        with open(out_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["left_char", "left_code", "right_char", "right_code", "kern_raw_16th", "kern_px"])
-            for (cl, cr), kpx in sorted(self.kern_pairs.items()):
-                try:
-                    sl = chr(cl) if cl >= 32 else f"<U+{cl:04X}>"
-                    sr = chr(cr) if cr >= 32 else f"<U+{cr:04X}>"
-                except Exception:
-                    sl = str(cl)
-                    sr = str(cr)
-                writer.writerow([sl, cl, sr, cr, int(kpx * 16), kpx])
-        print(f"Exported {len(self.kern_pairs)} kerning pairs to {out_path}")
-
-
+# Built-in FontAwesome 5 Unicode mappings for LVGL icons
 LVGL_SYMBOL_MAP = {
     "LV_SYMBOL_AUDIO": "\uf001",
     "LV_SYMBOL_VIDEO": "\uf008",
@@ -189,71 +55,119 @@ LVGL_SYMBOL_MAP = {
     "LV_SYMBOL_SD_CARD": "\uf7c2",
 }
 
-def audit_screen_files(font14: LVGLFontMetrics):
+
+class LVGLFontMetrics:
+    """Loads authoritative font metrics from tools/fonts/ CSV tables."""
+
+    def __init__(self, size: int):
+        self.size = size
+        self.widths: dict[int, float] = {}
+        self.kern_pairs: dict[tuple[int, int], float] = {}
+        self._load_from_csv()
+
+    def _load_from_csv(self):
+        char_csv = METRICS_DIR / f"char_widths_montserrat_{self.size}.csv"
+        kern_csv = METRICS_DIR / f"kern_pairs_montserrat_{self.size}.csv"
+
+        if not char_csv.is_file():
+            print(f"[!] Error: Font metric table missing: {char_csv}")
+            print(f"    Run 'python tools/agent/extract_font_metrics.py' to generate metrics.")
+            sys.exit(1)
+
+        with open(char_csv, "r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                self.widths[int(row["unicode_dec"])] = float(row["width_px"])
+
+        if kern_csv.is_file():
+            with open(kern_csv, "r", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    left_code = int(row["left_code"], 16)
+                    right_code = int(row["right_code"], 16)
+                    self.kern_pairs[(left_code, right_code)] = float(row["kern_px"])
+
+    def calc_width(self, text: str) -> tuple[float, list[dict]]:
+        """Calculate total pixel width including kerning pair adjustments."""
+        total_px = 0.0
+        details = []
+        prev_code = None
+
+        for ch in text:
+            code = ord(ch)
+            adv = self.widths.get(code, 8.0)
+            kern = self.kern_pairs.get((prev_code, code), 0.0) if prev_code is not None else 0.0
+
+            char_w = adv + kern
+            total_px += char_w
+            details.append({
+                "char": ch,
+                "code": code,
+                "adv_px": adv,
+                "kern_px": kern,
+                "total_char_px": char_w,
+            })
+            prev_code = code
+
+        return round(total_px, 2), details
+
+
+def audit_screen_files(font: LVGLFontMetrics):
+    """Scan all screen source files and validate string templates against layout boundary."""
     print("\n" + "=" * 78)
-    print("SCREEN SOURCE FILE AUTOMATED STRING WIDTH AUDIT (Threshold: <= 188.0 px)")
+    print(f"SCREEN SOURCE FILE AUTOMATED STRING WIDTH AUDIT (Threshold: <= {MAX_USABLE_WIDTH_PX:.1f} px)")
     print("=" * 78)
 
     c_files = sorted(SCREEN_DIR.glob("screen_*.c"))
+    if not c_files:
+        print(f"[!] No screen files found in {SCREEN_DIR}")
+        sys.exit(1)
+
     total_checked = 0
     overflows = 0
-
     str_pat = re.compile(r'lv_label_set_text(?:_fmt)?\s*\([^,]+,\s*"([^"\\]*(?:\\.[^"\\]*)*)"', re.DOTALL)
 
     for c_file in c_files:
         with open(c_file, "r", encoding="utf-8") as f:
             code = f.read()
 
-        # Handle LVGL symbol concatenation (e.g. LV_SYMBOL_TINT " text" -> "\uf043 text")
+        # Concatenate LVGL symbol constants (e.g., LV_SYMBOL_TINT " text" -> "\uf043 text")
         for sym_name, sym_char in LVGL_SYMBOL_MAP.items():
             code = re.sub(rf'\b{sym_name}\s*"', f'"{sym_char}', code)
             code = re.sub(rf'"\s*{sym_name}\b', f'{sym_char}"', code)
             code = re.sub(rf'\b{sym_name}\b', f'"{sym_char}"', code)
 
-        matches = str_pat.findall(code)
-        for raw_str in matches:
-            # Replace format specifiers with worst-case realistic text
+        for raw_str in str_pat.findall(code):
+            # Substitute format specifiers with realistic worst-case values
             sim_str = raw_str
             sim_str = sim_str.replace("%lu", "625").replace("%u", "100").replace("%d", "100")
             sim_str = sim_str.replace("%.2f", "4.00").replace("%.1f", "72.5").replace("%.0f", "120")
             sim_str = sim_str.replace("%+.1f", "+0.0").replace("%3lu", "240")
             sim_str = sim_str.replace("%02X", "00").replace("%X", "00").replace("%%", "%")
             sim_str = sim_str.replace("%s", "CHARGED")
-
-            # Clean escape sequences
             sim_str = sim_str.replace("\\n", " ").replace('\\"', '"')
 
-            w, _ = font14.calc_width(sim_str)
+            w, _ = font.calc_width(sim_str)
             total_checked += 1
             status = "PASS" if w <= MAX_USABLE_WIDTH_PX else "FAIL"
 
             if status == "FAIL":
                 overflows += 1
-                print(f"[{status:4s}] {w:6.2f} px > 188 px | {c_file.name:24s} | Template: '{raw_str}' -> Sim: '{sim_str}'")
+                print(f"[{status:4s}] {w:6.2f} px > {MAX_USABLE_WIDTH_PX:.0f} px | {c_file.name:24s} | Template: '{raw_str}' -> Sim: '{sim_str}'")
 
     if overflows == 0:
         print(f"\nAUDIT VERDICT: ALL {total_checked} STRINGS PASS! Zero screen boundaries breached.")
     else:
-        print(f"\nAUDIT VERDICT: {overflows} of {total_checked} STRINGS EXCEED 188px!")
+        print(f"\nAUDIT VERDICT: {overflows} of {total_checked} STRINGS EXCEED {MAX_USABLE_WIDTH_PX:.0f}px!")
+        sys.exit(1)
 
 
 def main():
     parser = argparse.ArgumentParser(description="H1OS Font Metric and String Width Checker")
     parser.add_argument("string", nargs="?", help="String to calculate width for")
-    parser.add_argument("--size", type=int, default=14, choices=[14, 16, 18, 20, 24, 32], help="Font size to evaluate (default: 14)")
+    parser.add_argument("--size", type=int, default=14, choices=[14, 16, 18, 20, 24, 32], help="Font size (default: 14)")
     parser.add_argument("--audit-screens", action="store_true", help="Audit all screen string templates")
     args = parser.parse_args()
 
-    font_path = GENERATED_DIR / f"h1os_font_montserrat_{args.size}_1bpp.c"
-    if not font_path.exists():
-        print(f"Error: {font_path} not found.")
-        sys.exit(1)
-
-    font = LVGLFontMetrics(f"Montserrat-{args.size}", font_path)
-
-    if args.audit_screens:
-        audit_screen_files(font)
-        return
+    font = LVGLFontMetrics(args.size)
 
     if args.string:
         w, details = font.calc_width(args.string)
@@ -267,8 +181,8 @@ def main():
         for d in details:
             print(f"{d['char']:<6} {d['adv_px']:<10.2f} {d['kern_px']:<10.2f} {d['total_char_px']:<10.2f}")
     else:
-        # Default behavior: run screen audit
         audit_screen_files(font)
+
 
 if __name__ == "__main__":
     main()

@@ -104,9 +104,9 @@ All five root causes have been remediated in **`v2.4.6-dev`**, restoring `<1.0 �
 
 ---
 
-## 5. Post-Audit Hardware Verification (`TST_005_IMGS_POST-AUDIT-THERMAL`) & `v2.4.7-dev` Remediation
+## 5. Post-Audit Hardware Verification (`TST_005_IMGS_POST-THERMAL`) & `v2.4.7-dev` Remediation
 
-Following the initial `v2.4.6-dev` patch, bench verification was conducted after a 10-minute ambient cooldown (`TST_005_IMGS_POST-AUDIT-THERMAL/IMG261029161206.bmp` – `IMG261029161752.bmp` and `internal_thermal_note.md`):
+Following the initial `v2.4.6-dev` patch, bench verification was conducted after a 10-minute ambient cooldown (`TST_005_IMGS_POST-THERMAL/IMG261029161206.bmp` – `IMG261029161752.bmp` and `internal_thermal_note.md`):
 
 ### 5.1 Observed Hardware Behavior on `v2.4.6-dev`
 
