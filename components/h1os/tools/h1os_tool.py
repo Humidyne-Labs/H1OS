@@ -16,10 +16,11 @@ import datetime
 from dataclasses import dataclass
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 VERSION = "2.4.1"
 SYSTEM_SECTIONS = {"project", "dist", "version", "partitions", "target", "build", "audit", "presets"}
@@ -612,6 +613,98 @@ def run_clean(
     return 0
 
 
+def spawn_serial_monitor(
+    config: H1OSConfig,
+    profile: Optional[str] = None,
+    build_dir: Optional[Union[str, Path]] = None,
+    port: Optional[str] = None,
+    baud: Optional[int] = None,
+) -> Tuple[bool, str]:
+    """Spawn an independent, detached serial monitor in an external terminal window."""
+    prof = config.resolve_profile(profile, build_dir)
+    if build_dir:
+        b_dir = Path(build_dir).resolve()
+    elif prof:
+        b_dir = prof.build_dir
+    else:
+        first_prof = list(config.profiles.values())[0] if config.profiles else None
+        b_dir = first_prof.build_dir if first_prof else None
+
+    eff_port = port or config.port
+    eff_baud = baud or config.baud or 115200
+
+    idf_args = []
+    if b_dir and b_dir.is_dir():
+        idf_args.extend(["-B", str(b_dir)])
+    if eff_port:
+        idf_args.extend(["-p", eff_port])
+    if eff_baud:
+        idf_args.extend(["-b", str(eff_baud)])
+    idf_args.append("monitor")
+
+    app_root_str = str(config.app_root)
+
+    if os.name == "nt":
+        profile_script = r"C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"
+        escaped_app_root = app_root_str.replace("'", "''")
+        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
+
+        ps_cmd = (
+            f"& {{ "
+            f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
+            f"Set-Location '{escaped_app_root}'; "
+            f"Write-Host '[H1OS] Launching serial monitor on port: {eff_port or 'auto-detect'}...' -ForegroundColor Cyan; "
+            f"Write-Host '[H1OS] Press Ctrl+] to disconnect monitor session.' -ForegroundColor Gray; "
+            f"idf.py {args_str} "
+            f"}}"
+        )
+
+        try:
+            wt_exe = shutil.which("wt.exe")
+            if not wt_exe:
+                cand_wt = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps" / "wt.exe"
+                if cand_wt.is_file():
+                    wt_exe = str(cand_wt)
+
+            if wt_exe:
+                subprocess.Popen(
+                    [wt_exe, "--title", "H1OS Serial Monitor", "-d", app_root_str, "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                    creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+                )
+            else:
+                subprocess.Popen(
+                    ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                    creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+                )
+            return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
+        except Exception as e:
+            return False, f"Failed to spawn external monitor window: {e}"
+
+    elif sys.platform == "darwin":
+        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
+        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && idf.py {args_str}"'
+        try:
+            subprocess.Popen(["osascript", "-e", osa_script])
+            return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in macOS Terminal."
+        except Exception as e:
+            return False, f"Failed to spawn macOS Terminal: {e}"
+
+    else:
+        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
+        for term in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm"):
+            if shutil.which(term):
+                try:
+                    if term == "gnome-terminal":
+                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && idf.py {args_str}; exec bash"]
+                    else:
+                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && idf.py {args_str}; exec bash'"]
+                    subprocess.Popen(cmd)
+                    return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in {term}."
+                except Exception as e:
+                    return False, f"Failed to spawn {term}: {e}"
+        return False, "No graphical terminal emulator found (tried x-terminal-emulator, gnome-terminal, konsole, xterm)."
+
+
 def run_menu(config: H1OSConfig) -> int:
     """Launch interactive Rich developer tooling console."""
     menu_script = config.comp_dir / "tools" / "menu" / "h1os_menu.py"
@@ -689,6 +782,13 @@ def main():
     erase_p.add_argument("-b", "--baud", type=int, dest="baud", default=None, help="Serial baud rate")
     erase_p.add_argument("--chip", dest="chip", default=None, help="Target silicon chip (default: esp32s3)")
 
+    # monitor subcommand
+    monitor_p = subparsers.add_parser("monitor", help="Spawn serial monitor in external terminal window")
+    monitor_p.add_argument("-P", "--profile", dest="profile", default=None, help="Target build profile")
+    monitor_p.add_argument("-B", "--build-dir", dest="build_dir", default=None, help="Explicit build directory")
+    monitor_p.add_argument("-p", "--port", dest="port", default=None, help="Serial COM port")
+    monitor_p.add_argument("-b", "--baud", type=int, dest="baud", default=None, help="Serial baud rate")
+
     # menu subcommand
     subparsers.add_parser("menu", help="Launch interactive Rich developer tooling console")
 
@@ -723,6 +823,10 @@ def main():
         sys.exit(run_flash(config, profile=args.profile, build_dir=args.build_dir, port=args.port, baud=args.baud, chip=args.chip))
     elif args.command == "erase":
         sys.exit(run_erase(config, port=args.port, baud=args.baud, chip=args.chip))
+    elif args.command == "monitor":
+        ok, msg = spawn_serial_monitor(config, profile=args.profile, build_dir=args.build_dir, port=args.port, baud=args.baud)
+        print(msg)
+        sys.exit(0 if ok else 1)
     else:
         parser.print_help()
         sys.exit(1)

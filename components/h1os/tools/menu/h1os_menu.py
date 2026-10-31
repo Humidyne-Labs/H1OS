@@ -21,7 +21,8 @@ if str(TOOLS_DIR) not in sys.path:
 
 try:
     from rich import box
-    from rich.console import Console
+    from rich.console import Console, Group
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
@@ -37,6 +38,7 @@ from h1os_tool import (
     run_flash,
     run_pack,
     run_size,
+    spawn_serial_monitor,
 )
 from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
 from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
@@ -117,10 +119,8 @@ def read_nav_key() -> str:
     return get_key_posix()
 
 
-def render_console_frame(config: H1OSConfig, console: "Console", selected_idx: int, menu_items: List[Dict[str, str]]) -> None:
-    """Render the full 78-column frame with header and highlighted selection."""
-    console.clear()
-
+def build_console_frame(config: H1OSConfig, selected_idx: int, menu_items: List[Dict[str, str]]) -> Group:
+    """Build the full 78-column frame with header and highlighted selection."""
     # 1. Header Information Panel (78 columns max)
     port_label = config.port if config.port else "Auto-discover"
     app_root_str = str(config.app_root)
@@ -170,7 +170,6 @@ def render_console_frame(config: H1OSConfig, console: "Console", selected_idx: i
         box=box.ROUNDED,
         width=TERM_WIDTH,
     )
-    console.print(header_panel)
 
     # 2. Operations Table (78 columns max)
     ops_table = Table(
@@ -200,14 +199,17 @@ def render_console_frame(config: H1OSConfig, console: "Console", selected_idx: i
             style=row_style,
         )
 
-    console.print(ops_table)
-
     # 3. Navigation Help Footer
     footer_text = Text(
         "  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Q/Esc] Exit",
         style="dim",
     )
-    console.print(footer_text)
+    return Group(header_panel, ops_table, footer_text)
+
+
+def render_console_frame(config: H1OSConfig, console: "Console", selected_idx: int, menu_items: List[Dict[str, str]]) -> None:
+    """Render the full 78-column frame with header and highlighted selection."""
+    console.print(build_console_frame(config, selected_idx, menu_items))
 
 
 def find_compiled_app_bin(profile, app_name: Optional[str] = None) -> Optional[Path]:
@@ -404,6 +406,13 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
         "action": "partition_menu",
     })
     menu_items.append({
+        "key": "M",
+        "label": "Spawn Serial Monitor",
+        "target": config.port or "Auto-detect",
+        "engine": "external terminal",
+        "action": "monitor",
+    })
+    menu_items.append({
         "key": "E",
         "label": "Erase Entire Flash Die",
         "target": config.chip.upper(),
@@ -422,27 +431,30 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
 
 
 def run_interactive_menu(config: H1OSConfig, console: "Console") -> str:
-    """Run real-time keyboard navigation loop with arrow keys."""
+    """Run real-time keyboard navigation loop with arrow keys and smooth Live rendering."""
     menu_items = build_dynamic_menu_items(config)
     selected_idx = 0
 
-    while True:
-        render_console_frame(config, console, selected_idx, menu_items)
-        key = read_nav_key()
+    frame = build_console_frame(config, selected_idx, menu_items)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        while True:
+            key = read_nav_key()
 
-        if key == "UP":
-            selected_idx = (selected_idx - 1) % len(menu_items)
-        elif key == "DOWN":
-            selected_idx = (selected_idx + 1) % len(menu_items)
-        elif key in ("ENTER", "SPACE"):
-            return menu_items[selected_idx]["action"]
-        elif key in ("Q", "ESC", "QUIT"):
-            return "quit"
-        else:
-            # Quick-jump by key
-            for item in menu_items:
-                if key == item["key"]:
-                    return item["action"]
+            if key == "UP":
+                selected_idx = (selected_idx - 1) % len(menu_items)
+                live.update(build_console_frame(config, selected_idx, menu_items), refresh=True)
+            elif key == "DOWN":
+                selected_idx = (selected_idx + 1) % len(menu_items)
+                live.update(build_console_frame(config, selected_idx, menu_items), refresh=True)
+            elif key in ("ENTER", "SPACE"):
+                return menu_items[selected_idx]["action"]
+            elif key in ("Q", "ESC", "QUIT"):
+                return "quit"
+            else:
+                # Quick-jump by key
+                for item in menu_items:
+                    if key == item["key"]:
+                        return item["action"]
 
 
 def run_plain_fallback(config: H1OSConfig) -> str:
@@ -469,6 +481,74 @@ def run_plain_fallback(config: H1OSConfig) -> str:
         if choice == item["key"]:
             return item["action"]
     return "quit"
+
+
+def build_profile_sub_frame(
+    title: str,
+    subtitle: str,
+    items: List[Dict[str, str]],
+    selected_idx: int,
+) -> Group:
+    """Build the profile selection sub-menu frame."""
+    sub_table = Table(
+        box=box.ROUNDED,
+        width=TERM_WIDTH,
+        header_style="bold bright_cyan",
+        title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
+        show_lines=False,
+        pad_edge=False,
+    )
+    sub_table.add_column(" ", justify="center", width=2)
+    sub_table.add_column("#", justify="center", style="bold white", width=3)
+    sub_table.add_column("Profile", style="bold", width=18)
+    sub_table.add_column("Target Build Dir", style="dim", width=20)
+    sub_table.add_column("CMake Preset", style="cyan", width=14)
+    sub_table.add_column("Status", width=12)
+
+    for i, item in enumerate(items):
+        is_sel = (i == selected_idx)
+        marker = ">" if is_sel else " "
+        row_style = "bold white on blue" if is_sel else ""
+        status_style = "[bold green]READY[/]" if item["status"] == "READY" else "[dim red]NOT BUILT[/]"
+
+        sub_table.add_row(
+            marker,
+            item["key"],
+            item["label"],
+            item["target"],
+            item["preset"],
+            status_style,
+            style=row_style,
+        )
+
+    back_is_sel = (selected_idx == len(items))
+    back_marker = ">" if back_is_sel else " "
+    back_style = "bold white on blue" if back_is_sel else "dim"
+    sub_table.add_row(
+        back_marker,
+        "B",
+        "[yellow]Back to Main Menu[/]",
+        "-",
+        "-",
+        "-",
+        style=back_style,
+    )
+
+    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B] Back", style="dim")
+    return Group(sub_table, footer)
+
+
+def pause_before_menu(console: Optional["Console"]) -> bool:
+    """Single-key pause before returning to main menu. Returns False if user chooses to quit."""
+    if console:
+        console.print("\n[dim]Press any key to return to menu ([bold white]Q[/dim] to exit)...[/]", end="")
+    else:
+        print("\nPress any key to return to menu (Q to exit)...", end="")
+
+    key = read_nav_key()
+    if key in ("Q", "ESC", "QUIT"):
+        return False
+    return True
 
 
 def run_profile_selection_menu(
@@ -534,73 +614,27 @@ def run_profile_selection_menu(
     selected_idx = 0
     total_rows = len(items) + 1  # items + Back entry
 
-    while True:
-        console.clear()
+    frame = build_profile_sub_frame(title, subtitle, items, selected_idx)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        while True:
+            key = read_nav_key()
 
-        sub_table = Table(
-            box=box.ROUNDED,
-            width=TERM_WIDTH,
-            header_style="bold bright_cyan",
-            title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
-            show_lines=False,
-            pad_edge=False,
-        )
-        sub_table.add_column(" ", justify="center", width=2)
-        sub_table.add_column("#", justify="center", style="bold white", width=3)
-        sub_table.add_column("Profile", style="bold", width=18)
-        sub_table.add_column("Target Build Dir", style="dim", width=20)
-        sub_table.add_column("CMake Preset", style="cyan", width=14)
-        sub_table.add_column("Status", width=12)
-
-        for i, item in enumerate(items):
-            is_sel = (i == selected_idx)
-            marker = ">" if is_sel else " "
-            row_style = "bold white on blue" if is_sel else ""
-            status_style = "[bold green]READY[/]" if item["status"] == "READY" else "[dim red]NOT BUILT[/]"
-
-            sub_table.add_row(
-                marker,
-                item["key"],
-                item["label"],
-                item["target"],
-                item["preset"],
-                status_style,
-                style=row_style,
-            )
-
-        back_is_sel = (selected_idx == len(items))
-        back_marker = ">" if back_is_sel else " "
-        back_style = "bold white on blue" if back_is_sel else "dim"
-        sub_table.add_row(
-            back_marker,
-            "B",
-            "[yellow]Back to Main Menu[/]",
-            "-",
-            "-",
-            "-",
-            style=back_style,
-        )
-
-        console.print(sub_table)
-        footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B] Back", style="dim")
-        console.print(footer)
-
-        key = read_nav_key()
-
-        if key == "UP":
-            selected_idx = (selected_idx - 1) % total_rows
-        elif key == "DOWN":
-            selected_idx = (selected_idx + 1) % total_rows
-        elif key in ("ENTER", "SPACE"):
-            if selected_idx == len(items):
+            if key == "UP":
+                selected_idx = (selected_idx - 1) % total_rows
+                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx), refresh=True)
+            elif key == "DOWN":
+                selected_idx = (selected_idx + 1) % total_rows
+                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx), refresh=True)
+            elif key in ("ENTER", "SPACE"):
+                if selected_idx == len(items):
+                    return None
+                return items[selected_idx]["profile"]
+            elif key in ("B", "ESC", "Q", "QUIT"):
                 return None
-            return items[selected_idx]["profile"]
-        elif key in ("B", "ESC", "Q", "QUIT"):
-            return None
-        else:
-            for item in items:
-                if key in (item["key"], item["profile"].upper()):
-                    return item["profile"]
+            else:
+                for item in items:
+                    if key in (item["key"], item["profile"].upper()):
+                        return item["profile"]
 
 
 def main():
@@ -632,13 +666,9 @@ def main():
                 title="Build Firmware",
                 subtitle="Select an auto-populated profile to build with 'idf.py build'",
             )
-            if sel_prof:
-                run_build(config, profile=sel_prof, clean=False, reconfig_only=False)
-            else:
-                if console:
-                    console.print("[dim]Build cancelled.[/]")
-                else:
-                    print("Build cancelled.")
+            if not sel_prof:
+                continue
+            run_build(config, profile=sel_prof, clean=False, reconfig_only=False)
 
         elif action.startswith("build:"):
             prof = action.split(":", 1)[1]
@@ -651,13 +681,9 @@ def main():
                 title="Reconfigure Build Profile",
                 subtitle="Select an auto-populated profile to run 'idf.py reconfigure'",
             )
-            if sel_prof:
-                run_build(config, profile=sel_prof, clean=False, reconfig_only=True)
-            else:
-                if console:
-                    console.print("[dim]Reconfiguration cancelled.[/]")
-                else:
-                    print("Reconfiguration cancelled.")
+            if not sel_prof:
+                continue
+            run_build(config, profile=sel_prof, clean=False, reconfig_only=True)
 
         elif action.startswith("reconfig:"):
             prof = action.split(":", 1)[1]
@@ -672,15 +698,12 @@ def main():
                 allow_all=True,
                 all_label="Clean All Profiles & Dependencies",
             )
+            if not sel_prof:
+                continue
             if sel_prof == "__ALL__":
                 run_clean(config, clean_all=True)
-            elif sel_prof:
-                run_clean(config, profile=sel_prof)
             else:
-                if console:
-                    console.print("[dim]Clean cancelled.[/]")
-                else:
-                    print("Clean cancelled.")
+                run_clean(config, profile=sel_prof)
 
         elif action.startswith("clean:"):
             prof = action.split(":", 1)[1]
@@ -696,13 +719,9 @@ def main():
                 title="Clean & Full Rebuild",
                 subtitle="WARNING: Erases build directory, dependencies.lock & managed_components before rebuilding",
             )
-            if sel_prof:
-                run_build(config, profile=sel_prof, clean=True, reconfig_only=False)
-            else:
-                if console:
-                    console.print("[dim]Clean rebuild cancelled.[/]")
-                else:
-                    print("Clean rebuild cancelled.")
+            if not sel_prof:
+                continue
+            run_build(config, profile=sel_prof, clean=True, reconfig_only=False)
 
         elif action.startswith("clean_rebuild:"):
             prof = action.split(":", 1)[1]
@@ -715,13 +734,9 @@ def main():
                 title="Size Audit Diagnostic",
                 subtitle="Select an auto-populated profile to analyze firmware memory footprint",
             )
-            if sel_prof:
-                run_size(config, profile=sel_prof)
-            else:
-                if console:
-                    console.print("[dim]Size audit cancelled.[/]")
-                else:
-                    print("Size audit cancelled.")
+            if not sel_prof:
+                continue
+            run_size(config, profile=sel_prof)
 
         elif action.startswith("size:"):
             prof = action.split(":", 1)[1]
@@ -734,13 +749,9 @@ def main():
                 title="Package Release Bundle",
                 subtitle="Select an auto-populated profile to package release distribution artifacts",
             )
-            if sel_prof:
-                run_pack(config, profile=sel_prof)
-            else:
-                if console:
-                    console.print("[dim]Packaging cancelled.[/]")
-                else:
-                    print("Packaging cancelled.")
+            if not sel_prof:
+                continue
+            run_pack(config, profile=sel_prof)
 
         elif action.startswith("pack:"):
             prof = action.split(":", 1)[1]
@@ -753,13 +764,9 @@ def main():
                 title="Flash Firmware to Device",
                 subtitle="Select an auto-populated profile to flash over serial COM port",
             )
-            if sel_prof:
-                run_flash(config, profile=sel_prof)
-            else:
-                if console:
-                    console.print("[dim]Flash cancelled.[/]")
-                else:
-                    print("Flash cancelled.")
+            if not sel_prof:
+                continue
+            run_flash(config, profile=sel_prof)
 
         elif action.startswith("flash:"):
             prof = action.split(":", 1)[1]
@@ -795,6 +802,9 @@ def main():
 
             if not choice:
                 choice = "1"
+
+            if choice in ("B", "BACK", "CANCEL"):
+                continue
 
             if choice == "1":
                 ok, msg = execute_dual_slot_deploy(config, b1, b2, n1, n2, active_slot=0)
@@ -837,6 +847,21 @@ def main():
 
         elif action == "partition_menu":
             run_partition_manager_menu(config, console)
+            continue
+
+        elif action == "monitor":
+            ok, msg = spawn_serial_monitor(config)
+            if ok:
+                if console:
+                    console.print(f"\n[bold green]SUCCESS:[/] {msg}")
+                    console.print("[dim]Serial monitor running independently in external window.[/]")
+                else:
+                    print(f"\nSUCCESS: {msg}")
+            else:
+                if console:
+                    console.print(f"\n[bold red]ERROR:[/] {msg}")
+                else:
+                    print(f"\nERROR: {msg}")
 
         elif action == "erase":
             confirmed = False
@@ -863,18 +888,13 @@ def main():
                 else:
                     print("Erase cancelled.")
 
-        # Pause before returning to menu
-        if console:
-            console.print("\n[dim]Press Enter to return to menu...[/]", end="")
-            try:
-                input()
-            except (KeyboardInterrupt, EOFError):
-                break
-        else:
-            try:
-                input("\nPress Enter to return to menu...")
-            except (KeyboardInterrupt, EOFError):
-                break
+        # Pause before returning to menu for actions that produce terminal output
+        if not pause_before_menu(console):
+            if console:
+                console.print("\n[dim]Exiting H1OS Console. Goodbye![/]\n")
+            else:
+                print("\nExiting. Goodbye!\n")
+            break
 
 
 if __name__ == "__main__":

@@ -38,7 +38,8 @@ from partition.part_hexdump import (
 )
 
 try:
-    from rich.console import Console
+    from rich.console import Console, Group
+    from rich.live import Live
     from rich.table import Table
     from rich.panel import Panel
     from rich import box
@@ -314,17 +315,83 @@ def render_pct_bar(pct: float, width: int = 6) -> str:
     return f"[dim][{bar}] 0%[/]"
 
 
-def pause_or_usage_prompt(console: Optional["Console"]) -> str:
-    """Pause before clearing with option to run live usage audit."""
-    if console:
-        console.print("\n[bold cyan][U][/] [white]Audit Live Usage from Device[/]   [dim]Press Enter to continue...[/] ", end="")
+def read_single_key() -> str:
+    """Read a single keypress or arrow key immediately without waiting for Enter."""
+    if not sys.stdin.isatty():
+        try:
+            line = sys.stdin.readline()
+            return line.strip().upper() if line else "QUIT"
+        except Exception:
+            return "QUIT"
+
+    if os.name == "nt":
+        import msvcrt
+        ch = msvcrt.getch()
+        if ch in (b"\x00", b"\xe0"):
+            ch2 = msvcrt.getch()
+            if ch2 == b"H":
+                return "UP"
+            elif ch2 == b"P":
+                return "DOWN"
+            elif ch2 == b"K":
+                return "LEFT"
+            elif ch2 == b"M":
+                return "RIGHT"
+            return "SPECIAL"
+        elif ch in (b"\r", b"\n"):
+            return "ENTER"
+        elif ch == b"\x1b":
+            return "ESC"
+        elif ch in (b"\x03", b"\x1a"):
+            return "QUIT"
+        elif ch == b" ":
+            return "SPACE"
+        else:
+            try:
+                return ch.decode("utf-8", errors="ignore").upper()
+            except Exception:
+                return ""
     else:
-        print("\n[U] Audit Live Usage from Device   Press Enter to continue... ", end="")
-    try:
-        val = input().strip().upper()
-        return val
-    except (KeyboardInterrupt, EOFError):
-        return ""
+        try:
+            import termios
+            import tty
+            fd = sys.stdin.fileno()
+            old = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                ch = sys.stdin.read(1)
+                if ch == "\x1b":
+                    seq = sys.stdin.read(2)
+                    if seq == "[A":
+                        return "UP"
+                    elif seq == "[B":
+                        return "DOWN"
+                    return "ESC"
+                elif ch in ("\r", "\n"):
+                    return "ENTER"
+                elif ch in ("\x03", "\x1a"):
+                    return "QUIT"
+                elif ch == " ":
+                    return "SPACE"
+                return ch.upper()
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        except Exception:
+            line = sys.stdin.readline().strip().upper()
+            return line if line else "ENTER"
+
+
+def pause_or_usage_prompt(console: Optional["Console"]) -> str:
+    """Single-key prompt to audit live usage or return immediately without waiting for Enter."""
+    if console:
+        console.print("\n[bold cyan][U][/] [white]Audit Live Usage from Device[/]   [dim][Q/Esc/Enter] Return to Menu[/] ", end="")
+    else:
+        print("\n[U] Audit Live Usage from Device   [Q/Enter] Return to Menu: ", end="")
+
+    key = read_single_key()
+    if key in ("U", "u"):
+        return "U"
+    return "QUIT"
 
 
 def run_live_partition_usage_audit(
@@ -498,6 +565,101 @@ def run_live_partition_usage_audit(
     console.print(table)
 
 
+def build_select_partition_frame(
+    title: str,
+    partitions: List[PartitionEntry],
+    selected_idx: int,
+) -> Group:
+    """Build interactive partition selection frame."""
+    sub_table = Table(
+        box=box.ROUNDED,
+        width=TERM_WIDTH,
+        header_style="bold bright_cyan",
+        title=f"[bold white]{title}[/]\n[dim]Choose an auto-discovered partition from active table[/]",
+        show_lines=False,
+        pad_edge=False,
+    )
+    sub_table.add_column(" ", justify="center", width=2)
+    sub_table.add_column("#", justify="center", style="bold white", width=3)
+    sub_table.add_column("Partition", style="bold", width=14)
+    sub_table.add_column("Type/Subtype", style="cyan", width=16)
+    sub_table.add_column("Offset", style="dim", width=14, justify="right")
+    sub_table.add_column("Size", style="green", width=12, justify="right")
+
+    for i, p in enumerate(partitions):
+        is_sel = (i == selected_idx)
+        marker = ">" if is_sel else " "
+        row_style = "bold white on blue" if is_sel else ""
+
+        sub_table.add_row(
+            marker,
+            str(i + 1),
+            p.name,
+            f"{p.type}/{p.subtype}",
+            f"0x{p.offset:08X}",
+            p.formatted_size,
+            style=row_style,
+        )
+
+    back_is_sel = (selected_idx == len(partitions))
+    back_marker = ">" if back_is_sel else " "
+    back_style = "bold white on blue" if back_is_sel else "dim"
+    sub_table.add_row(
+        back_marker,
+        "B",
+        "[yellow]Cancel / Back[/]",
+        "-",
+        "-",
+        "-",
+        style=back_style,
+    )
+
+    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B/Q] Cancel", style="dim")
+    return Group(sub_table, footer)
+
+
+def build_partition_menu_frame(
+    part_file: Optional[Path],
+    partitions: List[PartitionEntry],
+    config: H1OSConfig,
+    menu_items: List[Dict[str, str]],
+    selected_idx: int,
+) -> Group:
+    """Build partition manager operations menu frame."""
+    sub_table = Table(
+        box=box.ROUNDED,
+        width=TERM_WIDTH,
+        header_style="bold bright_cyan",
+        title=(
+            f"[bold white]H1OS Flash Partition Manager[/]\n"
+            f"[dim]Table: {part_file.name if part_file else 'None'} ({len(partitions)} auto-discovered partitions) | "
+            f"Port: {config.port or 'Auto-detect'}[/]"
+        ),
+        show_lines=False,
+        pad_edge=False,
+    )
+    sub_table.add_column(" ", justify="center", width=2)
+    sub_table.add_column("#", justify="center", style="bold white", width=3)
+    sub_table.add_column("Operation", style="bold", width=36)
+    sub_table.add_column("Description", style="dim", width=32)
+
+    for i, item in enumerate(menu_items):
+        is_sel = (i == selected_idx)
+        marker = ">" if is_sel else " "
+        row_style = "bold white on blue" if is_sel else ("yellow" if item["key"] == "B" else "")
+
+        sub_table.add_row(
+            marker,
+            item["key"],
+            item["label"],
+            item["desc"],
+            style=row_style,
+        )
+
+    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-8/B] Quick-Key   [Esc/B/Q] Back", style="dim")
+    return Group(sub_table, footer)
+
+
 def select_partition_interactive(
     partitions: List[PartitionEntry],
     console: Optional["Console"],
@@ -527,99 +689,31 @@ def select_partition_interactive(
     selected_idx = 0
     total_rows = len(partitions) + 1  # partitions + Back
 
-    try:
-        import msvcrt
-
-        def read_nav_key() -> str:
-            ch = msvcrt.getch()
-            if ch in (b"\x00", b"\xe0"):
-                ch2 = msvcrt.getch()
-                if ch2 == b"H":
-                    return "UP"
-                if ch2 == b"P":
-                    return "DOWN"
-            if ch in (b"\r", b"\n"):
-                return "ENTER"
-            if ch in (b"\x1b", b"b", b"B"):
-                return "BACK"
-            if ch in (b"q", b"Q"):
-                return "QUIT"
-            return ch.decode("utf-8", errors="ignore").upper()
-
-    except ImportError:
-        def read_nav_key() -> str:
-            line = sys.stdin.readline().strip().upper()
-            return line if line else "ENTER"
-
-    while True:
-        console.clear()
-        sub_table = Table(
-            box=box.ROUNDED,
-            width=TERM_WIDTH,
-            header_style="bold bright_cyan",
-            title=f"[bold white]{title}[/]\n[dim]Choose an auto-discovered partition from active table[/]",
-            show_lines=False,
-            pad_edge=False,
-        )
-        sub_table.add_column(" ", justify="center", width=2)
-        sub_table.add_column("#", justify="center", style="bold white", width=3)
-        sub_table.add_column("Partition", style="bold", width=14)
-        sub_table.add_column("Type/Subtype", style="cyan", width=16)
-        sub_table.add_column("Offset", style="dim", width=14, justify="right")
-        sub_table.add_column("Size", style="green", width=12, justify="right")
-
-        for i, p in enumerate(partitions):
-            is_sel = (i == selected_idx)
-            marker = ">" if is_sel else " "
-            row_style = "bold white on blue" if is_sel else ""
-
-            sub_table.add_row(
-                marker,
-                str(i + 1),
-                p.name,
-                f"{p.type}/{p.subtype}",
-                f"0x{p.offset:08X}",
-                p.formatted_size,
-                style=row_style,
-            )
-
-        back_is_sel = (selected_idx == len(partitions))
-        back_marker = ">" if back_is_sel else " "
-        back_style = "bold white on blue" if back_is_sel else "dim"
-        sub_table.add_row(
-            back_marker,
-            "B",
-            "[yellow]Cancel / Back[/]",
-            "-",
-            "-",
-            "-",
-            style=back_style,
-        )
-
-        console.print(sub_table)
-        footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B] Cancel", style="dim")
-        console.print(footer)
-
-        key = read_nav_key()
-        if key == "UP":
-            selected_idx = (selected_idx - 1) % total_rows
-        elif key == "DOWN":
-            selected_idx = (selected_idx + 1) % total_rows
-        elif key in ("ENTER", "SPACE"):
-            if selected_idx == len(partitions):
+    frame = build_select_partition_frame(title, partitions, selected_idx)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        while True:
+            key = read_single_key()
+            if key == "UP":
+                selected_idx = (selected_idx - 1) % total_rows
+                live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+            elif key == "DOWN":
+                selected_idx = (selected_idx + 1) % total_rows
+                live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+            elif key in ("ENTER", "SPACE"):
+                if selected_idx == len(partitions):
+                    return None
+                return partitions[selected_idx]
+            elif key in ("BACK", "QUIT", "ESC", "Q", "B"):
                 return None
-            return partitions[selected_idx]
-        elif key in ("BACK", "QUIT", "ESC"):
-            return None
-        else:
-            if key.isdigit():
-                val = int(key) - 1
-                if 0 <= val < len(partitions):
-                    return partitions[val]
+            else:
+                if key.isdigit():
+                    val = int(key) - 1
+                    if 0 <= val < len(partitions):
+                        return partitions[val]
 
 
 def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] = None) -> None:
-    """Run interactive Partition Manager sub-menu loop."""
+    """Run interactive Partition Manager sub-menu loop with smooth Live rendering."""
     part_file = config.partition_file
     if not part_file or not part_file.is_file():
         # Fallback search in project root or component
@@ -648,30 +742,6 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
     selected_idx = 0
     total_items = len(MENU_ITEMS)
 
-    try:
-        import msvcrt
-
-        def read_menu_key() -> str:
-            ch = msvcrt.getch()
-            if ch in (b"\x00", b"\xe0"):
-                ch2 = msvcrt.getch()
-                if ch2 == b"H":
-                    return "UP"
-                if ch2 == b"P":
-                    return "DOWN"
-            if ch in (b"\r", b"\n"):
-                return "ENTER"
-            if ch in (b"\x1b", b"b", b"B"):
-                return "BACK"
-            if ch in (b"q", b"Q"):
-                return "QUIT"
-            return ch.decode("utf-8", errors="ignore").upper()
-
-    except ImportError:
-        def read_menu_key() -> str:
-            line = sys.stdin.readline().strip().upper()
-            return line if line else "ENTER"
-
     while True:
         if not HAVE_RICH or not console or not sys.stdin.isatty():
             print("\n" + "=" * 78)
@@ -683,60 +753,35 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                 print(f"  [{item['key']}] {item['label']} - {item['desc']}")
             print("=" * 78)
             try:
-                choice = input("Select partition operation [1-7, B=Back]: ").strip().upper()
+                choice = input("Select partition operation [1-8, B=Back]: ").strip().upper()
             except (KeyboardInterrupt, EOFError):
                 break
             action_key = choice if choice else "1"
         else:
-            console.clear()
-
-            sub_table = Table(
-                box=box.ROUNDED,
-                width=TERM_WIDTH,
-                header_style="bold bright_cyan",
-                title=(
-                    f"[bold white]H1OS Flash Partition Manager[/]\n"
-                    f"[dim]Table: {part_file.name if part_file else 'None'} ({len(partitions)} auto-discovered partitions) | "
-                    f"Port: {config.port}[/]"
-                ),
-                show_lines=False,
-                pad_edge=False,
-            )
-            sub_table.add_column(" ", justify="center", width=2)
-            sub_table.add_column("#", justify="center", style="bold white", width=3)
-            sub_table.add_column("Operation", style="bold", width=36)
-            sub_table.add_column("Description", style="dim", width=32)
-
-            for i, item in enumerate(MENU_ITEMS):
-                is_sel = (i == selected_idx)
-                marker = ">" if is_sel else " "
-                row_style = "bold white on blue" if is_sel else ("yellow" if item["key"] == "B" else "")
-
-                sub_table.add_row(
-                    marker,
-                    item["key"],
-                    item["label"],
-                    item["desc"],
-                    style=row_style,
-                )
-
-            console.print(sub_table)
-            footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-7/B] Quick-Key   [Esc/B] Back", style="dim")
-            console.print(footer)
-
-            key = read_menu_key()
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % total_items
-                continue
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % total_items
-                continue
-            elif key in ("ENTER", "SPACE"):
-                action_key = MENU_ITEMS[selected_idx]["key"]
-            elif key in ("BACK", "QUIT", "ESC"):
-                break
-            else:
-                action_key = key
+            action_key = None
+            frame = build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx)
+            with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+                while True:
+                    key = read_single_key()
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_items
+                        live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_items
+                        live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                    elif key in ("ENTER", "SPACE"):
+                        action_key = MENU_ITEMS[selected_idx]["key"]
+                        break
+                    elif key in ("BACK", "QUIT", "ESC", "Q", "B"):
+                        action_key = "B"
+                        break
+                    else:
+                        for item in MENU_ITEMS:
+                            if key == item["key"]:
+                                action_key = item["key"]
+                                break
+                        if action_key:
+                            break
 
         # Dispatch action
         if action_key in ("B", "BACK", "Q", "QUIT", "ESC"):
@@ -1061,16 +1106,13 @@ def prompt_confirmation(console: Optional["Console"], message: str) -> bool:
         return False
 
 
-def pause_prompt(console: Optional["Console"]) -> None:
-    """Pause before clearing or returning to sub-menu."""
+def pause_prompt(console: Optional["Console"]) -> str:
+    """Single-key pause before returning to sub-menu."""
     if console:
-        console.print("\n[dim]Press Enter to continue...[/]", end="")
+        console.print("\n[dim]Press any key to return ([bold white]Q[/dim] to exit)...[/]", end="")
     else:
-        print("\nPress Enter to continue...", end="")
-    try:
-        input()
-    except (KeyboardInterrupt, EOFError):
-        pass
+        print("\nPress any key to return (Q to exit)...", end="")
+    return read_single_key()
 
 
 def main():
