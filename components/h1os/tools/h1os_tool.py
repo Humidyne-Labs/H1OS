@@ -635,7 +635,11 @@ def spawn_serial_monitor(
 
     idf_args = []
     if b_dir and b_dir.is_dir():
-        idf_args.extend(["-B", str(b_dir)])
+        try:
+            rel_b_dir = b_dir.relative_to(config.app_root)
+            idf_args.extend(["-B", str(rel_b_dir)])
+        except ValueError:
+            idf_args.extend(["-B", b_dir.name])
     if eff_port:
         idf_args.extend(["-p", eff_port])
     if eff_baud:
@@ -643,39 +647,36 @@ def spawn_serial_monitor(
     idf_args.append("monitor")
 
     app_root_str = str(config.app_root)
+    args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
 
     if os.name == "nt":
         profile_script = r"C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"
-        escaped_app_root = app_root_str.replace("'", "''")
-        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
+        bat_file = config.app_root / "run_monitor.bat"
 
-        ps_cmd = (
-            f"& {{ "
-            f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
-            f"Set-Location '{escaped_app_root}'; "
-            f"Write-Host '[H1OS] Launching serial monitor on port: {eff_port or 'auto-detect'}...' -ForegroundColor Cyan; "
-            f"Write-Host '[H1OS] Press Ctrl+] to disconnect monitor session.' -ForegroundColor Gray; "
-            f"idf.py {args_str} "
-            f"}}"
-        )
+        bat_lines = [
+            "@echo off\r\n",
+            "title H1OS Serial Monitor\r\n",
+            "cd /d \"%~dp0\"\r\n",
+            "powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
+            f'"& {{ '
+            f'if (Test-Path \'{profile_script}\') {{ . \'{profile_script}\' }}; '
+            f'Write-Host \'[H1OS] Serial Monitor Active on {eff_port or "auto-detect"} (baud {eff_baud})\' -ForegroundColor Cyan; '
+            f'Write-Host \'[H1OS] Press Ctrl+] to disconnect monitor session.\' -ForegroundColor Gray; '
+            f'Write-Host \'\'; '
+            f'idf.py {args_str} '
+            f'}}"\r\n',
+        ]
+        bat_file.write_text("".join(bat_lines), encoding="utf-8")
 
         try:
-            wt_exe = shutil.which("wt.exe")
-            if not wt_exe:
-                cand_wt = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps" / "wt.exe"
-                if cand_wt.is_file():
-                    wt_exe = str(cand_wt)
+            if hasattr(os, "startfile"):
+                os.startfile(str(bat_file))
+                return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} via {bat_file.name}."
 
-            if wt_exe:
-                subprocess.Popen(
-                    [wt_exe, "--title", "H1OS Serial Monitor", "-d", app_root_str, "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                    creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
-                )
-            else:
-                subprocess.Popen(
-                    ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                    creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
-                )
+            subprocess.Popen(
+                ["cmd.exe", "/c", "start", "H1OS Serial Monitor", str(bat_file)],
+                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+            )
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
         except Exception as e:
             return False, f"Failed to spawn external monitor window: {e}"

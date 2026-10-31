@@ -18,6 +18,9 @@ __pycache__/
 /release/
 /releases/
 
+# Generated Tooling Launchers
+run_monitor.bat
+
 # Sanitization Local Configurations (Personal identity words)
 .sanitize_names
 sanitize_names.txt
