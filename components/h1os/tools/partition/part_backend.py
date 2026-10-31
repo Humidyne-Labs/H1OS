@@ -244,3 +244,81 @@ def execute_otatool_switch(
         return False, f"otatool switch failed (code {res.returncode}):\n{err_msg}"
     except Exception as e:
         return False, f"Failed to execute otatool switch: {e}"
+
+
+def parse_active_ota_slot(output: str, num_slots: int = 2) -> int:
+    """Parse active OTA slot index from otatool read_otadata output."""
+    import re
+    fw_match = re.search(
+        r"Firmware:\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s*\|\s*(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)",
+        output,
+    )
+    if fw_match:
+        try:
+            seq0 = int(fw_match.group(1), 16)
+            seq1 = int(fw_match.group(3), 16)
+            valid0 = (seq0 != 0xFFFFFFFF)
+            valid1 = (seq1 != 0xFFFFFFFF)
+            if valid0 and valid1:
+                active_seq = max(seq0, seq1)
+                return (active_seq - 1) % num_slots
+            elif valid0:
+                return (seq0 - 1) % num_slots
+            elif valid1:
+                return (seq1 - 1) % num_slots
+        except ValueError:
+            pass
+    return 0
+
+
+def execute_otatool_toggle(
+    config: H1OSConfig,
+    num_slots: int = 2,
+    port: Optional[str] = None,
+    baud: Optional[int] = None,
+) -> Tuple[bool, str]:
+    """Toggle active boot partition between slot 0 and slot 1."""
+    ok, read_msg = execute_otatool_read(config, port=port, baud=baud)
+    current_slot = parse_active_ota_slot(read_msg, num_slots=num_slots) if ok else 0
+    next_slot = 1 if current_slot == 0 else 0
+
+    ok_switch, switch_msg = execute_otatool_switch(config, next_slot, port=port, baud=baud)
+    if ok_switch:
+        return True, f"Active boot slot toggled: ota_{current_slot} (Slot {current_slot}) -> ota_{next_slot} (Slot {next_slot})."
+    return False, f"Failed to toggle OTA boot slot:\n{switch_msg}"
+
+
+def execute_dual_slot_deploy(
+    config: H1OSConfig,
+    slot0_bin: Path,
+    slot1_bin: Path,
+    slot0_label: str = "Slot 0",
+    slot1_label: str = "Slot 1",
+    active_slot: Optional[int] = 0,
+    port: Optional[str] = None,
+    baud: Optional[int] = None,
+) -> Tuple[bool, str]:
+    """Flash two compiled binaries to ota_0 and ota_1 in sequence and configure active boot slot."""
+    # 1. Flash Slot 0
+    ok0, msg0 = execute_parttool_write(config, "ota_0", slot0_bin, port=port, baud=baud)
+    if not ok0:
+        return False, f"Failed writing '{slot0_label}' to ota_0:\n{msg0}"
+
+    # 2. Flash Slot 1
+    ok1, msg1 = execute_parttool_write(config, "ota_1", slot1_bin, port=port, baud=baud)
+    if not ok1:
+        return False, f"Failed writing '{slot1_label}' to ota_1:\n{msg1}"
+
+    # 3. Configure Active Slot
+    if active_slot is not None:
+        ok_sw, msg_sw = execute_otatool_switch(config, active_slot, port=port, baud=baud)
+        if not ok_sw:
+            return True, f"Dual images flashed successfully, but active slot switch failed:\n{msg_sw}"
+
+    active_name = slot0_label if active_slot == 0 else slot1_label
+    return True, (
+        f"Dual-Slot Deployment Complete on {config.chip.upper()}!\n"
+        f"  • ota_0 (Slot 0): {slot0_label} ({slot0_bin.name}, {slot0_bin.stat().st_size:,} bytes)\n"
+        f"  • ota_1 (Slot 1): {slot1_label} ({slot1_bin.name}, {slot1_bin.stat().st_size:,} bytes)\n"
+        f"  • Active Boot Partition: ota_{active_slot} ({active_name})"
+    )

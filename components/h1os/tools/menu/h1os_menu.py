@@ -37,7 +37,8 @@ from h1os_tool import (
     run_pack,
     run_size,
 )
-from partition.h1os_part import run_partition_manager_menu
+from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
+from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
 
 TERM_WIDTH = 78
 
@@ -208,6 +209,29 @@ def render_console_frame(config: H1OSConfig, console: "Console", selected_idx: i
     console.print(footer_text)
 
 
+def find_compiled_app_bin(profile, app_name: Optional[str] = None) -> Optional[Path]:
+    """Locate compiled application binary in build directory."""
+    if not profile.build_dir.is_dir():
+        return None
+    if app_name:
+        cand = profile.build_dir / f"{app_name}.bin"
+        if cand.is_file():
+            return cand
+    for b in profile.build_dir.glob("*.bin"):
+        if b.name not in ("bootloader.bin", "partition-table.bin", "ota_data_initial.bin"):
+            return b
+    return None
+
+
+def get_ota_app_partitions(config: H1OSConfig) -> List[Any]:
+    """Retrieve app partitions matching ota_* subtype from partition table."""
+    part_file = config.partition_file or (config.app_root / "partitions.csv")
+    if part_file and part_file.is_file():
+        parts = parse_csv_partitions(part_file)
+        return [p for p in parts if p.type == "app" and p.subtype.startswith("ota_")]
+    return []
+
+
 def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
     """Auto-populate operations table dynamically based on configured build profiles.
 
@@ -218,8 +242,8 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
     menu_items = []
     KEY_POOL = [
         "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-        "A", "B", "C", "D", "F", "G", "H", "J", "K", "L",
-        "M", "N", "P", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+        "A", "B", "C", "F", "G", "H", "J", "K", "L",
+        "M", "N", "R", "S", "U", "V", "W", "X", "Y", "Z"
     ]
     key_idx = 0
 
@@ -325,6 +349,34 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
             "target": target_dir,
             "engine": "esptool write",
             "action": f"flash:{single_name}",
+        })
+
+    # Conditional Dual-Slot OTA Deployment & Quick Toggle
+    ota_parts = get_ota_app_partitions(config)
+    prof_list = list(config.profiles.values())
+
+    # 1. Dual-Slot deploy: Exactly 2 profiles AND both .bin files compiled on disk
+    if len(prof_list) == 2 and len(ota_parts) >= 2:
+        p1, p2 = prof_list[0], prof_list[1]
+        bin1 = find_compiled_app_bin(p1, config.app_name)
+        bin2 = find_compiled_app_bin(p2, config.app_name)
+        if bin1 and bin2:
+            menu_items.append({
+                "key": "D",
+                "label": f"Deploy Dual-Slot ({p1.name}->ota_0, {p2.name}->ota_1)",
+                "target": "ota_0/ota_1",
+                "engine": "parttool write",
+                "action": f"dual_deploy:{p1.name}:{p2.name}",
+            })
+
+    # 2. Quick toggle: At least 2 OTA partitions in partition table
+    if len(ota_parts) >= 2:
+        menu_items.append({
+            "key": "T",
+            "label": "Toggle Active OTA Slot",
+            "target": "ota_0 <-> ota_1",
+            "engine": "otatool switch",
+            "action": "ota_toggle",
         })
 
     # Hardware maintenance & Partition Management
@@ -659,6 +711,76 @@ def main():
         elif action.startswith("flash:"):
             prof = action.split(":", 1)[1]
             run_flash(config, profile=prof)
+
+        elif action.startswith("dual_deploy:"):
+            parts = action.split(":")
+            n1, n2 = parts[1], parts[2]
+            p1 = config.profiles[n1]
+            p2 = config.profiles[n2]
+            b1 = find_compiled_app_bin(p1, config.app_name)
+            b2 = find_compiled_app_bin(p2, config.app_name)
+
+            if console:
+                console.print(f"\n[bold white]Dual-Slot OTA Deployment Options:[/]")
+                console.print(f"  [bold cyan][1][/] Flash ota_0=[cyan]{n1}[/] ({b1.name}) & ota_1=[cyan]{n2}[/] ({b2.name}) -> Boot [bold green]ota_0[/]")
+                console.print(f"  [bold cyan][2][/] Flash ota_0=[cyan]{n1}[/] ({b1.name}) & ota_1=[cyan]{n2}[/] ({b2.name}) -> Boot [bold green]ota_1[/]")
+                console.print(f"  [bold cyan][3][/] Swap: ota_0=[cyan]{n2}[/] ({b2.name}) & ota_1=[cyan]{n1}[/] ({b1.name}) -> Boot [bold green]ota_0[/]")
+                console.print(f"  [bold cyan][4][/] Swap: ota_0=[cyan]{n2}[/] ({b2.name}) & ota_1=[cyan]{n1}[/] ({b1.name}) -> Boot [bold green]ota_1[/]")
+                console.print("  [yellow][B][/] Cancel")
+            else:
+                print(f"\nDual-Slot OTA Deployment:")
+                print(f"  [1] ota_0={n1}, ota_1={n2} (Boot ota_0)")
+                print(f"  [2] ota_0={n1}, ota_1={n2} (Boot ota_1)")
+                print(f"  [3] ota_0={n2}, ota_1={n1} (Boot ota_0)")
+                print(f"  [4] ota_0={n2}, ota_1={n1} (Boot ota_1)")
+                print("  [B] Cancel")
+
+            try:
+                choice = input("\nSelect deployment configuration [1-4, B=Cancel, Enter=1]: ").strip().upper()
+            except (KeyboardInterrupt, EOFError):
+                choice = "B"
+
+            if not choice:
+                choice = "1"
+
+            if choice == "1":
+                ok, msg = execute_dual_slot_deploy(config, b1, b2, n1, n2, active_slot=0)
+            elif choice == "2":
+                ok, msg = execute_dual_slot_deploy(config, b1, b2, n1, n2, active_slot=1)
+            elif choice == "3":
+                ok, msg = execute_dual_slot_deploy(config, b2, b1, n2, n1, active_slot=0)
+            elif choice == "4":
+                ok, msg = execute_dual_slot_deploy(config, b2, b1, n2, n1, active_slot=1)
+            else:
+                ok, msg = False, "Deployment cancelled."
+
+            if ok:
+                if console:
+                    console.print(f"\n[bold green]SUCCESS:[/] {msg}")
+                else:
+                    print(f"\nSUCCESS: {msg}")
+            else:
+                if console:
+                    console.print(f"\n[bold red]{msg}[/]")
+                else:
+                    print(f"\n{msg}")
+
+        elif action == "ota_toggle":
+            if console:
+                console.print(f"\n[cyan]Toggling active OTA boot slot on {config.port}...[/]")
+            else:
+                print(f"\nToggling active OTA boot slot on {config.port}...")
+            ok, msg = execute_otatool_toggle(config)
+            if ok:
+                if console:
+                    console.print(f"[bold green]SUCCESS:[/] {msg}")
+                else:
+                    print(f"SUCCESS: {msg}")
+            else:
+                if console:
+                    console.print(f"[bold red]ERROR:[/] {msg}")
+                else:
+                    print(f"ERROR: {msg}")
 
         elif action == "partition_menu":
             run_partition_manager_menu(config, console)
