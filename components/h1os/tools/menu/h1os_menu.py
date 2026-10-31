@@ -409,7 +409,7 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
         "key": "M",
         "label": "Spawn Serial Monitor",
         "target": config.port or "Auto-detect",
-        "engine": "external terminal",
+        "engine": "h1os_monitor.py",
         "action": "monitor",
     })
     menu_items.append({

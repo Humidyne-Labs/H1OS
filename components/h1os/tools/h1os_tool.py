@@ -644,8 +644,14 @@ def spawn_serial_monitor(
     build_dir: Optional[Union[str, Path]] = None,
     port: Optional[str] = None,
     baud: Optional[int] = None,
+    timestamps: bool = False,
+    log: bool = False,
 ) -> Tuple[bool, str]:
-    """Spawn an independent, detached serial monitor in an external terminal window."""
+    """Spawn an independent, detached H1OS serial monitor in an external terminal window."""
+    monitor_script = config.comp_dir / "tools" / "monitor" / "h1os_monitor.py"
+    if not monitor_script.is_file():
+        return False, f"H1OS monitor script not found: {monitor_script}"
+
     prof = config.resolve_profile(profile, build_dir)
     if build_dir:
         b_dir = Path(build_dir).resolve()
@@ -660,87 +666,38 @@ def spawn_serial_monitor(
         eff_port = auto_detect_serial_port()
 
     eff_baud = baud or config.baud or 115200
+    eff_chip = config.chip or "esp32s3"
+    target_log_dir = prof.audit_log_dir if prof else (config.app_root / "build_prod" / "logs")
 
-    idf_args = []
-    if b_dir and b_dir.is_dir():
-        try:
-            rel_b_dir = b_dir.relative_to(config.app_root)
-            idf_args.extend(["-B", str(rel_b_dir)])
-        except ValueError:
-            idf_args.extend(["-B", b_dir.name])
+    py_exe = get_idf_python_exe()
+
+    mon_args = [py_exe, str(monitor_script), "-b", str(eff_baud), "--chip", eff_chip, "--log-dir", str(target_log_dir)]
     if eff_port:
-        idf_args.extend(["-p", eff_port])
-    if eff_baud:
-        idf_args.extend(["-b", str(eff_baud)])
-    idf_args.append("monitor")
-    idf_args.append("--timestamps")
-    if eff_port:
-        idf_args.append("--no-reset")
+        mon_args.extend(["-p", eff_port])
+    if timestamps:
+        mon_args.append("-t")
+    if log:
+        mon_args.append("-l")
 
     app_root_str = str(config.app_root)
-    args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
+    args_str = " ".join(f"'{a}'" if " " in a else a for a in mon_args)
 
     if os.name == "nt":
-        profile_script = r"C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"
-        bat_file = config.app_root / "run_monitor.bat"
-
-        # 1. Write standalone launcher script so user can also double-click or run from CLI
-        bat_lines = [
-            "@echo off\r\n",
-            "title H1OS Serial Monitor\r\n",
-            "cd /d \"%~dp0\"\r\n",
-            "set ESPTOOL_OPEN_PORT_ATTEMPTS=0\r\n",
-            "start \"H1OS Serial Monitor\" conhost.exe powershell.exe -NoExit -ExecutionPolicy Bypass -Command "
-            f'"& {{ '
-            f'if (Test-Path \'{profile_script}\') {{ . \'{profile_script}\' }}; '
-            f"$env:ESPTOOL_OPEN_PORT_ATTEMPTS = '0'; "
-            f'Write-Host \'[H1OS] Serial Monitor Active on {eff_port or "auto-detect"} (baud {eff_baud})\' -ForegroundColor Cyan; '
-            f'Write-Host \'[H1OS] Timestamps: ON | Reset on Connect: OFF | Auto-Reconnect: ON\' -ForegroundColor DarkGray; '
-            f'Write-Host \'[H1OS] Press Ctrl+] to disconnect monitor session.\' -ForegroundColor Gray; '
-            f'Write-Host \'\'; '
-            f'do {{ '
-            f'idf.py {args_str}; '
-            f'$code = $LASTEXITCODE; '
-            f'if ($code -ne 0) {{ '
-            f'Write-Host \"`n[H1OS] Target sleeping or disconnected (exit code $code). Waiting to reconnect...\" -ForegroundColor Yellow; '
-            f'Start-Sleep -Seconds 1; '
-            f'}} '
-            f'}} while ($code -ne 0) '
-            f'}}"\r\n',
-        ]
-        bat_file.write_text("".join(bat_lines), encoding="utf-8")
-
-        # 2. Directly spawn dedicated console window via conhost.exe (bypasses Windows Terminal swallowing)
-        ps_cmd = (
-            f"& {{ "
-            f"if (Test-Path '{profile_script}') {{ . '{profile_script}' }}; "
-            f"$env:ESPTOOL_OPEN_PORT_ATTEMPTS = '0'; "
-            f"Set-Location '{config.app_root}'; "
-            f"Write-Host '[H1OS] Serial Monitor Active on {eff_port or 'auto-detect'} (baud {eff_baud})' -ForegroundColor Cyan; "
-            f"Write-Host '[H1OS] Timestamps: ON | Reset on Connect: OFF | Auto-Reconnect: ON' -ForegroundColor DarkGray; "
-            f"Write-Host '[H1OS] Press Ctrl+] to disconnect monitor session.' -ForegroundColor Gray; "
-            f"Write-Host ''; "
-            f"do {{ "
-            f"idf.py {args_str}; "
-            f"$code = $LASTEXITCODE; "
-            f"if ($code -ne 0) {{ "
-            f'Write-Host "`n[H1OS] Target sleeping or disconnected (exit code $code). Waiting to reconnect..." -ForegroundColor Yellow; '
-            f"Start-Sleep -Seconds 1; "
-            f"}} "
-            f"}} while ($code -ne 0) "
-            f"}}"
-        )
-
+        # Launch dedicated console window via conhost.exe directly executing python h1os_monitor.py
+        cmd = ["conhost.exe"] + mon_args
         try:
             subprocess.Popen(
-                ["conhost.exe", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                cmd,
+                cwd=app_root_str,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
         except Exception:
             try:
+                fallback_cmd = ["cmd.exe", "/c", "start", "H1OS Serial Monitor"] + mon_args
                 subprocess.Popen(
-                    ["cmd.exe", "/c", "start", "H1OS Serial Monitor", "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                    fallback_cmd,
+                    cwd=app_root_str,
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
                 return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
@@ -748,8 +705,7 @@ def spawn_serial_monitor(
                 return False, f"Failed to spawn external monitor window: {e}"
 
     elif sys.platform == "darwin":
-        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
-        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}"'
+        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && {args_str}"'
         try:
             subprocess.Popen(["osascript", "-e", osa_script])
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in macOS Terminal."
@@ -757,14 +713,13 @@ def spawn_serial_monitor(
             return False, f"Failed to spawn macOS Terminal: {e}"
 
     else:
-        args_str = " ".join(f"'{a}'" if " " in a else a for a in idf_args)
         for term in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm"):
             if shutil.which(term):
                 try:
                     if term == "gnome-terminal":
-                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}; exec bash"]
+                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && {args_str}; exec bash"]
                     else:
-                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && export ESPTOOL_OPEN_PORT_ATTEMPTS=0 && idf.py {args_str}; exec bash'"]
+                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && {args_str}; exec bash'"]
                     subprocess.Popen(cmd)
                     return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in {term}."
                 except Exception as e:
@@ -850,11 +805,13 @@ def main():
     erase_p.add_argument("--chip", dest="chip", default=None, help="Target silicon chip (default: esp32s3)")
 
     # monitor subcommand
-    monitor_p = subparsers.add_parser("monitor", help="Spawn serial monitor in external terminal window")
+    monitor_p = subparsers.add_parser("monitor", help="Spawn dedicated H1OS serial monitor in external terminal window")
     monitor_p.add_argument("-P", "--profile", dest="profile", default=None, help="Target build profile")
     monitor_p.add_argument("-B", "--build-dir", dest="build_dir", default=None, help="Explicit build directory")
     monitor_p.add_argument("-p", "--port", dest="port", default=None, help="Serial COM port")
     monitor_p.add_argument("-b", "--baud", type=int, dest="baud", default=None, help="Serial baud rate")
+    monitor_p.add_argument("-t", "--timestamps", action="store_true", default=False, help="Enable millisecond timestamps on launch (default: OFF)")
+    monitor_p.add_argument("-l", "--log", action="store_true", default=False, help="Enable session disk logging on launch (default: OFF)")
 
     # menu subcommand
     subparsers.add_parser("menu", help="Launch interactive Rich developer tooling console")
@@ -891,7 +848,15 @@ def main():
     elif args.command == "erase":
         sys.exit(run_erase(config, port=args.port, baud=args.baud, chip=args.chip))
     elif args.command == "monitor":
-        ok, msg = spawn_serial_monitor(config, profile=args.profile, build_dir=args.build_dir, port=args.port, baud=args.baud)
+        ok, msg = spawn_serial_monitor(
+            config,
+            profile=args.profile,
+            build_dir=args.build_dir,
+            port=args.port,
+            baud=args.baud,
+            timestamps=args.timestamps,
+            log=args.log,
+        )
         print(msg)
         sys.exit(0 if ok else 1)
     else:
