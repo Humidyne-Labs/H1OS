@@ -322,3 +322,22 @@ class ConsoleEventDispatcher:
                 sys.stdout.write("\x1b[?1006l\x1b[?1000l")
                 sys.stdout.flush()
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def get_single_key(timeout: Optional[float] = None) -> str:
+    """Read a single keyboard key event across platforms with fallback."""
+    if not sys.stdin.isatty():
+        try:
+            line = sys.stdin.readline().strip().upper()
+            return line if line else "ENTER"
+        except Exception:
+            return "QUIT"
+
+    with ConsoleEventDispatcher(enable_mouse=False, enable_resize=False) as dispatcher:
+        while True:
+            ev = dispatcher.get_event(timeout=timeout)
+            if not ev:
+                return "TIMEOUT" if timeout else "ENTER"
+            if ev.type == EventType.KEY and ev.key:
+                return ev.key
+

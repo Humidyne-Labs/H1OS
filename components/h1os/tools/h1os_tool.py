@@ -22,8 +22,74 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-VERSION = "2.4.1"
+VERSION = "2.4.5-dev"
+H1OS_TOOLING_VERSION = "2.4.5-dev"
 SYSTEM_SECTIONS = {"project", "dist", "version", "partitions", "target", "build", "audit", "presets"}
+
+
+def check_tooling_dependencies(exit_on_fail: bool = True) -> bool:
+    """Pre-flight check for required Python dependencies (rich, pyserial).
+
+    If dependencies are missing, displays an explicit pip command and exits safely
+    to avoid modifying the host system without authorization.
+    """
+    import importlib.util
+
+    missing = []
+    if importlib.util.find_spec("rich") is None:
+        missing.append("rich>=13.0.0")
+    if importlib.util.find_spec("serial") is None:
+        missing.append("pyserial>=3.5")
+
+    if missing:
+        req_path = Path(__file__).resolve().parent / "requirements.txt"
+        print("\n" + "=" * 78, file=sys.stderr)
+        print("[ERROR] H1OS Tooling Missing Dependencies:", file=sys.stderr)
+        for pkg in missing:
+            print(f"  • {pkg}", file=sys.stderr)
+        print("-" * 78, file=sys.stderr)
+        print("Please install the required dependencies using pip:", file=sys.stderr)
+        if req_path.is_file():
+            print(f"  {sys.executable} -m pip install -r {req_path}", file=sys.stderr)
+        else:
+            print(f"  {sys.executable} -m pip install {' '.join(missing)}", file=sys.stderr)
+        print("=" * 78 + "\n", file=sys.stderr)
+        if exit_on_fail:
+            sys.exit(1)
+        return False
+    return True
+
+
+def run_tool_command(
+    cmd: List[str],
+    cwd: Optional[Path] = None,
+    env: Optional[Dict[str, str]] = None,
+    timeout_sec: Optional[float] = 120.0,
+) -> Tuple[bool, str]:
+    """Execute external CLI command with bounded timeout and safe UTF-8 decoding."""
+    exec_env = os.environ.copy()
+    if env:
+        exec_env.update(env)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            env=exec_env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_sec,
+        )
+        output = (proc.stdout or "") + (proc.stderr or "")
+        return (proc.returncode == 0, output.strip())
+    except subprocess.TimeoutExpired:
+        return (False, f"Command timed out after {timeout_sec} seconds: {' '.join(cmd)}")
+    except FileNotFoundError:
+        return (False, f"Command executable not found: {cmd[0] if cmd else ''}")
+    except Exception as e:
+        return (False, f"Execution error: {e}")
 
 
 def get_idf_python_exe() -> str:
@@ -763,8 +829,9 @@ def run_menu(config: H1OSConfig) -> int:
 
 
 def main():
+    check_tooling_dependencies()
     parser = argparse.ArgumentParser(
-        description=f"H1OS Master Developer Tooling & Dispatcher v{VERSION}",
+        description=f"H1OS Master Developer Tooling & Dispatcher v{H1OS_TOOLING_VERSION}",
         epilog="Examples:\n"
                "  python h1os_tool.py menu\n"
                "  python h1os_tool.py pack -B my_build\n"
@@ -772,6 +839,11 @@ def main():
                "  python h1os_tool.py size -B my_build\n"
                "  python h1os_tool.py flash -B my_build\n"
                "  python h1os_tool.py erase",
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"%(prog)s {H1OS_TOOLING_VERSION}",
     )
     parser.add_argument("-C", "--project-dir", dest="project_dir", default=None, help="Application project root directory")
     parser.add_argument("-c", "--config", dest="config", default=None, help="Explicit path to h1os.ini")

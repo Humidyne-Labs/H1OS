@@ -37,24 +37,23 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-try:
-    import serial
-    import serial.tools.list_ports
-except ImportError:
-    print("[ERROR] pyserial is required. Install via 'pip install pyserial'.", file=sys.stderr)
+from h1os_tool import H1OS_TOOLING_VERSION, check_tooling_dependencies
+
+# Pre-flight check for required packages (rich, pyserial)
+if not check_tooling_dependencies():
     sys.exit(1)
 
-try:
-    from rich import box
-    from rich.console import Console
-    from rich.layout import Layout
-    from rich.live import Live
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.text import Text
-except ImportError:
-    print("[ERROR] rich is required. Install via 'pip install rich'.", file=sys.stderr)
-    sys.exit(1)
+VERSION = H1OS_TOOLING_VERSION
+
+import serial
+import serial.tools.list_ports
+from rich import box
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 try:
     from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
@@ -723,7 +722,12 @@ class H1OSMonitor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="H1OS Dedicated Rich Serial Monitor & Telemetry Console")
+    parser = argparse.ArgumentParser(description=f"H1OS Dedicated Rich Serial Monitor & Telemetry Console v{H1OS_TOOLING_VERSION}")
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"%(prog)s {H1OS_TOOLING_VERSION}",
+    )
     parser.add_argument("-p", "--port", type=str, default=None, help="Serial port (auto-detects if omitted)")
     parser.add_argument("-b", "--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     parser.add_argument("--chip", type=str, default="esp32s3", help="Target chip (default: esp32s3)")

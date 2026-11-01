@@ -19,6 +19,23 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
+from h1os_tool import (
+    H1OS_TOOLING_VERSION,
+    H1OSConfig,
+    check_tooling_dependencies,
+    run_build,
+    run_clean,
+    run_erase,
+    run_flash,
+    run_pack,
+    run_size,
+    spawn_serial_monitor,
+)
+
+# Pre-flight check: display pip command if dependencies missing and exit safely
+if not check_tooling_dependencies():
+    sys.exit(1)
+
 try:
     from rich import box
     from rich.console import Console, Group
@@ -30,102 +47,17 @@ try:
 except ImportError:
     HAVE_RICH = False
 
-from h1os_tool import (
-    H1OSConfig,
-    run_build,
-    run_clean,
-    run_erase,
-    run_flash,
-    run_pack,
-    run_size,
-    spawn_serial_monitor,
-)
 from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
 from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
 
 try:
-    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
 except ImportError:
-    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
 
+VERSION = H1OS_TOOLING_VERSION
 TERM_WIDTH = 78
-
-
-def get_key_windows() -> str:
-    """Read a single keypress or arrow key on Windows using msvcrt."""
-    import msvcrt
-    ch = msvcrt.getch()
-    if ch in (b"\x00", b"\xe0"):
-        ch2 = msvcrt.getch()
-        if ch2 == b"H":
-            return "UP"
-        elif ch2 == b"P":
-            return "DOWN"
-        elif ch2 == b"K":
-            return "LEFT"
-        elif ch2 == b"M":
-            return "RIGHT"
-        return "SPECIAL"
-    elif ch in (b"\r", b"\n"):
-        return "ENTER"
-    elif ch == b"\x1b":
-        return "ESC"
-    elif ch in (b"\x03", b"\x1a"):  # Ctrl+C, Ctrl+Z
-        return "QUIT"
-    else:
-        try:
-            return ch.decode("utf-8", errors="ignore").upper()
-        except Exception:
-            return ""
-
-
-def get_key_posix() -> str:
-    """Read a single keypress or arrow key on POSIX systems."""
-    try:
-        import termios
-        import tty
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            ch = sys.stdin.read(1)
-            if ch == "\x1b":
-                seq = sys.stdin.read(2)
-                if seq == "[A":
-                    return "UP"
-                elif seq == "[B":
-                    return "DOWN"
-                elif seq == "[C":
-                    return "RIGHT"
-                elif seq == "[D":
-                    return "LEFT"
-                return "ESC"
-            elif ch in ("\r", "\n"):
-                return "ENTER"
-            elif ch in ("\x03", "\x1a"):
-                return "QUIT"
-            return ch.upper()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    except Exception:
-        line = sys.stdin.readline().strip().upper()
-        return line if line else "ENTER"
-
-
-def read_nav_key() -> str:
-    """Read a navigation key across platforms with non-interactive fallback."""
-    if not sys.stdin.isatty():
-        try:
-            line = sys.stdin.readline()
-            if not line:
-                return "QUIT"
-            return line.strip().upper()
-        except Exception:
-            return "QUIT"
-
-    if os.name == "nt":
-        return get_key_windows()
-    return get_key_posix()
+read_nav_key = get_single_key
 
 
 def clear_screen() -> None:
@@ -799,7 +731,12 @@ def run_profile_selection_menu(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="H1OS Interactive Developer Tooling Console")
+    parser = argparse.ArgumentParser(description=f"H1OS Interactive Developer Tooling Console v{H1OS_TOOLING_VERSION}")
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"%(prog)s {H1OS_TOOLING_VERSION}",
+    )
     parser.add_argument("-C", "--project-dir", dest="project_dir", default=None, help="Application project root directory")
     parser.add_argument("-c", "--config", dest="config", default=None, help="Explicit path to h1os.ini")
     args = parser.parse_args()

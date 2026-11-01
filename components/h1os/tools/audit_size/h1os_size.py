@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 H1OS Firmware Binary Size & Memory Footprint Diagnostic Inspector (h1os_size)
-Version: 2.3.3
+Version: 2.4.5-dev
 License: Apache-2.0
 """
 import argparse
@@ -13,9 +13,29 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "2.3.3"
+# Ensure components/h1os/tools is importable
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from h1os_tool import (
+    H1OS_TOOLING_VERSION,
+    check_tooling_dependencies,
+    H1OSConfig,
+)
+
+VERSION = H1OS_TOOLING_VERSION
 OUTPUT_STREAMS = {}
 LOG_FILE_PATH = None
+
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich import box
+    HAVE_RICH = True
+except ImportError:
+    HAVE_RICH = False
 
 
 def log_write(text: str):
@@ -174,12 +194,97 @@ def render_summary() -> str:
     return "\n".join(summary_lines)
 
 
+def render_rich_summary(console: "Console"):
+    """Extract key metrics from captured outputs and render styled Rich dashboard tables."""
+    part_out = OUTPUT_STREAMS.get("partition", "")
+    size_out = OUTPUT_STREAMS.get("size", "")
+    comp_out = OUTPUT_STREAMS.get("components", "")
+
+    console.print()
+    console.print(Panel(
+        "[bold cyan]EXECUTIVE SIZE & MEMORY FOOTPRINT SUMMARY[/]",
+        border_style="cyan",
+        box=box.ROUNDED,
+        width=78,
+    ))
+
+    # 1. Flash Partition Table
+    t_flash = Table(title="1. App Partition Headroom (Flash)", box=box.ROUNDED, width=78, border_style="cyan")
+    t_flash.add_column("Metric", style="bold white", width=26)
+    t_flash.add_column("Allocated Size", style="cyan", justify="right", width=22)
+    t_flash.add_column("Utilization", style="yellow", justify="right", width=22)
+
+    m_part = re.search(r"binary size (0x[0-9a-fA-F]+|\d+) bytes\. Smallest app partition is (0x[0-9a-fA-F]+|\d+) bytes\. (0x[0-9a-fA-F]+|\d+) bytes \((\d+)%\) free", part_out)
+    if m_part:
+        bin_sz = int(m_part.group(1), 0)
+        part_sz = int(m_part.group(2), 0)
+        free_sz = int(m_part.group(3), 0)
+        free_pct = float(m_part.group(4))
+        used_pct = 100.0 - free_pct
+        t_flash.add_row("Partition Max", format_bytes(part_sz), "100.0%")
+        t_flash.add_row("Firmware Used", format_bytes(bin_sz), f"{used_pct:.1f}%")
+        t_flash.add_row("Space Remaining", format_bytes(free_sz), f"[bold green]{free_pct:.1f}% FREE[/]")
+    else:
+        t_flash.add_row("Partition Headroom", "N/A", "See partition logs")
+    console.print(t_flash)
+    console.print()
+
+    # 2. RAM Allocation Table
+    t_ram = Table(title="2. Chip Internal RAM Allocation", box=box.ROUNDED, width=78, border_style="cyan")
+    t_ram.add_column("RAM Region", style="bold white", width=12)
+    t_ram.add_column("Used", style="cyan", justify="right", width=16)
+    t_ram.add_column("Total", style="white", justify="right", width=16)
+    t_ram.add_column("Usage", style="yellow", justify="right", width=10)
+    t_ram.add_column("Status / Free", style="green", justify="left")
+
+    ram_sections = ["DIRAM", "IRAM", "RTC FAST", "RTC SLOW"]
+    for ram_sec in ram_sections:
+        pattern = rf"│\s+{re.escape(ram_sec)}\s+│\s+(\d+)\s+│\s+([\d\.]+)\s+│\s+(\d+)\s+│\s+(\d+)\s+│"
+        m_ram = re.search(pattern, size_out)
+        if m_ram:
+            used = int(m_ram.group(1))
+            pct = float(m_ram.group(2))
+            remain = int(m_ram.group(3))
+            total = int(m_ram.group(4))
+            if remain == 0 and pct >= 100.0:
+                status_str = "[yellow]100.0% (overflow into DIRAM)[/]" if ram_sec == "IRAM" else "[bold red]CRITICAL (FULL)[/]"
+            else:
+                status_str = f"{format_bytes(remain)} free"
+            t_ram.add_row(
+                ram_sec,
+                format_bytes(used),
+                format_bytes(total),
+                f"{pct:.1f}%",
+                status_str
+            )
+    console.print(t_ram)
+    console.print()
+
+    # 3. Top Flash Consuming Archives
+    t_comp = Table(title="3. Top Flash Consuming Archives", box=box.ROUNDED, width=78, border_style="cyan")
+    t_comp.add_column("Static Archive (.a)", style="bold white", width=34)
+    t_comp.add_column("Size", style="cyan", justify="right", width=20)
+    t_comp.add_column("Share of Top 6", style="yellow", justify="right", width=16)
+
+    comp_matches = re.findall(r'│\s+([\w\.\-]+)\s+│\s+(\d+)\s+│', comp_out)
+    if comp_matches:
+        sorted_comps = sorted([(name, int(sz)) for name, sz in comp_matches], key=lambda x: x[1], reverse=True)
+        valid_comps = [c for c in sorted_comps if c[0].endswith(".a")][:6]
+        total_top = sum(sz for _, sz in valid_comps) or 1
+        for name, sz in valid_comps:
+            share = (sz / total_top) * 100.0
+            t_comp.add_row(name, format_bytes(sz), f"{share:.1f}%")
+    console.print(t_comp)
+    console.print()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=f"H1OS Firmware Binary Size & Memory Footprint Diagnostic Inspector v{VERSION}",
         epilog="Examples:\n"
                "  python h1os_size.py -B build_prod --log-file build_prod/logs/prod_20261031_140500.log\n"
-               "  python h1os_size.py -C examples/H1OS -B examples/H1OS/build_dev --log-file examples/H1OS/build_dev/logs/debug_20261031_140500.log",
+               "  python h1os_size.py -c h1os.ini -B build_dev\n"
+               "  python h1os_size.py -C examples/H1OS -B examples/H1OS/build_dev",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -188,10 +293,16 @@ def parse_args():
         version=f"%(prog)s {VERSION}",
     )
     parser.add_argument(
+        "-c", "--config",
+        dest="config_path",
+        default=None,
+        help="Path to h1os.ini configuration file (optional; resolves project defaults)",
+    )
+    parser.add_argument(
         "-B", "--build-dir",
         dest="build_dir",
-        required=True,
-        help="Explicit target build directory path (required; auto-searching is disabled)",
+        default=None,
+        help="Explicit target build directory path (e.g. -B build_prod)",
     )
     parser.add_argument(
         "-C", "--project-dir",
@@ -208,21 +319,65 @@ def parse_args():
     parser.add_argument(
         "--log-file",
         dest="log_file",
-        required=True,
-        help="Explicit destination log file path for audit diagnostic output (mandatory; zero-fallback)",
+        default=None,
+        help="Explicit destination log file path for audit diagnostic output",
     )
     return parser.parse_args()
 
 
 def main():
     global LOG_FILE_PATH
+    check_tooling_dependencies()
     args = parse_args()
 
-    # Strict zero-fallback log destination validation
-    if not args.log_file:
-        print("\n[ERROR] No audit log file destination provided via --log-file.", file=sys.stderr)
-        print("Zero-fallback policy requires an explicit log destination configured in h1os.ini.\n", file=sys.stderr)
+    # Attempt to load H1OSConfig if available
+    cfg = None
+    try:
+        cfg = H1OSConfig(project_dir=args.project_dir, config_path=args.config_path)
+    except SystemExit:
+        if args.config_path:
+            sys.exit(1)
+    except Exception:
+        pass
+
+    # Resolve build directory
+    if not args.build_dir and cfg:
+        prof = cfg.resolve_profile()
+        if prof and prof.build_dir.is_dir():
+            args.build_dir = str(prof.build_dir)
+
+    if not args.build_dir:
+        print("\n[ERROR] Target build directory was not provided via -B <build_dir>.", file=sys.stderr)
+        print("Please provide an existing build directory via -B <build_dir> (e.g. -B build_prod).", file=sys.stderr)
         sys.exit(1)
+
+    build_dir_raw = Path(args.build_dir)
+    if not build_dir_raw.is_dir():
+        print(f"\n[ERROR] Target build directory does not exist: {args.build_dir}", file=sys.stderr)
+        print("Please provide an existing build directory via -B <build_dir> (e.g. -B build_prod).", file=sys.stderr)
+        sys.exit(1)
+
+    build_dir_path = build_dir_raw.resolve()
+
+    # Resolve project root for audit log output
+    if args.project_dir:
+        project_root = Path(args.project_dir).resolve()
+    elif cfg:
+        project_root = cfg.app_root
+    elif (build_dir_path.parent / "CMakeLists.txt").exists() and (build_dir_path.parent / "main").is_dir():
+        project_root = build_dir_path.parent.resolve()
+    else:
+        project_root = Path.cwd().resolve()
+
+    # Resolve log file path
+    if not args.log_file:
+        prof = cfg.resolve_profile(build_dir=str(build_dir_path)) if cfg else None
+        target_log_dir = prof.audit_log_dir if prof else (build_dir_path / "logs")
+        prefix = (prof.pack_prefix if prof else (cfg.pack_prefix if cfg else "")) or ""
+        suffix = (prof.pack_suffix if prof else (cfg.pack_suffix if cfg else "")) or ""
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_filename = f"{prefix}{timestamp}{suffix}.log"
+        args.log_file = str(target_log_dir / log_filename)
 
     log_path = Path(args.log_file).resolve()
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -316,7 +471,18 @@ def main():
 
     # Render metrics dashboard
     summary_text = render_summary()
-    log_write(summary_text)
+    if LOG_FILE_PATH:
+        try:
+            with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+                f.write(summary_text)
+        except Exception:
+            pass
+
+    if HAVE_RICH:
+        console = Console(width=78)
+        render_rich_summary(console)
+    else:
+        print(summary_text, flush=True)
 
     log_write(f"Diagnostics completed successfully.\nFull scroll-back log saved to: {LOG_FILE_PATH}\n")
 

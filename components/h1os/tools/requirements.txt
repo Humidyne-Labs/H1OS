@@ -1,0 +1,4 @@
+# H1OS Developer Tooling Dependencies
+# Install via: pip install -r components/h1os/tools/requirements.txt
+rich>=13.0.0
+pyserial>=3.5
