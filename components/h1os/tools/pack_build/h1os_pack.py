@@ -254,6 +254,12 @@ def parse_args():
         default=None,
         help="Custom suffix for the release zip file",
     )
+    parser.add_argument(
+        "--partition-file",
+        dest="partition_file",
+        default=None,
+        help="Optional path to partition table CSV (deprecated; release bundles use binary partition-table.bin)",
+    )
     return parser.parse_args()
 
 
