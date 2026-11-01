@@ -588,20 +588,25 @@ class H1OSMonitor:
                             self.update_display(status_text)
                             self.dirty = False
 
-                        # Attempt to open port with DTR/RTS held LOW (zero-reset on connect)
+                        # Attempt to open port with DTR/RTS held LOW before connection (prevents hardware auto-reset)
                         if target_port:
                             try:
-                                self.ser = serial.Serial(
-                                    port=target_port,
-                                    baudrate=self.baud,
-                                    timeout=0.05,
-                                    dsrdtr=False,
-                                    rtscts=False,
-                                )
-                                # Explicitly hold lines low so MCU is not reset on connect
-                                set_dtr_pin(self.ser, False)
-                                set_rts_with_windows_quirk(self.ser, False)
+                                ser = serial.Serial()
+                                ser.port = target_port
+                                ser.baudrate = self.baud
+                                ser.timeout = 0.05
+                                ser.dsrdtr = False
+                                ser.rtscts = False
+                                # Configure control lines LOW before open() to ensure DCB disables DTR/RTS on creation
+                                ser.dtr = False
+                                ser.rts = False
+                                ser.open()
 
+                                # Confirm lines held low post-open
+                                set_dtr_pin(ser, False)
+                                set_rts_with_windows_quirk(ser, False)
+
+                                self.ser = ser
                                 self.port = target_port
                                 self._add_badge_entry("ONLINE", f"Target connected on {self.port} [dim](slept {time_str})[/]", "green")
                                 self._update_window_title()
