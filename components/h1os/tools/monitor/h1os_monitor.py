@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 H1OS Dedicated Serial Monitor & Telemetry Console (h1os_monitor)
-Version: 1.3.0
+Version: 1.4.0
 License: Apache-2.0
 
 High-performance, beautifully styled serial monitor for ESP32-S3 firmware development.
 Features:
 - Pinned static header panel with zero vertical scroll drift.
 - Fully framed, rounded telemetry viewport (box.ROUNDED) matching h1os_menu aesthetics.
+- Flicker-free atomic double-buffered rendering (no line-erasing or cursor strobing).
+- Full mouse scroll wheel support in terminal (native Windows Console API + VT SGR sequences).
 - Keyboard-driven interactive scrollback (PageUp/PageDown, Up/Down, Home/End).
 - Intelligent ESP-IDF, LVGL, and ROM bootloader log parsing into colored pills, aligned uptime, and module tags.
 - Zero scrollback pollution during deep sleep (in-place status spinner with elapsed time in the header).
@@ -41,13 +43,51 @@ try:
     from rich import box
     from rich.console import Console
     from rich.layout import Layout
-    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
 except ImportError:
     print("[ERROR] rich is required. Install via 'pip install rich'.", file=sys.stderr)
     sys.exit(1)
+
+# Windows Console API structures for mouse and keyboard input
+if os.name == "nt":
+    import ctypes
+    from ctypes import wintypes
+
+    class COORD(ctypes.Structure):
+        _fields_ = [("X", wintypes.SHORT), ("Y", wintypes.SHORT)]
+
+    class KEY_EVENT_RECORD(ctypes.Structure):
+        _fields_ = [
+            ("bKeyDown", wintypes.BOOL),
+            ("wRepeatCount", wintypes.WORD),
+            ("wVirtualKeyCode", wintypes.WORD),
+            ("wVirtualScanCode", wintypes.WORD),
+            ("UnicodeChar", wintypes.WCHAR),
+            ("dwControlKeyState", wintypes.DWORD),
+        ]
+
+    class MOUSE_EVENT_RECORD(ctypes.Structure):
+        _fields_ = [
+            ("dwMousePosition", COORD),
+            ("dwButtonState", wintypes.DWORD),
+            ("dwControlKeyState", wintypes.DWORD),
+            ("dwEventFlags", wintypes.DWORD),
+        ]
+
+    class EVENT_UNION(ctypes.Union):
+        _fields_ = [
+            ("KeyEvent", KEY_EVENT_RECORD),
+            ("MouseEvent", MOUSE_EVENT_RECORD),
+        ]
+
+    class INPUT_RECORD(ctypes.Structure):
+        _fields_ = [
+            ("EventType", wintypes.WORD),
+            ("Event", EVENT_UNION),
+        ]
+
 
 # Regex to strip ANSI escape codes for clean disk logging
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
@@ -56,6 +96,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 ESP_LOG_RE = re.compile(r"^([EWIDV])\s*\(([0-9]+)\)\s*([a-zA-Z0-9_.\-/]+):\s*(.*)$")
 LVGL_LOG_RE = re.compile(r"^\[(Info|Warn|Error|Trace|User)\]\s*\(([0-9.]+,\s*[+\-0-9]+)\)\s*([a-zA-Z0-9_]+):\s*(.*)$")
 ROM_PREFIXES = ("ESP-ROM:", "Build:", "rst:", "Saved PC:", "SPIWP:", "mode:", "load:", "entry ")
+SGR_MOUSE_RE = re.compile(r"\x1b\[<(\d+);(\d+);(\d+)([Mm])")
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -154,7 +195,7 @@ class LogEntry:
 
 
 class H1OSMonitor:
-    """High-performance, bordered serial monitor with a pinned static header."""
+    """High-performance, flicker-free bordered serial monitor with mouse scroll support."""
 
     def __init__(
         self,
@@ -183,12 +224,15 @@ class H1OSMonitor:
         self.lock = threading.Lock()
         self.dirty = True
 
-        self.console = Console(highlight=False)
+        self.console = Console(highlight=False, force_terminal=True)
         self.layout = Layout()
         self.layout.split(
             Layout(name="header", size=5),
             Layout(name="body"),
         )
+
+        self.last_status_text = "[bold green]ONLINE[/]"
+        self.last_dimensions = (0, 0)
 
         if self.enable_logging:
             self._open_log_file()
@@ -257,11 +301,14 @@ class H1OSMonitor:
         self._update_window_title()
 
     def clear_screen(self):
-        """Erase scrollback buffer while preserving the static header frame."""
+        """Erase scrollback buffer and clear terminal while preserving the static header frame."""
         with self.lock:
             self.history.clear()
             self.scroll_offset = 0
             self.dirty = True
+        # Blank the alternate screen buffer once to clear old line artifacts
+        sys.stdout.write("\x1b[2J\x1b[H")
+        sys.stdout.flush()
         self._add_badge_entry("CLEARED", "Telemetry buffer erased.", "cyan")
 
     def trigger_hardware_reset(self):
@@ -465,7 +512,7 @@ class H1OSMonitor:
             total_lines = len(self.history)
             if self.scroll_offset == 0:
                 lines = list(self.history)[-visible_count:]
-                subtitle = f"[dim][PageUp/Down] Scroll History  |  [End] Live Stream ({total_lines} lines)[/]"
+                subtitle = f"[dim]Scroll: Mouse Wheel / [PageUp/Down]  |  [End] Live Stream ({total_lines} lines)[/]"
             else:
                 end_idx = max(0, total_lines - self.scroll_offset)
                 start_idx = max(0, end_idx - visible_count)
@@ -485,20 +532,49 @@ class H1OSMonitor:
             box=box.ROUNDED,
         )
 
+    def render_frame(self, status_text: Optional[str] = None):
+        """Render the full monitor viewport atomically without line-clearing flicker."""
+        if status_text is not None:
+            self.last_status_text = status_text
+        st = self.last_status_text
+
+        # Check for window resize
+        cur_dims = (self.console.size.width, self.console.size.height)
+        if cur_dims != self.last_dimensions and self.last_dimensions != (0, 0):
+            sys.stdout.write("\x1b[2J\x1b[H")
+        self.last_dimensions = cur_dims
+
+        self.layout["header"].update(self._build_header_panel(st))
+        self.layout["body"].update(self._build_telemetry_panel())
+
+        with self.console.capture() as capture:
+            self.console.print(self.layout)
+        frame_ansi = capture.get()
+
+        # Atomic draw:
+        # \x1b[?25l: Hide cursor to prevent cursor strobing
+        # \x1b[H: Reposition cursor at (1, 1) without clearing lines (zero flicker)
+        sys.stdout.write("\x1b[?25l\x1b[H" + frame_ansi)
+        sys.stdout.flush()
+
     def run(self):
-        """Main execution loop supervising serial streaming, deep sleep, and keyboard input."""
+        """Main execution loop supervising serial streaming, deep sleep, and keyboard/mouse input."""
+        # Enter alternate screen buffer, hide cursor, enable SGR mouse tracking, and clear once
+        sys.stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[H")
+        sys.stdout.flush()
         self._update_window_title()
 
-        # Keyboard polling thread
-        kb_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
-        kb_thread.start()
+        # Input listener thread (handles mouse wheel, navigation keys, and hotkeys)
+        in_thread = threading.Thread(target=self._input_listener, daemon=True)
+        in_thread.start()
 
         line_buffer = bytearray()
         sleep_start_time: Optional[float] = None
         spinner_idx = 0
         last_render_time = 0.0
+        last_spin_time = 0.0
 
-        with Live(self.layout, console=self.console, screen=True, auto_refresh=False) as live:
+        try:
             while self.running:
                 now = time.time()
 
@@ -514,17 +590,15 @@ class H1OSMonitor:
                     secs = elapsed_sec % 60
                     time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
 
-                    spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
-                    spinner_idx += 1
-
-                    port_label = target_port or "active port"
-                    status_text = f"[bold yellow]SLEEPING ({time_str}) {spin_char}[/] [dim]Listening on {port_label}...[/]"
-
-                    # Update UI on every tick during deep sleep
-                    self.layout["header"].update(self._build_header_panel(status_text))
-                    self.layout["body"].update(self._build_telemetry_panel())
-                    live.update(self.layout, refresh=True)
-                    self.dirty = False
+                    # Throttle sleep spinner to a clean 4 FPS (250 ms) to eliminate busy-loop flicker
+                    if now - last_spin_time >= 0.25:
+                        spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
+                        spinner_idx += 1
+                        port_label = target_port or "active port"
+                        status_text = f"[bold yellow]SLEEPING ({time_str}) {spin_char}[/] [dim]Listening on {port_label}...[/]"
+                        self.render_frame(status_text)
+                        last_spin_time = now
+                        self.dirty = False
 
                     # Attempt to open port with DTR/RTS held LOW (zero-reset on connect)
                     if target_port:
@@ -545,16 +619,16 @@ class H1OSMonitor:
                             self._update_window_title()
                             sleep_start_time = None
                             line_buffer.clear()
+                            self.render_frame("[bold green]ONLINE[/]")
                             self.dirty = True
                         except (serial.SerialException, OSError) as exc:
                             self.ser = None
                             exc_msg = str(exc).lower()
                             if "access is denied" in exc_msg or "permissionerror" in exc_msg:
                                 status_text = f"[bold red]LOCKED (Access Denied)[/] [dim]Retrying {target_port}...[/]"
-                                self.layout["header"].update(self._build_header_panel(status_text))
-                                live.update(self.layout, refresh=True)
+                                self.render_frame(status_text)
 
-                    time.sleep(0.12)
+                    time.sleep(0.08)
                     continue
 
                 # 2. Read Serial Stream
@@ -575,7 +649,7 @@ class H1OSMonitor:
                                     self.history.append(entry)
                                     self.dirty = True
 
-                                # Persistent disk logging (ANSI stripped for 100% clean plain text)
+                                # Persistent disk logging (ANSI stripped for clean plain text)
                                 if self.enable_logging and self.log_file:
                                     clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
                                     if self.enable_timestamps:
@@ -588,11 +662,9 @@ class H1OSMonitor:
                             elif b != ord("\r"):
                                 line_buffer.append(b)
 
-                    # Throttle screen refresh to ~30 fps to keep serial processing lightning fast
+                    # Smooth, throttled 30 FPS display refresh without line wiping
                     if self.dirty and (now - last_render_time >= 0.033):
-                        self.layout["header"].update(self._build_header_panel("[bold green]ONLINE[/]"))
-                        self.layout["body"].update(self._build_telemetry_panel())
-                        live.update(self.layout, refresh=True)
+                        self.render_frame("[bold green]ONLINE[/]")
                         last_render_time = now
                         self.dirty = False
 
@@ -610,35 +682,146 @@ class H1OSMonitor:
                     sleep_start_time = time.time()
                     self._add_badge_entry("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
                     self._update_window_title()
+                    self.render_frame("[bold yellow]SLEEPING[/]")
 
-    def _keyboard_listener(self):
-        """Poll keyboard asynchronously for navigation and hotkeys."""
+        finally:
+            self.close()
+
+    def _input_listener(self):
+        """Cross-platform keyboard and mouse wheel input listener."""
         if os.name == "nt":
-            import msvcrt
+            self._input_listener_windows()
+        else:
+            self._input_listener_posix()
+
+    def _input_listener_windows(self):
+        """Listen for keyboard and mouse wheel events on Windows via Console API with msvcrt fallback."""
+        kernel32 = ctypes.windll.kernel32
+        h_in = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+
+        mode = wintypes.DWORD()
+        has_console = kernel32.GetConsoleMode(h_in, ctypes.byref(mode)) != 0
+        orig_mode = mode.value if has_console else 0
+
+        if has_console:
+            # Enable mouse input (0x0010) and extended flags (0x0080), disable quick edit (0x0040)
+            # so mouse wheel and clicks are passed to our application instead of freezing console
+            new_mode = (orig_mode | 0x0010 | 0x0080) & ~0x0040
+            kernel32.SetConsoleMode(h_in, new_mode)
+
+        try:
+            num_events = wintypes.DWORD()
+            records = (INPUT_RECORD * 32)()
+            read_count = wintypes.DWORD()
 
             while self.running:
-                if msvcrt.kbhit():
-                    ch = msvcrt.getch()
-                    # Extended navigation keys (Up, Down, PageUp, PageDown, Home, End)
-                    if ch in (b"\x00", b"\xe0"):
-                        ch2 = msvcrt.getch()
-                        code = ord(ch2)
-                        if code == 0x48:  # Up
+                if has_console:
+                    kernel32.GetNumberOfConsoleInputEvents(h_in, ctypes.byref(num_events))
+                    if num_events.value > 0:
+                        kernel32.ReadConsoleInputW(
+                            h_in,
+                            ctypes.byref(records),
+                            min(32, num_events.value),
+                            ctypes.byref(read_count),
+                        )
+                        for i in range(read_count.value):
+                            rec = records[i]
+                            # 1. KEY_EVENT
+                            if rec.EventType == 0x0001 and rec.Event.KeyEvent.bKeyDown:
+                                vk = rec.Event.KeyEvent.wVirtualKeyCode
+                                ch = rec.Event.KeyEvent.UnicodeChar.lower()
+                                if vk == 0x21:  # PageUp
+                                    self.scroll_page_up()
+                                elif vk == 0x22:  # PageDown
+                                    self.scroll_page_down()
+                                elif vk == 0x26:  # Up
+                                    self.scroll_up(1)
+                                elif vk == 0x28:  # Down
+                                    self.scroll_down(1)
+                                elif vk == 0x24:  # Home
+                                    self.scroll_home()
+                                elif vk == 0x23:  # End
+                                    self.scroll_end()
+                                elif ch in ("q", "\x1b", "\x03"):
+                                    self.running = False
+                                    break
+                                elif ch == "r":
+                                    self.trigger_hardware_reset()
+                                elif ch == "t":
+                                    self.toggle_timestamps()
+                                elif ch == "l":
+                                    self.toggle_logging()
+                                elif ch == "c":
+                                    self.clear_screen()
+                                elif ch == "b":
+                                    self.scroll_end()
+
+                            # 2. MOUSE_EVENT (Wheel)
+                            elif rec.EventType == 0x0002:
+                                ev_flags = rec.Event.MouseEvent.dwEventFlags
+                                # MOUSE_WHEELED is 0x0004
+                                if ev_flags & 0x0004:
+                                    delta = ctypes.c_int16(rec.Event.MouseEvent.dwButtonState >> 16).value
+                                    if delta > 0:
+                                        self.scroll_up(3)  # Scroll up 3 lines per notch
+                                    elif delta < 0:
+                                        self.scroll_down(3)  # Scroll down 3 lines per notch
+
+                        continue
+                time.sleep(0.015)
+        finally:
+            if has_console and orig_mode:
+                kernel32.SetConsoleMode(h_in, orig_mode)
+
+    def _input_listener_posix(self):
+        """Listen for keyboard and mouse wheel events on POSIX/VT terminals via stdin."""
+        import select
+        import termios
+        import tty
+
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            while self.running:
+                r, _, _ = select.select([sys.stdin], [], [], 0.02)
+                if r:
+                    ch = sys.stdin.read(1)
+                    if ch == "\x1b":
+                        # Check for escape sequences
+                        seq = ""
+                        while select.select([sys.stdin], [], [], 0.002)[0]:
+                            seq += sys.stdin.read(1)
+
+                        # Check for SGR mouse sequences: \x1b[<64;X;YM (Wheel Up) or \x1b[<65;X;YM (Wheel Down)
+                        m_mouse = SGR_MOUSE_RE.match("\x1b" + seq)
+                        if m_mouse:
+                            btn = int(m_mouse.group(1))
+                            if btn == 64:
+                                self.scroll_up(3)
+                            elif btn == 65:
+                                self.scroll_down(3)
+                            continue
+
+                        if seq == "[A":
                             self.scroll_up(1)
-                        elif code == 0x50:  # Down
+                        elif seq == "[B":
                             self.scroll_down(1)
-                        elif code == 0x49:  # PageUp
+                        elif seq in ("[5~", "[I"):
                             self.scroll_page_up()
-                        elif code == 0x51:  # PageDown
+                        elif seq in ("[6~", "[G"):
                             self.scroll_page_down()
-                        elif code == 0x47:  # Home
+                        elif seq in ("[H", "[1~"):
                             self.scroll_home()
-                        elif code == 0x4F:  # End
+                        elif seq in ("[F", "[4~"):
                             self.scroll_end()
+                        elif not seq:
+                            self.running = False
+                            break
                         continue
 
-                    key = ch.decode("utf-8", errors="ignore").lower()
-                    if key in ("q", "\x1b", "\x03"):  # Q, ESC, Ctrl+C
+                    key = ch.lower()
+                    if key in ("q", "\x03"):
                         self.running = False
                         break
                     elif key == "r":
@@ -651,58 +834,8 @@ class H1OSMonitor:
                         self.clear_screen()
                     elif key == "b":
                         self.scroll_end()
-                time.sleep(0.02)
-        else:
-            import select
-            import termios
-            import tty
-
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setcbreak(fd)
-                while self.running:
-                    r, _, _ = select.select([sys.stdin], [], [], 0.02)
-                    if r:
-                        ch = sys.stdin.read(1)
-                        if ch == "\x1b":
-                            # Check for escape sequences
-                            seq = ""
-                            while select.select([sys.stdin], [], [], 0.001)[0]:
-                                seq += sys.stdin.read(1)
-                            if seq == "[A":
-                                self.scroll_up(1)
-                            elif seq == "[B":
-                                self.scroll_down(1)
-                            elif seq in ("[5~", "[I"):
-                                self.scroll_page_up()
-                            elif seq in ("[6~", "[G"):
-                                self.scroll_page_down()
-                            elif seq in ("[H", "[1~"):
-                                self.scroll_home()
-                            elif seq in ("[F", "[4~"):
-                                self.scroll_end()
-                            elif not seq:
-                                self.running = False
-                                break
-                            continue
-
-                        key = ch.lower()
-                        if key in ("q", "\x03"):
-                            self.running = False
-                            break
-                        elif key == "r":
-                            self.trigger_hardware_reset()
-                        elif key == "t":
-                            self.toggle_timestamps()
-                        elif key == "l":
-                            self.toggle_logging()
-                        elif key == "c":
-                            self.clear_screen()
-                        elif key == "b":
-                            self.scroll_end()
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
     def close(self):
         """Clean shutdown and resource release."""
@@ -713,6 +846,9 @@ class H1OSMonitor:
             except Exception:
                 pass
         self._close_log_file()
+        # Disable SGR mouse tracking, show cursor, and restore main terminal screen buffer
+        sys.stdout.write("\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l")
+        sys.stdout.flush()
         self.console.print("\n[bold cyan]H1OS Serial Monitor closed.[/bold cyan]")
 
 
