@@ -774,21 +774,30 @@ namespace Esp32Slip.Flasher
         public void FinishAndReboot()
         {
             Console.WriteLine("[*] Finalizing flash and rebooting target SoC...");
+
+            // 1. Clear force download boot mode in RTC_CNTL_OPTION1_REG
+            // On ESP32-S3 over native USB CDC, bit 0 forces the ROM back into download mode across reset
             try {
-                byte[] endPayload = new byte[4]; // reboot flag = 0
+                WriteReg(0x6000812C, 0x00000000, 0x00000001);
+            } catch { }
+
+            // 2. Signal ROM to leave flash download mode
+            try {
+                byte[] endPayload = new byte[4]; // reboot flag = 0 (run user app)
                 uint val;
                 ExecuteCommand(ESP_FLASH_END, endPayload, 0, 1500, out val);
             } catch { }
 
-            // Hardware reset pulse via RTS/DTR
+            // 3. Hardware reset pulse via RTS/DTR with Windows usbser.sys flush workaround
             try {
                 if (_port != null && _port.IsOpen)
                 {
-                    _port.DtrEnable = false;
-                    _port.RtsEnable = true;
+                    SetDtr(false);
                     Thread.Sleep(50);
-                    _port.RtsEnable = false;
-                    Thread.Sleep(50);
+                    SetRts(true);  // Assert CHIP_PU LOW (reset active)
+                    Thread.Sleep(150);
+                    SetRts(false); // Release CHIP_PU HIGH (boots SPI flash app)
+                    Thread.Sleep(200);
                 }
             } catch { }
         }
