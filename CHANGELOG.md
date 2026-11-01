@@ -4,6 +4,28 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.8-dev] - 2026-11-01
+
+### 🛠️ Hardware Abstraction & Audio Subsystem Handover
+* **ESP-IDF v6.1 GPIO Reservation Handover** (`sub_audio.c`, `hal_io.c`):
+  * Resolved GPIO pin allocation conflicts (`GPIO 45 is not usable, maybe conflict with others`) introduced by ESP-IDF v6.1's driver reservation tracking (`esp_gpio_reserve`).
+  * Enforced architectural separation of concerns: `hal_io_quiesce_i2s_pads()` strictly configures low-leakage physical pad states and RTC pad holds without mutating driver-level software reservation bitmaps.
+  * Added explicit reservation revocation (`esp_gpio_revoke`) in `sub_audio_init()` immediately before `i2s_channel_init_std_mode()` claims peripheral I2S pins (`GPIO 14, 15, 38, 45`), ensuring clean driver handover.
+
+### ⚡ Flasher & Tooling Ecosystem Hardening
+* **Native USB SLIP ROM Flasher Engine** (`components/h1os/tools/pack_build/flasher.ps1`, `flash.bat`):
+  * **ROM Checksum Calculation:** Implemented empirical `0xEF` seed checksum computation for `ESP_FLASH_DATA` (opcode `0x03`) blocks, preventing on-chip MD5 mismatches during SPI flash programming.
+  * **4-Byte ROM Status Trailer Parsing:** Corrected response frame decoding to inspect status and error codes at `Length - 4` and `Length - 3`, handling ROM protocol framing accurately.
+  * **Memory-Safe Array Resizing:** Decoupled erase region queue management from fixed-size script argument arrays to prevent runtime collection resizing exceptions.
+  * **Deterministic Target Reset & Download Mode Release:** Implemented explicit clearance of `RTC_CNTL_FORCE_DOWNLOAD_BOOT_MASK` on `RTC_CNTL_OPTION1_REG` (`0x6000812C`) combined with RTS toggle and Windows `usbser.sys` DTR line flush workaround, enabling reliable automatic reset into user application firmware.
+  * **Batch Script Execution Stability:** Normalized script line endings to DOS CRLF via `.gitattributes` and flattened menu dispatch to direct jump targets, eliminating `cmd.exe` label seek failures.
+
+### 🖥️ Interactive Console & Partition Management Architecture
+* **Rich Terminal Tooling Suite** (`tools/`):
+  * Integrated unified event-driven console input dispatcher supporting mouse wheel scrolling, live window resize events, and flicker-free pinned-header panels.
+  * Added interactive partition manager (`idf.py h1os_part`) featuring live usage audits, dual-slot deployment toggles, and safe partition erasure.
+  * Hardened serial monitor launcher with decoupled session logging, automatic reconnection across sleep cycles, and external terminal launching.
+
 ## [2.4.7-dev] - 2026-10-31
 
 ### 🔬 Environmental Chamber Qualification (`TST_006`) & Chemical Baseline

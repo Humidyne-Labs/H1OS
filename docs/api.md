@@ -1254,7 +1254,7 @@ Defined in orch_math.c:16
 #define M_PI 3.14159265358979323846f
 ```
 
-Defined in sub_audio.c:28
+Defined in sub_audio.c:29
 
 ---
 
@@ -1266,7 +1266,7 @@ Defined in sub_audio.c:28
 #define SUB_AUDIO_TASK_STACK_WORKER 4096U
 ```
 
-Defined in sub_audio.c:34
+Defined in sub_audio.c:35
 
 Audio worker task stack depth (4 KB floor).
 
@@ -1280,7 +1280,7 @@ Audio worker task stack depth (4 KB floor).
 #define SUB_AUDIO_TASK_PRIO_WORKER 6
 ```
 
-Defined in sub_audio.c:35
+Defined in sub_audio.c:36
 
 High-priority audio DMA pump priority.
 
@@ -1294,7 +1294,7 @@ High-priority audio DMA pump priority.
 #define SUB_AUDIO_AMP_POWER_ON_DELAY_MS 120U
 ```
 
-Defined in sub_audio.c:36
+Defined in sub_audio.c:37
 
 Class-D amplifier power-up settling delay (120ms).
 
@@ -1308,7 +1308,7 @@ Class-D amplifier power-up settling delay (120ms).
 #define SUB_AUDIO_AMP_POWER_OFF_DELAY_MS 80U
 ```
 
-Defined in sub_audio.c:37
+Defined in sub_audio.c:38
 
 Class-D amplifier power-down muting delay (80ms).
 
@@ -1322,7 +1322,7 @@ Class-D amplifier power-down muting delay (80ms).
 #define SUB_AUDIO_DEFAULT_WAIT_TIMEOUT_MS 500U
 ```
 
-Defined in sub_audio.c:38
+Defined in sub_audio.c:39
 
 Default playback completion wait timeout.
 
@@ -1336,7 +1336,7 @@ Default playback completion wait timeout.
 #define SUB_AUDIO_QUEUE_DEPTH 8U
 ```
 
-Defined in sub_audio.c:39
+Defined in sub_audio.c:40
 
 Static audio command queue depth (8 slots).
 
@@ -1350,7 +1350,7 @@ Static audio command queue depth (8 slots).
 #define SUB_AUDIO_DMA_DESC_NUM 4U
 ```
 
-Defined in sub_audio.c:40
+Defined in sub_audio.c:41
 
 Number of I2S DMA descriptors (4 x 256 = 64 ms).
 
@@ -1364,7 +1364,7 @@ Number of I2S DMA descriptors (4 x 256 = 64 ms).
 #define SUB_AUDIO_CSM_SETTLE_TIMEOUT_MS 100U
 ```
 
-Defined in sub_audio.c:41
+Defined in sub_audio.c:42
 
 Maximum wait for ES8311 CSM to exit state S0.
 
@@ -1378,7 +1378,7 @@ Maximum wait for ES8311 CSM to exit state S0.
 #define SUB_AUDIO_CSM_QUIESCE_DELAY_US 2000U
 ```
 
-Defined in sub_audio.c:42
+Defined in sub_audio.c:43
 
 Post-suspend CSM power-down hold before clk stop.
 
@@ -1392,7 +1392,7 @@ Post-suspend CSM power-down hold before clk stop.
 #define ES8311_REG_RESET 0x00
 ```
 
-Defined in sub_audio.c:45
+Defined in sub_audio.c:46
 
 Reset control (Default 0x1F: CSM_ON=0, all RST_*=1).
 
@@ -1406,7 +1406,7 @@ Reset control (Default 0x1F: CSM_ON=0, all RST_*=1).
 #define ES8311_REG_CLK_MGR1 0x01
 ```
 
-Defined in sub_audio.c:46
+Defined in sub_audio.c:47
 
 Clock manager 1 (Default 0x00: all clocks gated off).
 
@@ -1420,7 +1420,7 @@ Clock manager 1 (Default 0x00: all clocks gated off).
 #define ES8311_REG_CLK_MGR2 0x02
 ```
 
-Defined in sub_audio.c:47
+Defined in sub_audio.c:48
 
 Clock manager 2 (Pre-divider & pre-multiplier).
 
@@ -1434,7 +1434,7 @@ Clock manager 2 (Pre-divider & pre-multiplier).
 #define ES8311_REG_CLK_MGR3 0x03
 ```
 
-Defined in sub_audio.c:48
+Defined in sub_audio.c:49
 
 Clock manager 3 (ADC oversampling ratio).
 
@@ -1448,7 +1448,7 @@ Clock manager 3 (ADC oversampling ratio).
 #define ES8311_REG_CLK_MGR4 0x04
 ```
 
-Defined in sub_audio.c:49
+Defined in sub_audio.c:50
 
 Clock manager 4 (DAC oversampling ratio).
 
@@ -1462,7 +1462,7 @@ Clock manager 4 (DAC oversampling ratio).
 #define ES8311_REG_CLK_MGR5 0x05
 ```
 
-Defined in sub_audio.c:50
+Defined in sub_audio.c:51
 
 Clock manager 5 (ADC/DAC digital clock dividers).
 
@@ -1476,7 +1476,7 @@ Clock manager 5 (ADC/DAC digital clock dividers).
 #define ES8311_REG_CLK_MGR6 0x06
 ```
 
-Defined in sub_audio.c:51
+Defined in sub_audio.c:52
 
 Clock manager 6 (BCLK divider).
 
@@ -1490,7 +1490,7 @@ Clock manager 6 (BCLK divider).
 #define ES8311_REG_CLK_MGR7 0x07
 ```
 
-Defined in sub_audio.c:52
+Defined in sub_audio.c:53
 
 Clock manager 7 (Bit 5 TRI_BLRCK, Bit 4 TRI_ADCDAT).
 
@@ -1504,7 +1504,7 @@ Clock manager 7 (Bit 5 TRI_BLRCK, Bit 4 TRI_ADCDAT).
 #define ES8311_REG_CLK_MGR8 0x08
 ```
 
-Defined in sub_audio.c:53
+Defined in sub_audio.c:54
 
 Clock manager 8 (LRCK divider low byte).
 
@@ -1518,7 +1518,7 @@ Clock manager 8 (LRCK divider low byte).
 #define ES8311_REG_SDPIN 0x09
 ```
 
-Defined in sub_audio.c:54
+Defined in sub_audio.c:55
 
 Serial data port input (Bit 6 SDPIN_MUTE).
 
@@ -1532,7 +1532,7 @@ Serial data port input (Bit 6 SDPIN_MUTE).
 #define ES8311_REG_SDPOUT 0x0A
 ```
 
-Defined in sub_audio.c:55
+Defined in sub_audio.c:56
 
 Serial data port output (Bit 6 SDPOUT_MUTE).
 
@@ -1546,7 +1546,7 @@ Serial data port output (Bit 6 SDPOUT_MUTE).
 #define ES8311_REG_SYS_PWR_A 0x0B
 ```
 
-Defined in sub_audio.c:56
+Defined in sub_audio.c:57
 
 System power-up time control 1 (CSM_COUNT1).
 
@@ -1560,7 +1560,7 @@ System power-up time control 1 (CSM_COUNT1).
 #define ES8311_REG_SYS_PWR_B 0x0C
 ```
 
-Defined in sub_audio.c:57
+Defined in sub_audio.c:58
 
 System power-up time control 2 (CSM_COUNT2).
 
@@ -1574,7 +1574,7 @@ System power-up time control 2 (CSM_COUNT2).
 #define ES8311_REG_SYS_PWR_ANA 0x0D
 ```
 
-Defined in sub_audio.c:58
+Defined in sub_audio.c:59
 
 System analog/bias/reference power-down (Default 0xFC).
 
@@ -1588,7 +1588,7 @@ System analog/bias/reference power-down (Default 0xFC).
 #define ES8311_REG_SYS_PDN_MOD 0x0E
 ```
 
-Defined in sub_audio.c:59
+Defined in sub_audio.c:60
 
 System PGA/ADC modulator power-down (Default 0x6A).
 
@@ -1602,7 +1602,7 @@ System PGA/ADC modulator power-down (Default 0x6A).
 #define ES8311_REG_SYS_LP_MOD 0x0F
 ```
 
-Defined in sub_audio.c:60
+Defined in sub_audio.c:61
 
 System low-power mode enables (0xFF = all LP blocks active).
 
@@ -1616,7 +1616,7 @@ System low-power mode enables (0xFF = all LP blocks active).
 #define ES8311_REG_SYS_IBIAS 0x10
 ```
 
-Defined in sub_audio.c:61
+Defined in sub_audio.c:62
 
 System master/DAC bias current control (Default 0x13).
 
@@ -1630,7 +1630,7 @@ System master/DAC bias current control (Default 0x13).
 #define ES8311_REG_SYS_INT11 0x11
 ```
 
-Defined in sub_audio.c:62
+Defined in sub_audio.c:63
 
 System internal bias control (Default 0x7C).
 
@@ -1644,7 +1644,7 @@ System internal bias control (Default 0x7C).
 #define ES8311_REG_DAC_PWR 0x12
 ```
 
-Defined in sub_audio.c:63
+Defined in sub_audio.c:64
 
 DAC power control (Default 0x02: PDN_DAC=1, ENREFR=0).
 
@@ -1658,7 +1658,7 @@ DAC power control (Default 0x02: PDN_DAC=1, ENREFR=0).
 #define ES8311_REG_SYS_HPSW 0x13
 ```
 
-Defined in sub_audio.c:64
+Defined in sub_audio.c:65
 
 System headphone driver switch (Default 0x00: HPSW=0).
 
@@ -1672,7 +1672,7 @@ System headphone driver switch (Default 0x00: HPSW=0).
 #define ES8311_REG_SYS_MIC_PGA 0x14
 ```
 
-Defined in sub_audio.c:65
+Defined in sub_audio.c:66
 
 System DMIC/analog MIC mux & PGA gain (Default 0x10).
 
@@ -1686,7 +1686,7 @@ System DMIC/analog MIC mux & PGA gain (Default 0x10).
 #define ES8311_REG_ADC_RAMP 0x15
 ```
 
-Defined in sub_audio.c:66
+Defined in sub_audio.c:67
 
 ADC soft-ramp rate & DMIC sense (Default 0x00).
 
@@ -1700,7 +1700,7 @@ ADC soft-ramp rate & DMIC sense (Default 0x00).
 #define ES8311_REG_ADC_SCALE 0x16
 ```
 
-Defined in sub_audio.c:67
+Defined in sub_audio.c:68
 
 ADC microphone gain scale (Default 0x04).
 
@@ -1714,7 +1714,7 @@ ADC microphone gain scale (Default 0x04).
 #define ES8311_REG_ADC_VOL 0x17
 ```
 
-Defined in sub_audio.c:68
+Defined in sub_audio.c:69
 
 ADC digital volume (Default 0x00: -95.5 dB).
 
@@ -1728,7 +1728,7 @@ ADC digital volume (Default 0x00: -95.5 dB).
 #define ES8311_REG_ADC_HPF 0x1B
 ```
 
-Defined in sub_audio.c:69
+Defined in sub_audio.c:70
 
 ADC high-pass filter coefficient S2 (Default 0x0C).
 
@@ -1742,7 +1742,7 @@ ADC high-pass filter coefficient S2 (Default 0x0C).
 #define ES8311_REG_ADC_EQ 0x1C
 ```
 
-Defined in sub_audio.c:70
+Defined in sub_audio.c:71
 
 ADC equalizer bypass & HPF S1 (Default 0x4C: EQ bypassed).
 
@@ -1756,7 +1756,7 @@ ADC equalizer bypass & HPF S1 (Default 0x4C: EQ bypassed).
 #define ES8311_REG_DAC_MUTE 0x31
 ```
 
-Defined in sub_audio.c:71
+Defined in sub_audio.c:72
 
 DAC digital mute control (0x60 = DSM & DEM muted).
 
@@ -1770,7 +1770,7 @@ DAC digital mute control (0x60 = DSM & DEM muted).
 #define ES8311_REG_DAC_VOL 0x32
 ```
 
-Defined in sub_audio.c:72
+Defined in sub_audio.c:73
 
 DAC digital volume (Default 0x00: -95.5 dB).
 
@@ -1784,7 +1784,7 @@ DAC digital volume (Default 0x00: -95.5 dB).
 #define ES8311_REG_DAC_RAMP_EQ 0x37
 ```
 
-Defined in sub_audio.c:73
+Defined in sub_audio.c:74
 
 DAC ramp rate & EQ bypass (Default 0x08: DAC_EQBYPASS=1).
 
@@ -1798,7 +1798,7 @@ DAC ramp rate & EQ bypass (Default 0x08: DAC_EQBYPASS=1).
 #define ES8311_REG_GPIO_CFG 0x44
 ```
 
-Defined in sub_audio.c:74
+Defined in sub_audio.c:75
 
 GPIO & ADCDAT loopback mux (Default 0x00).
 
@@ -1812,7 +1812,7 @@ GPIO & ADCDAT loopback mux (Default 0x00).
 #define ES8311_REG_GP_CTRL 0x45
 ```
 
-Defined in sub_audio.c:75
+Defined in sub_audio.c:76
 
 GP pull-up/pull-down control (Bit 0 PULLUP_SE: 1=pullup off).
 
@@ -1826,7 +1826,7 @@ GP pull-up/pull-down control (Bit 0 PULLUP_SE: 1=pullup off).
 #define ES8311_REG_FLAG 0xFC
 ```
 
-Defined in sub_audio.c:76
+Defined in sub_audio.c:77
 
 CSM & clock status flag register (Bits 6:4 FLAG_CSM_CHIP).
 
@@ -1840,7 +1840,7 @@ CSM & clock status flag register (Bits 6:4 FLAG_CSM_CHIP).
 #define ES8311_REG_CHIP_ID1 0xFD
 ```
 
-Defined in sub_audio.c:77
+Defined in sub_audio.c:78
 
 Chip ID high byte (0x83).
 
@@ -1854,7 +1854,7 @@ Chip ID high byte (0x83).
 #define ES8311_REG_CHIP_ID2 0xFE
 ```
 
-Defined in sub_audio.c:78
+Defined in sub_audio.c:79
 
 Chip ID low byte (0x11).
 
@@ -1868,7 +1868,7 @@ Chip ID low byte (0x11).
 #define FRAME_SIZE 0x100
 ```
 
-Defined in sub_audio.c:80
+Defined in sub_audio.c:81
 
 ---
 
@@ -1880,7 +1880,7 @@ Defined in sub_audio.c:80
 #define S_ES8311_INIT_PRE_CHARGE_SIZE (sizeof(s_es8311_init_pre_charge)  / sizeof(s_es8311_init_pre_charge[0]))
 ```
 
-Defined in sub_audio.c:309
+Defined in sub_audio.c:310
 
 Pre Charge Table Size Macro.
 
@@ -1894,7 +1894,7 @@ Pre Charge Table Size Macro.
 #define S_ES8311_INIT_POST_CHARGE_SIZE (sizeof(s_es8311_init_post_charge) / sizeof(s_es8311_init_post_charge[0]))
 ```
 
-Defined in sub_audio.c:310
+Defined in sub_audio.c:311
 
 Post Charge Table Size Macro.
 
@@ -1908,7 +1908,7 @@ Post Charge Table Size Macro.
 #define S_ES8311_DEINIT_SIZE (sizeof(s_es8311_deinit)           / sizeof(s_es8311_deinit[0]))
 ```
 
-Defined in sub_audio.c:311
+Defined in sub_audio.c:312
 
 Deinit Table Size Macro.
 
@@ -2447,7 +2447,7 @@ Minor version number (backward-compatible features).
 ### H1OS_VERSION_PATCH
 
 ```cpp
-#define H1OS_VERSION_PATCH 7
+#define H1OS_VERSION_PATCH 8
 ```
 
 Defined in h1os/h1os_version.h:19
@@ -2475,7 +2475,7 @@ Pre-release release track tag.
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.4.7-dev"
+#define H1OS_VERSION_STRING "2.4.8-dev"
 ```
 
 Defined in h1os/h1os_version.h:21
@@ -3373,7 +3373,7 @@ Battery operational state machine.
 enum audio_cmd_type_t
 ```
 
-Defined in sub_audio.c:82
+Defined in sub_audio.c:83
 
 | Value | Description |
 |-------|-------------|
@@ -9394,7 +9394,7 @@ True if |initial - current| <= gate_threshold.
 static inline void audio_cpu_max_acquire(void)
 ```
 
-Defined in sub_audio.c:148
+Defined in sub_audio.c:149
 
 Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 
@@ -9410,7 +9410,7 @@ Acquire 240 MHz CPU frequency lock for I2S/APB clock stability.
 static inline void audio_cpu_max_release(void)
 ```
 
-Defined in sub_audio.c:163
+Defined in sub_audio.c:164
 
 Release 240 MHz CPU frequency lock.
 
@@ -9426,7 +9426,7 @@ Release 240 MHz CPU frequency lock.
 static inline uint8_t volume_pct_to_es8311_reg(uint8_t pct)
 ```
 
-Defined in sub_audio.c:320
+Defined in sub_audio.c:321
 
 Convert perceptual volume percentage (0..100%) to ES8311 DAC_VOLUME register byte.
 
@@ -9451,7 +9451,7 @@ ES8311 Register 0x32 value.
 static void audio_worker_task(void * pvParameters)
 ```
 
-Defined in sub_audio.c:999
+Defined in sub_audio.c:1006
 
 Background FreeRTOS audio worker task.
 
@@ -9475,7 +9475,7 @@ Streams synthesized tones, chimes, and PCM buffers at 240 MHz CPU clock and flus
 static esp_err_t sub_audio_park_warm(bool park_mute)
 ```
 
-Defined in sub_audio.c:693
+Defined in sub_audio.c:700
 
 Control Class-D amplifier hardware mute/shutdown state (HAL_PIN_PA_CTRL / GPIO 46).
 
@@ -9500,7 +9500,7 @@ ESP_OK on success.
 static esp_err_t es8311_write_reg(uint8_t reg, uint8_t val)
 ```
 
-Defined in sub_audio.c:339
+Defined in sub_audio.c:340
 
 Write a single 8-bit value to an ES8311 control register over shared I2C.
 
@@ -9526,7 +9526,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_read_reg(uint8_t reg, uint8_t * val)
 ```
 
-Defined in sub_audio.c:353
+Defined in sub_audio.c:354
 
 Read a single 8-bit value from an ES8311 control register over shared I2C.
 
@@ -9552,7 +9552,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_read_chip_id(uint16_t * chip_id)
 ```
 
-Defined in sub_audio.c:365
+Defined in sub_audio.c:366
 
 Read and validate the 16-bit ES8311 Chip ID (0xFD=0x83, 0xFE=0x11).
 
@@ -9577,7 +9577,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_flush_frame(void)
 ```
 
-Defined in sub_audio.c:395
+Defined in sub_audio.c:396
 
 Drain the full 4-descriptor (64 ms) I2S DMA ring with silent PCM frames so short chirps play completely.
 
@@ -9596,7 +9596,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_wait_until_ready(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:429
+Defined in sub_audio.c:430
 
 Poll ES8311 over I2C to confirm Chip ID (0x8311) and wait for Chip State Machine (Reg 0xFC bits 6:4) to exit state S0.
 
@@ -9626,7 +9626,7 @@ ESP_OK if audio worker is ready, ESP_ERR_TIMEOUT otherwise.
 bool sub_audio_is_ready(void)
 ```
 
-Defined in sub_audio.c:460
+Defined in sub_audio.c:461
 
 Quick status check of whether ES8311 codec is ready.
 
@@ -9652,7 +9652,7 @@ True if audio worker is operational, false otherwise.
 static esp_err_t es8311_write_table(const es8311_reg_entry_t * table, size_t count)
 ```
 
-Defined in sub_audio.c:473
+Defined in sub_audio.c:474
 
 Write a table of register/value pairs to the ES8311 over I2C.
 
@@ -9678,7 +9678,7 @@ ESP_OK on success, or an error code.
 static esp_err_t es8311_init_dac_registers(void)
 ```
 
-Defined in sub_audio.c:487
+Defined in sub_audio.c:488
 
 Initialize ES8311 DAC registers for active playback (requires I2S MCLK/LRCK running per Note 5).
 
@@ -9695,7 +9695,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_init(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:520
+Defined in sub_audio.c:521
 
 Initialize ES8311 codec and NS4150B/NS4168 amplifier for an interactive session.
 
@@ -9729,7 +9729,7 @@ ESP_OK on success, or driver error code.
 esp_err_t sub_audio_standby(void)
 ```
 
-Defined in sub_audio.c:724
+Defined in sub_audio.c:731
 
 Put ES8311 codec into ultra-low-power software standby (<1.0 uA) and pull PA_CTRL LOW.
 
@@ -9763,7 +9763,7 @@ ESP_OK on success.
 static void sub_audio_render_tone_samples(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:768
+Defined in sub_audio.c:775
 
 Synthesize and stream sine wave tone samples to I2S DMA.
 
@@ -9786,7 +9786,7 @@ Synthesize and stream sine wave tone samples to I2S DMA.
 static void sub_audio_render_pcm_samples(const int16_t * samples, size_t sample_count)
 ```
 
-Defined in sub_audio.c:821
+Defined in sub_audio.c:828
 
 Stream raw 16-bit mono PCM samples to I2S DMA.
 
@@ -9809,7 +9809,7 @@ Stream raw 16-bit mono PCM samples to I2S DMA.
 static esp_err_t sub_audio_prepare_and_unmute(void)
 ```
 
-Defined in sub_audio.c:853
+Defined in sub_audio.c:860
 
 Ensure I2S clocks, ES8311 DAC registers, and Class-D amplifier are active prior to playback.
 
@@ -9828,7 +9828,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_tone(uint32_t frequency_hz, uint32_t duration_ms)
 ```
 
-Defined in sub_audio.c:896
+Defined in sub_audio.c:903
 
 Execute synthesized tone playback command.
 
@@ -9854,7 +9854,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_pcm(const int16_t * samples, size_t sample_count, uint32_t sample_rate_hz)
 ```
 
-Defined in sub_audio.c:918
+Defined in sub_audio.c:925
 
 Execute raw PCM buffer playback command.
 
@@ -9881,7 +9881,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_exec_chime(uint8_t type)
 ```
 
-Defined in sub_audio.c:937
+Defined in sub_audio.c:944
 
 Execute predefined acoustic presentation chime pattern.
 
@@ -9906,7 +9906,7 @@ ESP_OK on success, or an error code.
 static esp_err_t sub_audio_send_command(const audio_cmd_t * cmd, bool is_sync, uint32_t wait_ms)
 ```
 
-Defined in sub_audio.c:1072
+Defined in sub_audio.c:1079
 
 Enqueue an audio command to the background worker task.
 
@@ -9931,7 +9931,7 @@ ESP_OK on success, or an error code.
 esp_err_t sub_audio_play(sub_audio_type_t type, const void * data, size_t len)
 ```
 
-Defined in sub_audio.c:1124
+Defined in sub_audio.c:1131
 
 Unified asynchronous audio playback dispatcher.
 
@@ -9965,7 +9965,7 @@ ESP_OK if command was queued to worker, or error code.
 bool sub_audio_is_busy(void)
 ```
 
-Defined in sub_audio.c:1173
+Defined in sub_audio.c:1180
 
 Check if audio playback is currently active or queue has pending items.
 
@@ -9989,7 +9989,7 @@ True if amplifier is active and audio samples are playing.
 esp_err_t sub_audio_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in sub_audio.c:1193
+Defined in sub_audio.c:1200
 
 Wait until background audio worker completes all playback and enters standby.
 
@@ -10019,7 +10019,7 @@ ESP_OK when playback is idle, ESP_ERR_TIMEOUT on expiration.
 esp_err_t sub_audio_deinit(void)
 ```
 
-Defined in sub_audio.c:1220
+Defined in sub_audio.c:1227
 
 Teardown audio subsystem, stop background worker task cleanly, and delete I2S channel.
 
@@ -10043,7 +10043,7 @@ ESP_OK on success.
 esp_err_t sub_audio_set_volume(uint8_t volume_pct)
 ```
 
-Defined in sub_audio.c:1276
+Defined in sub_audio.c:1283
 
 Set ES8311 DAC output volume percentage (0% = Mute, 100% = 0 dB full-scale).
 
@@ -10075,7 +10075,7 @@ ESP_OK on success.
 uint8_t sub_audio_get_volume(void)
 ```
 
-Defined in sub_audio.c:1300
+Defined in sub_audio.c:1307
 
 Get currently configured output volume percentage (0 - 100).
 
@@ -10099,7 +10099,7 @@ Current volume level (0..100%).
 esp_err_t sub_audio_set_low_power_mode(bool enable)
 ```
 
-Defined in sub_audio.c:1316
+Defined in sub_audio.c:1323
 
 Configure ES8311 DAC power mode (Low-Power vs Normal).
 
@@ -10131,7 +10131,7 @@ ESP_OK on success.
 bool sub_audio_get_low_power_mode(void)
 ```
 
-Defined in sub_audio.c:1330
+Defined in sub_audio.c:1337
 
 Query whether audio subsystem is in Low-Power Mode.
 
@@ -12104,7 +12104,7 @@ Defined in h1os/h1os_version.h:85
 Get complete version string.
 
 #### Returns
-Full version string (e.g. "2.4.7-dev").
+Full version string (e.g. "2.4.8-dev").
 
 ---
 
@@ -14871,7 +14871,7 @@ Defined in orch_flow.c:31
 const char * TAG = "sub_audio"
 ```
 
-Defined in sub_audio.c:32
+Defined in sub_audio.c:33
 
 ---
 
@@ -14885,7 +14885,7 @@ Defined in sub_audio.c:32
 i2s_chan_handle_t s_tx_chan = NULL
 ```
 
-Defined in sub_audio.c:115
+Defined in sub_audio.c:116
 
 ---
 
@@ -14899,7 +14899,7 @@ Defined in sub_audio.c:115
 bool s_audio_inited = false
 ```
 
-Defined in sub_audio.c:117
+Defined in sub_audio.c:118
 
 ---
 
@@ -14913,7 +14913,7 @@ Defined in sub_audio.c:117
 bool s_i2s_chan_enabled = false
 ```
 
-Defined in sub_audio.c:118
+Defined in sub_audio.c:119
 
 ---
 
@@ -14927,7 +14927,7 @@ Defined in sub_audio.c:118
 bool s_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:119
+Defined in sub_audio.c:120
 
 ---
 
@@ -14941,7 +14941,7 @@ Defined in sub_audio.c:119
 bool s_pa_enabled = false
 ```
 
-Defined in sub_audio.c:120
+Defined in sub_audio.c:121
 
 ---
 
@@ -14955,7 +14955,7 @@ Defined in sub_audio.c:120
 bool s_low_power_mode = true
 ```
 
-Defined in sub_audio.c:121
+Defined in sub_audio.c:122
 
 ---
 
@@ -14969,7 +14969,7 @@ Defined in sub_audio.c:121
 RTC_DATA_ATTR bool s_rtc_codec_in_standby = false
 ```
 
-Defined in sub_audio.c:123
+Defined in sub_audio.c:124
 
 ---
 
@@ -14983,7 +14983,7 @@ Defined in sub_audio.c:123
 StaticQueue_t s_audio_queue_struct
 ```
 
-Defined in sub_audio.c:125
+Defined in sub_audio.c:126
 
 ---
 
@@ -14997,7 +14997,7 @@ Defined in sub_audio.c:125
 uint8_t s_audio_queue_storage[8U *sizeof(audio_cmd_t)]
 ```
 
-Defined in sub_audio.c:126
+Defined in sub_audio.c:127
 
 ---
 
@@ -15011,7 +15011,7 @@ Defined in sub_audio.c:126
 QueueHandle_t s_audio_queue = NULL
 ```
 
-Defined in sub_audio.c:127
+Defined in sub_audio.c:128
 
 ---
 
@@ -15025,7 +15025,7 @@ Defined in sub_audio.c:127
 volatile TaskHandle_t s_audio_task_handle = NULL
 ```
 
-Defined in sub_audio.c:128
+Defined in sub_audio.c:129
 
 ---
 
@@ -15039,7 +15039,7 @@ Defined in sub_audio.c:128
 volatile bool s_audio_is_busy = false
 ```
 
-Defined in sub_audio.c:129
+Defined in sub_audio.c:130
 
 ---
 
@@ -15053,7 +15053,7 @@ Defined in sub_audio.c:129
 uint8_t s_volume_pct = 0
 ```
 
-Defined in sub_audio.c:131
+Defined in sub_audio.c:132
 
 ---
 
@@ -15067,7 +15067,7 @@ Defined in sub_audio.c:131
 StaticSemaphore_t s_cmd_sync_sem_buffer
 ```
 
-Defined in sub_audio.c:133
+Defined in sub_audio.c:134
 
 ---
 
@@ -15081,7 +15081,7 @@ Defined in sub_audio.c:133
 SemaphoreHandle_t s_cmd_sync_sem = NULL
 ```
 
-Defined in sub_audio.c:134
+Defined in sub_audio.c:135
 
 ---
 
@@ -15095,7 +15095,7 @@ Defined in sub_audio.c:134
 StaticSemaphore_t s_audio_idle_sem_buffer
 ```
 
-Defined in sub_audio.c:135
+Defined in sub_audio.c:136
 
 ---
 
@@ -15109,7 +15109,7 @@ Defined in sub_audio.c:135
 SemaphoreHandle_t s_audio_idle_sem = NULL
 ```
 
-Defined in sub_audio.c:136
+Defined in sub_audio.c:137
 
 ---
 
@@ -15123,7 +15123,7 @@ Defined in sub_audio.c:136
 StaticSemaphore_t s_audio_stop_sem_buffer
 ```
 
-Defined in sub_audio.c:137
+Defined in sub_audio.c:138
 
 ---
 
@@ -15137,7 +15137,7 @@ Defined in sub_audio.c:137
 SemaphoreHandle_t s_audio_stop_sem = NULL
 ```
 
-Defined in sub_audio.c:138
+Defined in sub_audio.c:139
 
 ---
 
@@ -15151,7 +15151,7 @@ Defined in sub_audio.c:138
 int16_t s_audio_work_buffer[0x100]
 ```
 
-Defined in sub_audio.c:139
+Defined in sub_audio.c:140
 
 ---
 
@@ -15165,7 +15165,7 @@ Defined in sub_audio.c:139
 const uint8_t es8311_perceptual_vol_table[101]
 ```
 
-Defined in sub_audio.c:172
+Defined in sub_audio.c:173
 
 ---
 
@@ -15179,7 +15179,7 @@ Defined in sub_audio.c:172
 const es8311_reg_entry_t s_es8311_init_pre_charge[]
 ```
 
-Defined in sub_audio.c:201
+Defined in sub_audio.c:202
 
 ---
 
@@ -15193,7 +15193,7 @@ Defined in sub_audio.c:201
 const es8311_reg_entry_t s_es8311_init_post_charge[]
 ```
 
-Defined in sub_audio.c:247
+Defined in sub_audio.c:248
 
 ---
 
@@ -15207,7 +15207,7 @@ Defined in sub_audio.c:247
 const es8311_reg_entry_t s_es8311_deinit[]
 ```
 
-Defined in sub_audio.c:272
+Defined in sub_audio.c:273
 
 ---
 
@@ -16060,7 +16060,7 @@ Defined in orch_display_sync.c:25
 struct audio_cmd_t
 ```
 
-Defined in sub_audio.c:89
+Defined in sub_audio.c:90
 
 ### Public Attributes
 
@@ -16083,7 +16083,7 @@ audio_cmd_type_t type
 
 Type: [`audio_cmd_type_t`](#audio_cmd_type_t)
 
-Defined in sub_audio.c:90
+Defined in sub_audio.c:91
 
 ---
 
@@ -16095,7 +16095,7 @@ Defined in sub_audio.c:90
 union audio_cmd_t::@075142260334247171354103021266123360172342241057 params
 ```
 
-Defined in sub_audio.c:104
+Defined in sub_audio.c:105
 
 ---
 
@@ -16107,7 +16107,7 @@ Defined in sub_audio.c:104
 SemaphoreHandle_t done_sem
 ```
 
-Defined in sub_audio.c:106
+Defined in sub_audio.c:107
 
 ---
 
@@ -16119,7 +16119,7 @@ Defined in sub_audio.c:106
 esp_err_t * result
 ```
 
-Defined in sub_audio.c:107
+Defined in sub_audio.c:108
 
 {#unionparams}
 
@@ -16129,7 +16129,7 @@ Defined in sub_audio.c:107
 union [union].params
 ```
 
-Defined in sub_audio.c:91
+Defined in sub_audio.c:92
 
 ### Public Attributes
 
@@ -16149,7 +16149,7 @@ Defined in sub_audio.c:91
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:95
+Defined in sub_audio.c:96
 
 ---
 
@@ -16161,7 +16161,7 @@ Defined in sub_audio.c:95
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:98
+Defined in sub_audio.c:99
 
 ---
 
@@ -16173,7 +16173,7 @@ Defined in sub_audio.c:98
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:103
+Defined in sub_audio.c:104
 
 {#structparamstone}
 
@@ -16183,7 +16183,7 @@ Defined in sub_audio.c:103
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:92
+Defined in sub_audio.c:93
 
 ### Public Attributes
 
@@ -16202,7 +16202,7 @@ Defined in sub_audio.c:92
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:93
+Defined in sub_audio.c:94
 
 ---
 
@@ -16214,7 +16214,7 @@ Defined in sub_audio.c:93
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:94
+Defined in sub_audio.c:95
 
 {#structparamschime}
 
@@ -16224,7 +16224,7 @@ Defined in sub_audio.c:94
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:96
+Defined in sub_audio.c:97
 
 ### Public Attributes
 
@@ -16242,7 +16242,7 @@ Defined in sub_audio.c:96
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:97
+Defined in sub_audio.c:98
 
 {#structparamspcm}
 
@@ -16252,7 +16252,7 @@ Defined in sub_audio.c:97
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:99
+Defined in sub_audio.c:100
 
 ### Public Attributes
 
@@ -16272,7 +16272,7 @@ Defined in sub_audio.c:99
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:100
+Defined in sub_audio.c:101
 
 ---
 
@@ -16284,7 +16284,7 @@ Defined in sub_audio.c:100
 size_t sample_count
 ```
 
-Defined in sub_audio.c:101
+Defined in sub_audio.c:102
 
 ---
 
@@ -16296,7 +16296,7 @@ Defined in sub_audio.c:101
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:102
+Defined in sub_audio.c:103
 
 {#h1os_ui_msg_t}
 
@@ -17379,7 +17379,7 @@ Defined in h1os_lvgl.cpp:70
 struct es8311_reg_entry_t
 ```
 
-Defined in sub_audio.c:110
+Defined in sub_audio.c:111
 
 ### Public Attributes
 
@@ -17398,7 +17398,7 @@ Defined in sub_audio.c:110
 uint8_t reg
 ```
 
-Defined in sub_audio.c:111
+Defined in sub_audio.c:112
 
 ---
 
@@ -17410,7 +17410,7 @@ Defined in sub_audio.c:111
 uint8_t val
 ```
 
-Defined in sub_audio.c:112
+Defined in sub_audio.c:113
 
 {#h1os_wake_context_t}
 
@@ -18607,7 +18607,7 @@ Defined in sub_power.c:54
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:99
+Defined in sub_audio.c:100
 
 ### Public Attributes
 
@@ -18627,7 +18627,7 @@ Defined in sub_audio.c:99
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:100
+Defined in sub_audio.c:101
 
 ---
 
@@ -18639,7 +18639,7 @@ Defined in sub_audio.c:100
 size_t sample_count
 ```
 
-Defined in sub_audio.c:101
+Defined in sub_audio.c:102
 
 ---
 
@@ -18651,7 +18651,7 @@ Defined in sub_audio.c:101
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:102
+Defined in sub_audio.c:103
 
 {#structparamstone}
 
@@ -18661,7 +18661,7 @@ Defined in sub_audio.c:102
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:92
+Defined in sub_audio.c:93
 
 ### Public Attributes
 
@@ -18680,7 +18680,7 @@ Defined in sub_audio.c:92
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:93
+Defined in sub_audio.c:94
 
 ---
 
@@ -18692,7 +18692,7 @@ Defined in sub_audio.c:93
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:94
+Defined in sub_audio.c:95
 
 {#structsession}
 
@@ -18809,7 +18809,7 @@ Max barrier wait for async on_sync completion before sleep.
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:96
+Defined in sub_audio.c:97
 
 ### Public Attributes
 
@@ -18827,7 +18827,7 @@ Defined in sub_audio.c:96
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:97
+Defined in sub_audio.c:98
 
 {#structpresentation}
 
@@ -18916,7 +18916,7 @@ Acoustic presentation master volume (0..100%).
 union [union].params
 ```
 
-Defined in sub_audio.c:91
+Defined in sub_audio.c:92
 
 ### Public Attributes
 
@@ -18936,7 +18936,7 @@ Defined in sub_audio.c:91
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@342051060234134064244373243122027377274070330105 tone
 ```
 
-Defined in sub_audio.c:95
+Defined in sub_audio.c:96
 
 ---
 
@@ -18948,7 +18948,7 @@ Defined in sub_audio.c:95
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@035007020164214261121213220013133270155350134061 chime
 ```
 
-Defined in sub_audio.c:98
+Defined in sub_audio.c:99
 
 ---
 
@@ -18960,7 +18960,7 @@ Defined in sub_audio.c:98
 struct audio_cmd_t::@075142260334247171354103021266123360172342241057::@174042257255263212372236347353345125072343133315 pcm
 ```
 
-Defined in sub_audio.c:103
+Defined in sub_audio.c:104
 
 {#structparamstone}
 
@@ -18970,7 +18970,7 @@ Defined in sub_audio.c:103
 struct [struct].params.tone
 ```
 
-Defined in sub_audio.c:92
+Defined in sub_audio.c:93
 
 ### Public Attributes
 
@@ -18989,7 +18989,7 @@ Defined in sub_audio.c:92
 uint32_t frequency_hz
 ```
 
-Defined in sub_audio.c:93
+Defined in sub_audio.c:94
 
 ---
 
@@ -19001,7 +19001,7 @@ Defined in sub_audio.c:93
 uint32_t duration_ms
 ```
 
-Defined in sub_audio.c:94
+Defined in sub_audio.c:95
 
 {#structparamschime}
 
@@ -19011,7 +19011,7 @@ Defined in sub_audio.c:94
 struct [struct].params.chime
 ```
 
-Defined in sub_audio.c:96
+Defined in sub_audio.c:97
 
 ### Public Attributes
 
@@ -19029,7 +19029,7 @@ Defined in sub_audio.c:96
 uint8_t chime_type
 ```
 
-Defined in sub_audio.c:97
+Defined in sub_audio.c:98
 
 {#structparamspcm}
 
@@ -19039,7 +19039,7 @@ Defined in sub_audio.c:97
 struct [struct].params.pcm
 ```
 
-Defined in sub_audio.c:99
+Defined in sub_audio.c:100
 
 ### Public Attributes
 
@@ -19059,7 +19059,7 @@ Defined in sub_audio.c:99
 const int16_t * samples
 ```
 
-Defined in sub_audio.c:100
+Defined in sub_audio.c:101
 
 ---
 
@@ -19071,7 +19071,7 @@ Defined in sub_audio.c:100
 size_t sample_count
 ```
 
-Defined in sub_audio.c:101
+Defined in sub_audio.c:102
 
 ---
 
@@ -19083,6 +19083,6 @@ Defined in sub_audio.c:101
 uint32_t sample_rate_hz
 ```
 
-Defined in sub_audio.c:102
+Defined in sub_audio.c:103
 
 Generated by [Moxygen](https://0state.com/moxygen)
