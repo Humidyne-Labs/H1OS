@@ -687,23 +687,39 @@ def spawn_serial_monitor(
         mon_args.append("-l")
 
     app_root_str = str(config.app_root)
-    args_str = " ".join(f"'{a}'" if " " in a else a for a in mon_args)
+    child_args = [f"'{a}'" if (" " in a or "\\" in a) else a for a in mon_args]
+    child_command = f"& {child_args[0]} " + " ".join(child_args[1:])
 
     if os.name == "nt":
-        # Launch dedicated console window via conhost.exe directly executing python h1os_monitor.py
-        cmd = ["conhost.exe"] + mon_args
+        # 1. Prefer Windows Terminal (wt.exe) with PowerShell profile for flicker-free DirectX rendering
+        wt_exe = shutil.which("wt.exe") or shutil.which("wt")
+        if wt_exe:
+            try:
+                wt_cmd = [
+                    wt_exe,
+                    "nt",
+                    "--profile", "PowerShell",
+                    "powershell", "-NoExit", "-Command", child_command,
+                ]
+                subprocess.Popen(wt_cmd, cwd=app_root_str)
+                return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in Windows Terminal."
+            except Exception:
+                pass
+
+        # 2. Fallback: Standalone PowerShell window
         try:
+            ps_cmd = ["powershell.exe", "-NoExit", "-Command", child_command]
             subprocess.Popen(
-                cmd,
+                ps_cmd,
                 cwd=app_root_str,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
-            return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
+            return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in PowerShell."
         except Exception:
             try:
-                fallback_cmd = ["cmd.exe", "/c", "start", "H1OS Serial Monitor"] + mon_args
+                cmd = ["conhost.exe"] + mon_args
                 subprocess.Popen(
-                    fallback_cmd,
+                    cmd,
                     cwd=app_root_str,
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
