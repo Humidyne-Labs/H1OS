@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * **ROM Checksum Calculation:** Implemented empirical `0xEF` seed checksum computation for `ESP_FLASH_DATA` (opcode `0x03`) blocks, preventing on-chip MD5 mismatches during SPI flash programming.
   * **4-Byte ROM Status Trailer Parsing:** Corrected response frame decoding to inspect status and error codes at `Length - 4` and `Length - 3`, handling ROM protocol framing accurately.
   * **Memory-Safe Array Resizing:** Decoupled erase region queue management from fixed-size script argument arrays to prevent runtime collection resizing exceptions.
+  * **Literal Path Wildcard Immunity:** Replaced PowerShell path cmdlets (`Test-Path`, `Get-Item`) with .NET `[System.IO.File]::Exists` and `FileInfo` to prevent globbing/wildcard pattern matching on release directories containing square brackets (e.g., `2.4.8-dev[prod]`).
+  
   * **Deterministic Target Reset & Download Mode Release:** Implemented explicit clearance of `RTC_CNTL_FORCE_DOWNLOAD_BOOT_MASK` on `RTC_CNTL_OPTION1_REG` (`0x6000812C`) combined with RTS toggle and Windows `usbser.sys` DTR line flush workaround, enabling reliable automatic reset into user application firmware.
   * **Batch Script Execution Stability:** Normalized script line endings to DOS CRLF via `.gitattributes` and flattened menu dispatch to direct jump targets, eliminating `cmd.exe` label seek failures.
 

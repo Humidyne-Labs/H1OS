@@ -1161,9 +1161,9 @@ try {
             $segFile   = $Matches[2].Trim().Trim('"', "'")
 
             if (-not [System.IO.Path]::IsPathRooted($segFile)) {
-                $segFile = Join-Path (Get-Location).Path $segFile
+                $segFile = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).Path, $segFile))
             }
-            if (-not (Test-Path $segFile)) {
+            if (-not [System.IO.File]::Exists($segFile)) {
                 throw "Binary file not found for segment: $segFile"
             }
 
@@ -1188,7 +1188,7 @@ try {
     if ($writeSegments.Count -gt 0) {
         Write-Host "[*] Write Segments Queued     : $($writeSegments.Count)" -ForegroundColor Cyan
         foreach ($ws in $writeSegments) {
-            $szBytes = (Get-Item $ws.FilePath).Length
+            $szBytes = (New-Object System.IO.FileInfo($ws.FilePath)).Length
             Write-Host ("    -> WRITE 0x{0:X6} ({1,7:N1} KB) : {2}" -f $ws.Offset, ($szBytes / 1024.0), $ws.Label) -ForegroundColor Cyan
         }
     }
@@ -1230,7 +1230,7 @@ try {
             Write-Host "  Baud Rate         : $Baud baud" -ForegroundColor White
             Write-Host "  Flash Size        : ${FlashSizeMB} MB" -ForegroundColor White
 
-            if (-not [string]::IsNullOrWhiteSpace($PartitionTable) -and (Test-Path $PartitionTable)) {
+            if (-not [string]::IsNullOrWhiteSpace($PartitionTable) -and [System.IO.File]::Exists($PartitionTable)) {
                 $ptBytes = [System.IO.File]::ReadAllBytes($PartitionTable)
                 $partMap = [Esp32Slip.Flasher.PartitionTableParser]::ParseBinaryPartitionTable($ptBytes)
 
