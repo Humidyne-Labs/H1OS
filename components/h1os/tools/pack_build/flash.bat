@@ -78,13 +78,13 @@ goto :menu
 :cmd_update
 echo.
 echo [*] Executing Standard Firmware Update (Keep Settings ^& NVS)...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
 goto :action_done
 
 :cmd_app
 echo.
 echo [*] Executing Fast App-Only Update...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Write '0x20000=%APP_BIN%'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x20000=%APP_BIN%'"
 goto :action_done
 
 :cmd_factory
@@ -100,22 +100,22 @@ if /i not "%CONFIRM%"=="Y" (
 echo.
 echo [*] Executing Full Factory Restore...
 if exist "%FACTORY_BIN%" (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -EraseAll -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x10000=%FACTORY_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseAll -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x10000=%FACTORY_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
 ) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -EraseAll -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseAll -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
 )
 goto :action_done
 
 :cmd_nvs_wipe
 echo.
 echo [*] Resetting Device Settings (Wiping NVS 0x9000 and PHY 0x1F000)...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -EraseRegions '0x9000=0x14000', '0x1F000=0x1000'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x9000=0x14000', '0x1F000=0x1000'"
 goto :action_done
 
 :cmd_inspect
 echo.
 echo [*] Auditing On-Chip Hardware Telemetry ^& Partition MD5s...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Inspect -PartitionTable '%PART_BIN%'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Inspect -PartitionTable '%PART_BIN%'"
 goto :action_done
 
 :advanced_menu
@@ -138,31 +138,31 @@ set /p "ADV_CHOICE=Select advanced option [1-6, B]: "
 if "%ADV_CHOICE%"=="1" (
     echo.
     echo [*] Flashing ota_1 secondary slot at 0x320000...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Write '0x320000=%APP_BIN%'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x320000=%APP_BIN%'"
     goto :action_done
 )
 if "%ADV_CHOICE%"=="2" (
     echo.
     echo [*] Flashing both ota_0 (0x20000) and ota_1 (0x320000) slots identically...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Write '0x20000=%APP_BIN%', '0x320000=%APP_BIN%'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x20000=%APP_BIN%', '0x320000=%APP_BIN%'"
     goto :action_done
 )
 if "%ADV_CHOICE%"=="3" (
     echo.
     echo [*] Resetting storage partition at 0x620000 (1904 KB)...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -EraseRegions '0x620000=0x1DC000'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x620000=0x1DC000'"
     goto :action_done
 )
 if "%ADV_CHOICE%"=="4" (
     echo.
     echo [*] Clearing e-Paper frame partition at 0x7FC000 (16 KB)...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -EraseRegions '0x7FC000=0x4000'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x7FC000=0x4000'"
     goto :action_done
 )
 if "%ADV_CHOICE%"=="5" (
     echo.
     echo [*] Auditing On-Chip Hardware Telemetry ^& Partition MD5s...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Inspect -PartitionTable '%PART_BIN%'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Inspect -PartitionTable '%PART_BIN%'"
     goto :action_done
 )
 if "%ADV_CHOICE%"=="6" (
@@ -178,7 +178,7 @@ if "%ADV_CHOICE%"=="6" (
         goto :advanced_menu
     )
     echo [*] Flashing "!CUSTOM_FILE!" to !CUSTOM_ADDR!...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -Write '!CUSTOM_ADDR!=!CUSTOM_FILE!'"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '!CUSTOM_ADDR!=!CUSTOM_FILE!'"
     goto :action_done
 )
 if /i "%ADV_CHOICE%"=="B" goto :menu

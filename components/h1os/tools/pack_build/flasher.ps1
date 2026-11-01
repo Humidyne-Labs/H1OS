@@ -52,7 +52,10 @@ param(
     [switch]$NoVerify,
 
     # Suppress automatic post-flash reboot
-    [switch]$NoReset
+    [switch]$NoReset,
+
+    # Require connected board to be ESP32-S3-PICO-1-N8R8 (Waveshare 1.54" V2 panel)
+    [switch]$RequireN8R8
 )
 
 Set-StrictMode -Version Latest
@@ -208,6 +211,22 @@ namespace Esp32Slip.Flasher
         }
     }
 
+    public class Esp32ChipInfo
+    {
+        public uint ChipId;            // 9 = ESP32-S3
+        public string ChipName;        // "ESP32-S3-PICO-1 (LGA56)" or "ESP32-S3 (QFN56)"
+        public uint PackageCode;       // 1 = PICO-1, 0 = QFN56
+        public uint MajorRevision;
+        public uint MinorRevision;
+        public string RevisionStr;     // "v0.2"
+        public string MacAddress;      // "7C:DF:A1:XX:XX:XX"
+        public uint FlashCapCode;      // 1 = 8MB, 2 = 4MB, 0 = External
+        public string FlashCapStr;     // "8 MB Embedded Flash (GD)"
+        public uint PsramCapCode;      // 1 = 8MB, 2 = 2MB, 0 = None
+        public string PsramCapStr;     // "8 MB Embedded PSRAM"
+        public bool IsN8R8;            // PackageCode == 1 && FlashCapCode == 1 && PsramCapCode == 1
+    }
+
     public class Esp32S3RomFlasher : IDisposable
     {
         public const byte SLIP_END  = 0xC0;
@@ -228,6 +247,7 @@ namespace Esp32Slip.Flasher
         public const byte ESP_SPI_ATTACH  = 0x0D;
         public const byte ESP_CHANGE_BAUDRATE = 0x0F;
         public const byte ESP_SPI_FLASH_MD5   = 0x13;
+        public const byte ESP_GET_SECURITY_INFO = 0x14;
 
         public const int FLASH_BLOCK_SIZE = 1024;
         public const int FLASH_SECTOR_SIZE = 4096;
@@ -262,6 +282,113 @@ namespace Esp32Slip.Flasher
             uint val;
             ExecuteCommand(ESP_READ_REG, payload, 0, 1000, out val);
             return val;
+        }
+
+        public bool TryGetSecurityInfo(out uint chipId, out uint secFlags, out byte flashCryptCnt)
+        {
+            chipId = 0;
+            secFlags = 0;
+            flashCryptCnt = 0;
+            try
+            {
+                byte[] resp = ExecuteCommandRaw(ESP_GET_SECURITY_INFO, new byte[0], 0, 1000);
+                if (resp != null && resp.Length >= 8 + 20)
+                {
+                    secFlags = BitConverter.ToUInt32(resp, 8);
+                    flashCryptCnt = resp[12];
+                    chipId = BitConverter.ToUInt32(resp, 8 + 12);
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public Esp32ChipInfo ReadChipInfo()
+        {
+            Esp32ChipInfo info = new Esp32ChipInfo();
+
+            uint chipId;
+            uint secFlags;
+            byte cryptCnt;
+            if (TryGetSecurityInfo(out chipId, out secFlags, out cryptCnt))
+            {
+                info.ChipId = chipId;
+            }
+            else
+            {
+                info.ChipId = 9; // Fallback for standard S3 ROM
+            }
+
+            uint reg50 = ReadReg(0x60007050);
+            uint reg54 = ReadReg(0x60007054);
+            uint reg58 = ReadReg(0x60007058);
+            uint mac0  = ReadReg(0x60007044);
+            uint mac1  = ReadReg(0x60007048);
+
+            // MAC Address
+            byte b0 = (byte)((mac1 >> 8) & 0xFF);
+            byte b1 = (byte)(mac1 & 0xFF);
+            byte b2 = (byte)((mac0 >> 24) & 0xFF);
+            byte b3 = (byte)((mac0 >> 16) & 0xFF);
+            byte b4 = (byte)((mac0 >> 8) & 0xFF);
+            byte b5 = (byte)(mac0 & 0xFF);
+            info.MacAddress = string.Format("{0:X2}:{1:X2}:{2:X2}:{3:X2}:{4:X2}:{5:X2}", b0, b1, b2, b3, b4, b5);
+
+            // Package Variant: 1 = PICO-1 (LGA56), 0 = Standard QFN56
+            info.PackageCode = (reg50 >> 21) & 0x07;
+            if (info.PackageCode == 1) info.ChipName = "ESP32-S3-PICO-1 (LGA56)";
+            else if (info.PackageCode == 0) info.ChipName = "ESP32-S3 (QFN56)";
+            else info.ChipName = string.Format("ESP32-S3 (pkg {0})", info.PackageCode);
+
+            // Silicon Revisions
+            uint rawMinorLow = (reg50 >> 18) & 0x07;
+            uint rawMinorHi  = (reg58 >> 23) & 0x01;
+            uint rawMinor    = (rawMinorHi << 3) | rawMinorLow;
+            uint rawMajor    = (reg58 >> 24) & 0x03;
+
+            // ECO0 check
+            bool isEco0 = (rawMinor & 0x07) == 0 && (((reg54 >> 20) & 0x07) == 1);
+            if (isEco0) { info.MajorRevision = 0; info.MinorRevision = 0; }
+            else { info.MajorRevision = rawMajor; info.MinorRevision = rawMinor; }
+            info.RevisionStr = string.Format("v{0}.{1}", info.MajorRevision, info.MinorRevision);
+
+            // Embedded Flash Capacity & Vendor
+            info.FlashCapCode = (reg50 >> 27) & 0x07;
+            uint flashVendorId = reg54 & 0x07;
+            string vendorStr = "";
+            switch (flashVendorId) {
+                case 1: vendorStr = "XMC"; break;
+                case 2: vendorStr = "GD"; break;
+                case 3: vendorStr = "FM"; break;
+                case 4: vendorStr = "TT"; break;
+                case 5: vendorStr = "BY"; break;
+            }
+            string vendorSuffix = string.IsNullOrEmpty(vendorStr) ? "" : (" (" + vendorStr + ")");
+
+            switch (info.FlashCapCode) {
+                case 1: info.FlashCapStr = "8 MB Embedded Flash" + vendorSuffix; break;
+                case 2: info.FlashCapStr = "4 MB Embedded Flash" + vendorSuffix; break;
+                case 0: info.FlashCapStr = "External Flash (on PCB)"; break;
+                default: info.FlashCapStr = string.Format("Embedded Flash ({0})", info.FlashCapCode); break;
+            }
+
+            // Embedded PSRAM Capacity
+            uint psramLow = (reg54 >> 3) & 0x03;
+            uint psramHi  = (reg58 >> 19) & 0x01;
+            info.PsramCapCode = (psramHi << 2) | psramLow;
+            switch (info.PsramCapCode) {
+                case 1: info.PsramCapStr = "8 MB Embedded PSRAM"; break;
+                case 2: info.PsramCapStr = "2 MB Embedded PSRAM"; break;
+                case 3: info.PsramCapStr = "16 MB Embedded PSRAM"; break;
+                case 4: info.PsramCapStr = "4 MB Embedded PSRAM"; break;
+                case 0: info.PsramCapStr = "None"; break;
+                default: info.PsramCapStr = string.Format("Embedded PSRAM ({0})", info.PsramCapCode); break;
+            }
+
+            // Strictly true if LGA56 package + 8MB Flash + 8MB PSRAM
+            info.IsN8R8 = (info.PackageCode == 1 && info.FlashCapCode == 1 && info.PsramCapCode == 1);
+            return info;
         }
 
         public void DisableWatchdogs()
@@ -984,15 +1111,37 @@ try {
     try {
         $flasher.EnterBootloader()
         $flasher.SyncWithRom()
+
+        # Read silicon identity and validate invariant
+        $chipInfo = $flasher.ReadChipInfo()
+        if ($chipInfo.ChipId -ne 9) {
+            throw "Incompatible silicon detected! Target chip ID is $($chipInfo.ChipId), but flasher.ps1 strictly supports ESP32-S3 (Chip ID 9)."
+        }
+
+        Write-Host "[*] Detected Silicon          : $($chipInfo.ChipName) (revision $($chipInfo.RevisionStr))"
+        Write-Host "[*] Integrated Memory         : $($chipInfo.FlashCapStr) + $($chipInfo.PsramCapStr)"
+        Write-Host "[*] Factory Base MAC          : $($chipInfo.MacAddress)"
+
+        if ($RequireN8R8.IsPresent) {
+            if (-not $chipInfo.IsN8R8) {
+                throw "Hardware mismatch! Connected board is '$($chipInfo.ChipName)' with '$($chipInfo.FlashCapStr)' and '$($chipInfo.PsramCapStr)'. This firmware package strictly requires Waveshare ESP32-S3-PICO-1-N8R8."
+            }
+            Write-Host "[+] Hardware Invariant Check  : PASS (Waveshare ESP32-S3-PICO-1-N8R8 Confirmed)" -ForegroundColor Green
+        }
+
         $flasher.AttachAndConfigureSpiFlash($FlashSizeMB)
 
         if ($Inspect.IsPresent) {
             Write-Host ""
             Write-Host "  ESP32-S3 Hardware & Silicon Inspection:" -ForegroundColor Cyan
             Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
-            Write-Host "  Port        : $($portInfo.PortName) ($($portInfo.Description))" -ForegroundColor White
-            Write-Host "  Baud Rate   : $Baud baud" -ForegroundColor White
-            Write-Host "  Flash Size  : ${FlashSizeMB} MB" -ForegroundColor White
+            Write-Host "  Port              : $($portInfo.PortName) ($($portInfo.Description))" -ForegroundColor White
+            Write-Host "  Silicon Model     : $($chipInfo.ChipName) (revision $($chipInfo.RevisionStr))" -ForegroundColor White
+            Write-Host "  Integrated Memory : $($chipInfo.FlashCapStr) + $($chipInfo.PsramCapStr)" -ForegroundColor White
+            Write-Host "  Hardware Match    : $(if ($chipInfo.IsN8R8) { 'Waveshare ESP32-S3-PICO-1-N8R8 (CONFIRMED)' } else { 'Generic / Non-N8R8' })" -ForegroundColor $(if ($chipInfo.IsN8R8) { 'Green' } else { 'Yellow' })
+            Write-Host "  Factory Base MAC  : $($chipInfo.MacAddress)" -ForegroundColor White
+            Write-Host "  Baud Rate         : $Baud baud" -ForegroundColor White
+            Write-Host "  Flash Size        : ${FlashSizeMB} MB" -ForegroundColor White
 
             if (-not [string]::IsNullOrWhiteSpace($PartitionTable) -and (Test-Path $PartitionTable)) {
                 $ptBytes = [System.IO.File]::ReadAllBytes($PartitionTable)
