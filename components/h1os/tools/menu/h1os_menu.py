@@ -51,12 +51,23 @@ from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
 from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
 
 try:
-    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
+    from menu.console_events import (
+        ConsoleEventDispatcher,
+        ConsoleEvent,
+        EventType,
+        get_single_key,
+        restore_default_console_mode,
+    )
 except ImportError:
-    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
+    from console_events import (
+        ConsoleEventDispatcher,
+        ConsoleEvent,
+        EventType,
+        get_single_key,
+        restore_default_console_mode,
+    )
 
 VERSION = H1OS_TOOLING_VERSION
-TERM_WIDTH = 78
 read_nav_key = get_single_key
 
 
@@ -103,16 +114,15 @@ def run_interactive_choice_menu(
     def build_frame(idx: int) -> Group:
         sub_table = Table(
             box=box.ROUNDED,
-            width=TERM_WIDTH,
             header_style="bold bright_cyan",
             title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
             show_lines=False,
             pad_edge=False,
         )
-        sub_table.add_column(" ", justify="center", width=2)
-        sub_table.add_column("#", justify="center", style="bold white", width=3)
-        sub_table.add_column("Option", style="bold", width=38)
-        sub_table.add_column("Details", style="dim", width=28)
+        sub_table.add_column(" ", justify="center", no_wrap=True)
+        sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+        sub_table.add_column("Option", style="bold")
+        sub_table.add_column("Details", style="dim")
 
         for i, item in enumerate(options):
             is_sel = (i == idx)
@@ -172,11 +182,11 @@ def build_header_panel(config: H1OSConfig) -> Panel:
     if len(app_root_str) > 28:
         app_root_str = "..." + app_root_str[-25:]
 
-    header_table = Table.grid(padding=(0, 1))
-    header_table.add_column("K1", style="bold cyan", width=9)
-    header_table.add_column("V1", width=29)
-    header_table.add_column("K2", style="bold cyan", width=9)
-    header_table.add_column("V2", width=25)
+    header_table = Table.grid(padding=(0, 2), expand=True)
+    header_table.add_column("K1", style="bold cyan", no_wrap=True)
+    header_table.add_column("V1")
+    header_table.add_column("K2", style="bold cyan", no_wrap=True)
+    header_table.add_column("V2")
 
     header_table.add_row(
         "Project:", f"[white]{app_root_str}[/]",
@@ -213,7 +223,6 @@ def build_header_panel(config: H1OSConfig) -> Panel:
         title="[bold white]H1OS Firmware & Packaging Console[/]",
         border_style="cyan",
         box=box.ROUNDED,
-        width=TERM_WIDTH,
     )
 
 
@@ -223,23 +232,22 @@ def build_console_frame(
     menu_items: List[Dict[str, str]],
     header_panel: Optional[Panel] = None,
 ) -> Group:
-    """Build the full 78-column frame with pre-populated header and highlighted selection."""
+    """Build the frame with pre-populated header and highlighted selection."""
     if header_panel is None:
         header_panel = build_header_panel(config)
 
-    # 2. Operations Table (78 columns max)
+    # 2. Operations Table (auto-sized columns)
     ops_table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
         header_style="bold bright_cyan",
         show_lines=False,
         pad_edge=False,
     )
-    ops_table.add_column(" ", justify="center", width=2)
-    ops_table.add_column("#", justify="center", style="bold white", width=3)
-    ops_table.add_column("Operation", style="bold", width=32)
-    ops_table.add_column("Target Build", style="dim", width=18)
-    ops_table.add_column("Backend Engine", style="cyan", width=16)
+    ops_table.add_column(" ", justify="center", no_wrap=True)
+    ops_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+    ops_table.add_column("Operation", style="bold")
+    ops_table.add_column("Target Build", style="dim")
+    ops_table.add_column("Backend Engine", style="cyan")
 
     for i, item in enumerate(menu_items):
         is_sel = (i == selected_idx)
@@ -570,18 +578,17 @@ def build_profile_sub_frame(
     """Build the profile selection sub-menu frame."""
     sub_table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
         header_style="bold bright_cyan",
         title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
         show_lines=False,
         pad_edge=False,
     )
-    sub_table.add_column(" ", justify="center", width=2)
-    sub_table.add_column("#", justify="center", style="bold white", width=3)
-    sub_table.add_column("Profile", style="bold", width=18)
-    sub_table.add_column("Target Build Dir", style="dim", width=20)
-    sub_table.add_column("CMake Preset", style="cyan", width=14)
-    sub_table.add_column("Status", width=12)
+    sub_table.add_column(" ", justify="center", no_wrap=True)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+    sub_table.add_column("Profile", style="bold")
+    sub_table.add_column("Target Build Dir", style="dim")
+    sub_table.add_column("CMake Preset", style="cyan")
+    sub_table.add_column("Status")
 
     for i, item in enumerate(items):
         is_sel = (i == selected_idx)
@@ -619,17 +626,22 @@ def build_profile_sub_frame(
 
 
 def pause_before_menu(console: Optional["Console"]) -> bool:
-    """Single-key pause before returning to main menu. Returns False if user chooses to quit."""
+    """Pause after tool execution so developer can review terminal scrollback."""
+    restore_default_console_mode()
     if console:
-        console.print("\n[dim]Press any key to return to menu ([bold white]Q[/dim] to exit)...[/]", end="")
+        console.print("\n[dim]Press [bold white]Enter[/bold white] or [bold white]B[/bold white] to return to menu ([bold white]Q[/bold white] to exit)...[/]", end="", flush=True)
     else:
-        print("\nPress any key to return to menu (Q to exit)...", end="")
+        print("\nPress Enter or B to return to menu (Q to exit)...", end="", flush=True)
 
-    key = read_nav_key()
-    clear_screen()
-    if key in ("Q", "ESC", "QUIT"):
-        return False
-    return True
+    while True:
+        key = get_single_key()
+        # Allow terminal scrolling keys without returning to the menu
+        if key in ("UP", "DOWN", "PAGEUP", "PAGEDOWN", "HOME", "END"):
+            continue
+        clear_screen()
+        if key in ("Q", "QUIT"):
+            return False
+        return True
 
 
 def run_profile_selection_menu(
@@ -742,7 +754,7 @@ def main():
     args = parser.parse_args()
 
     config = H1OSConfig(project_dir=args.project_dir, config_path=args.config)
-    console = Console(width=TERM_WIDTH) if HAVE_RICH else None
+    console = Console() if HAVE_RICH else None
     header_panel = build_header_panel(config) if console else None
 
     while True:
@@ -848,10 +860,12 @@ def main():
             )
             if not sel_prof:
                 continue
+            restore_default_console_mode()
             run_size(config, profile=sel_prof)
 
         elif action.startswith("size:"):
             prof = action.split(":", 1)[1]
+            restore_default_console_mode()
             run_size(config, profile=prof)
 
         elif action == "pack":
@@ -864,10 +878,12 @@ def main():
             )
             if not sel_prof:
                 continue
+            restore_default_console_mode()
             run_pack(config, profile=sel_prof)
 
         elif action.startswith("pack:"):
             prof = action.split(":", 1)[1]
+            restore_default_console_mode()
             run_pack(config, profile=prof)
 
         elif action == "flash":

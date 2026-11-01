@@ -116,8 +116,9 @@ class ConsoleEventDispatcher:
         """Stop listener thread and restore console terminal modes."""
         self.running = False
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=0.2)
+            self._thread.join(timeout=0.3)
         self._thread = None
+        restore_default_console_mode()
 
     def get_event(self, timeout: Optional[float] = None) -> Optional[ConsoleEvent]:
         """Fetch next event from queue or return None if timeout expires."""
@@ -143,20 +144,29 @@ class ConsoleEventDispatcher:
     def _listener_windows(self) -> None:
         """Listen for Windows Console events (Keyboard, Mouse Wheel, Window Resize)."""
         kernel32 = ctypes.windll.kernel32
-        GENERIC_READ = 0x80000000
-        GENERIC_WRITE = 0x40000000
-
-        self._h_in = kernel32.CreateFileW("CONIN$", GENERIC_READ | GENERIC_WRITE, 1 | 2, None, 3, 0, None)
-        if self._h_in == -1:
-            self._h_in = kernel32.GetStdHandle(-10)
-
+        std_in = kernel32.GetStdHandle(-10)
         mode = wintypes.DWORD()
-        has_console = kernel32.GetConsoleMode(self._h_in, ctypes.byref(mode)) != 0
+        has_console = kernel32.GetConsoleMode(std_in, ctypes.byref(mode)) != 0
+        if not has_console:
+            GENERIC_READ = 0x80000000
+            GENERIC_WRITE = 0x40000000
+            self._h_in = kernel32.CreateFileW("CONIN$", GENERIC_READ | GENERIC_WRITE, 1 | 2, None, 3, 0, None)
+            has_console = kernel32.GetConsoleMode(self._h_in, ctypes.byref(mode)) != 0
+        else:
+            self._h_in = std_in
+
         self._orig_mode = mode.value if has_console else 0
 
         if has_console:
-            # Enable mouse input (0x0010), extended flags (0x0080), window resize (0x0008), disable quick-edit (0x0040)
-            new_mode = (self._orig_mode | 0x0010 | 0x0080 | 0x0008) & ~0x0040
+            new_mode = self._orig_mode
+            if self.enable_mouse:
+                new_mode = (new_mode | 0x0010 | 0x0080) & ~0x0040
+            else:
+                new_mode = (new_mode & ~0x0010) | 0x0040 | 0x0080
+            if self.enable_resize:
+                new_mode |= 0x0008
+            else:
+                new_mode &= ~0x0008
             kernel32.SetConsoleMode(self._h_in, new_mode)
 
         try:
@@ -231,8 +241,9 @@ class ConsoleEventDispatcher:
         finally:
             if has_console and self._orig_mode:
                 kernel32.SetConsoleMode(self._h_in, self._orig_mode)
-            if self._h_in != -1 and self._h_in != kernel32.GetStdHandle(-10):
+            if self._h_in != -1 and self._h_in != std_in:
                 kernel32.CloseHandle(self._h_in)
+            restore_default_console_mode()
 
     def _listener_posix(self) -> None:
         """Listen for POSIX terminal events via termios, select, and SIGWINCH."""
@@ -322,6 +333,27 @@ class ConsoleEventDispatcher:
                 sys.stdout.write("\x1b[?1006l\x1b[?1000l")
                 sys.stdout.flush()
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def restore_default_console_mode() -> None:
+    """Explicitly restore standard terminal console mode (mouse disabled, QuickEdit enabled)."""
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.windll.kernel32
+        h_in = kernel32.GetStdHandle(-10)
+        if h_in and h_in != -1:
+            mode = wintypes.DWORD()
+            if kernel32.GetConsoleMode(h_in, ctypes.byref(mode)):
+                # Disable mouse input (0x0010) and window input (0x0008)
+                # Enable quick-edit (0x0040) and extended flags (0x0080)
+                clean_mode = (mode.value & ~0x0010 & ~0x0008) | 0x0040 | 0x0080
+                kernel32.SetConsoleMode(h_in, clean_mode)
+    try:
+        sys.stdout.write("\x1b[?1006l\x1b[?1000l")
+        sys.stdout.flush()
+    except Exception:
+        pass
 
 
 def get_single_key(timeout: Optional[float] = None) -> str:

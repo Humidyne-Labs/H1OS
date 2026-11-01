@@ -110,15 +110,14 @@ def render_live_hex_view(
 
         table = Table(
             box=box.ROUNDED,
-            width=78,
             title=f"{title_text}\n{subtitle_text}",
             header_style="bold bright_cyan",
             pad_edge=False,
             show_lines=False,
         )
-        table.add_column("Offset", style="dim", width=10, justify="right")
-        table.add_column("Hex Bytes (00-0F)", style="bold white", width=50)
-        table.add_column("ASCII", style="green", width=16)
+        table.add_column("Offset", style="dim", justify="right")
+        table.add_column("Hex Bytes (00-0F)", style="bold white")
+        table.add_column("ASCII", style="green")
 
         for offset in range(0, len(chunk), 16):
             row_chunk = chunk[offset:offset + 16]

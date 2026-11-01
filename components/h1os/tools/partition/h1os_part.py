@@ -272,19 +272,18 @@ def render_partition_table_rich(
 
     table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
         header_style="bold bright_cyan",
         title=f"[bold white]Physical Flash Partition Map[/]\n[dim]Source: {source_label}[/]",
         show_lines=False,
         pad_edge=False,
     )
-    table.add_column("Name", style="bold white", width=12)
-    table.add_column("Type", style="cyan", width=8)
-    table.add_column("Subtype", style="blue", width=10)
-    table.add_column("Start Offset", style="dim", width=12, justify="right")
-    table.add_column("End Offset", style="dim", width=12, justify="right")
-    table.add_column("Size", style="bold green", width=10, justify="right")
-    table.add_column("Flags", style="yellow", width=8, justify="center")
+    table.add_column("Name", style="bold white")
+    table.add_column("Type", style="cyan")
+    table.add_column("Subtype", style="blue")
+    table.add_column("Start Offset", style="dim", justify="right")
+    table.add_column("End Offset", style="dim", justify="right")
+    table.add_column("Size", style="bold green", justify="right")
+    table.add_column("Flags", style="yellow", justify="center")
 
     for p in partitions:
         flags_str = p.flags if p.flags else "-"
@@ -370,16 +369,15 @@ def run_sub_choice_menu(
     def build_frame(idx: int) -> Group:
         sub_table = Table(
             box=box.ROUNDED,
-            width=TERM_WIDTH,
             header_style="bold bright_cyan",
             title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
             show_lines=False,
             pad_edge=False,
         )
-        sub_table.add_column(" ", justify="center", width=2)
-        sub_table.add_column("#", justify="center", style="bold white", width=3)
-        sub_table.add_column("Option", style="bold", width=36)
-        sub_table.add_column("Details", style="dim", width=30)
+        sub_table.add_column(" ", justify="center", no_wrap=True)
+        sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+        sub_table.add_column("Option", style="bold")
+        sub_table.add_column("Details", style="dim")
 
         for i, item in enumerate(options):
             is_sel = (i == idx)
@@ -623,18 +621,17 @@ def build_select_partition_frame(
     """Build interactive partition selection frame."""
     sub_table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
         header_style="bold bright_cyan",
         title=f"[bold white]{title}[/]\n[dim]Choose an auto-discovered partition from active table[/]",
         show_lines=False,
         pad_edge=False,
     )
-    sub_table.add_column(" ", justify="center", width=2)
-    sub_table.add_column("#", justify="center", style="bold white", width=3)
-    sub_table.add_column("Partition", style="bold", width=14)
-    sub_table.add_column("Type/Subtype", style="cyan", width=16)
-    sub_table.add_column("Offset", style="dim", width=14, justify="right")
-    sub_table.add_column("Size", style="green", width=12, justify="right")
+    sub_table.add_column(" ", justify="center", no_wrap=True)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+    sub_table.add_column("Partition", style="bold")
+    sub_table.add_column("Type/Subtype", style="cyan")
+    sub_table.add_column("Offset", style="dim", justify="right")
+    sub_table.add_column("Size", style="green", justify="right")
 
     for i, p in enumerate(partitions):
         is_sel = (i == selected_idx)
@@ -678,7 +675,6 @@ def build_partition_menu_frame(
     """Build partition manager operations menu frame."""
     sub_table = Table(
         box=box.ROUNDED,
-        width=TERM_WIDTH,
         header_style="bold bright_cyan",
         title=(
             f"[bold white]H1OS Flash Partition Manager[/]\n"
@@ -688,10 +684,10 @@ def build_partition_menu_frame(
         show_lines=False,
         pad_edge=False,
     )
-    sub_table.add_column(" ", justify="center", width=2)
-    sub_table.add_column("#", justify="center", style="bold white", width=3)
-    sub_table.add_column("Operation", style="bold", width=36)
-    sub_table.add_column("Description", style="dim", width=32)
+    sub_table.add_column(" ", justify="center", no_wrap=True)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
+    sub_table.add_column("Operation", style="bold")
+    sub_table.add_column("Description", style="dim")
 
     for i, item in enumerate(menu_items):
         is_sel = (i == selected_idx)
@@ -1019,11 +1015,11 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                         show_lines=False,
                         pad_edge=False,
                     )
-                    ota_table.add_column("Slot", style="bold white", width=10)
-                    ota_table.add_column("Partition", width=12)
-                    ota_table.add_column("Sequence", justify="center", width=14)
-                    ota_table.add_column("CRC32", justify="center", width=14)
-                    ota_table.add_column("Boot State", width=24)
+                    ota_table.add_column("Slot", style="bold white")
+                    ota_table.add_column("Partition")
+                    ota_table.add_column("Sequence", justify="center")
+                    ota_table.add_column("CRC32", justify="center")
+                    ota_table.add_column("Boot State")
 
                     is_s0 = (info["active_slot"] == 0)
                     s0_stat = "[bold green]Active (Boot Target)[/]" if is_s0 else ("[cyan]Valid / Standby[/]" if info["slot0_valid"] else "[dim]Unwritten / Invalid[/]")
@@ -1235,7 +1231,7 @@ def main():
     args = parser.parse_args()
 
     config = H1OSConfig(project_dir=args.project_dir, config_path=args.config)
-    console = Console(width=TERM_WIDTH) if HAVE_RICH else None
+    console = Console() if HAVE_RICH else None
 
     # CLI direct commands
     part_file = config.partition_file or (config.app_root / "partitions.csv")

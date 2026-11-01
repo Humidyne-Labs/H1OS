@@ -205,14 +205,13 @@ def render_rich_summary(console: "Console"):
         "[bold cyan]EXECUTIVE SIZE & MEMORY FOOTPRINT SUMMARY[/]",
         border_style="cyan",
         box=box.ROUNDED,
-        width=78,
     ))
 
-    # 1. Flash Partition Table
-    t_flash = Table(title="1. App Partition Headroom (Flash)", box=box.ROUNDED, width=78, border_style="cyan")
-    t_flash.add_column("Metric", style="bold white", width=26)
-    t_flash.add_column("Allocated Size", style="cyan", justify="right", width=22)
-    t_flash.add_column("Utilization", style="yellow", justify="right", width=22)
+    # 1. Flash Partition Table (auto-sized columns)
+    t_flash = Table(title="1. App Partition Headroom (Flash)", box=box.ROUNDED, border_style="cyan")
+    t_flash.add_column("Metric", style="bold white")
+    t_flash.add_column("Allocated Size", style="cyan", justify="right")
+    t_flash.add_column("Utilization", style="yellow", justify="right")
 
     m_part = re.search(r"binary size (0x[0-9a-fA-F]+|\d+) bytes\. Smallest app partition is (0x[0-9a-fA-F]+|\d+) bytes\. (0x[0-9a-fA-F]+|\d+) bytes \((\d+)%\) free", part_out)
     if m_part:
@@ -229,12 +228,12 @@ def render_rich_summary(console: "Console"):
     console.print(t_flash)
     console.print()
 
-    # 2. RAM Allocation Table
-    t_ram = Table(title="2. Chip Internal RAM Allocation", box=box.ROUNDED, width=78, border_style="cyan")
-    t_ram.add_column("RAM Region", style="bold white", width=12)
-    t_ram.add_column("Used", style="cyan", justify="right", width=16)
-    t_ram.add_column("Total", style="white", justify="right", width=16)
-    t_ram.add_column("Usage", style="yellow", justify="right", width=10)
+    # 2. RAM Allocation Table (auto-sized columns)
+    t_ram = Table(title="2. Chip Internal RAM Allocation", box=box.ROUNDED, border_style="cyan")
+    t_ram.add_column("RAM Region", style="bold white")
+    t_ram.add_column("Used", style="cyan", justify="right")
+    t_ram.add_column("Total", style="white", justify="right")
+    t_ram.add_column("Usage", style="yellow", justify="right")
     t_ram.add_column("Status / Free", style="green", justify="left")
 
     ram_sections = ["DIRAM", "IRAM", "RTC FAST", "RTC SLOW"]
@@ -260,11 +259,11 @@ def render_rich_summary(console: "Console"):
     console.print(t_ram)
     console.print()
 
-    # 3. Top Flash Consuming Archives
-    t_comp = Table(title="3. Top Flash Consuming Archives", box=box.ROUNDED, width=78, border_style="cyan")
-    t_comp.add_column("Static Archive (.a)", style="bold white", width=34)
-    t_comp.add_column("Size", style="cyan", justify="right", width=20)
-    t_comp.add_column("Share of Top 6", style="yellow", justify="right", width=16)
+    # 3. Top Flash Consuming Archives (auto-sized columns)
+    t_comp = Table(title="3. Top Flash Consuming Archives", box=box.ROUNDED, border_style="cyan")
+    t_comp.add_column("Static Archive (.a)", style="bold white")
+    t_comp.add_column("Size", style="cyan", justify="right")
+    t_comp.add_column("Share of Top 6", style="yellow", justify="right")
 
     comp_matches = re.findall(r'│\s+([\w\.\-]+)\s+│\s+(\d+)\s+│', comp_out)
     if comp_matches:
@@ -479,7 +478,7 @@ def main():
             pass
 
     if HAVE_RICH:
-        console = Console(width=78)
+        console = Console()
         render_rich_summary(console)
     else:
         print(summary_text, flush=True)

@@ -320,7 +320,7 @@ def main():
     raw_version = (cfg.version if (cfg and cfg.version) else None) or resolve_version(app_root, comp_dir)
     version = args.version.lstrip("v") if args.version else raw_version
 
-    console = Console(width=78) if HAVE_RICH else None
+    console = Console() if HAVE_RICH else None
     if console:
         console.print()
         console.print(Panel(
@@ -331,7 +331,6 @@ def main():
             title="H1OS Release Packager",
             border_style="cyan",
             box=box.ROUNDED,
-            width=78,
         ))
         console.print()
     else:
@@ -378,10 +377,10 @@ def main():
     factory_bin_path.write_bytes(buf)
 
     if console:
-        table_bins = Table(title="Bundled Firmware Partition Binaries", box=box.ROUNDED, width=78, border_style="cyan")
-        table_bins.add_column("Flash Offset", style="yellow", width=14)
-        table_bins.add_column("Partition Binary", style="bold white", width=36)
-        table_bins.add_column("Size", style="cyan", justify="right", width=20)
+        table_bins = Table(title="Bundled Firmware Partition Binaries", box=box.ROUNDED, border_style="cyan")
+        table_bins.add_column("Flash Offset", style="yellow")
+        table_bins.add_column("Partition Binary", style="bold white")
+        table_bins.add_column("Size", style="cyan", justify="right")
         for off_int, off_hex, rel, abs_p in flash_info["binaries"]:
             sz = abs_p.stat().st_size
             table_bins.add_row(off_hex, Path(rel).name, format_bytes(sz))
@@ -488,7 +487,6 @@ def main():
             title=f"[bold green]{app_title} v{version} Release Summary[/]",
             border_style="green",
             box=box.ROUNDED,
-            width=78,
         ))
         console.print()
     else:
