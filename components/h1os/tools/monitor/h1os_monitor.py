@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 H1OS Dedicated Serial Monitor & Telemetry Console (h1os_monitor)
-Version: 1.4.0
+Version: 1.4.1
 License: Apache-2.0
 
 High-performance, beautifully styled serial monitor for ESP32-S3 firmware development.
 Features:
 - Pinned static header panel with zero vertical scroll drift.
 - Fully framed, rounded telemetry viewport (box.ROUNDED) matching h1os_menu aesthetics.
-- Flicker-free atomic double-buffered rendering (no line-erasing or cursor strobing).
+- Flicker-free native Rich rendering with throttled refresh (no strobe or line-clearing artifacts).
 - Full mouse scroll wheel support in terminal (native Windows Console API + VT SGR sequences).
 - Keyboard-driven interactive scrollback (PageUp/PageDown, Up/Down, Home/End).
 - Intelligent ESP-IDF, LVGL, and ROM bootloader log parsing into colored pills, aligned uptime, and module tags.
@@ -43,6 +43,7 @@ try:
     from rich import box
     from rich.console import Console
     from rich.layout import Layout
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
@@ -50,7 +51,7 @@ except ImportError:
     print("[ERROR] rich is required. Install via 'pip install rich'.", file=sys.stderr)
     sys.exit(1)
 
-# Windows Console API structures for mouse and keyboard input
+# Windows Console API structures for native mouse and keyboard input
 if os.name == "nt":
     import ctypes
     from ctypes import wintypes
@@ -224,15 +225,15 @@ class H1OSMonitor:
         self.lock = threading.Lock()
         self.dirty = True
 
-        self.console = Console(highlight=False, force_terminal=True)
+        self.console = Console(highlight=False)
         self.layout = Layout()
         self.layout.split(
             Layout(name="header", size=5),
             Layout(name="body"),
         )
 
+        self.live: Optional[Live] = None
         self.last_status_text = "[bold green]ONLINE[/]"
-        self.last_dimensions = (0, 0)
 
         if self.enable_logging:
             self._open_log_file()
@@ -279,6 +280,7 @@ class H1OSMonitor:
                 )
             )
             self.dirty = True
+        self.update_display()
 
     def toggle_logging(self):
         """Toggle disk logging on/off interactively."""
@@ -301,14 +303,11 @@ class H1OSMonitor:
         self._update_window_title()
 
     def clear_screen(self):
-        """Erase scrollback buffer and clear terminal while preserving the static header frame."""
+        """Erase scrollback buffer while preserving the static header frame."""
         with self.lock:
             self.history.clear()
             self.scroll_offset = 0
             self.dirty = True
-        # Blank the alternate screen buffer once to clear old line artifacts
-        sys.stdout.write("\x1b[2J\x1b[H")
-        sys.stdout.flush()
         self._add_badge_entry("CLEARED", "Telemetry buffer erased.", "cyan")
 
     def trigger_hardware_reset(self):
@@ -338,12 +337,14 @@ class H1OSMonitor:
             max_offset = max(0, len(self.history) - 3)
             self.scroll_offset = min(max_offset, self.scroll_offset + count)
             self.dirty = True
+        self.update_display()
 
     def scroll_down(self, count: int = 1):
         """Scroll history down towards latest lines."""
         with self.lock:
             self.scroll_offset = max(0, self.scroll_offset - count)
             self.dirty = True
+        self.update_display()
 
     def scroll_page_up(self):
         """Scroll history up by one full screen page."""
@@ -360,12 +361,14 @@ class H1OSMonitor:
         with self.lock:
             self.scroll_offset = max(0, len(self.history) - 3)
             self.dirty = True
+        self.update_display()
 
     def scroll_end(self):
         """Jump to the bottom and resume live auto-scrolling."""
         with self.lock:
             self.scroll_offset = 0
             self.dirty = True
+        self.update_display()
 
     def _update_window_title(self):
         """Keep the console window title bar synchronized with live session state."""
@@ -532,36 +535,20 @@ class H1OSMonitor:
             box=box.ROUNDED,
         )
 
-    def render_frame(self, status_text: Optional[str] = None):
-        """Render the full monitor viewport atomically without line-clearing flicker."""
+    def update_display(self, status_text: Optional[str] = None):
+        """Update live layout smoothly through Rich without line-clearing strobing."""
+        if not self.live:
+            return
         if status_text is not None:
             self.last_status_text = status_text
-        st = self.last_status_text
-
-        # Check for window resize
-        cur_dims = (self.console.size.width, self.console.size.height)
-        if cur_dims != self.last_dimensions and self.last_dimensions != (0, 0):
-            sys.stdout.write("\x1b[2J\x1b[H")
-        self.last_dimensions = cur_dims
+        st = self.last_status_text or "[bold green]ONLINE[/]"
 
         self.layout["header"].update(self._build_header_panel(st))
         self.layout["body"].update(self._build_telemetry_panel())
-
-        with self.console.capture() as capture:
-            self.console.print(self.layout)
-        frame_ansi = capture.get()
-
-        # Atomic draw:
-        # \x1b[?25l: Hide cursor to prevent cursor strobing
-        # \x1b[H: Reposition cursor at (1, 1) without clearing lines (zero flicker)
-        sys.stdout.write("\x1b[?25l\x1b[H" + frame_ansi)
-        sys.stdout.flush()
+        self.live.update(self.layout, refresh=True)
 
     def run(self):
         """Main execution loop supervising serial streaming, deep sleep, and keyboard/mouse input."""
-        # Enter alternate screen buffer, hide cursor, enable SGR mouse tracking, and clear once
-        sys.stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[H")
-        sys.stdout.flush()
         self._update_window_title()
 
         # Input listener thread (handles mouse wheel, navigation keys, and hotkeys)
@@ -570,122 +557,130 @@ class H1OSMonitor:
 
         line_buffer = bytearray()
         sleep_start_time: Optional[float] = None
-        spinner_idx = 0
+        last_sec = -1
         last_render_time = 0.0
-        last_spin_time = 0.0
 
-        try:
-            while self.running:
-                now = time.time()
+        with Live(self.layout, console=self.console, screen=True, auto_refresh=False) as live:
+            self.live = live
+            self.update_display("[bold green]ONLINE[/]")
 
-                # 1. Port Connection / Deep Sleep Supervisor
-                if self.ser is None or not self.ser.is_open:
-                    target_port = self.port or auto_detect_serial_port()
+            try:
+                while self.running:
+                    now = time.time()
 
-                    if sleep_start_time is None:
-                        sleep_start_time = now
+                    # 1. Port Connection / Deep Sleep Supervisor
+                    if self.ser is None or not self.ser.is_open:
+                        target_port = self.port or auto_detect_serial_port()
 
-                    elapsed_sec = int(now - sleep_start_time)
-                    mins = elapsed_sec // 60
-                    secs = elapsed_sec % 60
-                    time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
+                        if sleep_start_time is None:
+                            sleep_start_time = now
 
-                    # Throttle sleep spinner to a clean 4 FPS (250 ms) to eliminate busy-loop flicker
-                    if now - last_spin_time >= 0.25:
-                        spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
-                        spinner_idx += 1
-                        port_label = target_port or "active port"
-                        status_text = f"[bold yellow]SLEEPING ({time_str}) {spin_char}[/] [dim]Listening on {port_label}...[/]"
-                        self.render_frame(status_text)
-                        last_spin_time = now
-                        self.dirty = False
+                        elapsed_sec = int(now - sleep_start_time)
+                        mins = elapsed_sec // 60
+                        secs = elapsed_sec % 60
+                        time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
 
-                    # Attempt to open port with DTR/RTS held LOW (zero-reset on connect)
-                    if target_port:
-                        try:
-                            self.ser = serial.Serial(
-                                port=target_port,
-                                baudrate=self.baud,
-                                timeout=0.05,
-                                dsrdtr=False,
-                                rtscts=False,
-                            )
-                            # Explicitly hold lines low so MCU is not reset on connect
-                            set_dtr_pin(self.ser, False)
-                            set_rts_with_windows_quirk(self.ser, False)
+                        # Update ONLY when the second changes (1 FPS clock tick) to completely eliminate flicker
+                        if elapsed_sec != last_sec:
+                            last_sec = elapsed_sec
+                            port_label = target_port or "active port"
+                            status_text = f"[bold yellow]SLEEPING ({time_str})[/] [dim]Listening on {port_label}...[/]"
+                            self.update_display(status_text)
+                            self.dirty = False
 
-                            self.port = target_port
-                            self._add_badge_entry("ONLINE", f"Target connected on {self.port} [dim](slept {time_str})[/]", "green")
-                            self._update_window_title()
-                            sleep_start_time = None
-                            line_buffer.clear()
-                            self.render_frame("[bold green]ONLINE[/]")
-                            self.dirty = True
-                        except (serial.SerialException, OSError) as exc:
-                            self.ser = None
-                            exc_msg = str(exc).lower()
-                            if "access is denied" in exc_msg or "permissionerror" in exc_msg:
-                                status_text = f"[bold red]LOCKED (Access Denied)[/] [dim]Retrying {target_port}...[/]"
-                                self.render_frame(status_text)
+                        # Attempt to open port with DTR/RTS held LOW (zero-reset on connect)
+                        if target_port:
+                            try:
+                                self.ser = serial.Serial(
+                                    port=target_port,
+                                    baudrate=self.baud,
+                                    timeout=0.05,
+                                    dsrdtr=False,
+                                    rtscts=False,
+                                )
+                                # Explicitly hold lines low so MCU is not reset on connect
+                                set_dtr_pin(self.ser, False)
+                                set_rts_with_windows_quirk(self.ser, False)
 
-                    time.sleep(0.08)
-                    continue
-
-                # 2. Read Serial Stream
-                try:
-                    available = self.ser.in_waiting
-                    if available > 0:
-                        chunk = self.ser.read(available)
-                        for b in chunk:
-                            if b == ord("\n"):
-                                try:
-                                    raw_line = line_buffer.decode("utf-8", errors="replace")
-                                except Exception:
-                                    raw_line = line_buffer.decode("latin-1", errors="replace")
+                                self.port = target_port
+                                self._add_badge_entry("ONLINE", f"Target connected on {self.port} [dim](slept {time_str})[/]", "green")
+                                self._update_window_title()
+                                sleep_start_time = None
+                                last_sec = -1
                                 line_buffer.clear()
+                                self.update_display("[bold green]ONLINE[/]")
+                                self.dirty = True
+                            except (serial.SerialException, OSError) as exc:
+                                self.ser = None
+                                exc_msg = str(exc).lower()
+                                if "access is denied" in exc_msg or "permissionerror" in exc_msg:
+                                    status_text = f"[bold red]LOCKED (Access Denied)[/] [dim]Retrying {target_port}...[/]"
+                                    self.update_display(status_text)
 
-                                entry = LogEntry(raw=raw_line)
-                                with self.lock:
-                                    self.history.append(entry)
-                                    self.dirty = True
+                        time.sleep(0.1)
+                        continue
 
-                                # Persistent disk logging (ANSI stripped for clean plain text)
-                                if self.enable_logging and self.log_file:
-                                    clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
-                                    if self.enable_timestamps:
-                                        ms_str = entry.ts.strftime("%H:%M:%S.%f")[:-3]
-                                        self.log_file.write(f"[{ms_str}] {clean_for_log}\n")
-                                    else:
-                                        self.log_file.write(f"{clean_for_log}\n")
-                                    self.log_file.flush()
+                    # 2. Read Serial Stream
+                    try:
+                        available = self.ser.in_waiting
+                        if available > 0:
+                            chunk = self.ser.read(available)
+                            for b in chunk:
+                                if b == ord("\n"):
+                                    try:
+                                        raw_line = line_buffer.decode("utf-8", errors="replace")
+                                    except Exception:
+                                        raw_line = line_buffer.decode("latin-1", errors="replace")
+                                    line_buffer.clear()
 
-                            elif b != ord("\r"):
-                                line_buffer.append(b)
+                                    entry = LogEntry(raw=raw_line)
+                                    with self.lock:
+                                        self.history.append(entry)
+                                        self.dirty = True
 
-                    # Smooth, throttled 30 FPS display refresh without line wiping
-                    if self.dirty and (now - last_render_time >= 0.033):
-                        self.render_frame("[bold green]ONLINE[/]")
-                        last_render_time = now
-                        self.dirty = False
+                                    # Persistent disk logging (ANSI stripped for clean plain text)
+                                    if self.enable_logging and self.log_file:
+                                        clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
+                                        if self.enable_timestamps:
+                                            ms_str = entry.ts.strftime("%H:%M:%S.%f")[:-3]
+                                            self.log_file.write(f"[{ms_str}] {clean_for_log}\n")
+                                        else:
+                                            self.log_file.write(f"{clean_for_log}\n")
+                                        self.log_file.flush()
 
-                    if available == 0:
-                        time.sleep(0.01)
+                                elif b != ord("\r"):
+                                    line_buffer.append(b)
 
-                except (serial.SerialException, OSError):
-                    # Target entered deep sleep and dropped USB serial PHY
-                    if self.ser:
-                        try:
-                            self.ser.close()
-                        except Exception:
-                            pass
-                    self.ser = None
-                    sleep_start_time = time.time()
-                    self._add_badge_entry("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
-                    self._update_window_title()
-                    self.render_frame("[bold yellow]SLEEPING[/]")
+                        # Smooth, throttled 10 FPS batch refresh so high-speed serial doesn't strobe
+                        if self.dirty and (now - last_render_time >= 0.080):
+                            self.update_display("[bold green]ONLINE[/]")
+                            last_render_time = now
+                            self.dirty = False
 
-        finally:
-            self.close()
+                        if available == 0:
+                            # Final drain update if data arrived
+                            if self.dirty:
+                                self.update_display("[bold green]ONLINE[/]")
+                                last_render_time = now
+                                self.dirty = False
+                            time.sleep(0.01)
+
+                    except (serial.SerialException, OSError):
+                        # Target entered deep sleep and dropped USB serial PHY
+                        if self.ser:
+                            try:
+                                self.ser.close()
+                            except Exception:
+                                pass
+                        self.ser = None
+                        sleep_start_time = time.time()
+                        last_sec = -1
+                        self._add_badge_entry("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
+                        self._update_window_title()
+                        self.update_display("[bold yellow]SLEEPING[/]")
+
+            finally:
+                self.live = None
 
     def _input_listener(self):
         """Cross-platform keyboard and mouse wheel input listener."""
@@ -697,7 +692,13 @@ class H1OSMonitor:
     def _input_listener_windows(self):
         """Listen for keyboard and mouse wheel events on Windows via Console API with msvcrt fallback."""
         kernel32 = ctypes.windll.kernel32
-        h_in = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        GENERIC_READ = 0x80000000
+        GENERIC_WRITE = 0x40000000
+
+        # Open CONIN$ to guarantee true interactive console input handle
+        h_in = kernel32.CreateFileW("CONIN$", GENERIC_READ | GENERIC_WRITE, 1 | 2, None, 3, 0, None)
+        if h_in == -1:
+            h_in = kernel32.GetStdHandle(-10)
 
         mode = wintypes.DWORD()
         has_console = kernel32.GetConsoleMode(h_in, ctypes.byref(mode)) != 0
@@ -706,7 +707,7 @@ class H1OSMonitor:
         if has_console:
             # Enable mouse input (0x0010) and extended flags (0x0080), disable quick edit (0x0040)
             # so mouse wheel and clicks are passed to our application instead of freezing console
-            new_mode = (orig_mode | 0x0010 | 0x0080) & ~0x0040
+            new_mode = (orig_mode | 0x0010 | 0x0080 | 0x0008) & ~0x0040
             kernel32.SetConsoleMode(h_in, new_mode)
 
         try:
@@ -768,10 +769,12 @@ class H1OSMonitor:
                                         self.scroll_down(3)  # Scroll down 3 lines per notch
 
                         continue
-                time.sleep(0.015)
+                time.sleep(0.02)
         finally:
             if has_console and orig_mode:
                 kernel32.SetConsoleMode(h_in, orig_mode)
+            if h_in != -1 and h_in != kernel32.GetStdHandle(-10):
+                kernel32.CloseHandle(h_in)
 
     def _input_listener_posix(self):
         """Listen for keyboard and mouse wheel events on POSIX/VT terminals via stdin."""
@@ -783,6 +786,10 @@ class H1OSMonitor:
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setcbreak(fd)
+            # Enable SGR mouse tracking in VT terminal
+            sys.stdout.write("\x1b[?1000h\x1b[?1006h")
+            sys.stdout.flush()
+
             while self.running:
                 r, _, _ = select.select([sys.stdin], [], [], 0.02)
                 if r:
@@ -835,6 +842,9 @@ class H1OSMonitor:
                     elif key == "b":
                         self.scroll_end()
         finally:
+            # Disable SGR mouse tracking on exit
+            sys.stdout.write("\x1b[?1000l\x1b[?1006l")
+            sys.stdout.flush()
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
     def close(self):
@@ -846,9 +856,6 @@ class H1OSMonitor:
             except Exception:
                 pass
         self._close_log_file()
-        # Disable SGR mouse tracking, show cursor, and restore main terminal screen buffer
-        sys.stdout.write("\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l")
-        sys.stdout.flush()
         self.console.print("\n[bold cyan]H1OS Serial Monitor closed.[/bold cyan]")
 
 
