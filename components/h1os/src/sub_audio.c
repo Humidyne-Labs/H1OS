@@ -13,6 +13,7 @@
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_pm.h"
+#include "esp_private/esp_gpio_reserve.h"
 #include "esp_rom_sys.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -592,6 +593,12 @@ esp_err_t sub_audio_init(uint8_t volume_pct)
     };
     std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
     std_cfg.slot_cfg.slot_mask    = I2S_STD_SLOT_LEFT;
+
+    /* Revoke any GPIO reservations on I2S output lines from early pad quiescing before driver binding */
+    (void)esp_gpio_revoke((1ULL << HAL_PIN_I2S_MCLK) |
+                          (1ULL << HAL_PIN_I2S_SCLK) |
+                          (1ULL << HAL_PIN_I2S_LRCK) |
+                          (1ULL << HAL_PIN_I2S_DSDIN));
 
     err = i2s_channel_init_std_mode(s_tx_chan, &std_cfg);
     if (err != ESP_OK) {

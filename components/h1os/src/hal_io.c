@@ -14,6 +14,7 @@
 #include "driver/rtc_io.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_private/esp_gpio_reserve.h"
 #include "esp_private/io_mux.h"
 #include "esp_rom_sys.h"
 #include "esp_sleep.h"
@@ -77,6 +78,9 @@ static void hal_io_quiesce_i2s_pads(bool enable_hold)
         .intr_type    = GPIO_INTR_DISABLE,
     };
     (void)gpio_config(&i2s_out_cfg);
+    /* In ESP-IDF v6.1, gpio_config(GPIO_MODE_OUTPUT) reserves output pads in esp_gpio_reserve.
+     * Revoke immediately so the I2S peripheral driver can claim them without conflict warnings. */
+    (void)esp_gpio_revoke(i2s_out_cfg.pin_bit_mask);
 
     for (size_t i = 0; i < sizeof(i2s_out_pins) / sizeof(i2s_out_pins[0]); i++) {
         (void)gpio_set_level(i2s_out_pins[i], 0);
