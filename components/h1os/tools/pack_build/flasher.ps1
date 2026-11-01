@@ -435,43 +435,66 @@ namespace Esp32Slip.Flasher
             ClosePort();
         }
 
+        private void SetDtr(bool state)
+        {
+            try { _port.DtrEnable = state; } catch { }
+        }
+
+        private void SetRts(bool state)
+        {
+            try {
+                _port.RtsEnable = state;
+                _port.DtrEnable = _port.DtrEnable; // Windows usbser.sys flush workaround
+            } catch { }
+        }
+
         public void EnterBootloader()
         {
             Console.WriteLine(string.Format("[*] Engaging ESP32-S3 USB CDC on {0}...", _portName));
+            if (_port == null || !_port.IsOpen)
+            {
+                OpenPort(115200);
+            }
 
             if (_isNativeUsb)
             {
-                // ESP32-S3 Native USB (USB-Serial-JTAG, VID_303A:PID_1001)
-                // Hardware RTS=LOW + DTR=PULSE triggers hardware bootloader without rebooting port
-                OpenPort(115200);
-                _port.DtrEnable = false;
-                _port.RtsEnable = false;
-                Thread.Sleep(50);
+                // Official Espressif USB-Serial-JTAG reset pulse train (PID 0x1001)
+                // Windows usbser.sys flushes SET_CONTROL_LINE_STATE only on RTS changes.
+                SetRts(false); // Idle
+                SetDtr(false);
+                Thread.Sleep(100);
 
-                _port.DtrEnable = false;
-                _port.RtsEnable = true;  // Boot mode LOW
+                SetDtr(true);  // Assert IO0 LOW (Download mode)
+                SetRts(false);
                 Thread.Sleep(100);
-                _port.DtrEnable = true;  // Reset pulse
+
+                SetRts(true);  // Assert CHIP_PU LOW (Reset active)
+                SetDtr(false);
+                SetRts(true);  // Re-apply RTS to flush DTR to usbser.sys
                 Thread.Sleep(100);
-                _port.DtrEnable = false; // Release reset
-                Thread.Sleep(250);
+
+                SetDtr(false); // Release IO0
+                SetRts(false); // Release CHIP_PU HIGH -> Chip boots into ROM download mode!
+                Thread.Sleep(200);
             }
             else
             {
-                // Standard UART bridge (CP2102/CH340/FTDI)
-                OpenPort(115200);
-                _port.DtrEnable = false;
-                _port.RtsEnable = true;
+                // Standard external UART bridge (CP2102/CH340/FTDI)
+                SetDtr(false);
+                SetRts(true);
                 Thread.Sleep(100);
-                _port.DtrEnable = true;
-                _port.RtsEnable = false;
-                Thread.Sleep(150);
-                _port.DtrEnable = false;
+                SetDtr(true);
+                SetRts(false);
+                Thread.Sleep(100);
+                SetDtr(false);
+                SetRts(false);
                 Thread.Sleep(200);
             }
 
-            _port.DiscardInBuffer();
-            _port.DiscardOutBuffer();
+            try {
+                _port.DiscardInBuffer();
+                _port.DiscardOutBuffer();
+            } catch { }
         }
 
         public void SyncWithRom()
@@ -487,6 +510,12 @@ namespace Esp32Slip.Flasher
             bool synced = false;
             for (int attempt = 1; attempt <= 25; attempt++)
             {
+                // Every 6 failed sync frames, re-trigger bootloader reset sequence
+                if (attempt == 7 || attempt == 14 || attempt == 20)
+                {
+                    EnterBootloader();
+                }
+
                 try
                 {
                     uint retVal;
@@ -496,8 +525,9 @@ namespace Esp32Slip.Flasher
                 }
                 catch
                 {
+                    try { _port.DiscardInBuffer(); } catch { }
                     Console.Write(".");
-                    Thread.Sleep(30);
+                    Thread.Sleep(40);
                 }
             }
 
@@ -793,7 +823,7 @@ namespace Esp32Slip.Flasher
             List<byte> replyBuffer = new List<byte>(64);
 
             int prevTimeout = _port.ReadTimeout;
-            _port.ReadTimeout = Math.Max(500, timeoutMs);
+            _port.ReadTimeout = Math.Max(100, timeoutMs);
 
             try
             {
