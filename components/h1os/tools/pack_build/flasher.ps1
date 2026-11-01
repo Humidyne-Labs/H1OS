@@ -394,12 +394,20 @@ namespace Esp32Slip.Flasher
         public void DisableWatchdogs()
         {
             try {
-                // RTC WDT (RTC_CNTL_WDTCONFIG0_REG: 0x60008048) -> disable stage 0-3
-                WriteReg(0x60008048, 0x00000000, 0xFFFFFFFF);
-                // Main System WDT (TIMG0_WDTCONFIG0_REG: 0x6001F048) -> disable
-                WriteReg(0x6001F048, 0x00000000, 0xFFFFFFFF);
-                // Super WDT (RTC_CNTL_SWD_CONF_REG: 0x600080B0) -> bypass
-                WriteReg(0x600080B0, 0x40000000, 0x40000000);
+                // Official ESP32-S3 Watchdog Disable Sequence (RTC WDT + Super WDT)
+                // Over USB-Serial-JTAG (PID 0x1001), RTC WDT & SWD must be explicitly disabled/fed
+                // or hardware resets the SoC during long operations (e.g. 3MB MD5 computation).
+
+                // 1. Disable RTC WDT: unlock with WKEY, set CONFIG0 to 0, lock
+                WriteReg(0x600080B0, 0x50D83AA1, 0xFFFFFFFF); // RTC_CNTL_WDTWPROTECT_REG = 0x50D83AA1
+                WriteReg(0x60008098, 0x00000000, 0xFFFFFFFF); // RTC_CNTL_WDTCONFIG0_REG = 0
+                WriteReg(0x600080B0, 0x00000000, 0xFFFFFFFF); // lock
+
+                // 2. Automatically feed Super Watchdog (SWD): unlock with WKEY, set AUTO_FEED_EN
+                WriteReg(0x600080B8, 0x8F1D312A, 0xFFFFFFFF); // RTC_CNTL_SWD_WPROTECT_REG = 0x8F1D312A
+                uint swdConf = ReadReg(0x600080B4);           // RTC_CNTL_SWD_CONF_REG
+                WriteReg(0x600080B4, swdConf | 0x80000000u, 0xFFFFFFFF); // RTC_CNTL_SWD_AUTO_FEED_EN
+                WriteReg(0x600080B8, 0x00000000, 0xFFFFFFFF); // lock
             } catch { }
         }
 
@@ -724,7 +732,7 @@ namespace Esp32Slip.Flasher
             Buffer.BlockCopy(BitConverter.GetBytes(0u),     0, md5Payload, 8,  4);
             Buffer.BlockCopy(BitConverter.GetBytes(0u),     0, md5Payload, 12, 4);
 
-            int md5Timeout = Math.Max(5000, 2000 + (int)((size / 65536) * 400));
+            int md5Timeout = Math.Max(10000, 3000 + (int)((size / 65536) * 800));
             byte[] resp = ExecuteCommandRaw(ESP_SPI_FLASH_MD5, md5Payload, 0, md5Timeout);
 
             // Response payload contains 16-byte binary MD5 or 32-byte hex string

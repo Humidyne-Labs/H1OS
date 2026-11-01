@@ -346,9 +346,15 @@ def main():
         dist_base = app_root / "dist"
 
     dist_root = dist_base / f"{app_stem}-v{version}"
-    if dist_root.exists():
-        shutil.rmtree(dist_root)
     dist_root.mkdir(parents=True, exist_ok=True)
+    for child in dist_root.iterdir():
+        try:
+            if child.is_dir():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink(missing_ok=True)
+        except Exception:
+            pass
     bins_dir = dist_root / "bins"
     bins_dir.mkdir(parents=True, exist_ok=True)
 
