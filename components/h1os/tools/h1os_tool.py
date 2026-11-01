@@ -433,9 +433,6 @@ def run_pack(
     if no_zip:
         cmd.append("--no-zip")
 
-    if config.partition_file:
-        cmd.extend(["--partition-file", str(config.partition_file)])
-
     if version_override:
         cmd.extend(["-V", version_override])
     elif config.version:
