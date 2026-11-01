@@ -276,14 +276,15 @@ def render_partition_table_rich(
         title=f"[bold white]Physical Flash Partition Map[/]\n[dim]Source: {source_label}[/]",
         show_lines=False,
         pad_edge=False,
+        expand=True,
     )
-    table.add_column("Name", style="bold white")
-    table.add_column("Type", style="cyan")
-    table.add_column("Subtype", style="blue")
-    table.add_column("Start Offset", style="dim", justify="right")
-    table.add_column("End Offset", style="dim", justify="right")
-    table.add_column("Size", style="bold green", justify="right")
-    table.add_column("Flags", style="yellow", justify="center")
+    table.add_column("Name", style="bold white", ratio=2)
+    table.add_column("Type", style="cyan", ratio=1)
+    table.add_column("Subtype", style="blue", ratio=1)
+    table.add_column("Start Offset", style="dim", justify="right", ratio=2)
+    table.add_column("End Offset", style="dim", justify="right", ratio=2)
+    table.add_column("Size", style="bold green", justify="right", ratio=2)
+    table.add_column("Flags", style="yellow", justify="center", ratio=1)
 
     for p in partitions:
         flags_str = p.flags if p.flags else "-"
@@ -625,13 +626,14 @@ def build_select_partition_frame(
         title=f"[bold white]{title}[/]\n[dim]Choose an auto-discovered partition from active table[/]",
         show_lines=False,
         pad_edge=False,
+        expand=True,
     )
-    sub_table.add_column(" ", justify="center", no_wrap=True)
-    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
-    sub_table.add_column("Partition", style="bold")
-    sub_table.add_column("Type/Subtype", style="cyan")
-    sub_table.add_column("Offset", style="dim", justify="right")
-    sub_table.add_column("Size", style="green", justify="right")
+    sub_table.add_column(" ", justify="center", no_wrap=True, width=2)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True, width=3)
+    sub_table.add_column("Partition", style="bold", ratio=2)
+    sub_table.add_column("Type/Subtype", style="cyan", ratio=2)
+    sub_table.add_column("Offset", style="dim", justify="right", ratio=2)
+    sub_table.add_column("Size", style="green", justify="right", ratio=2)
 
     for i, p in enumerate(partitions):
         is_sel = (i == selected_idx)
@@ -683,11 +685,12 @@ def build_partition_menu_frame(
         ),
         show_lines=False,
         pad_edge=False,
+        expand=True,
     )
-    sub_table.add_column(" ", justify="center", no_wrap=True)
-    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
-    sub_table.add_column("Operation", style="bold")
-    sub_table.add_column("Description", style="dim")
+    sub_table.add_column(" ", justify="center", no_wrap=True, width=2)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True, width=3)
+    sub_table.add_column("Operation", style="bold", ratio=4)
+    sub_table.add_column("Description", style="dim", ratio=4)
 
     for i, item in enumerate(menu_items):
         is_sel = (i == selected_idx)

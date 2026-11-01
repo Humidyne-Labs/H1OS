@@ -118,11 +118,12 @@ def run_interactive_choice_menu(
             title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
             show_lines=False,
             pad_edge=False,
+            expand=True,
         )
-        sub_table.add_column(" ", justify="center", no_wrap=True)
-        sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
-        sub_table.add_column("Option", style="bold")
-        sub_table.add_column("Details", style="dim")
+        sub_table.add_column(" ", justify="center", no_wrap=True, width=2)
+        sub_table.add_column("#", justify="center", style="bold white", no_wrap=True, width=3)
+        sub_table.add_column("Option", style="bold", ratio=3)
+        sub_table.add_column("Details", style="dim", ratio=3)
 
         for i, item in enumerate(options):
             is_sel = (i == idx)
@@ -236,18 +237,19 @@ def build_console_frame(
     if header_panel is None:
         header_panel = build_header_panel(config)
 
-    # 2. Operations Table (auto-sized columns)
+    # 2. Operations Table (auto-sized full-width columns)
     ops_table = Table(
         box=box.ROUNDED,
         header_style="bold bright_cyan",
         show_lines=False,
         pad_edge=False,
+        expand=True,
     )
-    ops_table.add_column(" ", justify="center", no_wrap=True)
-    ops_table.add_column("#", justify="center", style="bold white", no_wrap=True)
-    ops_table.add_column("Operation", style="bold")
-    ops_table.add_column("Target Build", style="dim")
-    ops_table.add_column("Backend Engine", style="cyan")
+    ops_table.add_column(" ", justify="center", no_wrap=True, width=2)
+    ops_table.add_column("#", justify="center", style="bold white", no_wrap=True, width=3)
+    ops_table.add_column("Operation", style="bold", ratio=4)
+    ops_table.add_column("Target Build", style="dim", ratio=2)
+    ops_table.add_column("Backend Engine", style="cyan", ratio=2)
 
     for i, item in enumerate(menu_items):
         is_sel = (i == selected_idx)
@@ -582,13 +584,14 @@ def build_profile_sub_frame(
         title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
         show_lines=False,
         pad_edge=False,
+        expand=True,
     )
-    sub_table.add_column(" ", justify="center", no_wrap=True)
-    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True)
-    sub_table.add_column("Profile", style="bold")
-    sub_table.add_column("Target Build Dir", style="dim")
-    sub_table.add_column("CMake Preset", style="cyan")
-    sub_table.add_column("Status")
+    sub_table.add_column(" ", justify="center", no_wrap=True, width=2)
+    sub_table.add_column("#", justify="center", style="bold white", no_wrap=True, width=3)
+    sub_table.add_column("Profile", style="bold", ratio=2)
+    sub_table.add_column("Target Build Dir", style="dim", ratio=3)
+    sub_table.add_column("CMake Preset", style="cyan", ratio=2)
+    sub_table.add_column("Status", ratio=1)
 
     for i, item in enumerate(items):
         is_sel = (i == selected_idx)

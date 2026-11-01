@@ -377,10 +377,10 @@ def main():
     factory_bin_path.write_bytes(buf)
 
     if console:
-        table_bins = Table(title="Bundled Firmware Partition Binaries", box=box.ROUNDED, border_style="cyan")
-        table_bins.add_column("Flash Offset", style="yellow")
-        table_bins.add_column("Partition Binary", style="bold white")
-        table_bins.add_column("Size", style="cyan", justify="right")
+        table_bins = Table(title="Bundled Firmware Partition Binaries", box=box.ROUNDED, border_style="cyan", expand=True)
+        table_bins.add_column("Flash Offset", style="yellow", ratio=2)
+        table_bins.add_column("Partition Binary", style="bold white", ratio=4)
+        table_bins.add_column("Size", style="cyan", justify="right", ratio=3)
         for off_int, off_hex, rel, abs_p in flash_info["binaries"]:
             sz = abs_p.stat().st_size
             table_bins.add_row(off_hex, Path(rel).name, format_bytes(sz))
