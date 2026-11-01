@@ -1038,12 +1038,12 @@ Write-Host "====================================================================
 try {
     $portInfo = Find-Esp32S3Port -RequestedPort $Port
 
-    $eraseRegions  = New-Object System.Collections.Generic.List[PSCustomObject]
-    $writeSegments = New-Object System.Collections.Generic.List[Esp32Slip.Flasher.FlashSegment]
+    $queuedEraseRegions = New-Object System.Collections.Generic.List[PSCustomObject]
+    $writeSegments      = New-Object System.Collections.Generic.List[Esp32Slip.Flasher.FlashSegment]
 
     # Handle -EraseAll
     if ($EraseAll.IsPresent) {
-        $eraseRegions.Add([PSCustomObject]@{
+        $queuedEraseRegions.Add([PSCustomObject]@{
             Offset = [uint32]0x000000
             Length = [uint32]($FlashSizeMB * 1024 * 1024)
             Label  = "Entire ${FlashSizeMB}MB NOR Flash Die"
@@ -1055,7 +1055,7 @@ try {
         if ($Offset -eq [uint32]::MaxValue -or $Length -eq 0) {
             throw "Specifying an offset erase requires both -Offset <uint32> and -Length <uint32> (or use -EraseRegions '0xOFFSET=0xLENGTH')."
         }
-        $eraseRegions.Add([PSCustomObject]@{
+        $queuedEraseRegions.Add([PSCustomObject]@{
             Offset = $Offset
             Length = $Length
             Label  = "Region @ 0x$($Offset.ToString('X6'))"
@@ -1082,7 +1082,7 @@ try {
             }
             $erOff = [Esp32Slip.Flasher.PartitionTableParser]::ParseSizeOrHex($Matches[1])
             $erLen = [Esp32Slip.Flasher.PartitionTableParser]::ParseSizeOrHex($Matches[2])
-            $eraseRegions.Add([PSCustomObject]@{
+            $queuedEraseRegions.Add([PSCustomObject]@{
                 Offset = $erOff
                 Length = $erLen
                 Label  = "Region @ 0x$($erOff.ToString('X6'))"
@@ -1129,9 +1129,9 @@ try {
     # Print plan
     Write-Host "[*] Target Serial Port        : $($portInfo.PortName) ($($portInfo.Description))"
 
-    if ($eraseRegions.Count -gt 0) {
-        Write-Host "[*] Erase Operations Queued   : $($eraseRegions.Count)" -ForegroundColor Yellow
-        foreach ($er in $eraseRegions) {
+    if ($queuedEraseRegions.Count -gt 0) {
+        Write-Host "[*] Erase Operations Queued   : $($queuedEraseRegions.Count)" -ForegroundColor Yellow
+        foreach ($er in $queuedEraseRegions) {
             Write-Host ("    -> ERASE 0x{0:X6} ({1,7:N1} KB) : {2}" -f $er.Offset, ($er.Length / 1024.0), $er.Label) -ForegroundColor Yellow
         }
     }
@@ -1204,7 +1204,7 @@ try {
             }
         }
         else {
-            foreach ($er in $eraseRegions) {
+            foreach ($er in $queuedEraseRegions) {
                 $flasher.EraseFlashRegion($er.Offset, $er.Length, $er.Label)
             }
 
