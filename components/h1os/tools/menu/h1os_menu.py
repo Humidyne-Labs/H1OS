@@ -43,6 +43,11 @@ from h1os_tool import (
 from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
 from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
 
+try:
+    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+except ImportError:
+    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+
 TERM_WIDTH = 78
 
 
@@ -199,23 +204,33 @@ def run_interactive_choice_menu(
 
     frame = build_frame(selected_idx)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-        while True:
-            key = read_nav_key()
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
 
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % total_rows
-                live.update(build_frame(selected_idx), refresh=True)
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % total_rows
-                live.update(build_frame(selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE", "RIGHT"):
-                return options[selected_idx].get("value")
-            elif key in ("B", "ESC", "Q", "QUIT", "CANCEL", "LEFT"):
-                return None
-            else:
-                for opt in options:
-                    if key == opt["key"]:
-                        return opt.get("value")
+                if ev.type == EventType.SCROLL:
+                    selected_idx = (selected_idx - ev.delta) % total_rows
+                    live.update(build_frame(selected_idx), refresh=True)
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_frame(selected_idx), refresh=True)
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_rows
+                        live.update(build_frame(selected_idx), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_rows
+                        live.update(build_frame(selected_idx), refresh=True)
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
+                        return options[selected_idx].get("value")
+                    elif key in ("B", "ESC", "Q", "QUIT", "CANCEL", "LEFT"):
+                        return None
+                    else:
+                        for opt in options:
+                            if key == opt["key"]:
+                                return opt.get("value")
 
 
 def build_header_panel(config: H1OSConfig) -> Panel:
@@ -553,27 +568,38 @@ def run_interactive_menu(
         header_panel = build_header_panel(config)
 
     frame = build_console_frame(config, selected_idx, menu_items, header_panel=header_panel)
+    total_items = len(menu_items)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-        while True:
-            key = read_nav_key()
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
 
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % len(menu_items)
-                live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % len(menu_items)
-                live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
-            elif key in ("ENTER", "SPACE", "RIGHT"):
-                return menu_items[selected_idx]["action"]
-            elif key in ("Q", "ESC", "QUIT"):
-                return "quit"
-            elif key == "LEFT":
-                pass
-            else:
-                # Quick-jump by key
-                for item in menu_items:
-                    if key == item["key"]:
-                        return item["action"]
+                if ev.type == EventType.SCROLL:
+                    selected_idx = (selected_idx - ev.delta) % total_items
+                    live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_items
+                        live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_items
+                        live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
+                        return menu_items[selected_idx]["action"]
+                    elif key in ("Q", "ESC", "QUIT"):
+                        return "quit"
+                    elif key == "LEFT":
+                        pass
+                    else:
+                        # Quick-jump by key
+                        for item in menu_items:
+                            if key == item["key"]:
+                                return item["action"]
 
 
 def run_plain_fallback(config: H1OSConfig) -> str:
@@ -741,25 +767,35 @@ def run_profile_selection_menu(
 
     frame = build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-        while True:
-            key = read_nav_key()
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
 
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % total_rows
-                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % total_rows
-                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
-            elif key in ("ENTER", "SPACE", "RIGHT"):
-                if selected_idx == len(items):
-                    return None
-                return items[selected_idx]["profile"]
-            elif key in ("B", "ESC", "Q", "QUIT", "LEFT"):
-                return None
-            else:
-                for item in items:
-                    if key in (item["key"], item["profile"].upper()):
-                        return item["profile"]
+                if ev.type == EventType.SCROLL:
+                    selected_idx = (selected_idx - ev.delta) % total_rows
+                    live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_rows
+                        live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_rows
+                        live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
+                        if selected_idx == len(items):
+                            return None
+                        return items[selected_idx]["profile"]
+                    elif key in ("B", "ESC", "Q", "QUIT", "LEFT"):
+                        return None
+                    else:
+                        for item in items:
+                            if key in (item["key"], item["profile"].upper()):
+                                return item["profile"]
 
 
 def main():

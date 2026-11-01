@@ -32,6 +32,11 @@ from collections import deque
 from pathlib import Path
 from typing import Deque, List, Optional
 
+# Ensure tools directory is in sys.path
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
 try:
     import serial
     import serial.tools.list_ports
@@ -51,43 +56,10 @@ except ImportError:
     print("[ERROR] rich is required. Install via 'pip install rich'.", file=sys.stderr)
     sys.exit(1)
 
-# Windows Console API structures for native mouse and keyboard input
-if os.name == "nt":
-    import ctypes
-    from ctypes import wintypes
-
-    class COORD(ctypes.Structure):
-        _fields_ = [("X", wintypes.SHORT), ("Y", wintypes.SHORT)]
-
-    class KEY_EVENT_RECORD(ctypes.Structure):
-        _fields_ = [
-            ("bKeyDown", wintypes.BOOL),
-            ("wRepeatCount", wintypes.WORD),
-            ("wVirtualKeyCode", wintypes.WORD),
-            ("wVirtualScanCode", wintypes.WORD),
-            ("UnicodeChar", wintypes.WCHAR),
-            ("dwControlKeyState", wintypes.DWORD),
-        ]
-
-    class MOUSE_EVENT_RECORD(ctypes.Structure):
-        _fields_ = [
-            ("dwMousePosition", COORD),
-            ("dwButtonState", wintypes.DWORD),
-            ("dwControlKeyState", wintypes.DWORD),
-            ("dwEventFlags", wintypes.DWORD),
-        ]
-
-    class EVENT_UNION(ctypes.Union):
-        _fields_ = [
-            ("KeyEvent", KEY_EVENT_RECORD),
-            ("MouseEvent", MOUSE_EVENT_RECORD),
-        ]
-
-    class INPUT_RECORD(ctypes.Structure):
-        _fields_ = [
-            ("EventType", wintypes.WORD),
-            ("Event", EVENT_UNION),
-        ]
+try:
+    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+except ImportError:
+    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
 
 
 # Regex to strip ANSI escape codes for clean disk logging
@@ -693,169 +665,50 @@ class H1OSMonitor:
                 self.live = None
 
     def _input_listener(self):
-        """Cross-platform keyboard and mouse wheel input listener."""
-        if os.name == "nt":
-            self._input_listener_windows()
-        else:
-            self._input_listener_posix()
-
-    def _input_listener_windows(self):
-        """Listen for keyboard and mouse wheel events on Windows via Console API with msvcrt fallback."""
-        kernel32 = ctypes.windll.kernel32
-        GENERIC_READ = 0x80000000
-        GENERIC_WRITE = 0x40000000
-
-        # Open CONIN$ to guarantee true interactive console input handle
-        h_in = kernel32.CreateFileW("CONIN$", GENERIC_READ | GENERIC_WRITE, 1 | 2, None, 3, 0, None)
-        if h_in == -1:
-            h_in = kernel32.GetStdHandle(-10)
-
-        mode = wintypes.DWORD()
-        has_console = kernel32.GetConsoleMode(h_in, ctypes.byref(mode)) != 0
-        orig_mode = mode.value if has_console else 0
-
-        if has_console:
-            # Enable mouse input (0x0010) and extended flags (0x0080), disable quick edit (0x0040)
-            # so mouse wheel and clicks are passed to our application instead of freezing console
-            new_mode = (orig_mode | 0x0010 | 0x0080 | 0x0008) & ~0x0040
-            kernel32.SetConsoleMode(h_in, new_mode)
-
-        try:
-            num_events = wintypes.DWORD()
-            records = (INPUT_RECORD * 32)()
-            read_count = wintypes.DWORD()
-
+        """Cross-platform keyboard, mouse wheel, and window resize input listener."""
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while self.running:
-                if has_console:
-                    kernel32.GetNumberOfConsoleInputEvents(h_in, ctypes.byref(num_events))
-                    if num_events.value > 0:
-                        kernel32.ReadConsoleInputW(
-                            h_in,
-                            ctypes.byref(records),
-                            min(32, num_events.value),
-                            ctypes.byref(read_count),
-                        )
-                        for i in range(read_count.value):
-                            rec = records[i]
-                            # 1. KEY_EVENT
-                            if rec.EventType == 0x0001 and rec.Event.KeyEvent.bKeyDown:
-                                vk = rec.Event.KeyEvent.wVirtualKeyCode
-                                ch = rec.Event.KeyEvent.UnicodeChar.lower()
-                                if vk == 0x21:  # PageUp
-                                    self.scroll_page_up()
-                                elif vk == 0x22:  # PageDown
-                                    self.scroll_page_down()
-                                elif vk == 0x26:  # Up
-                                    self.scroll_up(1)
-                                elif vk == 0x28:  # Down
-                                    self.scroll_down(1)
-                                elif vk == 0x24:  # Home
-                                    self.scroll_home()
-                                elif vk == 0x23:  # End
-                                    self.scroll_end()
-                                elif ch in ("q", "\x1b", "\x03"):
-                                    self.running = False
-                                    break
-                                elif ch == "r":
-                                    self.trigger_hardware_reset()
-                                elif ch == "t":
-                                    self.toggle_timestamps()
-                                elif ch == "l":
-                                    self.toggle_logging()
-                                elif ch == "c":
-                                    self.clear_screen()
-                                elif ch == "b":
-                                    self.scroll_end()
+                ev = dispatcher.get_event(timeout=0.03)
+                if not ev:
+                    continue
 
-                            # 2. MOUSE_EVENT (Wheel)
-                            elif rec.EventType == 0x0002:
-                                ev_flags = rec.Event.MouseEvent.dwEventFlags
-                                # MOUSE_WHEELED is 0x0004
-                                if ev_flags & 0x0004:
-                                    delta = ctypes.c_int16(rec.Event.MouseEvent.dwButtonState >> 16).value
-                                    if delta > 0:
-                                        self.scroll_up(3)  # Scroll up 3 lines per notch
-                                    elif delta < 0:
-                                        self.scroll_down(3)  # Scroll down 3 lines per notch
+                if ev.type == EventType.SCROLL:
+                    if ev.delta > 0:
+                        self.scroll_up(3)
+                    elif ev.delta < 0:
+                        self.scroll_down(3)
 
-                        continue
-                time.sleep(0.02)
-        finally:
-            if has_console and orig_mode:
-                kernel32.SetConsoleMode(h_in, orig_mode)
-            if h_in != -1 and h_in != kernel32.GetStdHandle(-10):
-                kernel32.CloseHandle(h_in)
+                elif ev.type == EventType.RESIZE:
+                    self.dirty = True
+                    self.update_display()
 
-    def _input_listener_posix(self):
-        """Listen for keyboard and mouse wheel events on POSIX/VT terminals via stdin."""
-        import select
-        import termios
-        import tty
-
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setcbreak(fd)
-            # Enable SGR mouse tracking in VT terminal
-            sys.stdout.write("\x1b[?1000h\x1b[?1006h")
-            sys.stdout.flush()
-
-            while self.running:
-                r, _, _ = select.select([sys.stdin], [], [], 0.02)
-                if r:
-                    ch = sys.stdin.read(1)
-                    if ch == "\x1b":
-                        # Check for escape sequences
-                        seq = ""
-                        while select.select([sys.stdin], [], [], 0.002)[0]:
-                            seq += sys.stdin.read(1)
-
-                        # Check for SGR mouse sequences: \x1b[<64;X;YM (Wheel Up) or \x1b[<65;X;YM (Wheel Down)
-                        m_mouse = SGR_MOUSE_RE.match("\x1b" + seq)
-                        if m_mouse:
-                            btn = int(m_mouse.group(1))
-                            if btn == 64:
-                                self.scroll_up(3)
-                            elif btn == 65:
-                                self.scroll_down(3)
-                            continue
-
-                        if seq == "[A":
-                            self.scroll_up(1)
-                        elif seq == "[B":
-                            self.scroll_down(1)
-                        elif seq in ("[5~", "[I"):
-                            self.scroll_page_up()
-                        elif seq in ("[6~", "[G"):
-                            self.scroll_page_down()
-                        elif seq in ("[H", "[1~"):
-                            self.scroll_home()
-                        elif seq in ("[F", "[4~"):
-                            self.scroll_end()
-                        elif not seq:
-                            self.running = False
-                            break
-                        continue
-
-                    key = ch.lower()
-                    if key in ("q", "\x03"):
+                elif ev.type == EventType.KEY:
+                    k = ev.key
+                    if k == "PAGEUP":
+                        self.scroll_page_up()
+                    elif k == "PAGEDOWN":
+                        self.scroll_page_down()
+                    elif k == "UP":
+                        self.scroll_up(1)
+                    elif k == "DOWN":
+                        self.scroll_down(1)
+                    elif k == "HOME":
+                        self.scroll_home()
+                    elif k == "END":
+                        self.scroll_end()
+                    elif k in ("Q", "ESC", "QUIT"):
                         self.running = False
                         break
-                    elif key == "r":
+                    elif k == "R":
                         self.trigger_hardware_reset()
-                    elif key == "t":
+                    elif k == "T":
                         self.toggle_timestamps()
-                    elif key == "l":
+                    elif k == "L":
                         self.toggle_logging()
-                    elif key == "c":
+                    elif k == "C":
                         self.clear_screen()
-                    elif key == "b":
+                    elif k == "B":
                         self.scroll_end()
-        finally:
-            # Disable SGR mouse tracking on exit
-            sys.stdout.write("\x1b[?1000l\x1b[?1006l")
-            sys.stdout.flush()
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
     def close(self):
         """Clean shutdown and resource release."""

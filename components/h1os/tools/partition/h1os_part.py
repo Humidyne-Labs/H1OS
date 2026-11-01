@@ -48,6 +48,11 @@ try:
 except ImportError:
     HAVE_RICH = False
 
+try:
+    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+except ImportError:
+    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+
 TERM_WIDTH = 78
 
 
@@ -458,23 +463,33 @@ def run_sub_choice_menu(
 
     frame = build_frame(selected_idx)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-        while True:
-            key = read_single_key()
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
 
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % total_rows
-                live.update(build_frame(selected_idx), refresh=True)
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % total_rows
-                live.update(build_frame(selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE", "RIGHT"):
-                return options[selected_idx].get("value")
-            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "CANCEL", "LEFT"):
-                return None
-            else:
-                for opt in options:
-                    if key.upper() == opt["key"].upper():
-                        return opt.get("value")
+                if ev.type == EventType.SCROLL:
+                    selected_idx = (selected_idx - ev.delta) % total_rows
+                    live.update(build_frame(selected_idx), refresh=True)
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_frame(selected_idx), refresh=True)
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_rows
+                        live.update(build_frame(selected_idx), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_rows
+                        live.update(build_frame(selected_idx), refresh=True)
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
+                        return options[selected_idx].get("value")
+                    elif key in ("BACK", "QUIT", "ESC", "Q", "B", "CANCEL", "LEFT"):
+                        return None
+                    else:
+                        for opt in options:
+                            if key.upper() == opt["key"].upper():
+                                return opt.get("value")
 
 
 def pause_or_usage_prompt(console: Optional["Console"]) -> str:
@@ -789,25 +804,36 @@ def select_partition_interactive(
 
     frame = build_select_partition_frame(title, partitions, selected_idx)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-        while True:
-            key = read_single_key()
-            if key == "UP":
-                selected_idx = (selected_idx - 1) % total_rows
-                live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
-            elif key == "DOWN":
-                selected_idx = (selected_idx + 1) % total_rows
-                live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE", "RIGHT"):
-                if selected_idx == len(partitions):
-                    return None
-                return partitions[selected_idx]
-            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
-                return None
-            else:
-                if key.isdigit():
-                    val = int(key) - 1
-                    if 0 <= val < len(partitions):
-                        return partitions[val]
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
+
+                if ev.type == EventType.SCROLL:
+                    selected_idx = (selected_idx - ev.delta) % total_rows
+                    live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key == "UP":
+                        selected_idx = (selected_idx - 1) % total_rows
+                        live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+                    elif key == "DOWN":
+                        selected_idx = (selected_idx + 1) % total_rows
+                        live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
+                        if selected_idx == len(partitions):
+                            return None
+                        return partitions[selected_idx]
+                    elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
+                        return None
+                    else:
+                        if key.isdigit():
+                            val = int(key) - 1
+                            if 0 <= val < len(partitions):
+                                return partitions[val]
 
 
 def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] = None) -> None:
@@ -860,27 +886,38 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
             action_key = None
             frame = build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx)
             with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
-                while True:
-                    key = read_single_key()
-                    if key == "UP":
-                        selected_idx = (selected_idx - 1) % total_items
-                        live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
-                    elif key == "DOWN":
-                        selected_idx = (selected_idx + 1) % total_items
-                        live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
-                    elif key in ("ENTER", "SPACE", "RIGHT"):
-                        action_key = MENU_ITEMS[selected_idx]["key"]
-                        break
-                    elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
-                        action_key = "B"
-                        break
-                    else:
-                        for item in MENU_ITEMS:
-                            if key == item["key"]:
-                                action_key = item["key"]
+                with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+                    while True:
+                        ev = dispatcher.get_event(timeout=0.05)
+                        if not ev:
+                            continue
+
+                        if ev.type == EventType.SCROLL:
+                            selected_idx = (selected_idx - ev.delta) % total_items
+                            live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                        elif ev.type == EventType.RESIZE:
+                            live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                        elif ev.type == EventType.KEY:
+                            key = ev.key
+                            if key == "UP":
+                                selected_idx = (selected_idx - 1) % total_items
+                                live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                            elif key == "DOWN":
+                                selected_idx = (selected_idx + 1) % total_items
+                                live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
+                            elif key in ("ENTER", "SPACE", "RIGHT"):
+                                action_key = MENU_ITEMS[selected_idx]["key"]
                                 break
-                        if action_key:
-                            break
+                            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
+                                action_key = "B"
+                                break
+                            else:
+                                for item in MENU_ITEMS:
+                                    if key == item["key"]:
+                                        action_key = item["key"]
+                                        break
+                                if action_key:
+                                    break
 
         # Dispatch action
         if action_key in ("B", "BACK", "Q", "QUIT", "ESC"):
