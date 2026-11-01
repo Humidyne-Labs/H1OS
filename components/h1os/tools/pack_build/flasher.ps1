@@ -704,13 +704,14 @@ namespace Esp32Slip.Flasher
                 Buffer.BlockCopy(data, (int)blockOffset, blockData, 0, (int)thisBlockSize);
 
                 byte[] dataPayload = new byte[16 + FLASH_BLOCK_SIZE];
-                Buffer.BlockCopy(BitConverter.GetBytes(thisBlockSize), 0, dataPayload, 0,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes(seq),           0, dataPayload, 4,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes(0u),            0, dataPayload, 8,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes(0u),            0, dataPayload, 12, 4);
-                Buffer.BlockCopy(blockData, 0, dataPayload, 16, FLASH_BLOCK_SIZE);
+                Buffer.BlockCopy(BitConverter.GetBytes((uint)FLASH_BLOCK_SIZE), 0, dataPayload, 0,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(seq),                    0, dataPayload, 4,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(0u),                     0, dataPayload, 8,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(0u),                     0, dataPayload, 12, 4);
+                Buffer.BlockCopy(blockData,                                     0, dataPayload, 16, FLASH_BLOCK_SIZE);
 
-                ExecuteCommand(ESP_FLASH_DATA, dataPayload, 0, 4000, out val);
+                uint checksum = ComputeBlockChecksum(blockData);
+                ExecuteCommand(ESP_FLASH_DATA, dataPayload, checksum, 4000, out val);
 
                 int pct = (int)(((seq + 1) * 100) / numBlocks);
                 double elapsedSec = sw.Elapsed.TotalSeconds;
@@ -849,11 +850,25 @@ namespace Esp32Slip.Flasher
 
                             if (decoded.Length >= 8 && decoded[0] == 0x01 && decoded[1] == op)
                             {
-                                byte status = (decoded.Length >= 10) ? decoded[decoded.Length - 2] : (byte)0;
-                                byte err = (decoded.Length >= 10) ? decoded[decoded.Length - 1] : (byte)0;
+                                byte status = 0;
+                                byte err = 0;
+                                if (decoded.Length >= 12)
+                                {
+                                    // ESP32-S3 ROM returns [status, err, 0, 0] at end of response packet
+                                    status = decoded[decoded.Length - 4];
+                                    err = decoded[decoded.Length - 3];
+                                }
+                                else if (decoded.Length >= 10)
+                                {
+                                    status = decoded[decoded.Length - 2];
+                                    err = decoded[decoded.Length - 1];
+                                }
+
                                 if (status != 0)
                                 {
-                                    throw new Exception(string.Format("ROM command 0x{0:X2} failed with status 0x{1:X2}, err 0x{2:X2}.", op, status, err));
+                                    uint fullErr = (uint)((status << 8) | err);
+                                    string desc = GetRomErrorDescription(fullErr);
+                                    throw new Exception(string.Format("ROM command 0x{0:X2} failed with status 0x{1:X2}, err 0x{2:X2} ({3}).", op, status, err, desc));
                                 }
                                 return decoded;
                             }
@@ -918,6 +933,31 @@ namespace Esp32Slip.Flasher
                 }
             }
             return outList.ToArray();
+        }
+
+        public static uint ComputeBlockChecksum(byte[] data)
+        {
+            uint state = 0xEF;
+            for (int i = 0; i < data.Length; i++)
+            {
+                state ^= data[i];
+            }
+            return state;
+        }
+
+        public static string GetRomErrorDescription(uint code)
+        {
+            switch (code)
+            {
+                case 0x101: return "Invalid parameter";
+                case 0x102: return "Out of memory";
+                case 0x105: return "Invalid message format";
+                case 0x106: return "Message OK, execution error";
+                case 0x107: return "Checksum error";
+                case 0x108: return "Flash write error";
+                case 0x109: return "Flash read error";
+                default:    return string.Format("Error 0x{0:X}", code);
+            }
         }
 
         public static string ComputeHostMd5Hex(byte[] data)
