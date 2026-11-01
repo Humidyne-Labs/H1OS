@@ -406,11 +406,13 @@ def main():
     if flash_bat.exists():
         shutil.copy2(flash_bat, dist_root / "flash.bat")
 
-    # Step 6: Deploy README.txt documentation
-    readme_src = script_dir / "README.md"
-    if readme_src.exists():
-        shutil.copy2(readme_src, dist_root / "README.txt")
-        shutil.copy2(readme_src, dist_root / "README.md")
+    # Step 6: Deploy README documentation
+    readme_md = script_dir / "README.md"
+    if readme_md.exists():
+        shutil.copy2(readme_md, dist_root / "README.md")
+    readme_txt = script_dir / "README.txt"
+    if readme_txt.exists():
+        shutil.copy2(readme_txt, dist_root / "README.txt")
 
     # Step 7: Compute SHA-256 Checksums
     checksums_file = dist_root / "checksums.sha256"
