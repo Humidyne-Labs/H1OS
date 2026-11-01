@@ -349,11 +349,12 @@ def restore_default_console_mode() -> None:
                 # Enable quick-edit (0x0040) and extended flags (0x0080)
                 clean_mode = (mode.value & ~0x0010 & ~0x0008) | 0x0040 | 0x0080
                 kernel32.SetConsoleMode(h_in, clean_mode)
-    try:
-        sys.stdout.write("\x1b[?1006l\x1b[?1000l")
-        sys.stdout.flush()
-    except Exception:
-        pass
+    else:
+        try:
+            sys.stdout.write("\x1b[?1006l\x1b[?1000l")
+            sys.stdout.flush()
+        except Exception:
+            pass
 
 
 def get_single_key(timeout: Optional[float] = None) -> str:

@@ -6,6 +6,7 @@ Provides canonical hexdump formatting for text logs and an interactive
 smooth Live terminal hex inspector with mouse wheel scrolling and keyboard navigation.
 """
 
+import shutil
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -19,6 +20,8 @@ try:
     from rich.console import Console, Group
     from rich.live import Live
     from rich.table import Table
+    from rich.panel import Panel
+    from rich.align import Align
     from rich import box
     from rich.text import Text
     HAVE_RICH = True
@@ -87,37 +90,50 @@ def render_live_hex_view(
             print(f"... ({len(data) - 512} additional bytes omitted from console preview) ...\n")
         return
 
-    ROWS_PER_SCREEN = 16  # 16 rows = 256 bytes per screen
+    def calc_rows_per_screen() -> int:
+        _, term_rows = shutil.get_terminal_size((80, 24))
+        # Account for header panel (~4 lines), footer (~2 lines), and borders (~3 lines)
+        return max(6, min(32, term_rows - 9))
+
+    rows_per_screen = calc_rows_per_screen()
     total_bytes = len(data)
     total_rows = max(1, (total_bytes + 15) // 16)
-    max_row = max(0, total_rows - ROWS_PER_SCREEN)
+    max_row = max(0, total_rows - rows_per_screen)
     current_row = 0
 
     def build_hex_frame(row_idx: int) -> Group:
         start_byte = row_idx * 16
-        end_byte = min(total_bytes, start_byte + (ROWS_PER_SCREEN * 16))
+        end_byte = min(total_bytes, start_byte + (rows_per_screen * 16))
         chunk = data[start_byte:end_byte]
 
         pct = int((row_idx / max(1, max_row)) * 100) if max_row > 0 else 100
         title_text = (
-            f"[bold white]Partition Hex Inspector: [/][bold cyan]{partition_name}[/] "
-            f"([dim]{total_bytes:,} bytes total[/])"
+            f"[bold cyan]Partition Hex Inspector:[/] [bold white]{partition_name}[/] "
+            f"[dim]({total_bytes:,} bytes total)[/]"
         )
         subtitle_text = (
             f"[dim]Offset: 0x{base_offset + start_byte:08X} - 0x{base_offset + max(start_byte, end_byte - 1):08X} | "
             f"Row {row_idx + 1} of {total_rows} ({pct}%)[/]"
         )
 
+        header_panel = Panel(
+            Align.center(f"{title_text}\n{subtitle_text}"),
+            box=box.ROUNDED,
+            border_style="cyan",
+            padding=(0, 1),
+            expand=True,
+        )
+
         table = Table(
             box=box.ROUNDED,
-            title=f"{title_text}\n{subtitle_text}",
             header_style="bold bright_cyan",
             pad_edge=False,
             show_lines=False,
+            expand=True,
         )
-        table.add_column("Offset", style="dim", justify="right")
-        table.add_column("Hex Bytes (00-0F)", style="bold white")
-        table.add_column("ASCII", style="green")
+        table.add_column("Offset", style="dim", justify="right", ratio=2)
+        table.add_column("Hex Bytes (00-0F)", style="bold white", ratio=5)
+        table.add_column("ASCII", style="green", ratio=3)
 
         for offset in range(0, len(chunk), 16):
             row_chunk = chunk[offset:offset + 16]
@@ -139,10 +155,13 @@ def render_live_hex_view(
             "  [↑/↓/MouseWheel] Row   [PgUp/PgDn] Page   [Home/End] Jump   [←/Esc/Q] Back",
             style="dim",
         )
-        return Group(table, footer)
+        return Group(header_panel, table, footer)
+
+    if console:
+        console.clear()
 
     frame = build_hex_frame(current_row)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
@@ -158,6 +177,9 @@ def render_live_hex_view(
                     live.update(build_hex_frame(current_row), refresh=True)
 
                 elif ev.type == EventType.RESIZE:
+                    rows_per_screen = calc_rows_per_screen()
+                    max_row = max(0, total_rows - rows_per_screen)
+                    current_row = min(current_row, max_row)
                     live.update(build_hex_frame(current_row), refresh=True)
 
                 elif ev.type == EventType.KEY:
@@ -171,10 +193,10 @@ def render_live_hex_view(
                         current_row = min(max_row, current_row + 1)
                         live.update(build_hex_frame(current_row), refresh=True)
                     elif key in ("PAGEUP", "PGUP"):
-                        current_row = max(0, current_row - ROWS_PER_SCREEN)
+                        current_row = max(0, current_row - rows_per_screen)
                         live.update(build_hex_frame(current_row), refresh=True)
                     elif key in ("PAGEDOWN", "PGDN", "SPACE"):
-                        current_row = min(max_row, current_row + ROWS_PER_SCREEN)
+                        current_row = min(max_row, current_row + rows_per_screen)
                         live.update(build_hex_frame(current_row), refresh=True)
                     elif key == "HOME":
                         current_row = 0

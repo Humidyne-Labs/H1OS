@@ -6,6 +6,8 @@ Thin, zero-fallback execution layer wrapping ESP-IDF's parttool.py and otatool.p
 Handles live progress streaming, clean OTA state parsing, and firmware image introspection.
 """
 
+import binascii
+from dataclasses import dataclass
 import os
 import re
 import struct
@@ -22,6 +24,111 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from h1os_tool import H1OSConfig
+
+
+@dataclass
+class PartitionEntry:
+    name: str
+    type: str
+    subtype: str
+    offset: int
+    size: int
+    flags: str = ""
+
+    @property
+    def end_offset(self) -> int:
+        return self.offset + self.size
+
+    @property
+    def size_kb(self) -> float:
+        return self.size / 1024.0
+
+    @property
+    def size_mb(self) -> float:
+        return self.size / (1024.0 * 1024.0)
+
+    @property
+    def formatted_size(self) -> str:
+        if self.size >= 1024 * 1024 and (self.size % (1024 * 1024) == 0):
+            return f"{self.size // (1024 * 1024)} MB"
+        if self.size >= 1024:
+            return f"{self.size // 1024} KB"
+        return f"{self.size} B"
+
+
+def parse_size_str(val: str) -> int:
+    """Parse size string with optional hex, K, or M suffix."""
+    v = val.strip().upper()
+    if v.startswith("0X"):
+        return int(v, 16)
+    if v.endswith("MB") or v.endswith("M"):
+        num_str = v.rstrip("MB").rstrip("M")
+        return int(num_str) * 1024 * 1024
+    if v.endswith("KB") or v.endswith("K"):
+        num_str = v.rstrip("KB").rstrip("K")
+        return int(num_str) * 1024
+    return int(v)
+
+
+def parse_offset_str(val: str) -> Optional[int]:
+    """Parse offset string (usually hex like 0x9000)."""
+    v = val.strip()
+    if not v:
+        return None
+    if v.lower().startswith("0x"):
+        return int(v, 16)
+    return int(v)
+
+
+def parse_csv_partitions(csv_path: Path, table_offset: int = 0x8000) -> List[PartitionEntry]:
+    """Parse CSV partition table and auto-compute contiguous offsets if omitted."""
+    if not csv_path or not csv_path.is_file():
+        return []
+
+    partitions = []
+    # ESP-IDF default: first partition starts at table_offset + 0x1000
+    current_offset = table_offset + 0x1000
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        for line in f:
+            clean = line.strip()
+            if not clean or clean.startswith("#"):
+                continue
+
+            parts = [p.strip() for p in clean.split(",")]
+            if len(parts) < 5:
+                continue
+
+            name = parts[0]
+            ptype = parts[1].lower()
+            subtype = parts[2].lower()
+            offset_raw = parts[3]
+            size_raw = parts[4]
+            flags = parts[5].strip() if len(parts) > 5 else ""
+
+            size = parse_size_str(size_raw)
+            explicit_offset = parse_offset_str(offset_raw)
+
+            if explicit_offset is not None:
+                offset = explicit_offset
+                current_offset = offset + size
+            else:
+                align = 0x10000 if ptype == "app" else 0x1000
+                if current_offset % align != 0:
+                    current_offset += align - (current_offset % align)
+                offset = current_offset
+                current_offset += size
+
+            partitions.append(PartitionEntry(
+                name=name,
+                type=ptype,
+                subtype=subtype,
+                offset=offset,
+                size=size,
+                flags=flags,
+            ))
+
+    return partitions
 
 
 def find_tool(tool_name: str, comp_subpath: str) -> Optional[Path]:
@@ -215,38 +322,169 @@ def execute_parttool_write(
         return False, f"Failed to execute parttool write: {e}"
 
 
+def parse_raw_otadata(raw: bytes) -> Dict[str, Any]:
+    """Parse sequence numbers, CRC validity, and active slot from 8192-byte otadata buffer."""
+    if len(raw) < 8192:
+        raw = raw.ljust(8192, b"\xFF")
+
+    sec0 = raw[:4096]
+    sec1 = raw[4096:8192]
+
+    s0 = struct.unpack("<I", sec0[0:4])[0]
+    c0 = struct.unpack("<I", sec0[28:32])[0]
+    expected_c0 = binascii.crc32(sec0[0:4], 0xFFFFFFFF) % (1 << 32)
+    valid0 = (s0 != 0xFFFFFFFF and c0 == expected_c0)
+
+    s1 = struct.unpack("<I", sec1[0:4])[0]
+    c1 = struct.unpack("<I", sec1[28:32])[0]
+    expected_c1 = binascii.crc32(sec1[0:4], 0xFFFFFFFF) % (1 << 32)
+    valid1 = (s1 != 0xFFFFFFFF and c1 == expected_c1)
+
+    if valid0 and valid1:
+        active_seq = max(s0, s1)
+        active_slot = (active_seq - 1) % 2
+    elif valid0:
+        active_slot = (s0 - 1) % 2
+    elif valid1:
+        active_slot = (s1 - 1) % 2
+    else:
+        active_slot = 0
+
+    return {
+        "valid0": valid0,
+        "valid1": valid1,
+        "seq0": s0,
+        "crc0": c0,
+        "seq1": s1,
+        "crc1": c1,
+        "active_slot": active_slot,
+    }
+
+
+def read_otadata_bytes(
+    config: H1OSConfig,
+    port: Optional[str] = None,
+    baud: Optional[int] = None,
+) -> Tuple[bool, bytes]:
+    """Read raw 8192-byte otadata partition from target device."""
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tf:
+        temp_path = Path(tf.name)
+
+    # 1. Try reading via parttool by partition name 'otadata'
+    ok, _ = execute_parttool_read(config, "otadata", temp_path, port=port, baud=baud)
+    if ok and temp_path.is_file() and temp_path.stat().st_size >= 8192:
+        data = temp_path.read_bytes()[:8192]
+        temp_path.unlink(missing_ok=True)
+        return True, data
+
+    temp_path.unlink(missing_ok=True)
+
+    # 2. Direct physical flash read fallback
+    otadata_offset = 0x1D000
+    if config.partition_file and config.partition_file.is_file():
+        parts = parse_csv_partitions(config.partition_file)
+        for p in parts:
+            if p.name == "otadata" or (p.type == "data" and p.subtype == "ota"):
+                otadata_offset = p.offset
+                break
+
+    ok_flash, data = read_flash_header(config, otadata_offset, size=8192, port=port, baud=baud)
+    if ok_flash and len(data) >= 8192:
+        return True, data[:8192]
+
+    return False, b""
+
+
+def write_otadata_bytes(
+    config: H1OSConfig,
+    data: bytes,
+    port: Optional[str] = None,
+    baud: Optional[int] = None,
+) -> Tuple[bool, str]:
+    """Write 8192 bytes directly to otadata partition on target device."""
+    if len(data) != 8192:
+        data = data.ljust(8192, b"\xFF")[:8192]
+
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tf:
+        tf.write(data)
+        tf.flush()
+        temp_path = Path(tf.name)
+
+    try:
+        # 1. Try writing via parttool by partition name 'otadata'
+        ok, msg = execute_parttool_write(config, "otadata", temp_path, port=port, baud=baud)
+        if ok:
+            temp_path.unlink(missing_ok=True)
+            return True, "Successfully wrote otadata via parttool."
+
+        # 2. Direct flash write fallback via esptool
+        otadata_offset = 0x1D000
+        if config.partition_file and config.partition_file.is_file():
+            parts = parse_csv_partitions(config.partition_file)
+            for p in parts:
+                if p.name == "otadata" or (p.type == "data" and p.subtype == "ota"):
+                    otadata_offset = p.offset
+                    break
+
+        target_port = (port or config.port or "").strip()
+        target_baud = str(baud or config.baud or 460800)
+        cmd = [get_python_exe(), "-m", "esptool"]
+        if target_port:
+            cmd.extend(["--port", target_port])
+        if target_baud:
+            cmd.extend(["--baud", target_baud])
+        cmd.extend(["write-flash", hex(otadata_offset), str(temp_path)])
+
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        temp_path.unlink(missing_ok=True)
+        if res.returncode == 0:
+            return True, f"Successfully wrote otadata to flash at 0x{otadata_offset:X}."
+        err_out = res.stderr.strip() or res.stdout.strip()
+        return False, f"esptool write-flash failed (code {res.returncode}):\n{err_out}"
+    except Exception as e:
+        temp_path.unlink(missing_ok=True)
+        return False, f"Exception while writing otadata: {e}"
+
+
 def execute_otatool_read(
     config: H1OSConfig,
     port: Optional[str] = None,
     baud: Optional[int] = None,
 ) -> Tuple[bool, str]:
-    """Read raw OTA state machine status via otatool.py."""
-    tool = get_otatool_path()
-    if not tool:
-        return False, "Could not locate 'otatool.py'. Ensure ESP-IDF is installed."
+    """Read raw OTA state machine status with zero-guesswork native fallback."""
+    ok, data = read_otadata_bytes(config, port=port, baud=baud)
+    if not ok:
+        # If reading fails, try official otatool script as secondary attempt
+        tool = get_otatool_path()
+        if tool:
+            target_port = (port or config.port or "").strip()
+            target_baud = str(baud or config.baud or 460800)
+            cmd = [get_python_exe(), str(tool)]
+            if target_port:
+                cmd.extend(["--port", target_port])
+            if target_baud:
+                cmd.extend(["--baud", target_baud])
+            cmd.append("read_otadata")
+            try:
+                res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                if res.returncode == 0 and res.stdout.strip():
+                    return True, res.stdout.strip()
+            except Exception:
+                pass
+        return False, "Could not read otadata partition from device (check serial connection and port)."
 
-    target_port = (port or config.port or "").strip()
-    target_baud = str(baud or config.baud or 460800)
+    parsed = parse_raw_otadata(data)
+    s0_hex = f"0x{parsed['seq0']:08X}"
+    c0_hex = f"0x{parsed['crc0']:08X}"
+    s1_hex = f"0x{parsed['seq1']:08X}"
+    c1_hex = f"0x{parsed['crc1']:08X}"
+    act = parsed["active_slot"]
 
-    cmd = [get_python_exe(), str(tool)]
-    if target_port:
-        cmd.extend(["--port", target_port])
-    if target_baud:
-        cmd.extend(["--baud", target_baud])
-
-    if config.partition_file and config.partition_file.is_file():
-        cmd.extend(["--partition-table-file", str(config.partition_file)])
-
-    cmd.append("read_otadata")
-
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        out = res.stdout.strip() or res.stderr.strip()
-        if res.returncode == 0:
-            return True, out
-        return False, f"otatool read_otadata failed (code {res.returncode}):\n{out}"
-    except Exception as e:
-        return False, f"Failed to execute otatool: {e}"
+    summary = (
+        f"Firmware: {s0_hex} {c0_hex} | {s1_hex} {c1_hex}\n"
+        f"Boot Target: ota_{act} (Slot {act})"
+    )
+    return True, summary
 
 
 def parse_otadata_info(output: str) -> Dict[str, Any]:
@@ -309,32 +547,40 @@ def execute_otatool_switch(
     baud: Optional[int] = None,
 ) -> Tuple[bool, str]:
     """Switch active OTA boot partition slot (0 or 1)."""
-    tool = get_otatool_path()
-    if not tool:
-        return False, "Could not locate 'otatool.py'. Ensure ESP-IDF is installed."
+    ok, current_data = read_otadata_bytes(config, port=port, baud=baud)
+    if not ok or len(current_data) < 8192:
+        current_data = b"\xFF" * 8192
 
-    target_port = (port or config.port or "").strip()
-    target_baud = str(baud or config.baud or 460800)
+    parsed = parse_raw_otadata(current_data)
+    max_valid = 0
+    if parsed["valid0"]:
+        max_valid = max(max_valid, parsed["seq0"])
+    if parsed["valid1"]:
+        max_valid = max(max_valid, parsed["seq1"])
 
-    cmd = [get_python_exe(), str(tool)]
-    if target_port:
-        cmd.extend(["--port", target_port])
-    if target_baud:
-        cmd.extend(["--baud", target_baud])
+    next_seq = max_valid + 1
+    while (next_seq - 1) % 2 != target_slot:
+        next_seq += 1
 
-    if config.partition_file and config.partition_file.is_file():
-        cmd.extend(["--partition-table-file", str(config.partition_file)])
+    # Choose alternate sector
+    sec_idx = 1 if (parsed["valid0"] and parsed["seq0"] >= max_valid) else 0
 
-    cmd.extend(["switch_ota_partition", "--slot", str(target_slot)])
+    new_sec = bytearray(b"\xFF" * 4096)
+    seq_bytes = struct.pack("<I", next_seq)
+    crc = binascii.crc32(seq_bytes, 0xFFFFFFFF) % (1 << 32)
+    new_sec[0:4] = seq_bytes
+    new_sec[28:32] = struct.pack("<I", crc)
 
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if res.returncode == 0:
-            return True, f"Successfully switched active boot partition to slot {target_slot} (ota_{target_slot})."
-        err_msg = res.stderr.strip() or res.stdout.strip()
-        return False, f"otatool switch failed (code {res.returncode}):\n{err_msg}"
-    except Exception as e:
-        return False, f"Failed to execute otatool switch: {e}"
+    out = bytearray(current_data.ljust(8192, b"\xFF"))
+    if sec_idx == 0:
+        out[0:4096] = new_sec
+    else:
+        out[4096:8192] = new_sec
+
+    ok_w, msg_w = write_otadata_bytes(config, bytes(out), port=port, baud=baud)
+    if ok_w:
+        return True, f"Successfully switched active boot partition to slot {target_slot} (ota_{target_slot}, sequence {next_seq})."
+    return False, f"Failed writing otadata partition: {msg_w}"
 
 
 def parse_active_ota_slot(output: str, num_slots: int = 2) -> int:

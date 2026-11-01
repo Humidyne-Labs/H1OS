@@ -23,6 +23,10 @@ if str(TOOLS_DIR) not in sys.path:
 
 from h1os_tool import H1OSConfig, H1OS_TOOLING_VERSION, check_tooling_dependencies
 from partition.part_backend import (
+    PartitionEntry,
+    parse_size_str,
+    parse_offset_str,
+    parse_csv_partitions,
     execute_parttool_erase,
     execute_parttool_read,
     execute_parttool_write,
@@ -61,110 +65,39 @@ VERSION = H1OS_TOOLING_VERSION
 TERM_WIDTH = 78
 
 
-@dataclass
-class PartitionEntry:
-    name: str
-    type: str
-    subtype: str
-    offset: int
-    size: int
-    flags: str = ""
+def build_partition_header_panel(
+    part_file: Optional[Path],
+    partitions: List[PartitionEntry],
+    config: Optional[H1OSConfig] = None,
+    flash_size_bytes: int = 0x800000,
+) -> Panel:
+    """Build standardized header panel matching H1OS console aesthetic standard."""
+    header_table = Table.grid(expand=True)
+    header_table.add_column(style="bold cyan", ratio=1)
+    header_table.add_column(style="bold white", ratio=2)
+    header_table.add_column(style="bold cyan", ratio=1)
+    header_table.add_column(style="bold white", ratio=2)
 
-    @property
-    def end_offset(self) -> int:
-        return self.offset + self.size
+    total_part = sum(p.size for p in partitions)
+    cov_pct = (total_part / flash_size_bytes) * 100.0 if flash_size_bytes else 0.0
+    f_mb = flash_size_bytes / (1024.0 * 1024.0)
 
-    @property
-    def size_kb(self) -> float:
-        return self.size / 1024.0
+    t_name = part_file.name if part_file else "partitions.csv"
+    p_info = f"{t_name} ({len(partitions)} discovered)"
+    s_info = (config.chip.upper() if config and config.chip else "ESP32S3")
+    port_str = (config.port if config and config.port else "Auto-discover")
+    baud_val = (config.baud if config and config.baud else 460800)
 
-    @property
-    def size_mb(self) -> float:
-        return self.size / (1024.0 * 1024.0)
+    header_table.add_row("Table:", p_info, "Silicon:", s_info)
+    header_table.add_row("Flash:", f"{f_mb:.3f} MB ({cov_pct:.1f}% Partitioned)", "Serial:", f"{port_str} @ {baud_val}")
 
-    @property
-    def formatted_size(self) -> str:
-        if self.size >= 1024 * 1024 and (self.size % (1024 * 1024) == 0):
-            return f"{self.size // (1024 * 1024)} MB"
-        if self.size >= 1024:
-            return f"{self.size // 1024} KB"
-        return f"{self.size} B"
-
-
-def parse_size_str(val: str) -> int:
-    """Parse size string with optional hex, K, or M suffix."""
-    v = val.strip().upper()
-    if v.startswith("0X"):
-        return int(v, 16)
-    if v.endswith("MB") or v.endswith("M"):
-        num_str = v.rstrip("MB").rstrip("M")
-        return int(num_str) * 1024 * 1024
-    if v.endswith("KB") or v.endswith("K"):
-        num_str = v.rstrip("KB").rstrip("K")
-        return int(num_str) * 1024
-    return int(v)
-
-
-def parse_offset_str(val: str) -> Optional[int]:
-    """Parse offset string (usually hex like 0x9000)."""
-    v = val.strip()
-    if not v:
-        return None
-    if v.lower().startswith("0x"):
-        return int(v, 16)
-    return int(v)
-
-
-def parse_csv_partitions(csv_path: Path, table_offset: int = 0x8000) -> List[PartitionEntry]:
-    """Parse CSV partition table and auto-compute contiguous offsets if omitted."""
-    if not csv_path.is_file():
-        return []
-
-    partitions = []
-    # ESP-IDF default: first partition starts at table_offset + 0x1000
-    current_offset = table_offset + 0x1000
-
-    with open(csv_path, "r", encoding="utf-8") as f:
-        for line in f:
-            clean = line.strip()
-            if not clean or clean.startswith("#"):
-                continue
-
-            parts = [p.strip() for p in clean.split(",")]
-            if len(parts) < 5:
-                continue
-
-            name = parts[0]
-            ptype = parts[1].lower()
-            subtype = parts[2].lower()
-            offset_raw = parts[3]
-            size_raw = parts[4]
-            flags = parts[5].strip() if len(parts) > 5 else ""
-
-            size = parse_size_str(size_raw)
-            explicit_offset = parse_offset_str(offset_raw)
-
-            if explicit_offset is not None:
-                offset = explicit_offset
-                current_offset = offset + size
-            else:
-                # Alignment rules: app requires 64KB (0x10000), data requires 4KB (0x1000)
-                align = 0x10000 if ptype == "app" else 0x1000
-                if current_offset % align != 0:
-                    current_offset += align - (current_offset % align)
-                offset = current_offset
-                current_offset += size
-
-            partitions.append(PartitionEntry(
-                name=name,
-                type=ptype,
-                subtype=subtype,
-                offset=offset,
-                size=size,
-                flags=flags,
-            ))
-
-    return partitions
+    return Panel(
+        header_table,
+        title="[bold white]H1OS Flash Partition Manager[/]",
+        border_style="cyan",
+        box=box.ROUNDED,
+        expand=True,
+    )
 
 
 def audit_partition_invariants(
@@ -260,6 +193,7 @@ def render_partition_table_rich(
     flash_size_bytes: int = 0x800000,
     console: Optional["Console"] = None,
     source_label: str = "partitions.csv",
+    config: Optional[H1OSConfig] = None,
 ) -> None:
     """Render formatted Rich table of discovered partitions and alignment health."""
     if not HAVE_RICH or not console:
@@ -270,10 +204,14 @@ def render_partition_table_rich(
         print(f"\n{summary}\n")
         return
 
+    part_p = Path(source_label) if source_label else None
+    header_panel = build_partition_header_panel(part_p, partitions, config, flash_size_bytes)
+    console.print(header_panel)
+
     table = Table(
         box=box.ROUNDED,
         header_style="bold bright_cyan",
-        title=f"[bold white]Physical Flash Partition Map[/]\n[dim]Source: {source_label}[/]",
+        title="[bold cyan]— Physical Flash Partition Map —[/]",
         show_lines=False,
         pad_edge=False,
         expand=True,
@@ -306,7 +244,7 @@ def render_partition_table_rich(
         title="[bold cyan]Flash Memory Allocation[/]",
         border_style="cyan",
         box=box.ROUNDED,
-        width=TERM_WIDTH,
+        expand=True,
     )
     console.print(panel)
 
@@ -399,7 +337,7 @@ def run_sub_choice_menu(
         return Group(sub_table, footer)
 
     frame = build_frame(selected_idx)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
@@ -675,14 +613,11 @@ def build_partition_menu_frame(
     selected_idx: int,
 ) -> Group:
     """Build partition manager operations menu frame."""
+    header_panel = build_partition_header_panel(part_file, partitions, config)
+
     sub_table = Table(
         box=box.ROUNDED,
         header_style="bold bright_cyan",
-        title=(
-            f"[bold white]H1OS Flash Partition Manager[/]\n"
-            f"[dim]Table: {part_file.name if part_file else 'None'} ({len(partitions)} auto-discovered partitions) | "
-            f"Port: {config.port or 'Auto-detect'}[/]"
-        ),
         show_lines=False,
         pad_edge=False,
         expand=True,
@@ -706,7 +641,7 @@ def build_partition_menu_frame(
         )
 
     footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Back   [1-8/B] Quick-Key", style="dim")
-    return Group(sub_table, footer)
+    return Group(header_panel, sub_table, footer)
 
 
 def select_partition_interactive(
@@ -740,7 +675,7 @@ def select_partition_interactive(
     total_rows = len(partitions) + 1  # partitions + Back
 
     frame = build_select_partition_frame(title, partitions, selected_idx)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
@@ -822,7 +757,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
             clear_screen()
             action_key = None
             frame = build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx)
-            with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+            with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
                 with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
                     while True:
                         ev = dispatcher.get_event(timeout=0.05)
@@ -869,6 +804,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                 flash_size_bytes=0x800000,
                 console=console,
                 source_label=str(part_file),
+                config=config,
             )
             choice = pause_or_usage_prompt(console)
             if choice == "U":
@@ -1241,7 +1177,7 @@ def main():
     partitions = parse_csv_partitions(part_file) if part_file and part_file.is_file() else []
 
     if args.map:
-        render_partition_table_rich(partitions, console=console, source_label=str(part_file))
+        render_partition_table_rich(partitions, console=console, source_label=str(part_file), config=config)
         return
 
     if args.live_usage:

@@ -112,10 +112,15 @@ def run_interactive_choice_menu(
     total_rows = len(options)
 
     def build_frame(idx: int) -> Group:
+        title_str = (
+            f"[bold cyan]— {title} —[/]  [dim]({subtitle})[/]"
+            if header_panel
+            else f"[bold white]{title}[/]\n[dim]{subtitle}[/]"
+        )
         sub_table = Table(
             box=box.ROUNDED,
             header_style="bold bright_cyan",
-            title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
+            title=title_str,
             show_lines=False,
             pad_edge=False,
             expand=True,
@@ -146,7 +151,7 @@ def run_interactive_choice_menu(
         return Group(sub_table, footer)
 
     frame = build_frame(selected_idx)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
@@ -511,7 +516,7 @@ def run_interactive_menu(
 
     frame = build_console_frame(config, selected_idx, menu_items, header_panel=header_panel)
     total_items = len(menu_items)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
@@ -713,7 +718,7 @@ def run_profile_selection_menu(
     total_rows = len(items) + 1  # items + Back entry
 
     frame = build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel)
-    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True, vertical_overflow="crop") as live:
         with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
             while True:
                 ev = dispatcher.get_event(timeout=0.05)
