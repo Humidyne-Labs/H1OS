@@ -476,6 +476,11 @@ class H1OSMonitor:
         log_badge = f"[bold green]ACTIVE[/] [dim]({self.log_path.name})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
 
         log_dir_str = str(self.log_dir)
+        try:
+            rel = self.log_dir.relative_to(Path.cwd())
+            log_dir_str = str(rel)
+        except ValueError:
+            pass
         if len(log_dir_str) > 28:
             log_dir_str = "..." + log_dir_str[-25:]
 

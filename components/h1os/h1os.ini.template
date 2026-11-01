@@ -72,3 +72,5 @@ chip = esp32s3
 port = 
 # Flashing communication baud rate
 baud = 460800
+# Destination directory for serial monitor session logs (independent of build dirs, default: logs)
+log_dir = logs
