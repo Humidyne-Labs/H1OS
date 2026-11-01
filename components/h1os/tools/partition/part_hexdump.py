@@ -3,20 +3,32 @@
 H1OS Hex Dump Formatter & Interactive Terminal Viewer
 =====================================================
 Provides canonical hexdump formatting for text logs and an interactive
-paginated terminal hex inspector for rapid non-destructive diagnostics.
+smooth Live terminal hex inspector with mouse wheel scrolling and keyboard navigation.
 """
 
 import sys
+from pathlib import Path
 from typing import List, Optional
 
+# Ensure tools directory is in sys.path
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
 try:
-    from rich.console import Console
+    from rich.console import Console, Group
+    from rich.live import Live
     from rich.table import Table
     from rich import box
     from rich.text import Text
     HAVE_RICH = True
 except ImportError:
     HAVE_RICH = False
+
+try:
+    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+except ImportError:
+    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
 
 
 def format_canonical_hexdump(data: bytes, base_offset: int = 0) -> str:
@@ -58,7 +70,7 @@ def render_live_hex_view(
     base_offset: int = 0,
     console: Optional["Console"] = None,
 ) -> None:
-    """Render interactive or paginated hex viewer for partition dump in terminal."""
+    """Render interactive smooth Live hex viewer for partition dump in terminal."""
     if not data:
         if console:
             console.print("[yellow]Partition data buffer is empty (0 bytes).[/]")
@@ -75,56 +87,25 @@ def render_live_hex_view(
             print(f"... ({len(data) - 512} additional bytes omitted from console preview) ...\n")
         return
 
-    # Windows msvcrt keyboard input
-    try:
-        import msvcrt
-
-        def read_key() -> str:
-            ch = msvcrt.getch()
-            if ch in (b"\x00", b"\xe0"):
-                ch2 = msvcrt.getch()
-                if ch2 == b"H":
-                    return "UP"
-                if ch2 == b"P":
-                    return "DOWN"
-                if ch2 == b"I":
-                    return "PGUP"
-                if ch2 == b"Q":
-                    return "PGDN"
-                if ch2 == b"G":
-                    return "HOME"
-                if ch2 == b"O":
-                    return "END"
-            if ch in (b"\r", b"\n"):
-                return "ENTER"
-            if ch in (b"\x1b", b"q", b"Q"):
-                return "QUIT"
-            return ch.decode("utf-8", errors="ignore").upper()
-
-    except ImportError:
-        def read_key() -> str:
-            line = sys.stdin.readline().strip().upper()
-            return line if line else "ENTER"
-
-    ROWS_PER_PAGE = 16  # 256 bytes per page
-    BYTES_PER_PAGE = ROWS_PER_PAGE * 16
+    ROWS_PER_SCREEN = 16  # 16 rows = 256 bytes per screen
     total_bytes = len(data)
-    total_pages = max(1, (total_bytes + BYTES_PER_PAGE - 1) // BYTES_PER_PAGE)
-    current_page = 0
+    total_rows = max(1, (total_bytes + 15) // 16)
+    max_row = max(0, total_rows - ROWS_PER_SCREEN)
+    current_row = 0
 
-    while True:
-        console.clear()
-        page_start = current_page * BYTES_PER_PAGE
-        page_end = min(total_bytes, page_start + BYTES_PER_PAGE)
-        chunk = data[page_start:page_end]
+    def build_hex_frame(row_idx: int) -> Group:
+        start_byte = row_idx * 16
+        end_byte = min(total_bytes, start_byte + (ROWS_PER_SCREEN * 16))
+        chunk = data[start_byte:end_byte]
 
+        pct = int((row_idx / max(1, max_row)) * 100) if max_row > 0 else 100
         title_text = (
             f"[bold white]Partition Hex Inspector: [/][bold cyan]{partition_name}[/] "
             f"([dim]{total_bytes:,} bytes total[/])"
         )
         subtitle_text = (
-            f"[dim]Page {current_page + 1} of {total_pages} | "
-            f"Offset: 0x{base_offset + page_start:08X} - 0x{base_offset + page_end - 1:08X}[/]"
+            f"[dim]Offset: 0x{base_offset + start_byte:08X} - 0x{base_offset + max(start_byte, end_byte - 1):08X} | "
+            f"Row {row_idx + 1} of {total_rows} ({pct}%)[/]"
         )
 
         table = Table(
@@ -139,8 +120,8 @@ def render_live_hex_view(
         table.add_column("Hex Bytes (00-0F)", style="bold white", width=50)
         table.add_column("ASCII", style="green", width=16)
 
-        for row_idx in range(0, len(chunk), 16):
-            row_chunk = chunk[row_idx:row_idx + 16]
+        for offset in range(0, len(chunk), 16):
+            row_chunk = chunk[offset:offset + 16]
             hex_bytes = [f"{b:02x}" for b in row_chunk]
             if len(hex_bytes) > 8:
                 hex_str = " ".join(hex_bytes[:8]) + "  " + " ".join(hex_bytes[8:])
@@ -152,27 +133,53 @@ def render_live_hex_view(
                 hex_str += " " * pad_len
 
             ascii_str = "".join(chr(b) if 32 <= b <= 126 else "." for b in row_chunk)
-            row_addr = f"0x{base_offset + page_start + row_idx:08X}"
-
+            row_addr = f"0x{base_offset + start_byte + offset:08X}"
             table.add_row(row_addr, hex_str, ascii_str)
 
-        console.print(table)
         footer = Text(
-            "  [↑/↓] Row   [PgUp/PgDn] Page   [Home/End] Jump   [Q/Esc] Exit Inspector",
+            "  [↑/↓/MouseWheel] Row   [PgUp/PgDn] Page   [Home/End] Jump   [←/Esc/Q] Back",
             style="dim",
         )
-        console.print(footer)
+        return Group(table, footer)
 
-        key = read_key()
-        if key in ("QUIT", "Q", "ESC"):
-            break
-        elif key in ("DOWN", "PGDN", "SPACE"):
-            if current_page < total_pages - 1:
-                current_page += 1
-        elif key in ("UP", "PGUP"):
-            if current_page > 0:
-                current_page -= 1
-        elif key == "HOME":
-            current_page = 0
-        elif key == "END":
-            current_page = total_pages - 1
+    frame = build_hex_frame(current_row)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        with ConsoleEventDispatcher(enable_mouse=True, enable_resize=True) as dispatcher:
+            while True:
+                ev = dispatcher.get_event(timeout=0.05)
+                if not ev:
+                    continue
+
+                if ev.type == EventType.SCROLL:
+                    # Wheel Up moves rows up (towards offset 0), Wheel Down moves rows down
+                    if ev.delta > 0:
+                        current_row = max(0, current_row - 2)
+                    else:
+                        current_row = min(max_row, current_row + 2)
+                    live.update(build_hex_frame(current_row), refresh=True)
+
+                elif ev.type == EventType.RESIZE:
+                    live.update(build_hex_frame(current_row), refresh=True)
+
+                elif ev.type == EventType.KEY:
+                    key = ev.key
+                    if key in ("QUIT", "Q", "ESC", "LEFT", "B"):
+                        break
+                    elif key == "UP":
+                        current_row = max(0, current_row - 1)
+                        live.update(build_hex_frame(current_row), refresh=True)
+                    elif key == "DOWN":
+                        current_row = min(max_row, current_row + 1)
+                        live.update(build_hex_frame(current_row), refresh=True)
+                    elif key in ("PAGEUP", "PGUP"):
+                        current_row = max(0, current_row - ROWS_PER_SCREEN)
+                        live.update(build_hex_frame(current_row), refresh=True)
+                    elif key in ("PAGEDOWN", "PGDN", "SPACE"):
+                        current_row = min(max_row, current_row + ROWS_PER_SCREEN)
+                        live.update(build_hex_frame(current_row), refresh=True)
+                    elif key == "HOME":
+                        current_row = 0
+                        live.update(build_hex_frame(current_row), refresh=True)
+                    elif key == "END":
+                        current_row = max_row
+                        live.update(build_hex_frame(current_row), refresh=True)
