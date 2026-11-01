@@ -632,7 +632,7 @@ def pause_before_menu(console: Optional["Console"]) -> bool:
     """Pause after tool execution so developer can review terminal scrollback."""
     restore_default_console_mode()
     if console:
-        console.print("\n[dim]Press [bold white]Enter[/bold white] or [bold white]B[/bold white] to return to menu ([bold white]Q[/bold white] to exit)...[/]", end="", flush=True)
+        console.print("\n[dim]Press [bold white]Enter[/bold white] or [bold white]B[/bold white] to return to menu ([bold white]Q[/bold white] to exit)...[/]", end="")
     else:
         print("\nPress Enter or B to return to menu (Q to exit)...", end="", flush=True)
 
