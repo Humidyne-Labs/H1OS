@@ -381,6 +381,98 @@ def read_single_key() -> str:
             return line if line else "ENTER"
 
 
+def clear_screen() -> None:
+    """Clear terminal screen to eliminate visual artifacts across menu transitions."""
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+
+
+def run_sub_choice_menu(
+    console: Optional["Console"],
+    title: str,
+    subtitle: str,
+    options: List[Dict[str, Any]],
+    default_idx: int = 0,
+) -> Optional[Any]:
+    """Interactive arrow-key navigable sub-menu eliminating numpad / key switching."""
+    if not HAVE_RICH or not console or not sys.stdin.isatty():
+        print(f"\n--- {title} ---")
+        print(f"  {subtitle}")
+        print("-" * 60)
+        for opt in options:
+            print(f"  [{opt['key']}] {opt['label']} - {opt.get('desc', '')}")
+        print("-" * 60)
+        try:
+            choice = input(f"Select option [Enter={options[default_idx]['key']}, B=Back]: ").strip().upper()
+        except (KeyboardInterrupt, EOFError):
+            return None
+        if not choice:
+            return options[default_idx].get("value")
+        for opt in options:
+            if choice == opt["key"].upper():
+                return opt.get("value")
+        return None
+
+    clear_screen()
+    selected_idx = default_idx
+    total_rows = len(options)
+
+    def build_frame(idx: int) -> Group:
+        sub_table = Table(
+            box=box.ROUNDED,
+            width=TERM_WIDTH,
+            header_style="bold bright_cyan",
+            title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
+            show_lines=False,
+            pad_edge=False,
+        )
+        sub_table.add_column(" ", justify="center", width=2)
+        sub_table.add_column("#", justify="center", style="bold white", width=3)
+        sub_table.add_column("Option", style="bold", width=36)
+        sub_table.add_column("Details", style="dim", width=30)
+
+        for i, item in enumerate(options):
+            is_sel = (i == idx)
+            marker = ">" if is_sel else " "
+            row_style = "bold white on blue" if is_sel else ""
+            if item.get("warning"):
+                row_style = "bold white on red" if is_sel else "bold red"
+
+            sub_table.add_row(
+                marker,
+                item["key"],
+                item["label"],
+                item.get("desc", ""),
+                style=row_style,
+            )
+
+        footer = Text("  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Esc/B] Cancel", style="dim")
+        return Group(sub_table, footer)
+
+    frame = build_frame(selected_idx)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        while True:
+            key = read_single_key()
+
+            if key == "UP":
+                selected_idx = (selected_idx - 1) % total_rows
+                live.update(build_frame(selected_idx), refresh=True)
+            elif key == "DOWN":
+                selected_idx = (selected_idx + 1) % total_rows
+                live.update(build_frame(selected_idx), refresh=True)
+            elif key in ("ENTER", "SPACE"):
+                return options[selected_idx].get("value")
+            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "CANCEL"):
+                return None
+            else:
+                for opt in options:
+                    if key.upper() == opt["key"].upper():
+                        return opt.get("value")
+
+
 def pause_or_usage_prompt(console: Optional["Console"]) -> str:
     """Single-key prompt to audit live usage or return immediately without waiting for Enter."""
     if console:
@@ -389,6 +481,7 @@ def pause_or_usage_prompt(console: Optional["Console"]) -> str:
         print("\n[U] Audit Live Usage from Device   [Q/Enter] Return to Menu: ", end="")
 
     key = read_single_key()
+    clear_screen()
     if key in ("U", "u"):
         return "U"
     return "QUIT"
@@ -686,6 +779,7 @@ def select_partition_interactive(
         return None
 
     # Interactive Rich loop
+    clear_screen()
     selected_idx = 0
     total_rows = len(partitions) + 1  # partitions + Back
 
@@ -758,6 +852,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                 break
             action_key = choice if choice else "1"
         else:
+            clear_screen()
             action_key = None
             frame = build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx)
             with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
@@ -1018,61 +1113,71 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
 
 
 def prompt_dump_mode(console: Optional["Console"]) -> Optional[str]:
-    """Prompt user to select partition dump output format."""
+    """Prompt user to select partition dump output format via interactive menu."""
     options = [
-        ("1", "bin", "Raw Binary Stream (.bin)"),
-        ("2", "hex", "Formatted Canonical Hex Log (.hex)"),
-        ("3", "view", "Live Interactive Terminal Hex Inspector"),
+        {
+            "key": "1",
+            "label": "Raw Binary Stream (.bin)",
+            "desc": "Direct partition byte stream dump to disk",
+            "value": "bin",
+        },
+        {
+            "key": "2",
+            "label": "Formatted Canonical Hex Log (.hex)",
+            "desc": "Formatted 16-byte hex dump with ASCII sidebar",
+            "value": "hex",
+        },
+        {
+            "key": "3",
+            "label": "Live Interactive Terminal Inspector",
+            "desc": "Scrollable terminal hex viewer with color coding",
+            "value": "view",
+        },
+        {
+            "key": "B",
+            "label": "Cancel Dump Operation",
+            "desc": "Return to partition menu without reading",
+            "value": None,
+        },
     ]
-
-    if not HAVE_RICH or not console or not sys.stdin.isatty():
-        print("\nSelect Dump Output Format:")
-        for k, _, label in options:
-            print(f"  [{k}] {label}")
-        print("  [B] Cancel")
-        try:
-            c = input("Choice [1-3, B=Cancel]: ").strip().upper()
-            for k, mode, _ in options:
-                if c == k:
-                    return mode
-        except (KeyboardInterrupt, EOFError):
-            return None
-        return None
-
-    console.print("\n[bold white]Select Dump Output Format:[/]")
-    for k, _, label in options:
-        console.print(f"  [bold cyan][{k}][/] {label}")
-    console.print("  [yellow][B][/] Cancel")
-
-    try:
-        c = input("\nChoice [1-3, B=Cancel]: ").strip().upper()
-        for k, mode, _ in options:
-            if c == k:
-                return mode
-    except (KeyboardInterrupt, EOFError):
-        return None
-    return None
+    return run_sub_choice_menu(
+        console,
+        title="Partition Dump Format",
+        subtitle="Select extraction format and inspector mode",
+        options=options,
+        default_idx=0,
+    )
 
 
 def prompt_ota_slot(console: Optional["Console"]) -> Optional[int]:
-    """Prompt user to select OTA boot slot (0 or 1)."""
-    if console:
-        console.print("\n[bold white]Select Target OTA Boot Slot:[/]")
-        console.print("  [bold cyan][0][/] Slot 0 (ota_0)")
-        console.print("  [bold cyan][1][/] Slot 1 (ota_1)")
-        console.print("  [yellow][B][/] Cancel")
-    else:
-        print("\nSelect Target OTA Boot Slot [0=ota_0, 1=ota_1, B=Cancel]:")
-
-    try:
-        c = input("Choice: ").strip().upper()
-        if c == "0":
-            return 0
-        if c == "1":
-            return 1
-    except (KeyboardInterrupt, EOFError):
-        return None
-    return None
+    """Prompt user to select target OTA boot slot via interactive menu."""
+    options = [
+        {
+            "key": "0",
+            "label": "Slot 0 (ota_0)",
+            "desc": "Set active boot partition to ota_0",
+            "value": 0,
+        },
+        {
+            "key": "1",
+            "label": "Slot 1 (ota_1)",
+            "desc": "Set active boot partition to ota_1",
+            "value": 1,
+        },
+        {
+            "key": "B",
+            "label": "Cancel Slot Switch",
+            "desc": "Keep current active boot partition unchanged",
+            "value": None,
+        },
+    ]
+    return run_sub_choice_menu(
+        console,
+        title="Select Target OTA Boot Slot",
+        subtitle="Update otadata partition to switch the active boot partition",
+        options=options,
+        default_idx=0,
+    )
 
 
 def prompt_file_path(console: Optional["Console"], prompt_text: str) -> Optional[Path]:
@@ -1092,18 +1197,30 @@ def prompt_file_path(console: Optional["Console"], prompt_text: str) -> Optional
 
 
 def prompt_confirmation(console: Optional["Console"], message: str) -> bool:
-    """Prompt user for explicit yes/no confirmation."""
-    if console:
-        console.print(f"\n[bold yellow]CONFIRMATION REQUIRED:[/] {message}")
-        console.print("[yellow]Type 'y' or 'yes' to proceed: [/]", end="")
-    else:
-        print(f"\nCONFIRMATION REQUIRED: {message}")
-        print("Type 'y' or 'yes' to proceed: ", end="")
-    try:
-        c = input().strip().lower()
-        return c in ("y", "yes")
-    except (KeyboardInterrupt, EOFError):
-        return False
+    """Prompt user for explicit confirmation via interactive menu."""
+    options = [
+        {
+            "key": "C",
+            "label": "Cancel Operation (Safe)",
+            "desc": "Abort action and return safely without changes",
+            "value": False,
+        },
+        {
+            "key": "Y",
+            "label": "Confirm & Proceed",
+            "desc": message,
+            "value": True,
+            "warning": True,
+        },
+    ]
+    result = run_sub_choice_menu(
+        console,
+        title="Confirmation Required",
+        subtitle=message,
+        options=options,
+        default_idx=0,
+    )
+    return bool(result)
 
 
 def pause_prompt(console: Optional["Console"]) -> str:
@@ -1112,7 +1229,9 @@ def pause_prompt(console: Optional["Console"]) -> str:
         console.print("\n[dim]Press any key to return ([bold white]Q[/dim] to exit)...[/]", end="")
     else:
         print("\nPress any key to return (Q to exit)...", end="")
-    return read_single_key()
+    key = read_single_key()
+    clear_screen()
+    return key
 
 
 def main():

@@ -119,6 +119,98 @@ def read_nav_key() -> str:
     return get_key_posix()
 
 
+def clear_screen() -> None:
+    """Clear terminal screen to eliminate visual artifacts across menu transitions."""
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+
+
+def run_interactive_choice_menu(
+    console: Optional["Console"],
+    title: str,
+    subtitle: str,
+    options: List[Dict[str, Any]],
+    default_idx: int = 0,
+) -> Optional[Any]:
+    """Interactive arrow-key navigable sub-menu eliminating numpad / key switching."""
+    if not console or not sys.stdin.isatty():
+        print(f"\n--- {title} ---")
+        print(f"  {subtitle}")
+        print("-" * 60)
+        for opt in options:
+            print(f"  [{opt['key']}] {opt['label']} - {opt.get('desc', '')}")
+        print("-" * 60)
+        try:
+            choice = input("Select option [Enter=1, B=Back]: ").strip().upper()
+        except (KeyboardInterrupt, EOFError):
+            return None
+        if not choice:
+            return options[0].get("value")
+        for opt in options:
+            if choice == opt["key"]:
+                return opt.get("value")
+        return None
+
+    clear_screen()
+    selected_idx = default_idx
+    total_rows = len(options)
+
+    def build_frame(idx: int) -> Group:
+        sub_table = Table(
+            box=box.ROUNDED,
+            width=TERM_WIDTH,
+            header_style="bold bright_cyan",
+            title=f"[bold white]{title}[/]\n[dim]{subtitle}[/]",
+            show_lines=False,
+            pad_edge=False,
+        )
+        sub_table.add_column(" ", justify="center", width=2)
+        sub_table.add_column("#", justify="center", style="bold white", width=3)
+        sub_table.add_column("Option", style="bold", width=38)
+        sub_table.add_column("Details", style="dim", width=28)
+
+        for i, item in enumerate(options):
+            is_sel = (i == idx)
+            marker = ">" if is_sel else " "
+            row_style = "bold white on blue" if is_sel else ""
+            if item.get("warning"):
+                row_style = "bold white on red" if is_sel else "bold red"
+
+            sub_table.add_row(
+                marker,
+                item["key"],
+                item["label"],
+                item.get("desc", ""),
+                style=row_style,
+            )
+
+        footer = Text("  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Esc/B] Cancel", style="dim")
+        return Group(sub_table, footer)
+
+    frame = build_frame(selected_idx)
+    with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
+        while True:
+            key = read_nav_key()
+
+            if key == "UP":
+                selected_idx = (selected_idx - 1) % total_rows
+                live.update(build_frame(selected_idx), refresh=True)
+            elif key == "DOWN":
+                selected_idx = (selected_idx + 1) % total_rows
+                live.update(build_frame(selected_idx), refresh=True)
+            elif key in ("ENTER", "SPACE"):
+                return options[selected_idx].get("value")
+            elif key in ("B", "ESC", "Q", "QUIT", "CANCEL"):
+                return None
+            else:
+                for opt in options:
+                    if key == opt["key"]:
+                        return opt.get("value")
+
+
 def build_console_frame(config: H1OSConfig, selected_idx: int, menu_items: List[Dict[str, str]]) -> Group:
     """Build the full 78-column frame with header and highlighted selection."""
     # 1. Header Information Panel (78 columns max)
@@ -432,6 +524,7 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
 
 def run_interactive_menu(config: H1OSConfig, console: "Console") -> str:
     """Run real-time keyboard navigation loop with arrow keys and smooth Live rendering."""
+    clear_screen()
     menu_items = build_dynamic_menu_items(config)
     selected_idx = 0
 
@@ -546,6 +639,7 @@ def pause_before_menu(console: Optional["Console"]) -> bool:
         print("\nPress any key to return to menu (Q to exit)...", end="")
 
     key = read_nav_key()
+    clear_screen()
     if key in ("Q", "ESC", "QUIT"):
         return False
     return True
@@ -560,6 +654,7 @@ def run_profile_selection_menu(
     all_label: str = "All Profiles & Dependencies",
 ) -> Optional[str]:
     """Interactive pop-up sub-menu to select an auto-populated build profile."""
+    clear_screen()
     prof_list = list(config.profiles.values())
     if not prof_list:
         return None
@@ -780,43 +875,50 @@ def main():
             b1 = find_compiled_app_bin(p1, config.app_name)
             b2 = find_compiled_app_bin(p2, config.app_name)
 
-            if console:
-                console.print(f"\n[bold white]Dual-Slot OTA Deployment Options:[/]")
-                console.print(f"  [bold cyan][1][/] Flash ota_0=[cyan]{n1}[/] ({b1.name}) & ota_1=[cyan]{n2}[/] ({b2.name}) -> Boot [bold green]ota_0[/]")
-                console.print(f"  [bold cyan][2][/] Flash ota_0=[cyan]{n1}[/] ({b1.name}) & ota_1=[cyan]{n2}[/] ({b2.name}) -> Boot [bold green]ota_1[/]")
-                console.print(f"  [bold cyan][3][/] Swap: ota_0=[cyan]{n2}[/] ({b2.name}) & ota_1=[cyan]{n1}[/] ({b1.name}) -> Boot [bold green]ota_0[/]")
-                console.print(f"  [bold cyan][4][/] Swap: ota_0=[cyan]{n2}[/] ({b2.name}) & ota_1=[cyan]{n1}[/] ({b1.name}) -> Boot [bold green]ota_1[/]")
-                console.print("  [yellow][B][/] Cancel")
-            else:
-                print(f"\nDual-Slot OTA Deployment:")
-                print(f"  [1] ota_0={n1}, ota_1={n2} (Boot ota_0)")
-                print(f"  [2] ota_0={n1}, ota_1={n2} (Boot ota_1)")
-                print(f"  [3] ota_0={n2}, ota_1={n1} (Boot ota_0)")
-                print(f"  [4] ota_0={n2}, ota_1={n1} (Boot ota_1)")
-                print("  [B] Cancel")
+            deploy_opts = [
+                {
+                    "key": "1",
+                    "label": f"Deploy ota_0={n1} & ota_1={n2} (Boot ota_0)",
+                    "desc": f"ota_0: {b1.name if b1 else n1}, ota_1: {b2.name if b2 else n2}",
+                    "value": (b1, b2, n1, n2, 0),
+                },
+                {
+                    "key": "2",
+                    "label": f"Deploy ota_0={n1} & ota_1={n2} (Boot ota_1)",
+                    "desc": f"ota_0: {b1.name if b1 else n1}, ota_1: {b2.name if b2 else n2} (Active: 1)",
+                    "value": (b1, b2, n1, n2, 1),
+                },
+                {
+                    "key": "3",
+                    "label": f"Swap: ota_0={n2} & ota_1={n1} (Boot ota_0)",
+                    "desc": f"ota_0: {b2.name if b2 else n2}, ota_1: {b1.name if b1 else n1}",
+                    "value": (b2, b1, n2, n1, 0),
+                },
+                {
+                    "key": "4",
+                    "label": f"Swap: ota_0={n2} & ota_1={n1} (Boot ota_1)",
+                    "desc": f"ota_0: {b2.name if b2 else n2}, ota_1: {b1.name if b1 else n1} (Active: 1)",
+                    "value": (b2, b1, n2, n1, 1),
+                },
+                {
+                    "key": "B",
+                    "label": "Cancel & Return to Menu",
+                    "desc": "Abort dual-slot deployment",
+                    "value": None,
+                },
+            ]
 
-            try:
-                choice = input("\nSelect deployment configuration [1-4, B=Cancel, Enter=1]: ").strip().upper()
-            except (KeyboardInterrupt, EOFError):
-                choice = "B"
-
-            if not choice:
-                choice = "1"
-
-            if choice in ("B", "BACK", "CANCEL"):
+            selected = run_interactive_choice_menu(
+                console,
+                title="Dual-Slot OTA Deployment",
+                subtitle="Select firmware slot mapping and initial active boot partition",
+                options=deploy_opts,
+            )
+            if not selected:
                 continue
 
-            if choice == "1":
-                ok, msg = execute_dual_slot_deploy(config, b1, b2, n1, n2, active_slot=0)
-            elif choice == "2":
-                ok, msg = execute_dual_slot_deploy(config, b1, b2, n1, n2, active_slot=1)
-            elif choice == "3":
-                ok, msg = execute_dual_slot_deploy(config, b2, b1, n2, n1, active_slot=0)
-            elif choice == "4":
-                ok, msg = execute_dual_slot_deploy(config, b2, b1, n2, n1, active_slot=1)
-            else:
-                ok, msg = False, "Deployment cancelled."
-
+            tb1, tb2, tn1, tn2, slot = selected
+            ok, msg = execute_dual_slot_deploy(config, tb1, tb2, tn1, tn2, active_slot=slot)
             if ok:
                 if console:
                     console.print(f"\n[bold green]SUCCESS:[/] {msg}")
@@ -864,21 +966,29 @@ def main():
                     print(f"\nERROR: {msg}")
 
         elif action == "erase":
-            confirmed = False
-            if console:
-                console.print(f"\n[bold red]WARNING:[/] This operation will completely scrub all SPI Flash on {config.chip.upper()} to 0xFF.")
-                console.print("[yellow]Type 'yes' or 'y' to confirm, or press Enter/any key to cancel: [/]", end="")
-                try:
-                    c = input().strip().lower()
-                    confirmed = c in ("y", "yes")
-                except (KeyboardInterrupt, EOFError):
-                    confirmed = False
-            else:
-                try:
-                    c = input(f"Scrub full flash on {config.chip.upper()} to 0xFF? [y/N]: ").strip().lower()
-                    confirmed = c in ("y", "yes")
-                except (KeyboardInterrupt, EOFError):
-                    confirmed = False
+            erase_opts = [
+                {
+                    "key": "C",
+                    "label": "Cancel Erase Operation (Safe)",
+                    "desc": "Return to menu without touching flash",
+                    "value": False,
+                },
+                {
+                    "key": "E",
+                    "label": f"Scrub Entire Flash Die on {config.chip.upper()} (0xFF)",
+                    "desc": "PERMANENT DATA LOSS: Completely erase all partitions",
+                    "value": True,
+                    "warning": True,
+                },
+            ]
+
+            confirmed = run_interactive_choice_menu(
+                console,
+                title="Erase Entire Flash Die",
+                subtitle=f"DANGER: Completely wipe physical SPI flash on {config.chip.upper()} to 0xFF",
+                options=erase_opts,
+                default_idx=0,
+            )
 
             if confirmed:
                 run_erase(config)
