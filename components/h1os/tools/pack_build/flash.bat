@@ -93,10 +93,7 @@ echo [!] WARNING: Full Factory Restore will erase the entire 8MB flash die!
 echo [!] All Wi-Fi credentials, runtime statistics, and persistent frames will be lost.
 set "CONFIRM=N"
 set /p "CONFIRM=Are you sure you want to proceed with full erase? [y/N]: "
-if /i not "%CONFIRM%"=="Y" (
-    echo [*] Factory restore aborted by user.
-    goto :action_done
-)
+if /i not "%CONFIRM%"=="Y" goto :factory_aborted
 echo.
 echo [*] Executing Full Factory Restore...
 if exist "%FACTORY_BIN%" (
@@ -104,6 +101,10 @@ if exist "%FACTORY_BIN%" (
 ) else (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseAll -Write '0x0=%BOOT_BIN%', '0x8000=%PART_BIN%', '0x1D000=%OTA_DATA%', '0x20000=%APP_BIN%'"
 )
+goto :action_done
+
+:factory_aborted
+echo [*] Factory restore aborted by user.
 goto :action_done
 
 :cmd_nvs_wipe
@@ -135,57 +136,57 @@ echo ===========================================================================
 set "ADV_CHOICE=B"
 set /p "ADV_CHOICE=Select advanced option [1-6, B]: "
 
-if "%ADV_CHOICE%"=="1" (
-    echo.
-    echo [*] Flashing ota_1 secondary slot at 0x320000...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x320000=%APP_BIN%'"
-    goto :action_done
-)
-if "%ADV_CHOICE%"=="2" (
-    echo.
-    echo [*] Flashing both ota_0 (0x20000) and ota_1 (0x320000) slots identically...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x20000=%APP_BIN%', '0x320000=%APP_BIN%'"
-    goto :action_done
-)
-if "%ADV_CHOICE%"=="3" (
-    echo.
-    echo [*] Resetting storage partition at 0x620000 (1904 KB)...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x620000=0x1DC000'"
-    goto :action_done
-)
-if "%ADV_CHOICE%"=="4" (
-    echo.
-    echo [*] Clearing e-Paper frame partition at 0x7FC000 (16 KB)...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x7FC000=0x4000'"
-    goto :action_done
-)
-if "%ADV_CHOICE%"=="5" (
-    echo.
-    echo [*] Auditing On-Chip Hardware Telemetry ^& Partition MD5s...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Inspect -PartitionTable '%PART_BIN%'"
-    goto :action_done
-)
-if "%ADV_CHOICE%"=="6" (
-    echo.
-    set "CUSTOM_ADDR="
-    set /p "CUSTOM_ADDR=Enter destination flash offset in hex (e.g. 0x20000): "
-    set "CUSTOM_FILE="
-    set /p "CUSTOM_FILE=Enter path to binary file to flash: "
-    if not defined CUSTOM_ADDR goto :advanced_menu
-    if not exist "!CUSTOM_FILE!" (
-        echo [ERROR] File "!CUSTOM_FILE!" not found.
-        pause
-        goto :advanced_menu
-    )
-    echo [*] Flashing "!CUSTOM_FILE!" to !CUSTOM_ADDR!...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '!CUSTOM_ADDR!=!CUSTOM_FILE!'"
-    goto :action_done
-)
+if "%ADV_CHOICE%"=="1" goto :adv_flash_ota1
+if "%ADV_CHOICE%"=="2" goto :adv_flash_both_ota
+if "%ADV_CHOICE%"=="3" goto :adv_reset_storage
+if "%ADV_CHOICE%"=="4" goto :adv_clear_epd
+if "%ADV_CHOICE%"=="5" goto :cmd_inspect
+if "%ADV_CHOICE%"=="6" goto :adv_custom_flash
 if /i "%ADV_CHOICE%"=="B" goto :menu
 
 echo [ERROR] Invalid selection "%ADV_CHOICE%".
 pause
 goto :advanced_menu
+
+:adv_flash_ota1
+echo.
+echo [*] Flashing ota_1 secondary slot at 0x320000...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x320000=%APP_BIN%'"
+goto :action_done
+
+:adv_flash_both_ota
+echo.
+echo [*] Flashing both ota_0 (0x20000) and ota_1 (0x320000) slots identically...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '0x20000=%APP_BIN%', '0x320000=%APP_BIN%'"
+goto :action_done
+
+:adv_reset_storage
+echo.
+echo [*] Resetting storage partition at 0x620000 (1904 KB)...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x620000=0x1DC000'"
+goto :action_done
+
+:adv_clear_epd
+echo.
+echo [*] Clearing e-Paper frame partition at 0x7FC000 (16 KB)...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -EraseRegions '0x7FC000=0x4000'"
+goto :action_done
+
+:adv_custom_flash
+echo.
+set "CUSTOM_ADDR="
+set /p "CUSTOM_ADDR=Enter destination flash offset in hex (e.g. 0x20000): "
+set "CUSTOM_FILE="
+set /p "CUSTOM_FILE=Enter path to binary file to flash: "
+if not defined CUSTOM_ADDR goto :advanced_menu
+if not exist "!CUSTOM_FILE!" (
+    echo [ERROR] File "!CUSTOM_FILE!" not found.
+    pause
+    goto :advanced_menu
+)
+echo [*] Flashing "!CUSTOM_FILE!" to !CUSTOM_ADDR!...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ENGINE%' -RequireN8R8 -Write '!CUSTOM_ADDR!=!CUSTOM_FILE!'"
+goto :action_done
 
 :action_done
 set "ERR=!ERRORLEVEL!"
