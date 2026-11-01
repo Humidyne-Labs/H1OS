@@ -90,6 +90,10 @@ def get_key_posix() -> str:
                     return "UP"
                 elif seq == "[B":
                     return "DOWN"
+                elif seq == "[C":
+                    return "RIGHT"
+                elif seq == "[D":
+                    return "LEFT"
                 return "ESC"
             elif ch in ("\r", "\n"):
                 return "ENTER"
@@ -134,6 +138,7 @@ def run_interactive_choice_menu(
     subtitle: str,
     options: List[Dict[str, Any]],
     default_idx: int = 0,
+    header_panel: Optional["Panel"] = None,
 ) -> Optional[Any]:
     """Interactive arrow-key navigable sub-menu eliminating numpad / key switching."""
     if not console or not sys.stdin.isatty():
@@ -144,11 +149,11 @@ def run_interactive_choice_menu(
             print(f"  [{opt['key']}] {opt['label']} - {opt.get('desc', '')}")
         print("-" * 60)
         try:
-            choice = input("Select option [Enter=1, B=Back]: ").strip().upper()
+            choice = input(f"Select option [Enter={options[default_idx]['key']}, B=Back]: ").strip().upper()
         except (KeyboardInterrupt, EOFError):
             return None
         if not choice:
-            return options[0].get("value")
+            return options[default_idx].get("value")
         for opt in options:
             if choice == opt["key"]:
                 return opt.get("value")
@@ -187,7 +192,9 @@ def run_interactive_choice_menu(
                 style=row_style,
             )
 
-        footer = Text("  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Esc/B] Cancel", style="dim")
+        footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Cancel   [Quick-Key] Direct Action", style="dim")
+        if header_panel:
+            return Group(header_panel, sub_table, footer)
         return Group(sub_table, footer)
 
     frame = build_frame(selected_idx)
@@ -201,9 +208,9 @@ def run_interactive_choice_menu(
             elif key == "DOWN":
                 selected_idx = (selected_idx + 1) % total_rows
                 live.update(build_frame(selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE"):
+            elif key in ("ENTER", "SPACE", "RIGHT"):
                 return options[selected_idx].get("value")
-            elif key in ("B", "ESC", "Q", "QUIT", "CANCEL"):
+            elif key in ("B", "ESC", "Q", "QUIT", "CANCEL", "LEFT"):
                 return None
             else:
                 for opt in options:
@@ -211,9 +218,8 @@ def run_interactive_choice_menu(
                         return opt.get("value")
 
 
-def build_console_frame(config: H1OSConfig, selected_idx: int, menu_items: List[Dict[str, str]]) -> Group:
-    """Build the full 78-column frame with header and highlighted selection."""
-    # 1. Header Information Panel (78 columns max)
+def build_header_panel(config: H1OSConfig) -> Panel:
+    """Build pre-populated static header information panel."""
     port_label = config.port if config.port else "Auto-discover"
     app_root_str = str(config.app_root)
     if len(app_root_str) > 28:
@@ -255,13 +261,24 @@ def build_console_frame(config: H1OSConfig, selected_idx: int, menu_items: List[
 
         header_table.add_row(k1, v1, k2, v2)
 
-    header_panel = Panel(
+    return Panel(
         header_table,
         title="[bold white]H1OS Firmware & Packaging Console[/]",
         border_style="cyan",
         box=box.ROUNDED,
         width=TERM_WIDTH,
     )
+
+
+def build_console_frame(
+    config: H1OSConfig,
+    selected_idx: int,
+    menu_items: List[Dict[str, str]],
+    header_panel: Optional[Panel] = None,
+) -> Group:
+    """Build the full 78-column frame with pre-populated header and highlighted selection."""
+    if header_panel is None:
+        header_panel = build_header_panel(config)
 
     # 2. Operations Table (78 columns max)
     ops_table = Table(
@@ -293,7 +310,7 @@ def build_console_frame(config: H1OSConfig, selected_idx: int, menu_items: List[
 
     # 3. Navigation Help Footer
     footer_text = Text(
-        "  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Q/Esc] Exit",
+        "  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/Q] Exit   [Quick-Key] Direct Action",
         style="dim",
     )
     return Group(header_panel, ops_table, footer_text)
@@ -522,27 +539,36 @@ def build_dynamic_menu_items(config: H1OSConfig) -> List[Dict[str, str]]:
     return menu_items
 
 
-def run_interactive_menu(config: H1OSConfig, console: "Console") -> str:
+def run_interactive_menu(
+    config: H1OSConfig,
+    console: "Console",
+    header_panel: Optional[Panel] = None,
+) -> str:
     """Run real-time keyboard navigation loop with arrow keys and smooth Live rendering."""
     clear_screen()
     menu_items = build_dynamic_menu_items(config)
     selected_idx = 0
 
-    frame = build_console_frame(config, selected_idx, menu_items)
+    if header_panel is None:
+        header_panel = build_header_panel(config)
+
+    frame = build_console_frame(config, selected_idx, menu_items, header_panel=header_panel)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
         while True:
             key = read_nav_key()
 
             if key == "UP":
                 selected_idx = (selected_idx - 1) % len(menu_items)
-                live.update(build_console_frame(config, selected_idx, menu_items), refresh=True)
+                live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
             elif key == "DOWN":
                 selected_idx = (selected_idx + 1) % len(menu_items)
-                live.update(build_console_frame(config, selected_idx, menu_items), refresh=True)
-            elif key in ("ENTER", "SPACE"):
+                live.update(build_console_frame(config, selected_idx, menu_items, header_panel=header_panel), refresh=True)
+            elif key in ("ENTER", "SPACE", "RIGHT"):
                 return menu_items[selected_idx]["action"]
             elif key in ("Q", "ESC", "QUIT"):
                 return "quit"
+            elif key == "LEFT":
+                pass
             else:
                 # Quick-jump by key
                 for item in menu_items:
@@ -581,6 +607,7 @@ def build_profile_sub_frame(
     subtitle: str,
     items: List[Dict[str, str]],
     selected_idx: int,
+    header_panel: Optional[Panel] = None,
 ) -> Group:
     """Build the profile selection sub-menu frame."""
     sub_table = Table(
@@ -627,7 +654,9 @@ def build_profile_sub_frame(
         style=back_style,
     )
 
-    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B] Back", style="dim")
+    footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Back   [1-9/B] Quick-Key", style="dim")
+    if header_panel:
+        return Group(header_panel, sub_table, footer)
     return Group(sub_table, footer)
 
 
@@ -652,6 +681,7 @@ def run_profile_selection_menu(
     subtitle: str = "Choose an auto-populated profile to execute",
     allow_all: bool = False,
     all_label: str = "All Profiles & Dependencies",
+    header_panel: Optional[Panel] = None,
 ) -> Optional[str]:
     """Interactive pop-up sub-menu to select an auto-populated build profile."""
     clear_screen()
@@ -709,22 +739,22 @@ def run_profile_selection_menu(
     selected_idx = 0
     total_rows = len(items) + 1  # items + Back entry
 
-    frame = build_profile_sub_frame(title, subtitle, items, selected_idx)
+    frame = build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel)
     with Live(frame, console=console, auto_refresh=False, screen=False, transient=True) as live:
         while True:
             key = read_nav_key()
 
             if key == "UP":
                 selected_idx = (selected_idx - 1) % total_rows
-                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx), refresh=True)
+                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
             elif key == "DOWN":
                 selected_idx = (selected_idx + 1) % total_rows
-                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE"):
+                live.update(build_profile_sub_frame(title, subtitle, items, selected_idx, header_panel=header_panel), refresh=True)
+            elif key in ("ENTER", "SPACE", "RIGHT"):
                 if selected_idx == len(items):
                     return None
                 return items[selected_idx]["profile"]
-            elif key in ("B", "ESC", "Q", "QUIT"):
+            elif key in ("B", "ESC", "Q", "QUIT", "LEFT"):
                 return None
             else:
                 for item in items:
@@ -740,10 +770,11 @@ def main():
 
     config = H1OSConfig(project_dir=args.project_dir, config_path=args.config)
     console = Console(width=TERM_WIDTH) if HAVE_RICH else None
+    header_panel = build_header_panel(config) if console else None
 
     while True:
         if console and sys.stdin.isatty():
-            action = run_interactive_menu(config, console)
+            action = run_interactive_menu(config, console, header_panel=header_panel)
         else:
             action = run_plain_fallback(config)
 
@@ -760,14 +791,17 @@ def main():
                 console,
                 title="Build Firmware",
                 subtitle="Select an auto-populated profile to build with 'idf.py build'",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
             run_build(config, profile=sel_prof, clean=False, reconfig_only=False)
+            header_panel = build_header_panel(config) if console else None
 
         elif action.startswith("build:"):
             prof = action.split(":", 1)[1]
             run_build(config, profile=prof, clean=False, reconfig_only=False)
+            header_panel = build_header_panel(config) if console else None
 
         elif action == "reconfig":
             sel_prof = run_profile_selection_menu(
@@ -775,14 +809,17 @@ def main():
                 console,
                 title="Reconfigure Build Profile",
                 subtitle="Select an auto-populated profile to run 'idf.py reconfigure'",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
             run_build(config, profile=sel_prof, clean=False, reconfig_only=True)
+            header_panel = build_header_panel(config) if console else None
 
         elif action.startswith("reconfig:"):
             prof = action.split(":", 1)[1]
             run_build(config, profile=prof, clean=False, reconfig_only=True)
+            header_panel = build_header_panel(config) if console else None
 
         elif action == "clean":
             sel_prof = run_profile_selection_menu(
@@ -792,6 +829,7 @@ def main():
                 subtitle="Select a profile to erase its build directory (without rebuilding)",
                 allow_all=True,
                 all_label="Clean All Profiles & Dependencies",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
@@ -799,6 +837,7 @@ def main():
                 run_clean(config, clean_all=True)
             else:
                 run_clean(config, profile=sel_prof)
+            header_panel = build_header_panel(config) if console else None
 
         elif action.startswith("clean:"):
             prof = action.split(":", 1)[1]
@@ -806,6 +845,7 @@ def main():
                 run_clean(config, clean_all=True)
             else:
                 run_clean(config, profile=prof)
+            header_panel = build_header_panel(config) if console else None
 
         elif action == "clean_rebuild":
             sel_prof = run_profile_selection_menu(
@@ -813,14 +853,17 @@ def main():
                 console,
                 title="Clean & Full Rebuild",
                 subtitle="WARNING: Erases build directory, dependencies.lock & managed_components before rebuilding",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
             run_build(config, profile=sel_prof, clean=True, reconfig_only=False)
+            header_panel = build_header_panel(config) if console else None
 
         elif action.startswith("clean_rebuild:"):
             prof = action.split(":", 1)[1]
             run_build(config, profile=prof, clean=True, reconfig_only=False)
+            header_panel = build_header_panel(config) if console else None
 
         elif action == "size":
             sel_prof = run_profile_selection_menu(
@@ -828,6 +871,7 @@ def main():
                 console,
                 title="Size Audit Diagnostic",
                 subtitle="Select an auto-populated profile to analyze firmware memory footprint",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
@@ -843,6 +887,7 @@ def main():
                 console,
                 title="Package Release Bundle",
                 subtitle="Select an auto-populated profile to package release distribution artifacts",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
@@ -858,6 +903,7 @@ def main():
                 console,
                 title="Flash Firmware to Device",
                 subtitle="Select an auto-populated profile to flash over serial COM port",
+                header_panel=header_panel,
             )
             if not sel_prof:
                 continue
@@ -913,6 +959,7 @@ def main():
                 title="Dual-Slot OTA Deployment",
                 subtitle="Select firmware slot mapping and initial active boot partition",
                 options=deploy_opts,
+                header_panel=header_panel,
             )
             if not selected:
                 continue
@@ -988,6 +1035,7 @@ def main():
                 subtitle=f"DANGER: Completely wipe physical SPI flash on {config.chip.upper()} to 0xFF",
                 options=erase_opts,
                 default_idx=0,
+                header_panel=header_panel,
             )
 
             if confirmed:

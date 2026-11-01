@@ -366,6 +366,10 @@ def read_single_key() -> str:
                         return "UP"
                     elif seq == "[B":
                         return "DOWN"
+                    elif seq == "[C":
+                        return "RIGHT"
+                    elif seq == "[D":
+                        return "LEFT"
                     return "ESC"
                 elif ch in ("\r", "\n"):
                     return "ENTER"
@@ -449,7 +453,7 @@ def run_sub_choice_menu(
                 style=row_style,
             )
 
-        footer = Text("  [↑/↓] Navigate   [Enter] Select   [Quick-Key] Direct Action   [Esc/B] Cancel", style="dim")
+        footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Cancel   [Quick-Key] Direct Action", style="dim")
         return Group(sub_table, footer)
 
     frame = build_frame(selected_idx)
@@ -463,9 +467,9 @@ def run_sub_choice_menu(
             elif key == "DOWN":
                 selected_idx = (selected_idx + 1) % total_rows
                 live.update(build_frame(selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE"):
+            elif key in ("ENTER", "SPACE", "RIGHT"):
                 return options[selected_idx].get("value")
-            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "CANCEL"):
+            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "CANCEL", "LEFT"):
                 return None
             else:
                 for opt in options:
@@ -707,7 +711,7 @@ def build_select_partition_frame(
         style=back_style,
     )
 
-    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-9/B] Quick-Key   [Esc/B/Q] Cancel", style="dim")
+    footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Cancel   [1-9/B] Quick-Key", style="dim")
     return Group(sub_table, footer)
 
 
@@ -749,7 +753,7 @@ def build_partition_menu_frame(
             style=row_style,
         )
 
-    footer = Text("  [↑/↓] Navigate   [Enter] Select   [1-8/B] Quick-Key   [Esc/B/Q] Back", style="dim")
+    footer = Text("  [↑/↓] Navigate   [→/Enter] Select   [←/Esc/B] Back   [1-8/B] Quick-Key", style="dim")
     return Group(sub_table, footer)
 
 
@@ -793,11 +797,11 @@ def select_partition_interactive(
             elif key == "DOWN":
                 selected_idx = (selected_idx + 1) % total_rows
                 live.update(build_select_partition_frame(title, partitions, selected_idx), refresh=True)
-            elif key in ("ENTER", "SPACE"):
+            elif key in ("ENTER", "SPACE", "RIGHT"):
                 if selected_idx == len(partitions):
                     return None
                 return partitions[selected_idx]
-            elif key in ("BACK", "QUIT", "ESC", "Q", "B"):
+            elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
                 return None
             else:
                 if key.isdigit():
@@ -864,10 +868,10 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                     elif key == "DOWN":
                         selected_idx = (selected_idx + 1) % total_items
                         live.update(build_partition_menu_frame(part_file, partitions, config, MENU_ITEMS, selected_idx), refresh=True)
-                    elif key in ("ENTER", "SPACE"):
+                    elif key in ("ENTER", "SPACE", "RIGHT"):
                         action_key = MENU_ITEMS[selected_idx]["key"]
                         break
-                    elif key in ("BACK", "QUIT", "ESC", "Q", "B"):
+                    elif key in ("BACK", "QUIT", "ESC", "Q", "B", "LEFT"):
                         action_key = "B"
                         break
                     else:
