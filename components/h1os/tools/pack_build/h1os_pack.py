@@ -254,12 +254,6 @@ def parse_args():
         default=None,
         help="Custom suffix for the release zip file",
     )
-    parser.add_argument(
-        "--partition-file",
-        dest="partition_file",
-        default=None,
-        help="Explicit path to partition table CSV (defaults to project root partitions.csv)",
-    )
     return parser.parse_args()
 
 
@@ -352,6 +346,8 @@ def main():
         dist_base = app_root / "dist"
 
     dist_root = dist_base / f"{app_stem}-v{version}"
+    if dist_root.exists():
+        shutil.rmtree(dist_root)
     dist_root.mkdir(parents=True, exist_ok=True)
     bins_dir = dist_root / "bins"
     bins_dir.mkdir(parents=True, exist_ok=True)
@@ -391,46 +387,30 @@ def main():
         print(f"[*] Generating monolithic factory binary: {factory_bin_name}...")
         print(f"    [+] Created: {factory_bin_name} ({len(buf)/1024.0:.1f} KB)")
 
-    # Step 3: Provision partitions.csv strictly from project root or explicit partition_file
-    if args.partition_file:
-        part_csv = Path(args.partition_file).resolve()
-    elif cfg and cfg.partition_file:
-        part_csv = cfg.partition_file
-    else:
-        part_csv = (app_root / "partitions.csv").resolve()
-
-    if not part_csv.is_file():
-        print(f"\n[ERROR] Partition table file not found: {part_csv}", file=sys.stderr)
-        print("Please ensure partitions.csv is in project root or configured via partition_file_location in h1os.ini.\n", file=sys.stderr)
+    # Step 3: Verify binary partition table in bins/
+    part_bin = bins_dir / "partition-table.bin"
+    if not part_bin.is_file():
+        print(f"\n[ERROR] Binary partition table not found: {part_bin}", file=sys.stderr)
+        print("Please compile firmware first so partition-table.bin is generated.\n", file=sys.stderr)
         sys.exit(1)
 
-    shutil.copy2(part_csv, dist_root / "partitions.csv")
-
-    # Step 4: Copy flasher.ps1 from script_dir
+    # Step 4: Deploy generic flasher engine into engine/flasher.ps1
+    engine_dir = dist_root / "engine"
+    engine_dir.mkdir(parents=True, exist_ok=True)
     flasher_ps1 = script_dir / "flasher.ps1"
     if flasher_ps1.exists():
-        shutil.copy2(flasher_ps1, dist_root / "flasher.ps1")
+        shutil.copy2(flasher_ps1, engine_dir / "flasher.ps1")
 
-    # Step 5: Copy modular Control-Vector batch files from disk
-    bat_files = [
-        "flash_update_keep_nvs.bat",
-        "flash_app_only.bat",
-        "flash_factory.bat",
-        "flash_nvs_wipe.bat",
-        "flash_now.bat",
-    ]
-    bundled_bats = []
-    for bat_name in bat_files:
-        src_bat = script_dir / bat_name
-        if src_bat.exists():
-            shutil.copy2(src_bat, dist_root / bat_name)
-            bundled_bats.append(bat_name)
+    # Step 5: Deploy hardware ecosystem control launcher flash.bat into root
+    flash_bat = script_dir / "flash.bat"
+    if flash_bat.exists():
+        shutil.copy2(flash_bat, dist_root / "flash.bat")
 
-    # Step 6: Copy README.md from disk
+    # Step 6: Deploy README.txt documentation
     readme_src = script_dir / "README.md"
     if readme_src.exists():
-        shutil.copy2(readme_src, dist_root / "README.md")
         shutil.copy2(readme_src, dist_root / "README.txt")
+        shutil.copy2(readme_src, dist_root / "README.md")
 
     # Step 7: Compute SHA-256 Checksums
     checksums_file = dist_root / "checksums.sha256"
@@ -475,8 +455,8 @@ def main():
             f"[bold green]✓ Release Bundle Generated Successfully[/]\n\n"
             f"  * [bold white]Destination[/]     : {dist_root}\n"
             f"  * [bold white]Monolithic Image[/]: {factory_bin_name} ({format_bytes(len(buf))})\n"
-            f"  * [bold white]Partition Table [/]: {part_csv.name}\n"
-            f"  * [bold white]Control Vectors [/]: {len(bundled_bats)} batch runners + flasher.ps1\n"
+            f"  * [bold white]Partition Table [/]: bins/{part_bin.name} (Embedded MD5 Verified)\n"
+            f"  * [bold white]Control Deck    [/]: flash.bat + engine/flasher.ps1\n"
             f"  * [bold white]SHA-256 Digest  [/]: checksums.sha256\n"
         )
         if zip_path and zip_path.exists():
@@ -490,9 +470,11 @@ def main():
         ))
         console.print()
     else:
-        print(f"    [+] Created partition table: {part_csv.name}")
+        print(f"    [+] Verified partition table: bins/{part_bin.name}")
         if flasher_ps1.exists():
-            print(f"    [+] Created flasher.ps1")
+            print(f"    [+] Created engine/flasher.ps1")
+        if flash_bat.exists():
+            print(f"    [+] Created flash.bat")
         if zip_path:
             print(f"    [+] Created Release Zip: {zip_path}")
         print(f"\n[SUCCESS] {app_title} v{version} Release Bundle ready at: {dist_root}\n")

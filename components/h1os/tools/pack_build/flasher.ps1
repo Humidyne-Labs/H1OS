@@ -1,86 +1,62 @@
 <#
 .SYNOPSIS
-    H1OS Unified Zero-Dependency ESP32-S3 Native USB Flasher, Partition & NVS Manager
-    Target Hardware: Waveshare ESP32-S3 ePaper 1.54" V2 (ESP32-S3-PICO-1-N8R8, 8MB DIO Flash, VID_303A&PID_1001)
+    ESP32-S3 Zero-Dependency Native USB SLIP Flasher & Partition Inspector
+    Target Silicon: Espressif ESP32-S3 (Mask ROM USB CDC, VID_303A&PID_1001)
 
 .DESCRIPTION
-    Single self-contained PowerShell + embedded C# SLIP engine that communicates directly with the
-    ESP32-S3 Mask ROM bootloader over Windows inbox USB CDC (usbser.sys).
-    Requires ZERO external dependencies (no Python, no esptool, no Zadig/FTDI drivers).
+    Pure, project-agnostic PowerShell + embedded C# SLIP engine that communicates
+    directly with the ESP32-S3 Mask ROM bootloader over Windows inbox USB CDC (usbser.sys).
+    Requires ZERO external dependencies (no Python, no esptool, no external drivers).
 
-    Designed to be driven either by:
-      1. One-touch Control-Vector Batch Files:
-         - flash_update_keep_nvs.bat : Updates Bootloader + PartTable + otadata + ota_0 App; keeps NVS, SPIFFS & epd_frame
-         - flash_app_only.bat        : Updates ota_0 App (0x20000) + otadata; keeps Bootloader, PartTable, NVS, SPIFFS & epd_frame
-         - flash_factory.bat         : Full 8MB NOR die scrub to 0xFF + complete factory restore
-         - flash_nvs_wipe.bat        : Erases only nvs (0x9000) and phy_init (0x1F000); keeps App & SPIFFS intact
-      2. Master Interactive Hub (flash_now.bat / -Interactive):
-         - Calls the turnkey batch vectors OR opens the built-in Partition Manager, Dual-OTA Slot Manager,
-           NVS/SPIFFS/Framebuffer Manager, and Live On-Chip MD5 Inspector.
-      3. Direct CLI Invocation for custom hacking/automation.
-
-.PARAMETER Profile
-    High-level operation profile:
-      - KeepNvs       : (Default) Flashes Bootloader, Partition Table, otadata, and App -> ota_0; preserves nvs, ota_1, storage, epd_frame
-      - AppOnly       : Flashes App -> TargetSlot (default ota_0) and updates otadata; preserves Bootloader, Partition Table, nvs, storage, epd_frame
-      - Factory       : Scrubs full 8MB flash die to 0xFF, then flashes Bootloader, Partition Table, otadata, and App -> ota_0
-      - DualOta       : Flashes App to BOTH ota_0 (0x20000) and ota_1 (0x320000) for redundant fallback
-      - WipeNvs       : Erases only nvs (0x9000, 80KB) and phy_init (0x1F000, 4KB)
-      - WipeStorage   : Erases only storage SPIFFS partition (0x620000, 1904KB)
-      - WipeEpdFrame  : Erases only epd_frame ePaper buffer partition (0x7FC000, 16KB)
-      - SetBootSlot   : Updates otadata (0x1D000) to boot either ota_0 or ota_1 without re-flashing app binaries
-      - CustomWrite   : Writes -Binary to -TargetPartition (by name) or -Offset (hex)
-      - CustomErase   : Erases -TargetPartition (by name) or [-Offset, -EraseLength]
-      - Inspect       : Connects to ESP32-S3 and computes live on-chip MD5 across all partitions in the 8MB map
-      - Interactive   : Opens the advanced Partition, Dual-OTA & NVS Manager console
+    Accepts generic physical flash primitives:
+      -Write "0x0=boot.bin", "0x8000=pt.bin" : Flashes one or more offset=file segments
+      -EraseAll                              : Scrubs entire SPI NOR flash die to 0xFF
+      -EraseRegion -Offset 0x9000 -Length 0x14000 : Erases specific physical sector range
+      -EraseRegions "0x9000=0x14000", ...    : Erases multiple physical regions
+      -Inspect [-PartitionTable pt.bin]      : Audits on-chip hardware MD5s and chip info
 #>
 
 [CmdletBinding()]
 param(
-    [ValidateSet(
-        "KeepNvs", "AppOnly", "Factory", "DualOta",
-        "WipeNvs", "WipeStorage", "WipeEpdFrame",
-        "SetBootSlot", "CustomWrite", "CustomErase",
-        "Inspect", "Interactive"
-    )]
-    [string]$Profile = "KeepNvs",
+    # Flash segments in form "0xOFFSET=file.bin" or "OFFSET=file.bin"
+    [Alias("Segments")]
+    [string[]]$Write = @(),
 
-    [ValidateSet("ota_0", "ota_1", "both")]
-    [string]$TargetSlot = "ota_0",
+    # Full flash die scrub to 0xFF (entire flash capacity)
+    [switch]$EraseAll,
 
-    [switch]$KeepNvs,
+    # Single or multiple region erases in form "0xOFFSET=0xLENGTH"
+    [Alias("EraseRegion")]
+    [string[]]$EraseRegions = @(),
 
-    [switch]$KeepPartitionTable,
-
-    [switch]$KeepOtaData,
-
-    [string]$TargetPartition = "",
-
-    [string]$Binary = "",
-
+    # Specific flash region erase offset/length (alternative to -EraseRegions)
     [uint32]$Offset = [uint32]::MaxValue,
+    [uint32]$Length = 0,
 
-    [uint32]$EraseLength = 0,
+    # Connect to device and inspect on-chip partition MD5s and hardware telemetry
+    [switch]$Inspect,
 
-    [string[]]$Segments = @(),
+    # Path to binary partition-table.bin for structural validation and on-chip MD5 auditing
+    [string]$PartitionTable = "",
 
+    # Target COM port (auto-detects ESP32-S3 VID_303A:PID_1001 if omitted)
     [string]$Port = "",
 
+    # Serial baud rate for SPI flashing (default: 460800)
     [int]$Baud = 460800,
 
+    # Physical flash size in MB (default: 8)
     [int]$FlashSizeMB = 8,
 
+    # Skip on-chip MD5 verification
     [switch]$NoVerify,
 
-    [switch]$Interactive
+    # Suppress automatic post-flash reboot
+    [switch]$NoReset
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-if ($Interactive.IsPresent) {
-    $Profile = "Interactive"
-}
 
 # ---------------------------------------------------------------------------
 # 1. Embedded C# ESP32-S3 Mask ROM SLIP Engine & Partition Table Parser
@@ -96,7 +72,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
-namespace H1OS.Flasher
+namespace Esp32Slip.Flasher
 {
     public class PartitionEntry
     {
@@ -126,65 +102,22 @@ namespace H1OS.Flasher
     {
         public const int FLASH_SECTOR_SIZE = 4096;
 
-        /// <summary>
-        /// Builds the complete 8MB partition map (including system regions bootloader @ 0x0 and partition-table @ 0x8000)
-        /// by parsing bins/partition-table.bin (binary 0x50AA format), partitions.csv, or the canonical H1OS 8MB Dual-OTA layout.
-        /// </summary>
-        public static List<PartitionEntry> LoadPartitionMap(string distRoot)
-        {
-            List<PartitionEntry> map = new List<PartitionEntry>();
-
-            // System Region 0: Bootloader (0x000000 .. 0x007FFF, 32 KB reserved window)
-            map.Add(new PartitionEntry {
-                Name = "bootloader", TypeStr = "system", SubTypeStr = "boot",
-                TypeCode = 0xFE, SubTypeCode = 0x00, Offset = 0x000000, Size = 0x008000, IsSystemRegion = true
-            });
-
-            // System Region 1: Partition Table (0x008000 .. 0x008FFF, 4 KB)
-            map.Add(new PartitionEntry {
-                Name = "partition-table", TypeStr = "system", SubTypeStr = "part",
-                TypeCode = 0xFE, SubTypeCode = 0x01, Offset = 0x008000, Size = 0x001000, IsSystemRegion = true
-            });
-
-            string binPath = Path.Combine(distRoot, "bins", "partition-table.bin");
-            string csvPath = Path.Combine(distRoot, "partitions.csv");
-
-            List<PartitionEntry> parsed = null;
-            if (File.Exists(binPath))
-            {
-                try { parsed = ParseBinaryPartitionTable(File.ReadAllBytes(binPath)); }
-                catch { parsed = null; }
-            }
-
-            if ((parsed == null || parsed.Count == 0) && File.Exists(csvPath))
-            {
-                try { parsed = ParseCsvPartitionTable(File.ReadAllLines(csvPath)); }
-                catch { parsed = null; }
-            }
-
-            if (parsed == null || parsed.Count == 0)
-            {
-                parsed = GetCanonicalH1OsPartitions();
-            }
-
-            map.AddRange(parsed);
-            return map;
-        }
-
         public static List<PartitionEntry> ParseBinaryPartitionTable(byte[] data)
         {
             List<PartitionEntry> list = new List<PartitionEntry>();
             if (data == null || data.Length < 32) return list;
 
+            int md5RowOffset = -1;
+
             for (int off = 0; off + 32 <= data.Length; off += 32)
             {
                 ushort magic = BitConverter.ToUInt16(data, off);
-                if (magic == 0xEBEB || magic == 0xFFFF)
+                if (magic == 0xEBEB)
                 {
-                    // 0xEBEB = MD5 checksum row; 0xFFFF = end of table
-                    if (magic == 0xFFFF) break;
-                    continue;
+                    md5RowOffset = off;
+                    break;
                 }
+                if (magic == 0xFFFF) break;
                 if (magic != 0x50AA) break;
 
                 byte pType = data[off + 2];
@@ -207,70 +140,26 @@ namespace H1OS.Flasher
                     IsSystemRegion = false
                 });
             }
-            return list;
-        }
 
-        public static List<PartitionEntry> ParseCsvPartitionTable(string[] lines)
-        {
-            List<PartitionEntry> list = new List<PartitionEntry>();
-            uint runningOffset = 0x9000; // Standard ESP-IDF first partition offset after 0x8000 partition table
-
-            foreach (string rawLine in lines)
+            // Verify embedded MD5 checksum if present
+            if (md5RowOffset > 0)
             {
-                string line = rawLine.Trim();
-                if (string.IsNullOrEmpty(line) || line.StartsWith("#")) continue;
-
-                string[] cols = line.Split(',');
-                if (cols.Length < 5) continue;
-
-                string name = cols[0].Trim();
-                string typeStr = cols[1].Trim().ToLowerInvariant();
-                string subTypeStr = cols[2].Trim().ToLowerInvariant();
-                string offStr = cols[3].Trim();
-                string sizeStr = cols[4].Trim();
-
-                bool isApp = (typeStr == "app" || typeStr == "0" || typeStr == "0x00");
-                uint align = isApp ? 0x10000u : 0x1000u; // ESP-IDF aligns app partitions to 64KB, data to 4KB
-
-                uint offset;
-                if (!string.IsNullOrEmpty(offStr))
+                byte[] expectedMd5 = new byte[16];
+                Array.Copy(data, md5RowOffset + 16, expectedMd5, 0, 16);
+                using (MD5 md5 = MD5.Create())
                 {
-                    offset = ParseSizeOrHex(offStr);
+                    byte[] actualMd5 = md5.ComputeHash(data, 0, md5RowOffset);
+                    for (int i = 0; i < 16; i++)
+                    {
+                        if (expectedMd5[i] != actualMd5[i])
+                        {
+                            throw new InvalidDataException("Partition table MD5 checksum verification failed! Binary may be corrupt.");
+                        }
+                    }
                 }
-                else
-                {
-                    offset = ((runningOffset + align - 1) / align) * align;
-                }
-
-                uint size = ParseSizeOrHex(sizeStr);
-                runningOffset = offset + size;
-
-                list.Add(new PartitionEntry {
-                    Name = name,
-                    TypeStr = typeStr,
-                    SubTypeStr = subTypeStr,
-                    TypeCode = isApp ? (byte)0x00 : (byte)0x01,
-                    SubTypeCode = 0,
-                    Offset = offset,
-                    Size = size,
-                    IsSystemRegion = false
-                });
             }
-            return list;
-        }
 
-        public static List<PartitionEntry> GetCanonicalH1OsPartitions()
-        {
-            // Canonical H1OS 8MB Dual-Slot OTA Layout from partitions.csv
-            return new List<PartitionEntry> {
-                new PartitionEntry { Name = "nvs",       TypeStr = "data", SubTypeStr = "nvs",       TypeCode = 1, SubTypeCode = 0x02, Offset = 0x009000, Size = 0x014000 },
-                new PartitionEntry { Name = "otadata",   TypeStr = "data", SubTypeStr = "ota",       TypeCode = 1, SubTypeCode = 0x00, Offset = 0x01D000, Size = 0x002000 },
-                new PartitionEntry { Name = "phy_init",  TypeStr = "data", SubTypeStr = "phy",       TypeCode = 1, SubTypeCode = 0x01, Offset = 0x01F000, Size = 0x001000 },
-                new PartitionEntry { Name = "ota_0",     TypeStr = "app",  SubTypeStr = "ota_0",     TypeCode = 0, SubTypeCode = 0x10, Offset = 0x020000, Size = 0x300000 },
-                new PartitionEntry { Name = "ota_1",     TypeStr = "app",  SubTypeStr = "ota_1",     TypeCode = 0, SubTypeCode = 0x11, Offset = 0x320000, Size = 0x300000 },
-                new PartitionEntry { Name = "storage",   TypeStr = "data", SubTypeStr = "spiffs",    TypeCode = 1, SubTypeCode = 0x82, Offset = 0x620000, Size = 0x1DC000 },
-                new PartitionEntry { Name = "epd_frame", TypeStr = "data", SubTypeStr = "undefined", TypeCode = 1, SubTypeCode = 0x06, Offset = 0x7FC000, Size = 0x004000 }
-            };
+            return list;
         }
 
         public static uint ParseSizeOrHex(string val)
@@ -280,123 +169,80 @@ namespace H1OS.Flasher
             {
                 return uint.Parse(s.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
             }
-            if (s.EndsWith("M", StringComparison.OrdinalIgnoreCase) || s.EndsWith("MB", StringComparison.OrdinalIgnoreCase))
+            if (s.EndsWith("MB", StringComparison.OrdinalIgnoreCase))
             {
-                string num = s.TrimEnd('M', 'm', 'B', 'b');
-                return uint.Parse(num, CultureInfo.InvariantCulture) * 1024u * 1024u;
+                return (uint)(double.Parse(s.Substring(0, s.Length - 2), CultureInfo.InvariantCulture) * 1024 * 1024);
             }
-            if (s.EndsWith("K", StringComparison.OrdinalIgnoreCase) || s.EndsWith("KB", StringComparison.OrdinalIgnoreCase))
+            if (s.EndsWith("KB", StringComparison.OrdinalIgnoreCase))
             {
-                string num = s.TrimEnd('K', 'k', 'B', 'b');
-                return uint.Parse(num, CultureInfo.InvariantCulture) * 1024u;
+                return (uint)(double.Parse(s.Substring(0, s.Length - 2), CultureInfo.InvariantCulture) * 1024);
             }
             return uint.Parse(s, CultureInfo.InvariantCulture);
         }
 
         private static string DecodeType(byte t)
         {
-            if (t == 0x00) return "app";
-            if (t == 0x01) return "data";
-            return "0x" + t.ToString("X2");
+            switch (t) {
+                case 0x00: return "app";
+                case 0x01: return "data";
+                default:   return string.Format("0x{0:X2}", t);
+            }
         }
 
         private static string DecodeSubType(byte t, byte st)
         {
-            if (t == 0x00)
-            {
+            if (t == 0x00) {
                 if (st == 0x00) return "factory";
-                if (st >= 0x10 && st <= 0x1F) return "ota_" + (st - 0x10);
+                if (st >= 0x10 && st <= 0x1F) return string.Format("ota_{0}", st - 0x10);
                 if (st == 0x20) return "test";
+            } else if (t == 0x01) {
+                if (st == 0x00) return "ota";
+                if (st == 0x01) return "phy";
+                if (st == 0x02) return "nvs";
+                if (st == 0x03) return "coredump";
+                if (st == 0x04) return "nvs_keys";
+                if (st == 0x81) return "fat";
+                if (st == 0x82) return "spiffs";
             }
-            else if (t == 0x01)
-            {
-                switch (st)
-                {
-                    case 0x00: return "ota";
-                    case 0x01: return "phy";
-                    case 0x02: return "nvs";
-                    case 0x03: return "coredump";
-                    case 0x04: return "nvs_keys";
-                    case 0x06: return "undefined";
-                    case 0x81: return "fat";
-                    case 0x82: return "spiffs";
-                    case 0x83: return "littlefs";
-                }
-            }
-            return "0x" + st.ToString("X2");
-        }
-
-        /// <summary>
-        /// Synthesizes an 8KB (0x2000) ESP-IDF otadata image selecting either ota_0 (seq=1) or ota_1 (seq=2).
-        /// Matches ESP-IDF bootloader_common_ota_select_crc(esp_rom_crc32_le(0xFFFFFFFF, &ota_seq, 4)).
-        /// </summary>
-        public static byte[] BuildOtaDataPayload(string targetSlot)
-        {
-            byte[] buf = new byte[0x2000];
-            for (int i = 0; i < buf.Length; i++) buf[i] = 0xFF;
-
-            uint otaSeq = string.Equals(targetSlot, "ota_1", StringComparison.OrdinalIgnoreCase) ? 2u : 1u;
-            uint otaState = 1u; // ESP_OTA_IMG_VALID = 1
-            byte[] seqBytes = BitConverter.GetBytes(otaSeq);
-            uint crc = ComputeEspRomCrc32Le(0xFFFFFFFF, seqBytes);
-
-            // Write 32-byte esp_ota_select_entry_t into Sector 0 (0x1D000), leaving Sector 1 (0x1E000) as 0xFF
-            Buffer.BlockCopy(seqBytes, 0, buf, 0, 4);
-            // bytes 4..23 are seq_label (20 x 0xFF)
-            Buffer.BlockCopy(BitConverter.GetBytes(otaState), 0, buf, 24, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes(crc), 0, buf, 28, 4);
-
-            return buf;
-        }
-
-        public static uint ComputeEspRomCrc32Le(uint initCrc, byte[] data)
-        {
-            // In ESP-ROM, esp_rom_crc32_le(uint32_t crc, const uint8_t *buf, uint32_t len)
-            // starts with crc = ~crc and returns ~crc.
-            uint crc = ~initCrc;
-            foreach (byte b in data)
-            {
-                crc ^= b;
-                for (int k = 0; k < 8; k++)
-                {
-                    crc = ((crc & 1) != 0) ? ((crc >> 1) ^ 0xEDB88320u) : (crc >> 1);
-                }
-            }
-            return ~crc;
+            return string.Format("0x{0:X2}", st);
         }
     }
 
     public class Esp32S3RomFlasher : IDisposable
     {
-        private const byte SLIP_END     = 0xC0;
-        private const byte SLIP_ESC     = 0xDB;
-        private const byte SLIP_ESC_END = 0xDC;
-        private const byte SLIP_ESC_ESC = 0xDD;
+        public const byte SLIP_END  = 0xC0;
+        public const byte SLIP_ESC  = 0xDB;
+        public const byte SLIP_ESC_END = 0xDC;
+        public const byte SLIP_ESC_ESC = 0xDD;
 
-        // ESP32-S3 Mask ROM Opcodes
-        private const byte ESP_FLASH_BEGIN        = 0x02;
-        private const byte ESP_FLASH_DATA         = 0x03;
-        private const byte ESP_FLASH_END          = 0x04;
-        private const byte ESP_SYNC               = 0x08;
-        private const byte ESP_WRITE_REG          = 0x09;
-        private const byte ESP_READ_REG           = 0x0A;
-        private const byte ESP_SPI_SET_PARAMS     = 0x0B;
-        private const byte ESP_SPI_ATTACH         = 0x0D;
-        private const byte ESP_CHANGE_BAUDRATE    = 0x0F;
-        private const byte ESP_SPI_FLASH_MD5      = 0x13;
-        private const byte ESP_GET_SECURITY_INFO  = 0x14;
+        public const byte ESP_FLASH_BEGIN = 0x02;
+        public const byte ESP_FLASH_DATA  = 0x03;
+        public const byte ESP_FLASH_END   = 0x04;
+        public const byte ESP_MEM_BEGIN   = 0x05;
+        public const byte ESP_MEM_END     = 0x06;
+        public const byte ESP_MEM_DATA    = 0x07;
+        public const byte ESP_SYNC        = 0x08;
+        public const byte ESP_WRITE_REG   = 0x09;
+        public const byte ESP_READ_REG    = 0x0A;
+        public const byte ESP_SPI_SET_PARAMS = 0x0B;
+        public const byte ESP_SPI_ATTACH  = 0x0D;
+        public const byte ESP_CHANGE_BAUDRATE = 0x0F;
+        public const byte ESP_SPI_FLASH_MD5   = 0x13;
 
-        private const byte ESP_CHECKSUM_MAGIC     = 0xEF;
-        private const int  FLASH_SECTOR_SIZE      = 4096;
-        private const int  FLASH_BLOCK_SIZE       = 4096;
-        private const uint RTC_CNTL_OPTION1_REG      = 0x60008128;
-        private const uint RTC_CNTL_WDTWPROTECT_REG  = 0x600080B0;
-        private const uint RTC_CNTL_WDTCONFIG0_REG   = 0x60008098;
-        private const uint RTC_CNTL_WDT_WKEY         = 0x50D83AA1;
-        private const uint RTC_CNTL_SWD_WPROTECT_REG = 0x600080B8;
-        private const uint RTC_CNTL_SWD_CONF_REG     = 0x600080B4;
-        private const uint RTC_CNTL_SWD_WKEY         = 0x8F1D312A;
-        private const uint RTC_CNTL_SWD_AUTO_FEED_EN = 0x80000000;
+        public const int FLASH_BLOCK_SIZE = 1024;
+        public const int FLASH_SECTOR_SIZE = 4096;
+
+        private SerialPort _port;
+        private string _portName;
+        private int _baud;
+        private bool _isNativeUsb;
+
+        public Esp32S3RomFlasher(string portName, int baud, bool isNativeUsb)
+        {
+            _portName = portName;
+            _baud = baud;
+            _isNativeUsb = isNativeUsb;
+        }
 
         public void WriteReg(uint addr, uint value, uint mask)
         {
@@ -404,7 +250,8 @@ namespace H1OS.Flasher
             Buffer.BlockCopy(BitConverter.GetBytes(addr),  0, payload, 0,  4);
             Buffer.BlockCopy(BitConverter.GetBytes(value), 0, payload, 4,  4);
             Buffer.BlockCopy(BitConverter.GetBytes(mask),  0, payload, 8,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0), 0, payload, 12, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(0u),    0, payload, 12, 4);
+
             uint val;
             ExecuteCommand(ESP_WRITE_REG, payload, 0, 1000, out val);
         }
@@ -419,49 +266,38 @@ namespace H1OS.Flasher
 
         public void DisableWatchdogs()
         {
-            try
+            try {
+                // RTC WDT (RTC_CNTL_WDTCONFIG0_REG: 0x60008048) -> disable stage 0-3
+                WriteReg(0x60008048, 0x00000000, 0xFFFFFFFF);
+                // Main System WDT (TIMG0_WDTCONFIG0_REG: 0x6001F048) -> disable
+                WriteReg(0x6001F048, 0x00000000, 0xFFFFFFFF);
+                // Super WDT (RTC_CNTL_SWD_CONF_REG: 0x600080B0) -> bypass
+                WriteReg(0x600080B0, 0x40000000, 0x40000000);
+            } catch { }
+        }
+
+        public void OpenPort(int baud)
+        {
+            if (_port != null && _port.IsOpen)
             {
-                WriteReg(RTC_CNTL_WDTWPROTECT_REG, RTC_CNTL_WDT_WKEY, 0xFFFFFFFF);
-                WriteReg(RTC_CNTL_WDTCONFIG0_REG, 0, 0xFFFFFFFF);
-                WriteReg(RTC_CNTL_WDTWPROTECT_REG, 0, 0xFFFFFFFF);
-
-                WriteReg(RTC_CNTL_SWD_WPROTECT_REG, RTC_CNTL_SWD_WKEY, 0xFFFFFFFF);
-                uint swdConf = ReadReg(RTC_CNTL_SWD_CONF_REG);
-                WriteReg(RTC_CNTL_SWD_CONF_REG, swdConf | RTC_CNTL_SWD_AUTO_FEED_EN, 0xFFFFFFFF);
-                WriteReg(RTC_CNTL_SWD_WPROTECT_REG, 0, 0xFFFFFFFF);
+                _port.Close();
+                _port.Dispose();
             }
-            catch { }
-        }
-
-        private SerialPort _port;
-        private string _portName;
-        private int _baudRate;
-        private bool _isNativeUsb;
-
-        public Esp32S3RomFlasher(string portName, int baudRate, bool isNativeUsb)
-        {
-            _portName = portName;
-            _baudRate = baudRate;
-            _isNativeUsb = isNativeUsb;
-        }
-
-        private void OpenPort(int baud)
-        {
-            ClosePort();
             _port = new SerialPort(_portName, baud, Parity.None, 8, StopBits.One);
-            _port.Handshake = Handshake.None;
-            _port.ReadBufferSize = 65536;
-            _port.WriteBufferSize = 65536;
-            _port.ReadTimeout = 3000;
-            _port.WriteTimeout = 5000;
+            _port.ReadTimeout = 2500;
+            _port.WriteTimeout = 2500;
+            _port.DtrEnable = false;
+            _port.RtsEnable = false;
             _port.Open();
+            _port.DiscardInBuffer();
+            _port.DiscardOutBuffer();
         }
 
         public void ClosePort()
         {
-            if (_port != null)
+            if (_port != null && _port.IsOpen)
             {
-                try { if (_port.IsOpen) _port.Close(); } catch { }
+                try { _port.Close(); } catch { }
                 try { _port.Dispose(); } catch { }
                 _port = null;
             }
@@ -474,221 +310,121 @@ namespace H1OS.Flasher
 
         public void EnterBootloader()
         {
-            Console.WriteLine("[*] Triggering ESP32-S3 hardware reset into Mask ROM Download Mode...");
+            Console.WriteLine(string.Format("[*] Engaging ESP32-S3 USB CDC on {0}...", _portName));
 
-            for (int attempt = 1; attempt <= 3; attempt++)
+            if (_isNativeUsb)
             {
-                try
-                {
-                    OpenPort(115200);
+                // ESP32-S3 Native USB (USB-Serial-JTAG, VID_303A:PID_1001)
+                // Hardware RTS=LOW + DTR=PULSE triggers hardware bootloader without rebooting port
+                OpenPort(115200);
+                _port.DtrEnable = false;
+                _port.RtsEnable = false;
+                Thread.Sleep(50);
 
-                    if (_isNativeUsb)
-                    {
-                        // ESP32-S3 internal USB-Serial/JTAG Reset Sequence (USBJTAGSerialReset)
-                        _port.RtsEnable = false;
-                        _port.DtrEnable = false;
-                        Thread.Sleep(100);
-
-                        _port.DtrEnable = true;
-                        _port.RtsEnable = false;
-                        Thread.Sleep(100);
-
-                        _port.RtsEnable = true;
-                        _port.DtrEnable = false;
-                        _port.RtsEnable = true;
-                        Thread.Sleep(100);
-
-                        _port.RtsEnable = false;
-                        _port.DtrEnable = false;
-                    }
-                    else
-                    {
-                        _port.DtrEnable = false;
-                        _port.RtsEnable = true;
-                        Thread.Sleep(100);
-                        _port.DtrEnable = true;
-                        _port.RtsEnable = false;
-                        Thread.Sleep(50);
-                        _port.DtrEnable = false;
-                    }
-
-                    ClosePort();
-                    Thread.Sleep(_isNativeUsb ? 450 : 120);
-                    ReopenPortWithRetry(115200, 4000);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    ClosePort();
-                    if (attempt == 3)
-                    {
-                        throw new Exception("Failed to reset ESP32-S3 on " + _portName + ": " + ex.Message);
-                    }
-                    Thread.Sleep(500);
-                }
+                _port.DtrEnable = false;
+                _port.RtsEnable = true;  // Boot mode LOW
+                Thread.Sleep(100);
+                _port.DtrEnable = true;  // Reset pulse
+                Thread.Sleep(100);
+                _port.DtrEnable = false; // Release reset
+                Thread.Sleep(250);
             }
-        }
-
-        private void ReopenPortWithRetry(int baud, int maxWaitMs)
-        {
-            Stopwatch sw = Stopwatch.StartNew();
-            Exception lastErr = null;
-            while (sw.ElapsedMilliseconds < maxWaitMs)
+            else
             {
-                try
-                {
-                    OpenPort(baud);
-                    _port.DiscardInBuffer();
-                    _port.DiscardOutBuffer();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    lastErr = ex;
-                    ClosePort();
-                    Thread.Sleep(150);
-                }
+                // Standard UART bridge (CP2102/CH340/FTDI)
+                OpenPort(115200);
+                _port.DtrEnable = false;
+                _port.RtsEnable = true;
+                Thread.Sleep(100);
+                _port.DtrEnable = true;
+                _port.RtsEnable = false;
+                Thread.Sleep(150);
+                _port.DtrEnable = false;
+                Thread.Sleep(200);
             }
-            throw new Exception("Serial port " + _portName + " did not re-enumerate after reset: " +
-                (lastErr != null ? lastErr.Message : "timeout"));
+
+            _port.DiscardInBuffer();
+            _port.DiscardOutBuffer();
         }
 
         public void SyncWithRom()
         {
-            Console.Write("[*] Synchronizing with ESP32-S3 Mask ROM via SLIP... ");
+            Console.Write("[*] Synchronizing with ESP32-S3 Mask ROM...");
+            byte[] syncFrame = new byte[36];
+            syncFrame[0] = 0x07;
+            syncFrame[1] = 0x07;
+            syncFrame[2] = 0x12;
+            syncFrame[3] = 0x20;
+            for (int i = 4; i < 36; i++) syncFrame[i] = 0x55;
 
-            byte[] syncPayload = new byte[36];
-            syncPayload[0] = 0x07;
-            syncPayload[1] = 0x07;
-            syncPayload[2] = 0x12;
-            syncPayload[3] = 0x20;
-            for (int i = 4; i < 36; i++) syncPayload[i] = 0x55;
-
-            byte[] syncPacket = BuildCommandPacket(ESP_SYNC, syncPayload, 0);
-
-            for (int cycle = 0; cycle < 3; cycle++)
+            bool synced = false;
+            for (int attempt = 1; attempt <= 25; attempt++)
             {
-                if (cycle > 0)
+                try
                 {
-                    Console.Write("\n[*] Retrying hardware bootloader trap (attempt " + (cycle + 1) + ")... ");
-                    EnterBootloader();
+                    uint retVal;
+                    ExecuteCommand(ESP_SYNC, syncFrame, 0, 150, out retVal);
+                    synced = true;
+                    break;
                 }
-
-                for (int i = 0; i < 10; i++)
+                catch
                 {
-                    try
-                    {
-                        _port.DiscardInBuffer();
-                        SendSlipPacket(syncPacket);
-
-                        uint val;
-                        byte[] resp = ReadCommandResponse(ESP_SYNC, 250, out val);
-                        if (resp != null)
-                        {
-                            DrainExtraSyncResponses();
-                            Console.WriteLine("Connected!");
-                            VerifyChipIdentity();
-
-                            if (!_isNativeUsb && _baudRate > 115200)
-                            {
-                                ChangeBaudRate(_baudRate);
-                            }
-                            return;
-                        }
-                    }
-                    catch (TimeoutException) { }
-                    catch (IOException)
-                    {
-                        ReopenPortWithRetry(115200, 2000);
-                    }
+                    Console.Write(".");
+                    Thread.Sleep(30);
                 }
             }
 
-            Console.WriteLine("Failed!");
-            throw new Exception("Timed out waiting for ESP32-S3 ROM SYNC handshake on " + _portName +
-                ". Hold BOOT (GPIO0), tap RESET, and try again.");
-        }
-
-        private void DrainExtraSyncResponses()
-        {
-            int oldTimeout = _port.ReadTimeout;
-            _port.ReadTimeout = 60;
-            try
+            if (!synced)
             {
-                for (int i = 0; i < 12; i++)
-                {
-                    byte[] pkt = ReadRawSlipFrame(60);
-                    if (pkt == null) break;
-                }
+                Console.WriteLine(" FAILED");
+                throw new TimeoutException("Failed to synchronize with ESP32-S3 Mask ROM. Hold BOOT, press RESET, and retry.");
             }
-            catch { }
-            finally
-            {
-                _port.ReadTimeout = oldTimeout;
-                try { _port.DiscardInBuffer(); } catch { }
-            }
-        }
+            Console.WriteLine(" OK (Mask ROM Connected)");
 
-        private void VerifyChipIdentity()
-        {
-            try
-            {
-                uint val;
-                byte[] secInfo = ExecuteCommand(ESP_GET_SECURITY_INFO, new byte[0], 0, 1000, out val);
-                if (secInfo != null && secInfo.Length >= 16)
-                {
-                    uint chipId = BitConverter.ToUInt32(secInfo, 12);
-                    if (chipId == 9)
-                    {
-                        Console.WriteLine("[+] Confirmed Target Silicon : ESP32-S3 (Chip ID: 0x0009, Mask ROM Loader)");
-                        return;
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private void ChangeBaudRate(int newBaud)
-        {
-            Console.Write("[*] Stepping UART baud rate to " + newBaud + " bps... ");
-            byte[] payload = new byte[8];
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)newBaud), 0, payload, 0, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0), 0, payload, 4, 4);
-
-            uint val;
-            ExecuteCommand(ESP_CHANGE_BAUDRATE, payload, 0, 1000, out val);
-            Thread.Sleep(50);
-            _port.BaudRate = newBaud;
-            Thread.Sleep(50);
-            _port.DiscardInBuffer();
-            Console.WriteLine("OK.");
+            // Drain extra sync replies
+            Thread.Sleep(40);
+            DrainInput(100);
+            DisableWatchdogs();
         }
 
         public void AttachAndConfigureSpiFlash(int flashSizeMB)
         {
-            Console.Write("[*] Attaching internal SPI Flash bus (" + flashSizeMB + "MB DIO 80MHz)... ");
+            Console.WriteLine("[*] Attaching SPI Flash (DIO Mode, 80MHz)...");
 
+            // Attach SPI (ESP_SPI_ATTACH 0x0D, payload = 8 zero bytes)
             byte[] attachPayload = new byte[8];
             uint val;
-            ExecuteCommand(ESP_SPI_ATTACH, attachPayload, 0, 3000, out val);
+            ExecuteCommand(ESP_SPI_ATTACH, attachPayload, 0, 1500, out val);
 
-            uint totalBytes = (uint)(flashSizeMB * 1024 * 1024);
+            // Configure SPI parameters (0x0B)
+            // 8MB = 0x800000, 64KB block, 4KB sector, 256B page, 0xFFFF status mask
+            uint flashSizeParam = (uint)flashSizeMB * 1024u * 1024u;
             byte[] spiParams = new byte[24];
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0),          0, spiParams, 0,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes(totalBytes),       0, spiParams, 4,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)65536),      0, spiParams, 8,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)4096),       0, spiParams, 12, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)256),        0, spiParams, 16, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0xFFFF),     0, spiParams, 20, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(0u),              0, spiParams, 0,  4); // id
+            Buffer.BlockCopy(BitConverter.GetBytes(flashSizeParam), 0, spiParams, 4,  4); // total size
+            Buffer.BlockCopy(BitConverter.GetBytes(64u * 1024u),    0, spiParams, 8,  4); // block size
+            Buffer.BlockCopy(BitConverter.GetBytes(4u * 1024u),     0, spiParams, 12, 4); // sector size
+            Buffer.BlockCopy(BitConverter.GetBytes(256u),           0, spiParams, 16, 4); // page size
+            Buffer.BlockCopy(BitConverter.GetBytes(0xFFFFu),        0, spiParams, 20, 4); // status mask
+            ExecuteCommand(ESP_SPI_SET_PARAMS, spiParams, 0, 1500, out val);
 
-            ExecuteCommand(ESP_SPI_SET_PARAMS, spiParams, 0, 3000, out val);
-            Console.WriteLine("Bound.");
+            // Negotiate fast baud rate if requested and != 115200
+            if (_baud > 115200)
+            {
+                Console.WriteLine(string.Format("[*] Accelerating baud rate to {0:N0} baud...", _baud));
+                byte[] baudPayload = new byte[8];
+                Buffer.BlockCopy(BitConverter.GetBytes((uint)_baud), 0, baudPayload, 0, 4);
+                Buffer.BlockCopy(BitConverter.GetBytes(0u),          0, baudPayload, 4, 4);
+                ExecuteCommand(ESP_CHANGE_BAUDRATE, baudPayload, 0, 1000, out val);
+
+                ClosePort();
+                Thread.Sleep(50);
+                OpenPort(_baud);
+                Thread.Sleep(50);
+                _port.DiscardInBuffer();
+            }
         }
 
-        /// <summary>
-        /// Erases an arbitrary sector-aligned flash region (or the full 8MB die) to 0xFF using
-        /// the ESP32-S3 Mask ROM's native ESP_FLASH_BEGIN (0x02) erase engine.
-        /// </summary>
         public void EraseFlashRegion(uint startOffset, uint byteLength, string regionLabel)
         {
             if ((startOffset % FLASH_SECTOR_SIZE) != 0)
@@ -696,10 +432,10 @@ namespace H1OS.Flasher
                 throw new Exception(string.Format("Erase start offset 0x{0:X} must be 4KB sector-aligned.", startOffset));
             }
             uint alignedLen = ((byteLength + (uint)FLASH_SECTOR_SIZE - 1u) / (uint)FLASH_SECTOR_SIZE) * (uint)FLASH_SECTOR_SIZE;
-            uint maxStep = 256u * 1024u; // 256KB chunks for smooth progress & safe ROM timeouts
+            uint maxStep = 256u * 1024u;
             uint totalSteps = (alignedLen + maxStep - 1u) / maxStep;
 
-            Console.WriteLine(string.Format("\n[*] Scrubbing {0} (0x{1:X6} .. 0x{2:X6}, {3:N1} KB -> 0xFF)...",
+            Console.WriteLine(string.Format("\n[*] Erasing {0} (0x{1:X6} .. 0x{2:X6}, {3:N1} KB -> 0xFF)...",
                 regionLabel, startOffset, startOffset + alignedLen - 1, alignedLen / 1024.0));
             Stopwatch sw = Stopwatch.StartNew();
 
@@ -712,7 +448,7 @@ namespace H1OS.Flasher
                 stepIdx++;
                 uint chunk = Math.Min(remaining, maxStep);
                 int pct = (int)((stepIdx * 100) / totalSteps);
-                Console.Write(string.Format("\r    Erasing 0x{0:X6} .. 0x{1:X6} [{2,3}%]",
+                Console.Write(string.Format("\r    Scrubbing 0x{0:X6} .. 0x{1:X6} [{2,3}%]",
                     curOffset, curOffset + chunk - 1, pct));
 
                 byte[] beginPayload = new byte[20];
@@ -731,17 +467,17 @@ namespace H1OS.Flasher
             }
 
             sw.Stop();
-            Console.WriteLine(string.Format("\n    [+] Scrubbed {0} to 0xFF in {1:F1}s.", regionLabel, sw.Elapsed.TotalSeconds));
+            Console.WriteLine(string.Format("\n    [+] Erased {0} in {1:F1}s.", regionLabel, sw.Elapsed.TotalSeconds));
         }
 
-        public void FlashSegment(FlashSegment segment, bool verifyMd5, bool preserveNvsGap)
+        public void FlashSegment(FlashSegment segment, bool verifyMd5)
         {
             byte[] rawBytes = segment.RawPayload;
             if (rawBytes == null)
             {
                 if (!File.Exists(segment.FilePath))
                 {
-                    throw new FileNotFoundException("Firmware binary not found: " + segment.FilePath);
+                    throw new FileNotFoundException("Binary file not found: " + segment.FilePath);
                 }
                 rawBytes = File.ReadAllBytes(segment.FilePath);
             }
@@ -754,508 +490,333 @@ namespace H1OS.Flasher
             if (segment.MaxAllowedSize > 0 && rawBytes.Length > segment.MaxAllowedSize)
             {
                 throw new Exception(string.Format(
-                    "Binary '{0}' ({1:N0} bytes) exceeds partition capacity ({2:N0} bytes) at 0x{3:X6}!",
+                    "Binary '{0}' ({1:N0} bytes) exceeds capacity ({2:N0} bytes) at 0x{3:X6}!",
                     segment.Label, rawBytes.Length, segment.MaxAllowedSize, segment.Offset));
             }
 
             if ((segment.Offset % FLASH_SECTOR_SIZE) != 0)
             {
-                throw new Exception(string.Format("Flash offset 0x{0:X} is not aligned to 4096-byte sector boundary.", segment.Offset));
+                throw new Exception(string.Format("Flash offset 0x{0:X} is not 4KB sector-aligned.", segment.Offset));
             }
 
-            if (preserveNvsGap && segment.Offset == 0 && rawBytes.Length > 0x20000)
-            {
-                List<Tuple<uint, byte[], string>> subSegments = SplitMonolithicHeaderGaps(rawBytes, segment.Label);
-                if (subSegments.Count > 1)
-                {
-                    foreach (var sub in subSegments)
-                    {
-                        FlashByteSlice(sub.Item1, sub.Item2, sub.Item3, verifyMd5);
-                    }
-                    return;
-                }
-            }
-
-            FlashByteSlice(segment.Offset, rawBytes, segment.Label, verifyMd5);
-        }
-
-        private List<Tuple<uint, byte[], string>> SplitMonolithicHeaderGaps(byte[] rawBytes, string baseLabel)
-        {
-            List<Tuple<uint, byte[], string>> slices = new List<Tuple<uint, byte[], string>>();
-            int headerLimit = Math.Min(rawBytes.Length, 0x20000);
-            int totalHeaderSectors = headerLimit / FLASH_SECTOR_SIZE;
-
-            int sec = 0;
-            while (sec < totalHeaderSectors)
-            {
-                if (IsSectorAllFF(rawBytes, sec * FLASH_SECTOR_SIZE))
-                {
-                    sec++;
-                    continue;
-                }
-
-                int startSec = sec;
-                while (sec < totalHeaderSectors && !IsSectorAllFF(rawBytes, sec * FLASH_SECTOR_SIZE))
-                {
-                    sec++;
-                }
-
-                uint sliceOffset = (uint)(startSec * FLASH_SECTOR_SIZE);
-                int sliceLen = (sec - startSec) * FLASH_SECTOR_SIZE;
-                while (sliceLen > 16 && rawBytes[(int)sliceOffset + sliceLen - 1] == 0xFF)
-                {
-                    sliceLen--;
-                }
-
-                byte[] buf = new byte[sliceLen];
-                Buffer.BlockCopy(rawBytes, (int)sliceOffset, buf, 0, sliceLen);
-                string label = string.Format("{0} [0x{1:X5}]", baseLabel, sliceOffset);
-                slices.Add(new Tuple<uint, byte[], string>(sliceOffset, buf, label));
-            }
-
-            if (rawBytes.Length > 0x20000)
-            {
-                int appLen = rawBytes.Length - 0x20000;
-                byte[] appBuf = new byte[appLen];
-                Buffer.BlockCopy(rawBytes, 0x20000, appBuf, 0, appLen);
-                slices.Add(new Tuple<uint, byte[], string>(0x20000, appBuf, baseLabel + " [App 0x20000]"));
-            }
-
-            return slices;
-        }
-
-        private static bool IsSectorAllFF(byte[] data, int sectorOffset)
-        {
-            int end = Math.Min(data.Length, sectorOffset + FLASH_SECTOR_SIZE);
-            for (int i = sectorOffset; i < end; i++)
-            {
-                if (data[i] != 0xFF) return false;
-            }
-            return true;
-        }
-
-        private void FlashByteSlice(uint offset, byte[] rawBytes, string label, bool verifyMd5)
-        {
-            int paddedLength = ((rawBytes.Length + FLASH_BLOCK_SIZE - 1) / FLASH_BLOCK_SIZE) * FLASH_BLOCK_SIZE;
-            byte[] paddedBytes = new byte[paddedLength];
-            Buffer.BlockCopy(rawBytes, 0, paddedBytes, 0, rawBytes.Length);
-            for (int i = rawBytes.Length; i < paddedLength; i++)
-            {
-                paddedBytes[i] = 0xFF;
-            }
-
-            uint numBlocks = (uint)(paddedLength / FLASH_BLOCK_SIZE);
-            uint eraseSize = (uint)paddedLength;
-
-            Console.WriteLine(string.Format("\n[*] Flashing {0} ({1:N1} KB) -> 0x{2:X6} ({3} blocks)...",
-                label, rawBytes.Length / 1024.0, offset, numBlocks));
-
-            byte[] beginPayload = new byte[20];
-            Buffer.BlockCopy(BitConverter.GetBytes(eraseSize),               0, beginPayload, 0,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes(numBlocks),               0, beginPayload, 4,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)FLASH_BLOCK_SIZE),  0, beginPayload, 8,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes(offset),                  0, beginPayload, 12, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0),                 0, beginPayload, 16, 4);
-
-            int beginTimeoutMs = Math.Max(15000, 6000 + (int)((eraseSize / 65536) * 2000));
-            uint val;
-            ExecuteCommand(ESP_FLASH_BEGIN, beginPayload, 0, beginTimeoutMs, out val);
-
-            Stopwatch sw = Stopwatch.StartNew();
-            byte[] blockPayload = new byte[16 + FLASH_BLOCK_SIZE];
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)FLASH_BLOCK_SIZE), 0, blockPayload, 0,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0),                0, blockPayload, 8,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0),                0, blockPayload, 12, 4);
-
-            for (uint seq = 0; seq < numBlocks; seq++)
-            {
-                int srcOffset = (int)(seq * FLASH_BLOCK_SIZE);
-                Buffer.BlockCopy(BitConverter.GetBytes(seq), 0, blockPayload, 4, 4);
-                Buffer.BlockCopy(paddedBytes, srcOffset, blockPayload, 16, FLASH_BLOCK_SIZE);
-
-                uint checksum = ComputeXorChecksum(paddedBytes, srcOffset, FLASH_BLOCK_SIZE);
-
-                bool blockOk = false;
-                Exception lastBlockErr = null;
-                for (int retry = 0; retry < 3; retry++)
-                {
-                    try
-                    {
-                        ExecuteCommand(ESP_FLASH_DATA, blockPayload, checksum, 5000, out val);
-                        blockOk = true;
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        lastBlockErr = ex;
-                        Thread.Sleep(50);
-                        try { _port.DiscardInBuffer(); } catch { }
-                    }
-                }
-
-                if (!blockOk)
-                {
-                    Console.WriteLine();
-                    throw new Exception(string.Format("Failed writing block {0}/{1} at 0x{2:X6}: {3}",
-                        seq, numBlocks, offset + srcOffset,
-                        lastBlockErr != null ? lastBlockErr.Message : "unknown error"));
-                }
-
-                if ((seq % 4 == 0) || (seq == numBlocks - 1))
-                {
-                    RenderProgressBar(seq + 1, numBlocks, sw.Elapsed.TotalSeconds, paddedLength);
-                }
-            }
-
-            sw.Stop();
-            double kbps = (paddedLength / 1024.0) / Math.Max(0.05, sw.Elapsed.TotalSeconds);
-            Console.WriteLine(string.Format("\n    [+] Wrote {0:N0} bytes in {1:F1}s ({2:F1} KB/s).",
-                rawBytes.Length, sw.Elapsed.TotalSeconds, kbps));
+            FlashBlockSequence(segment.Offset, rawBytes, segment.Label);
 
             if (verifyMd5)
             {
-                VerifySegmentMd5(offset, rawBytes);
+                VerifySegmentMd5(segment.Offset, rawBytes, segment.Label);
             }
         }
 
-        public string ComputeOnChipMd5(uint offset, uint length)
+        private void FlashBlockSequence(uint offset, byte[] data, string label)
+        {
+            uint totalSize = (uint)data.Length;
+            uint numBlocks = (totalSize + FLASH_BLOCK_SIZE - 1) / FLASH_BLOCK_SIZE;
+
+            Console.WriteLine(string.Format("\n[*] Writing {0} (0x{1:X6}, {2:N1} KB, {3} blocks)...",
+                label, offset, totalSize / 1024.0, numBlocks));
+
+            // ESP_FLASH_BEGIN
+            byte[] beginPayload = new byte[20];
+            Buffer.BlockCopy(BitConverter.GetBytes(totalSize),               0, beginPayload, 0,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes(numBlocks),                0, beginPayload, 4,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes((uint)FLASH_BLOCK_SIZE),   0, beginPayload, 8,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes(offset),                   0, beginPayload, 12, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes((uint)0),                  0, beginPayload, 16, 4);
+
+            int eraseTimeoutMs = Math.Max(12000, 5000 + (int)((totalSize / 65536) * 1800));
+            uint val;
+            ExecuteCommand(ESP_FLASH_BEGIN, beginPayload, 0, eraseTimeoutMs, out val);
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            for (uint seq = 0; seq < numBlocks; seq++)
+            {
+                uint blockOffset = seq * FLASH_BLOCK_SIZE;
+                uint thisBlockSize = Math.Min((uint)FLASH_BLOCK_SIZE, totalSize - blockOffset);
+
+                byte[] blockData = new byte[FLASH_BLOCK_SIZE];
+                for (int i = 0; i < FLASH_BLOCK_SIZE; i++) blockData[i] = 0xFF;
+                Buffer.BlockCopy(data, (int)blockOffset, blockData, 0, (int)thisBlockSize);
+
+                byte[] dataPayload = new byte[16 + FLASH_BLOCK_SIZE];
+                Buffer.BlockCopy(BitConverter.GetBytes(thisBlockSize), 0, dataPayload, 0,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(seq),           0, dataPayload, 4,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(0u),            0, dataPayload, 8,  4);
+                Buffer.BlockCopy(BitConverter.GetBytes(0u),            0, dataPayload, 12, 4);
+                Buffer.BlockCopy(blockData, 0, dataPayload, 16, FLASH_BLOCK_SIZE);
+
+                ExecuteCommand(ESP_FLASH_DATA, dataPayload, 0, 4000, out val);
+
+                int pct = (int)(((seq + 1) * 100) / numBlocks);
+                double elapsedSec = sw.Elapsed.TotalSeconds;
+                double speedKBps = (elapsedSec > 0.05) ? ((seq + 1) * FLASH_BLOCK_SIZE / 1024.0) / elapsedSec : 0.0;
+                Console.Write(string.Format("\r    Progress: {0,3}% ({1,5:N1} KB / {2,5:N1} KB) @ {3:F1} KB/s    ",
+                    pct, (blockOffset + thisBlockSize) / 1024.0, totalSize / 1024.0, speedKBps));
+            }
+
+            sw.Stop();
+            Console.WriteLine(string.Format("\n    [+] Written in {0:F2}s ({1:F1} KB/s).",
+                sw.Elapsed.TotalSeconds, (totalSize / 1024.0) / Math.Max(0.01, sw.Elapsed.TotalSeconds)));
+        }
+
+        public string ComputeOnChipMd5(uint offset, uint size)
         {
             byte[] md5Payload = new byte[16];
-            Buffer.BlockCopy(BitConverter.GetBytes(offset),  0, md5Payload, 0,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes(length),  0, md5Payload, 4,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0), 0, md5Payload, 8,  4);
-            Buffer.BlockCopy(BitConverter.GetBytes((uint)0), 0, md5Payload, 12, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(offset), 0, md5Payload, 0,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes(size),   0, md5Payload, 4,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes(0u),     0, md5Payload, 8,  4);
+            Buffer.BlockCopy(BitConverter.GetBytes(0u),     0, md5Payload, 12, 4);
 
-            int timeoutMs = Math.Max(5000, 2000 + (int)((length / 65536) * 600));
-            uint val;
-            byte[] respData = ExecuteCommand(ESP_SPI_FLASH_MD5, md5Payload, 0, timeoutMs, out val);
-            return ExtractMd5FromResponse(respData);
-        }
+            int md5Timeout = Math.Max(5000, 2000 + (int)((size / 65536) * 400));
+            byte[] resp = ExecuteCommandRaw(ESP_SPI_FLASH_MD5, md5Payload, 0, md5Timeout);
 
-        private void VerifySegmentMd5(uint offset, byte[] expectedBytes)
-        {
-            Console.Write("    [*] Verifying on-chip SPI Flash MD5... ");
-            string hostMd5 = ComputeHostMd5Hex(expectedBytes);
-            string romMd5 = ComputeOnChipMd5(offset, (uint)expectedBytes.Length);
+            // Response payload contains 16-byte binary MD5 or 32-byte hex string
+            byte[] valBytes = new byte[resp.Length - 8];
+            Buffer.BlockCopy(resp, 8, valBytes, 0, valBytes.Length);
 
-            if (string.IsNullOrEmpty(romMd5))
+            if (valBytes.Length >= 32)
             {
-                Console.WriteLine("Skipped (unexpected MD5 payload length).");
-                return;
+                return Encoding.ASCII.GetString(valBytes, 0, 32).ToLowerInvariant();
             }
-
-            if (!string.Equals(hostMd5, romMd5, StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine("MISMATCH!");
-                throw new Exception(string.Format("MD5 verification failed at 0x{0:X6}! Host={1}, Chip={2}",
-                    offset, hostMd5, romMd5));
-            }
-
-            Console.WriteLine("OK (" + romMd5.Substring(0, 12) + "...).");
-        }
-
-        public static string ComputeHostMd5Hex(byte[] bytes)
-        {
-            using (MD5 md5 = MD5.Create())
-            {
-                byte[] hash = md5.ComputeHash(bytes);
-                StringBuilder sb = new StringBuilder(32);
-                foreach (byte b in hash) sb.Append(b.ToString("x2"));
-                return sb.ToString();
-            }
-        }
-
-        public static string ComputeBlankRegionMd5Hex(uint length)
-        {
-            byte[] blank = new byte[length];
-            for (int i = 0; i < blank.Length; i++) blank[i] = 0xFF;
-            return ComputeHostMd5Hex(blank);
-        }
-
-        private string ExtractMd5FromResponse(byte[] respData)
-        {
-            if (respData == null) return null;
-            if (respData.Length >= 36)
-            {
-                return Encoding.ASCII.GetString(respData, 0, 32).ToLowerInvariant();
-            }
-            if (respData.Length >= 18)
+            if (valBytes.Length >= 16)
             {
                 StringBuilder sb = new StringBuilder(32);
-                for (int i = 0; i < 16; i++) sb.Append(respData[i].ToString("x2"));
+                for (int i = 0; i < 16; i++) sb.Append(valBytes[i].ToString("x2"));
                 return sb.ToString();
             }
-            return null;
+            throw new Exception("Unexpected MD5 response size: " + valBytes.Length);
+        }
+
+        public void VerifySegmentMd5(uint offset, byte[] expectedData, string label)
+        {
+            Console.Write(string.Format("[*] Verifying on-chip MD5 for {0}...", label));
+            string hostMd5 = ComputeHostMd5Hex(expectedData);
+            string chipMd5 = ComputeOnChipMd5(offset, (uint)expectedData.Length);
+
+            if (string.Equals(hostMd5, chipMd5, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(" VERIFIED (" + chipMd5.Substring(0, 16) + "...)");
+            }
+            else
+            {
+                Console.WriteLine(" MISMATCH!");
+                throw new Exception(string.Format("MD5 Mismatch for {0} at 0x{1:X6}!\n  Host: {2}\n  Chip: {3}",
+                    label, offset, hostMd5, chipMd5));
+            }
         }
 
         public void FinishAndReboot()
         {
-            Console.Write("\n[*] Finalizing flash & rebooting into H1OS firmware... ");
-
-            try
-            {
-                byte[] writeRegPayload = new byte[16];
-                Buffer.BlockCopy(BitConverter.GetBytes(RTC_CNTL_OPTION1_REG), 0, writeRegPayload, 0,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes((uint)0),              0, writeRegPayload, 4,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes((uint)0x1),            0, writeRegPayload, 8,  4);
-                Buffer.BlockCopy(BitConverter.GetBytes((uint)0),              0, writeRegPayload, 12, 4);
+            Console.WriteLine("[*] Finalizing flash and rebooting target SoC...");
+            try {
+                byte[] endPayload = new byte[4]; // reboot flag = 0
                 uint val;
-                ExecuteCommand(ESP_WRITE_REG, writeRegPayload, 0, 500, out val);
-            }
-            catch { }
+                ExecuteCommand(ESP_FLASH_END, endPayload, 0, 1500, out val);
+            } catch { }
 
-            try
-            {
-                byte[] endPayload = BitConverter.GetBytes((uint)0);
-                uint val;
-                ExecuteCommand(ESP_FLASH_END, endPayload, 0, 1000, out val);
-            }
-            catch { }
-
-            try
-            {
+            // Hardware reset pulse via RTS/DTR
+            try {
                 if (_port != null && _port.IsOpen)
                 {
                     _port.DtrEnable = false;
                     _port.RtsEnable = true;
-                    Thread.Sleep(100);
+                    Thread.Sleep(50);
                     _port.RtsEnable = false;
                     Thread.Sleep(50);
                 }
+            } catch { }
+        }
+
+        private void DrainInput(int timeoutMs)
+        {
+            if (_port == null || !_port.IsOpen) return;
+            int oldTimeout = _port.ReadTimeout;
+            _port.ReadTimeout = timeoutMs;
+            try {
+                while (true) { _port.ReadByte(); }
+            } catch { }
+            finally {
+                if (_port != null && _port.IsOpen) _port.ReadTimeout = oldTimeout;
             }
-            catch { }
+        }
+
+        private void ExecuteCommand(byte op, byte[] data, uint checksum, int timeoutMs, out uint retVal)
+        {
+            byte[] resp = ExecuteCommandRaw(op, data, checksum, timeoutMs);
+            retVal = BitConverter.ToUInt32(resp, 4);
+        }
+
+        private byte[] ExecuteCommandRaw(byte op, byte[] data, uint checksum, int timeoutMs)
+        {
+            if (data == null) data = new byte[0];
+            ushort dataLen = (ushort)data.Length;
+
+            byte[] pkt = new byte[8 + dataLen];
+            pkt[0] = 0x00; // Direction: host -> ROM
+            pkt[1] = op;
+            pkt[2] = (byte)(dataLen & 0xFF);
+            pkt[3] = (byte)((dataLen >> 8) & 0xFF);
+            Buffer.BlockCopy(BitConverter.GetBytes(checksum), 0, pkt, 4, 4);
+            Buffer.BlockCopy(data, 0, pkt, 8, dataLen);
+
+            byte[] slipPkt = SlipEncode(pkt);
+            _port.Write(slipPkt, 0, slipPkt.Length);
+
+            Stopwatch sw = Stopwatch.StartNew();
+            List<byte> replyBuffer = new List<byte>(64);
+
+            int prevTimeout = _port.ReadTimeout;
+            _port.ReadTimeout = Math.Max(500, timeoutMs);
+
+            try
+            {
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    int b = _port.ReadByte();
+                    if (b < 0) continue;
+
+                    if ((byte)b == SLIP_END)
+                    {
+                        if (replyBuffer.Count > 0)
+                        {
+                            byte[] decoded = SlipDecode(replyBuffer.ToArray());
+                            replyBuffer.Clear();
+
+                            if (decoded.Length >= 8 && decoded[0] == 0x01 && decoded[1] == op)
+                            {
+                                byte status = (decoded.Length >= 10) ? decoded[decoded.Length - 2] : (byte)0;
+                                byte err = (decoded.Length >= 10) ? decoded[decoded.Length - 1] : (byte)0;
+                                if (status != 0)
+                                {
+                                    throw new Exception(string.Format("ROM command 0x{0:X2} failed with status 0x{1:X2}, err 0x{2:X2}.", op, status, err));
+                                }
+                                return decoded;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        replyBuffer.Add((byte)b);
+                    }
+                }
+            }
             finally
             {
-                ClosePort();
+                if (_port != null && _port.IsOpen) _port.ReadTimeout = prevTimeout;
             }
 
-            Console.WriteLine("Done!");
+            throw new TimeoutException(string.Format("Timeout waiting for ROM reply to command 0x{0:X2} after {1}ms.", op, timeoutMs));
         }
 
-        private void RenderProgressBar(uint currentBlock, uint totalBlocks, double elapsedSec, int totalBytes)
+        private static byte[] SlipEncode(byte[] input)
         {
-            int width = 28;
-            double ratio = (double)currentBlock / totalBlocks;
-            int filled = (int)Math.Round(ratio * width);
-            if (filled > width) filled = width;
-
-            string bar = new string('#', filled) + new string('-', width - filled);
-            int pct = (int)Math.Round(ratio * 100.0);
-            double kbWritten = (currentBlock * FLASH_BLOCK_SIZE) / 1024.0;
-            double kbTotal = totalBytes / 1024.0;
-
-            Console.Write(string.Format("\r    [{0}] {1,3}% ({2,6:F1} / {3,6:F1} KB)",
-                bar, pct, Math.Min(kbWritten, kbTotal), kbTotal));
-        }
-
-        private static uint ComputeXorChecksum(byte[] data, int offset, int count)
-        {
-            byte chk = ESP_CHECKSUM_MAGIC;
-            int end = offset + count;
-            for (int i = offset; i < end; i++) chk ^= data[i];
-            return chk;
-        }
-
-        private static byte[] BuildCommandPacket(byte op, byte[] data, uint checksum)
-        {
-            ushort len = (ushort)(data != null ? data.Length : 0);
-            byte[] pkt = new byte[8 + len];
-            pkt[0] = 0x00;
-            pkt[1] = op;
-            pkt[2] = (byte)(len & 0xFF);
-            pkt[3] = (byte)((len >> 8) & 0xFF);
-            pkt[4] = (byte)(checksum & 0xFF);
-            pkt[5] = (byte)((checksum >> 8) & 0xFF);
-            pkt[6] = (byte)((checksum >> 16) & 0xFF);
-            pkt[7] = (byte)((checksum >> 24) & 0xFF);
-            if (len > 0) Buffer.BlockCopy(data, 0, pkt, 8, len);
-            return pkt;
-        }
-
-        private void SendSlipPacket(byte[] rawPacket)
-        {
-            byte[] encoded = new byte[rawPacket.Length * 2 + 2];
-            int idx = 0;
-            encoded[idx++] = SLIP_END;
-
-            for (int i = 0; i < rawPacket.Length; i++)
+            List<byte> outList = new List<byte>(input.Length + 16);
+            outList.Add(SLIP_END);
+            for (int i = 0; i < input.Length; i++)
             {
-                byte b = rawPacket[i];
+                byte b = input[i];
                 if (b == SLIP_END)
                 {
-                    encoded[idx++] = SLIP_ESC;
-                    encoded[idx++] = SLIP_ESC_END;
+                    outList.Add(SLIP_ESC);
+                    outList.Add(SLIP_ESC_END);
                 }
                 else if (b == SLIP_ESC)
                 {
-                    encoded[idx++] = SLIP_ESC;
-                    encoded[idx++] = SLIP_ESC_ESC;
+                    outList.Add(SLIP_ESC);
+                    outList.Add(SLIP_ESC_ESC);
                 }
                 else
                 {
-                    encoded[idx++] = b;
+                    outList.Add(b);
                 }
             }
-
-            encoded[idx++] = SLIP_END;
-            _port.Write(encoded, 0, idx);
+            outList.Add(SLIP_END);
+            return outList.ToArray();
         }
 
-        private byte[] ExecuteCommand(byte op, byte[] payload, uint checksum, int timeoutMs, out uint regValue)
+        private static byte[] SlipDecode(byte[] input)
         {
-            byte[] cmdPkt = BuildCommandPacket(op, payload, checksum);
-            SendSlipPacket(cmdPkt);
-            return ReadCommandResponse(op, timeoutMs, out regValue);
-        }
-
-        private byte[] ReadCommandResponse(byte expectedOp, int timeoutMs, out uint regValue)
-        {
-            regValue = 0;
-            Stopwatch sw = Stopwatch.StartNew();
-
-            while (sw.ElapsedMilliseconds < timeoutMs)
+            List<byte> outList = new List<byte>(input.Length);
+            for (int i = 0; i < input.Length; i++)
             {
-                int remaining = timeoutMs - (int)sw.ElapsedMilliseconds;
-                if (remaining <= 0) break;
-
-                byte[] frame = ReadRawSlipFrame(remaining);
-                if (frame == null || frame.Length < 8) continue;
-                if (frame[0] != 0x01 || frame[1] != expectedOp) continue;
-
-                regValue = BitConverter.ToUInt32(frame, 4);
-                int actualPayloadLen = frame.Length - 8;
-                byte[] data = new byte[actualPayloadLen];
-                if (actualPayloadLen > 0)
+                byte b = input[i];
+                if (b == SLIP_ESC && i + 1 < input.Length)
                 {
-                    Buffer.BlockCopy(frame, 8, data, 0, actualPayloadLen);
-                }
-
-                if (actualPayloadLen >= 4)
-                {
-                    byte status = data[actualPayloadLen - 4];
-                    byte errCode = data[actualPayloadLen - 3];
-                    if (status != 0)
-                    {
-                        throw new Exception(string.Format("ESP32-S3 ROM command 0x{0:X2} failed with error 0x{1:X2} ({2})",
-                            expectedOp, errCode, DescribeRomError(errCode)));
-                    }
-                }
-                else if (actualPayloadLen >= 2)
-                {
-                    byte status = data[actualPayloadLen - 2];
-                    byte errCode = data[actualPayloadLen - 1];
-                    if (status != 0)
-                    {
-                        throw new Exception(string.Format("Bootloader command 0x{0:X2} failed with error 0x{1:X2} ({2})",
-                            expectedOp, errCode, DescribeRomError(errCode)));
-                    }
-                }
-
-                return data;
-            }
-
-            throw new TimeoutException(string.Format("Timed out waiting for response to opcode 0x{0:X2} ({1} ms).",
-                expectedOp, timeoutMs));
-        }
-
-        private byte[] ReadRawSlipFrame(int timeoutMs)
-        {
-            _port.ReadTimeout = Math.Max(50, timeoutMs);
-            Stopwatch sw = Stopwatch.StartNew();
-
-            while (true)
-            {
-                if (sw.ElapsedMilliseconds >= timeoutMs) throw new TimeoutException("SLIP frame start timeout.");
-                int b = _port.ReadByte();
-                if (b == SLIP_END) break;
-            }
-
-            List<byte> buf = new List<byte>(128);
-            bool inEscape = false;
-
-            while (true)
-            {
-                if (sw.ElapsedMilliseconds >= timeoutMs) throw new TimeoutException("SLIP frame body timeout.");
-
-                int readVal = _port.ReadByte();
-                if (readVal < 0) continue;
-                byte b = (byte)readVal;
-
-                if (inEscape)
-                {
-                    if (b == SLIP_ESC_END) buf.Add(SLIP_END);
-                    else if (b == SLIP_ESC_ESC) buf.Add(SLIP_ESC);
-                    else buf.Add(b);
-                    inEscape = false;
-                }
-                else if (b == SLIP_ESC)
-                {
-                    inEscape = true;
-                }
-                else if (b == SLIP_END)
-                {
-                    if (buf.Count == 0) continue;
-                    return buf.ToArray();
+                    byte next = input[++i];
+                    if (next == SLIP_ESC_END) outList.Add(SLIP_END);
+                    else if (next == SLIP_ESC_ESC) outList.Add(SLIP_ESC);
+                    else outList.Add(next);
                 }
                 else
                 {
-                    buf.Add(b);
+                    outList.Add(b);
                 }
+            }
+            return outList.ToArray();
+        }
+
+        public static string ComputeHostMd5Hex(byte[] data)
+        {
+            using (MD5 md5 = MD5.Create())
+            {
+                byte[] hash = md5.ComputeHash(data);
+                StringBuilder sb = new StringBuilder(32);
+                for (int i = 0; i < 16; i++) sb.Append(hash[i].ToString("x2"));
+                return sb.ToString();
             }
         }
 
-        private static string DescribeRomError(byte code)
+        public static string ComputeBlankRegionMd5Hex(uint size)
         {
-            switch (code)
+            using (MD5 md5 = MD5.Create())
             {
-                case 0x01: return "Invalid input parameter";
-                case 0x02: return "Failed to allocate memory in ROM";
-                case 0x03: return "Failed to send command response";
-                case 0x04: return "Failed to receive message";
-                case 0x05: return "Invalid message format";
-                case 0x06: return "Command execution failed";
-                case 0x07: return "XOR checksum mismatch";
-                case 0x08: return "SPI flash write/CRC error";
-                case 0x09: return "SPI flash read error";
-                case 0x0A: return "SPI flash read length error";
-                case 0x64: return "Invalid parameter (0x64)";
-                default:   return "ROM error code 0x" + code.ToString("X2");
+                byte[] chunk = new byte[65536];
+                for (int i = 0; i < chunk.Length; i++) chunk[i] = 0xFF;
+
+                uint remaining = size;
+                while (remaining > 0)
+                {
+                    int take = (int)Math.Min((uint)chunk.Length, remaining);
+                    if (remaining - (uint)take == 0)
+                    {
+                        md5.TransformFinalBlock(chunk, 0, take);
+                    }
+                    else
+                    {
+                        md5.TransformBlock(chunk, 0, take, null, 0);
+                    }
+                    remaining -= (uint)take;
+                }
+                byte[] hash = md5.Hash;
+                StringBuilder sb = new StringBuilder(32);
+                for (int i = 0; i < 16; i++) sb.Append(hash[i].ToString("x2"));
+                return sb.ToString();
             }
         }
     }
 }
 "@
 
-if (-not ("H1OS.Flasher.Esp32S3RomFlasher" -as [type])) {
+# Compile embedded C# SLIP engine
+if (-not ([System.Management.Automation.PSTypeName]'Esp32Slip.Flasher.Esp32S3RomFlasher').Type) {
     Add-Type -TypeDefinition $CSharpSource -Language CSharp
 }
 
 # ---------------------------------------------------------------------------
-# 2. Helper Functions: Discovery, Partition Lookup & Checksum Verification
+# 2. Port Auto-Discovery Helper
 # ---------------------------------------------------------------------------
-function Resolve-DistributionRoot {
-    $scriptDir = $PSScriptRoot
-    if (-not $scriptDir) {
-        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    }
-    if ((Split-Path -Leaf $scriptDir) -ieq "engine") {
-        return (Split-Path -Parent $scriptDir)
-    }
-    return $scriptDir
-}
-
 function Find-Esp32S3Port {
     param([string]$RequestedPort)
 
     if (-not [string]::IsNullOrWhiteSpace($RequestedPort)) {
         return [PSCustomObject]@{
             PortName    = $RequestedPort.Trim().ToUpper()
-            Description = "User-specified COM port"
+            Description = "User-specified serial port"
             IsNativeUsb = $true
         }
     }
 
-    Write-Host "[*] Scanning Windows PnP tree for ESP32-S3 Native USB (VID_303A)..." -ForegroundColor Cyan
+    Write-Host "[*] Scanning Windows PnP tree for ESP32-S3 USB CDC (VID_303A)..." -ForegroundColor Cyan
 
     try {
         $pnpDevices = @(Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue |
@@ -1299,464 +860,112 @@ function Find-Esp32S3Port {
         }
     }
 
-    throw "No ESP32-S3 USB serial port detected. Verify the USB-C data cable is connected."
-}
-
-function Show-PartitionMapTable {
-    param([System.Collections.Generic.List[H1OS.Flasher.PartitionEntry]]$PartMap)
-
-    Write-Host ""
-    Write-Host "  ESP32-S3 8MB Dual-Slot OTA Flash Partition Map:" -ForegroundColor Cyan
-    Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host ("  {0,-3} {1,-16} {2,-8} {3,-10} {4,-10} {5,-10} {6,10}" -f "#", "Partition", "Type", "SubType", "Start", "End", "Size (KB)") -ForegroundColor White
-    Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
-    $idx = 1
-    foreach ($p in $PartMap) {
-        $color = if ($p.IsSystemRegion) { "DarkCyan" } elseif ($p.TypeStr -eq "app") { "Green" } else { "Yellow" }
-        Write-Host ("  {0,-3} {1,-16} {2,-8} {3,-10} 0x{4:X6}   0x{5:X6}   {6,10:N1}" -f `
-            $idx, $p.Name, $p.TypeStr, $p.SubTypeStr, $p.Offset, $p.EndOffset, $p.SizeKB) -ForegroundColor $color
-        $idx++
-    }
-    Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host ""
-}
-
-function Find-DistributionBinaries {
-    param([string]$DistRoot)
-
-    $factoryBins = @(Get-ChildItem -Path $DistRoot -Filter "*-factory.bin" -File -ErrorAction SilentlyContinue)
-    if ($factoryBins.Count -eq 0 -and (Test-Path (Join-Path $DistRoot "firmware"))) {
-        $factoryBins = @(Get-ChildItem -Path (Join-Path $DistRoot "firmware") -Filter "*-factory.bin" -File -ErrorAction SilentlyContinue)
-    }
-
-    $appBin = $null
-    foreach ($cand in @(
-        (Join-Path $DistRoot "h1os.bin"),
-        (Join-Path $DistRoot "bins\h1os.bin"),
-        (Join-Path $DistRoot "firmware\h1os.bin")
-    )) {
-        if (Test-Path $cand) { $appBin = $cand; break }
-    }
-    # Cross-project fallback: auto-discover any app .bin if h1os.bin is not present
-    if (-not $appBin) {
-        $sysNames = @("bootloader.bin", "partition-table.bin", "ota_data_initial.bin")
-        $candBins = @(Get-ChildItem -Path $DistRoot, (Join-Path $DistRoot "bins") -Filter "*.bin" -File -ErrorAction SilentlyContinue |
-            Where-Object { ($sysNames -notcontains $_.Name.ToLowerInvariant()) -and ($_.Name -notlike "*-factory.bin") })
-        if ($candBins.Count -gt 0) {
-            $appBin = $candBins[0].FullName
-        }
-    }
-
-    $bootBin = Join-Path $DistRoot "bins\bootloader.bin"
-    $partBin = Join-Path $DistRoot "bins\partition-table.bin"
-    $otaBin  = Join-Path $DistRoot "bins\ota_data_initial.bin"
-
-    return [PSCustomObject]@{
-        FactoryBin   = if ($factoryBins.Count -gt 0) { $factoryBins[0].FullName } else { $null }
-        AppBin       = $appBin
-        Bootloader   = if (Test-Path $bootBin) { $bootBin } else { $null }
-        PartTable    = if (Test-Path $partBin) { $partBin } else { $null }
-        OtaData      = if (Test-Path $otaBin)  { $otaBin }  else { $null }
-    }
-}
-
-function Test-BundleChecksums {
-    param(
-        [string]$DistRoot,
-        [H1OS.Flasher.FlashSegment[]]$TargetSegments
-    )
-
-    $checksumFile = Join-Path $DistRoot "checksums.sha256"
-    if (-not (Test-Path $checksumFile)) { return }
-
-    $expectedMap = @{}
-    foreach ($line in (Get-Content $checksumFile)) {
-        $trimmed = $line.Trim()
-        if ($trimmed -match '^([0-9a-fA-F]{64})\s+(.+)$') {
-            $hash = $Matches[1].ToLowerInvariant()
-            $relPath = ($Matches[2].Trim() -replace '\\', '/').ToLowerInvariant()
-            $expectedMap[$relPath] = $hash
-        }
-    }
-
-    foreach ($seg in $TargetSegments) {
-        if ([string]::IsNullOrWhiteSpace($seg.FilePath)) { continue }
-        $fullPath = (Resolve-Path $seg.FilePath).Path
-        if ($fullPath.StartsWith($DistRoot, [StringComparison]::OrdinalIgnoreCase)) {
-            $rel = $fullPath.Substring($DistRoot.Length).TrimStart('\', '/') -replace '\\', '/'
-            $relKey = $rel.ToLowerInvariant()
-            if ($expectedMap.ContainsKey($relKey)) {
-                $actual = (Get-FileHash -Path $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
-                if ($actual -ne $expectedMap[$relKey]) {
-                    throw "Pre-flight SHA-256 mismatch for '$rel'! Expected $($expectedMap[$relKey]), got $actual."
-                }
-                Write-Host "[+] Pre-flight SHA-256 verified : $rel" -ForegroundColor DarkGray
-            }
-        }
-    }
+    throw "No ESP32-S3 serial port detected. Verify the USB-C cable is connected."
 }
 
 # ---------------------------------------------------------------------------
-# 3. Advanced Interactive Console (Partition, Dual-OTA & NVS Manager)
-# ---------------------------------------------------------------------------
-function Invoke-InteractiveManager {
-    param(
-        [string]$DistRoot,
-        [System.Collections.Generic.List[H1OS.Flasher.PartitionEntry]]$PartMap
-    )
-
-    Show-PartitionMapTable -PartMap $PartMap
-
-    Write-Host "  ================ ADVANCED PARTITION, DUAL-OTA & NVS MANAGER ================" -ForegroundColor Green
-    Write-Host "  [1] Live On-Chip Flash Inspector  (Read & compare MD5 of all 9 partitions)"
-    Write-Host "  [2] Dual-OTA Slot Manager         (Flash ota_0, ota_1, Both, or Switch Active Boot Slot)"
-    Write-Host "  [3] NVS & Storage Manager         (Wipe or flash nvs, SPIFFS storage, or epd_frame)"
-    Write-Host "  [4] Custom Partition Flasher      (Pick any partition by #/name & flash a .bin)"
-    Write-Host "  [5] Custom Partition Eraser       (Pick any partition by #/name & scrub to 0xFF)"
-    Write-Host "  [6] Update Firmware (Keep PartTable + Keep NVS intact)"
-    Write-Host "  [Q] Quit"
-    Write-Host "  ============================================================================" -ForegroundColor Green
-    $sel = (Read-Host "  Select operation [1-6, Q]").Trim().ToUpperInvariant()
-
-    switch ($sel) {
-        "1" {
-            return @{ Profile = "Inspect" }
-        }
-        "2" {
-            Write-Host ""
-            Write-Host "  --- Dual-Slot OTA Manager (ota_0 @ 0x20000 | ota_1 @ 0x320000) ---" -ForegroundColor Cyan
-            Write-Host "  [1] Flash App to ota_0 (0x020000) and set active boot -> ota_0"
-            Write-Host "  [2] Flash App to ota_1 (0x320000) and set active boot -> ota_1"
-            Write-Host "  [3] Clone App to BOTH ota_0 & ota_1 (Redundant Dual-Slot Image)"
-            Write-Host "  [4] Switch Active Boot Slot to ota_0 (Rewrite otadata @ 0x1D000 only)"
-            Write-Host "  [5] Switch Active Boot Slot to ota_1 (Rewrite otadata @ 0x1D000 only)"
-            $otaChoice = (Read-Host "  Select OTA action [1-5]").Trim()
-            switch ($otaChoice) {
-                "1" { return @{ Profile = "AppOnly"; TargetSlot = "ota_0"; KeepPartitionTable = $true; KeepNvs = $true } }
-                "2" { return @{ Profile = "AppOnly"; TargetSlot = "ota_1"; KeepPartitionTable = $true; KeepNvs = $true } }
-                "3" { return @{ Profile = "DualOta"; TargetSlot = "both";  KeepPartitionTable = $true; KeepNvs = $true } }
-                "4" { return @{ Profile = "SetBootSlot"; TargetSlot = "ota_0" } }
-                "5" { return @{ Profile = "SetBootSlot"; TargetSlot = "ota_1" } }
-                default { throw "Invalid OTA selection." }
-            }
-        }
-        "3" {
-            Write-Host ""
-            Write-Host "  --- NVS, SPIFFS Storage & ePaper Framebuffer Manager ---" -ForegroundColor Cyan
-            Write-Host "  [1] Wipe NVS + PHY Calibration (0x009000, 80KB + 0x01F000, 4KB -> 0xFF)"
-            Write-Host "  [2] Wipe SPIFFS Storage Partition (0x620000, 1904KB -> 0xFF)"
-            Write-Host "  [3] Wipe ePaper Framebuffer epd_frame (0x7FC000, 16KB -> 0xFF)"
-            Write-Host "  [4] Flash pre-built NVS image (.bin) to nvs (0x009000)"
-            Write-Host "  [5] Flash pre-built SPIFFS image (.bin) to storage (0x620000)"
-            Write-Host "  [6] Flash pre-built Framebuffer (.bin) to epd_frame (0x7FC000)"
-            $nvsChoice = (Read-Host "  Select data partition action [1-6]").Trim()
-            switch ($nvsChoice) {
-                "1" { return @{ Profile = "WipeNvs" } }
-                "2" { return @{ Profile = "WipeStorage" } }
-                "3" { return @{ Profile = "WipeEpdFrame" } }
-                "4" {
-                    $binPath = Read-Host "  Enter path to NVS .bin file"
-                    return @{ Profile = "CustomWrite"; TargetPartition = "nvs"; Binary = $binPath }
-                }
-                "5" {
-                    $binPath = Read-Host "  Enter path to SPIFFS .bin file"
-                    return @{ Profile = "CustomWrite"; TargetPartition = "storage"; Binary = $binPath }
-                }
-                "6" {
-                    $binPath = Read-Host "  Enter path to epd_frame .bin file"
-                    return @{ Profile = "CustomWrite"; TargetPartition = "epd_frame"; Binary = $binPath }
-                }
-                default { throw "Invalid NVS/Storage selection." }
-            }
-        }
-        "4" {
-            $partInput = (Read-Host "  Enter Partition # (1-$($PartMap.Count)) or Partition Name (e.g. ota_1, storage)").Trim()
-            $partName = Resolve-PartitionChoice -PartMap $PartMap -UserInput $partInput
-            $binInput = (Read-Host "  Enter path to .bin file to flash into '$partName'").Trim().Trim('"')
-            return @{ Profile = "CustomWrite"; TargetPartition = $partName; Binary = $binInput }
-        }
-        "5" {
-            $partInput = (Read-Host "  Enter Partition # (1-$($PartMap.Count)) or Partition Name to ERASE to 0xFF").Trim()
-            $partName = Resolve-PartitionChoice -PartMap $PartMap -UserInput $partInput
-            return @{ Profile = "CustomErase"; TargetPartition = $partName }
-        }
-        "6" {
-            return @{ Profile = "KeepNvs"; KeepPartitionTable = $true; KeepNvs = $true }
-        }
-        default {
-            Write-Host "[*] Exiting Interactive Manager." -ForegroundColor Yellow
-            exit 0
-        }
-    }
-}
-
-function Resolve-PartitionChoice {
-    param(
-        [System.Collections.Generic.List[H1OS.Flasher.PartitionEntry]]$PartMap,
-        [string]$UserInput
-    )
-    $num = 0
-    if ([int]::TryParse($UserInput, [ref]$num)) {
-        if ($num -ge 1 -and $num -le $PartMap.Count) {
-            return $PartMap[$num - 1].Name
-        }
-    }
-    foreach ($p in $PartMap) {
-        if ($p.Name.Equals($UserInput, [StringComparison]::OrdinalIgnoreCase)) {
-            return $p.Name
-        }
-    }
-    throw "Unknown partition '$UserInput'."
-}
-
-function Get-PartitionByName {
-    param(
-        [System.Collections.Generic.List[H1OS.Flasher.PartitionEntry]]$PartMap,
-        [string]$Name
-    )
-    foreach ($p in $PartMap) {
-        if ($p.Name.Equals($Name, [StringComparison]::OrdinalIgnoreCase)) {
-            return $p
-        }
-    }
-    throw "Partition '$Name' was not found in the partition table."
-}
-
-# ---------------------------------------------------------------------------
-# 4. Execution Plan Builder
+# 3. Main Flasher Execution Logic
 # ---------------------------------------------------------------------------
 Write-Host "=========================================================================" -ForegroundColor Green
-Write-Host "   H1OS Unified Zero-Dependency ESP32-S3 Flasher & Partition Manager     " -ForegroundColor Green
-Write-Host "      Target Hardware: Waveshare ESP32-S3 ePaper 1.54 V2 (303A:1001)     " -ForegroundColor Green
+Write-Host "    ESP32-S3 Zero-Dependency Native USB SLIP Flasher (Windows CDC)       " -ForegroundColor Green
 Write-Host "=========================================================================" -ForegroundColor Green
 
 try {
-    $distRoot = Resolve-DistributionRoot
-    $partMap  = [H1OS.Flasher.PartitionTableParser]::LoadPartitionMap($distRoot)
-    $bins     = Find-DistributionBinaries -DistRoot $distRoot
-
-    if ($Profile -eq "Interactive") {
-        $cmdOverride = Invoke-InteractiveManager -DistRoot $distRoot -PartMap $partMap
-        $Profile = $cmdOverride.Profile
-        if ($cmdOverride.ContainsKey("TargetSlot"))         { $TargetSlot = $cmdOverride.TargetSlot }
-        if ($cmdOverride.ContainsKey("TargetPartition"))    { $TargetPartition = $cmdOverride.TargetPartition }
-        if ($cmdOverride.ContainsKey("Binary"))             { $Binary = $cmdOverride.Binary }
-        if ($cmdOverride.ContainsKey("KeepPartitionTable")) { $KeepPartitionTable = [switch]$cmdOverride.KeepPartitionTable }
-        if ($cmdOverride.ContainsKey("KeepNvs"))            { $KeepNvs = [switch]$cmdOverride.KeepNvs }
-    }
-
     $portInfo = Find-Esp32S3Port -RequestedPort $Port
 
-    # Build list of erase actions and write segments
     $eraseRegions  = New-Object System.Collections.Generic.List[PSCustomObject]
-    $writeSegments = New-Object System.Collections.Generic.List[H1OS.Flasher.FlashSegment]
+    $writeSegments = New-Object System.Collections.Generic.List[Esp32Slip.Flasher.FlashSegment]
 
-    # Helper to queue a file segment
-    function Add-FileSegment([uint32]$segOffset, [uint32]$maxSz, [string]$path, [string]$label) {
-        $s = New-Object H1OS.Flasher.FlashSegment
-        $s.Offset = $segOffset
-        $s.MaxAllowedSize = $maxSz
-        $s.FilePath = $path
-        $s.Label = $label
-        $writeSegments.Add($s)
+    # Handle -EraseAll
+    if ($EraseAll.IsPresent) {
+        $eraseRegions.Add([PSCustomObject]@{
+            Offset = [uint32]0x000000
+            Length = [uint32]($FlashSizeMB * 1024 * 1024)
+            Label  = "Entire ${FlashSizeMB}MB NOR Flash Die"
+        })
     }
 
-    function Add-RawSegment([uint32]$segOffset, [uint32]$maxSz, [byte[]]$payload, [string]$label) {
-        $s = New-Object H1OS.Flasher.FlashSegment
-        $s.Offset = $segOffset
-        $s.MaxAllowedSize = $maxSz
-        $s.RawPayload = $payload
-        $s.Label = $label
-        $writeSegments.Add($s)
-    }
-
-    # Explicit -Segments override if passed on CLI
-    if ($Segments -and $Segments.Count -gt 0) {
-        foreach ($entry in $Segments) {
-            if ($entry -notmatch '^(0x[0-9a-fA-F]+|\d+|[a-zA-Z0-9_\-]+)=(.+)$') {
-                throw "Invalid segment format '$entry'. Expected '0xOFFSET=file.bin' or 'partition_name=file.bin'."
-            }
-            $lhs = $Matches[1]
-            $rhs = $Matches[2]
-            $resolvedPath = if ([System.IO.Path]::IsPathRooted($rhs)) { $rhs } else { Join-Path $distRoot $rhs }
-
-            $segOffset = [uint32]0
-            $maxSz = [uint32]0
-            if ($lhs -match '^(0x[0-9a-fA-F]+|\d+)$') {
-                $segOffset = [H1OS.Flasher.PartitionTableParser]::ParseSizeOrHex($lhs)
-            } else {
-                $pEntry = Get-PartitionByName -PartMap $partMap -Name $lhs
-                $segOffset = $pEntry.Offset
-                $maxSz = $pEntry.Size
-            }
-            Add-FileSegment $segOffset $maxSz $resolvedPath "$lhs ($([System.IO.Path]::GetFileName($resolvedPath)))"
+    # Handle single region via -Offset and -Length
+    if ($Offset -ne [uint32]::MaxValue -or $Length -gt 0) {
+        if ($Offset -eq [uint32]::MaxValue -or $Length -eq 0) {
+            throw "Specifying an offset erase requires both -Offset <uint32> and -Length <uint32> (or use -EraseRegions '0xOFFSET=0xLENGTH')."
         }
+        $eraseRegions.Add([PSCustomObject]@{
+            Offset = $Offset
+            Length = $Length
+            Label  = "Region @ 0x$($Offset.ToString('X6'))"
+        })
     }
-    else {
-        switch ($Profile) {
-            "Factory" {
-                # Scrub full 8MB flash die to 0xFF
-                $eraseRegions.Add([PSCustomObject]@{
-                    Offset = [uint32]0x000000
-                    Length = [uint32]($FlashSizeMB * 1024 * 1024)
-                    Label  = "Entire ${FlashSizeMB}MB NOR Flash Die (Factory POR Scrub)"
-                })
 
-                if ($bins.Bootloader -and $bins.PartTable -and $bins.AppBin) {
-                    Add-FileSegment 0x000000 0x008000 $bins.Bootloader "bootloader (0x000000)"
-                    Add-FileSegment 0x008000 0x001000 $bins.PartTable  "partition-table (0x008000)"
-                    if ($bins.OtaData) {
-                        Add-FileSegment 0x01D000 0x002000 $bins.OtaData "otadata (0x01D000 -> ota_0)"
-                    } else {
-                        Add-RawSegment 0x01D000 0x002000 ([H1OS.Flasher.PartitionTableParser]::BuildOtaDataPayload("ota_0")) "otadata (synthesized -> ota_0)"
-                    }
-                    Add-FileSegment 0x020000 0x300000 $bins.AppBin "ota_0 App (0x020000)"
-                }
-                elseif ($bins.FactoryBin) {
-                    Add-FileSegment 0x000000 0x800000 $bins.FactoryBin ([System.IO.Path]::GetFileName($bins.FactoryBin))
-                }
-                else {
-                    throw "No factory or modular binaries found in $distRoot."
-                }
-            }
-
-            "KeepNvs" {
-                # Updates Bootloader (unless -KeepPartitionTable), Partition Table (unless -KeepPartitionTable),
-                # otadata (unless -KeepOtaData), and ota_0 App while strictly preserving nvs (0x9000), storage (0x620000), and epd_frame (0x7FC000)
-                if ($bins.Bootloader -and $bins.PartTable -and $bins.AppBin) {
-                    if (-not $KeepPartitionTable.IsPresent) {
-                        Add-FileSegment 0x000000 0x008000 $bins.Bootloader "bootloader (0x000000)"
-                        Add-FileSegment 0x008000 0x001000 $bins.PartTable  "partition-table (0x008000)"
-                    }
-                    if (-not $KeepOtaData.IsPresent) {
-                        if ($bins.OtaData -and $TargetSlot -eq "ota_0") {
-                            Add-FileSegment 0x01D000 0x002000 $bins.OtaData "otadata (0x01D000 -> ota_0)"
-                        } else {
-                            Add-RawSegment 0x01D000 0x002000 ([H1OS.Flasher.PartitionTableParser]::BuildOtaDataPayload($TargetSlot)) "otadata (0x01D000 -> $TargetSlot)"
-                        }
-                    }
-                    $appPart = Get-PartitionByName -PartMap $partMap -Name $(if ($TargetSlot -eq "ota_1") { "ota_1" } else { "ota_0" })
-                    Add-FileSegment $appPart.Offset $appPart.Size $bins.AppBin "$($appPart.Name) App (0x$($appPart.Offset.ToString('X6')))"
-                }
-                elseif ($bins.FactoryBin) {
-                    # FlashSegment automatically splits 0xFF gaps in 0x0..0x20000 so NVS (0x9000) is preserved!
-                    Add-FileSegment 0x000000 0x800000 $bins.FactoryBin ([System.IO.Path]::GetFileName($bins.FactoryBin))
-                }
-                else {
-                    throw "No firmware binaries found in $distRoot."
-                }
-            }
-
-            "AppOnly" {
-                $appFile = if (-not [string]::IsNullOrWhiteSpace($Binary)) {
-                    if ([System.IO.Path]::IsPathRooted($Binary)) { $Binary } else { Join-Path $distRoot $Binary }
-                } else {
-                    $bins.AppBin
-                }
-                if (-not $appFile) { throw "Could not locate h1os.bin for AppOnly update." }
-
-                $slotName = if ($TargetSlot -eq "ota_1") { "ota_1" } else { "ota_0" }
-                $appPart = Get-PartitionByName -PartMap $partMap -Name $slotName
-
-                if (-not $KeepOtaData.IsPresent) {
-                    if ($bins.OtaData -and $slotName -eq "ota_0") {
-                        Add-FileSegment 0x01D000 0x002000 $bins.OtaData "otadata (0x01D000 -> ota_0)"
-                    } else {
-                        Add-RawSegment 0x01D000 0x002000 ([H1OS.Flasher.PartitionTableParser]::BuildOtaDataPayload($slotName)) "otadata (0x01D000 -> $slotName)"
-                    }
-                }
-                Add-FileSegment $appPart.Offset $appPart.Size $appFile "$slotName App (0x$($appPart.Offset.ToString('X6')))"
-            }
-
-            "DualOta" {
-                $appFile = if (-not [string]::IsNullOrWhiteSpace($Binary)) {
-                    if ([System.IO.Path]::IsPathRooted($Binary)) { $Binary } else { Join-Path $distRoot $Binary }
-                } else {
-                    $bins.AppBin
-                }
-                if (-not $appFile) { throw "Could not locate h1os.bin for DualOta flash." }
-
-                $ota0 = Get-PartitionByName -PartMap $partMap -Name "ota_0"
-                $ota1 = Get-PartitionByName -PartMap $partMap -Name "ota_1"
-
-                if (-not $KeepOtaData.IsPresent) {
-                    if ($bins.OtaData) {
-                        Add-FileSegment 0x01D000 0x002000 $bins.OtaData "otadata (0x01D000 -> ota_0)"
-                    } else {
-                        Add-RawSegment 0x01D000 0x002000 ([H1OS.Flasher.PartitionTableParser]::BuildOtaDataPayload("ota_0")) "otadata (0x01D000 -> ota_0)"
-                    }
-                }
-                Add-FileSegment $ota0.Offset $ota0.Size $appFile "ota_0 Primary App (0x$($ota0.Offset.ToString('X6')))"
-                Add-FileSegment $ota1.Offset $ota1.Size $appFile "ota_1 Secondary App (0x$($ota1.Offset.ToString('X6')))"
-            }
-
-            "SetBootSlot" {
-                $slotName = if ($TargetSlot -eq "ota_1") { "ota_1" } else { "ota_0" }
-                $otaPart = Get-PartitionByName -PartMap $partMap -Name "otadata"
-                if ($slotName -eq "ota_0" -and $bins.OtaData) {
-                    Add-FileSegment $otaPart.Offset $otaPart.Size $bins.OtaData "otadata (Active Boot -> ota_0)"
-                } else {
-                    Add-RawSegment $otaPart.Offset $otaPart.Size ([H1OS.Flasher.PartitionTableParser]::BuildOtaDataPayload($slotName)) "otadata (Active Boot -> $slotName)"
-                }
-            }
-
-            "WipeNvs" {
-                $nvsPart = Get-PartitionByName -PartMap $partMap -Name "nvs"
-                $eraseRegions.Add([PSCustomObject]@{ Offset = $nvsPart.Offset; Length = $nvsPart.Size; Label = "nvs (0x$($nvsPart.Offset.ToString('X6')))" })
-                try {
-                    $phyPart = Get-PartitionByName -PartMap $partMap -Name "phy_init"
-                    $eraseRegions.Add([PSCustomObject]@{ Offset = $phyPart.Offset; Length = $phyPart.Size; Label = "phy_init (0x$($phyPart.Offset.ToString('X6')))" })
-                } catch { }
-            }
-
-            "WipeStorage" {
-                $stPart = Get-PartitionByName -PartMap $partMap -Name "storage"
-                $eraseRegions.Add([PSCustomObject]@{ Offset = $stPart.Offset; Length = $stPart.Size; Label = "storage SPIFFS (0x$($stPart.Offset.ToString('X6')))" })
-            }
-
-            "WipeEpdFrame" {
-                $epdPart = Get-PartitionByName -PartMap $partMap -Name "epd_frame"
-                $eraseRegions.Add([PSCustomObject]@{ Offset = $epdPart.Offset; Length = $epdPart.Size; Label = "epd_frame ePaper Buffer (0x$($epdPart.Offset.ToString('X6')))" })
-            }
-
-            "CustomWrite" {
-                if ([string]::IsNullOrWhiteSpace($Binary)) {
-                    throw "CustomWrite requires -Binary <path>."
-                }
-                $resolvedBin = if ([System.IO.Path]::IsPathRooted($Binary)) { $Binary } else { Join-Path $distRoot $Binary }
-                if (-not [string]::IsNullOrWhiteSpace($TargetPartition)) {
-                    $pEntry = Get-PartitionByName -PartMap $partMap -Name $TargetPartition
-                    Add-FileSegment $pEntry.Offset $pEntry.Size $resolvedBin "$($pEntry.Name) (0x$($pEntry.Offset.ToString('X6')))"
-                }
-                elseif ($Offset -ne [uint32]::MaxValue) {
-                    Add-FileSegment $Offset 0 $resolvedBin "Custom @ 0x$($Offset.ToString('X6'))"
-                }
-                else {
-                    throw "CustomWrite requires either -TargetPartition <name> or -Offset <hex>."
-                }
-            }
-
-            "CustomErase" {
-                if (-not [string]::IsNullOrWhiteSpace($TargetPartition)) {
-                    $pEntry = Get-PartitionByName -PartMap $partMap -Name $TargetPartition
-                    $eraseRegions.Add([PSCustomObject]@{ Offset = $pEntry.Offset; Length = $pEntry.Size; Label = "$($pEntry.Name) (0x$($pEntry.Offset.ToString('X6')))" })
-                }
-                elseif ($Offset -ne [uint32]::MaxValue -and $EraseLength -gt 0) {
-                    $eraseRegions.Add([PSCustomObject]@{ Offset = $Offset; Length = $EraseLength; Label = "Custom Region (0x$($Offset.ToString('X6')))" })
-                }
-                else {
-                    throw "CustomErase requires -TargetPartition <name> or both -Offset and -EraseLength."
+    # Handle -EraseRegions @("0xOFFSET=0xLENGTH", ...)
+    if ($EraseRegions -and $EraseRegions.Count -gt 0) {
+        $expandedErase = New-Object System.Collections.Generic.List[string]
+        foreach ($item in $EraseRegions) {
+            if ([string]::IsNullOrWhiteSpace($item)) { continue }
+            $parts = $item -split '[,;]'
+            foreach ($p in $parts) {
+                $trimmed = $p.Trim().Trim('"', "'")
+                if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+                    $expandedErase.Add($trimmed)
                 }
             }
         }
+
+        foreach ($entry in $expandedErase) {
+            if ($entry -notmatch '^(0x[0-9a-fA-F]+|\d+)=(0x[0-9a-fA-F]+|\d+)$') {
+                throw "Invalid erase region format '$entry'. Expected '0xOFFSET=0xLENGTH'."
+            }
+            $erOff = [Esp32Slip.Flasher.PartitionTableParser]::ParseSizeOrHex($Matches[1])
+            $erLen = [Esp32Slip.Flasher.PartitionTableParser]::ParseSizeOrHex($Matches[2])
+            $eraseRegions.Add([PSCustomObject]@{
+                Offset = $erOff
+                Length = $erLen
+                Label  = "Region @ 0x$($erOff.ToString('X6'))"
+            })
+        }
     }
 
-    # Print Execution Summary
+    # Handle -Write @("0xOFFSET=file.bin", ...)
+    if ($Write -and $Write.Count -gt 0) {
+        $expandedWrite = New-Object System.Collections.Generic.List[string]
+        foreach ($item in $Write) {
+            if ([string]::IsNullOrWhiteSpace($item)) { continue }
+            $parts = $item -split '[,;]'
+            foreach ($p in $parts) {
+                $trimmed = $p.Trim().Trim('"', "'")
+                if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+                    $expandedWrite.Add($trimmed)
+                }
+            }
+        }
+
+        foreach ($entry in $expandedWrite) {
+            if ($entry -notmatch '^(0x[0-9a-fA-F]+|\d+)=(.+)$') {
+                throw "Invalid segment format '$entry'. Expected '0xOFFSET=file.bin'."
+            }
+            $segOffset = [Esp32Slip.Flasher.PartitionTableParser]::ParseSizeOrHex($Matches[1])
+            $segFile   = $Matches[2].Trim().Trim('"', "'")
+
+            if (-not [System.IO.Path]::IsPathRooted($segFile)) {
+                $segFile = Join-Path (Get-Location).Path $segFile
+            }
+            if (-not (Test-Path $segFile)) {
+                throw "Binary file not found for segment: $segFile"
+            }
+
+            $s = New-Object Esp32Slip.Flasher.FlashSegment
+            $s.Offset = $segOffset
+            $s.FilePath = $segFile
+            $s.Label = [System.IO.Path]::GetFileName($segFile)
+            $writeSegments.Add($s)
+        }
+    }
+
+    # Print plan
     Write-Host "[*] Target Serial Port        : $($portInfo.PortName) ($($portInfo.Description))"
-    Write-Host "[*] Operation Profile         : $Profile"
 
     if ($eraseRegions.Count -gt 0) {
-        Write-Host "[*] Erase Regions Queued      : $($eraseRegions.Count)" -ForegroundColor Yellow
+        Write-Host "[*] Erase Operations Queued   : $($eraseRegions.Count)" -ForegroundColor Yellow
         foreach ($er in $eraseRegions) {
             Write-Host ("    -> ERASE 0x{0:X6} ({1,7:N1} KB) : {2}" -f $er.Offset, ($er.Length / 1024.0), $er.Label) -ForegroundColor Yellow
         }
@@ -1765,61 +974,47 @@ try {
     if ($writeSegments.Count -gt 0) {
         Write-Host "[*] Write Segments Queued     : $($writeSegments.Count)" -ForegroundColor Cyan
         foreach ($ws in $writeSegments) {
-            $szBytes = if ($ws.RawPayload) { $ws.RawPayload.Length } else { (Get-Item $ws.FilePath).Length }
+            $szBytes = (Get-Item $ws.FilePath).Length
             Write-Host ("    -> WRITE 0x{0:X6} ({1,7:N1} KB) : {2}" -f $ws.Offset, ($szBytes / 1024.0), $ws.Label) -ForegroundColor Cyan
         }
-        Test-BundleChecksums -DistRoot $distRoot -TargetSegments $writeSegments.ToArray()
     }
 
-    # Execute on Hardware
-    $flasher = New-Object H1OS.Flasher.Esp32S3RomFlasher($portInfo.PortName, $Baud, $portInfo.IsNativeUsb)
+    # Execute Hardware Connection
+    $flasher = New-Object Esp32Slip.Flasher.Esp32S3RomFlasher($portInfo.PortName, $Baud, $portInfo.IsNativeUsb)
     try {
         $flasher.EnterBootloader()
         $flasher.SyncWithRom()
         $flasher.AttachAndConfigureSpiFlash($FlashSizeMB)
 
-        if ($Profile -eq "Inspect") {
+        if ($Inspect.IsPresent) {
             Write-Host ""
-            Write-Host "  Live On-Chip Partition Inspection (via ESP_SPI_FLASH_MD5 0x13):" -ForegroundColor Cyan
-            Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
-            Write-Host ("  {0,-16} {1,-10} {2,10}  {3,-34} {4}" -f "Partition", "Offset", "Size (KB)", "On-Chip MD5", "Status") -ForegroundColor White
-            Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "  ESP32-S3 Hardware & Silicon Inspection:" -ForegroundColor Cyan
+            Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
+            Write-Host "  Port        : $($portInfo.PortName) ($($portInfo.Description))" -ForegroundColor White
+            Write-Host "  Baud Rate   : $Baud baud" -ForegroundColor White
+            Write-Host "  Flash Size  : ${FlashSizeMB} MB" -ForegroundColor White
 
-            foreach ($p in $partMap) {
-                $chipMd5 = $flasher.ComputeOnChipMd5($p.Offset, $p.Size)
-                $blankMd5 = [H1OS.Flasher.Esp32S3RomFlasher]::ComputeBlankRegionMd5Hex($p.Size)
+            if (-not [string]::IsNullOrWhiteSpace($PartitionTable) -and (Test-Path $PartitionTable)) {
+                $ptBytes = [System.IO.File]::ReadAllBytes($PartitionTable)
+                $partMap = [Esp32Slip.Flasher.PartitionTableParser]::ParseBinaryPartitionTable($ptBytes)
 
-                $statusStr = "POPULATED DATA"
-                $statusColor = "Yellow"
-                if ($chipMd5 -eq $blankMd5) {
-                    $statusStr = "BLANK (All 0xFF)"
-                    $statusColor = "DarkGray"
+                Write-Host ""
+                Write-Host "  Partition Table Inspection ($([System.IO.Path]::GetFileName($PartitionTable))):" -ForegroundColor Cyan
+                Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
+                Write-Host ("  {0,-16} {1,-8} {2,-10} {3,-10} {4,10}  {5,-34} {6}" -f "Name", "Type", "SubType", "Offset", "Size (KB)", "On-Chip MD5", "Status") -ForegroundColor White
+                Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
+
+                foreach ($p in $partMap) {
+                    $chipMd5 = $flasher.ComputeOnChipMd5($p.Offset, $p.Size)
+                    $blankMd5 = [Esp32Slip.Flasher.Esp32S3RomFlasher]::ComputeBlankRegionMd5Hex($p.Size)
+                    $statusStr = if ($chipMd5 -eq $blankMd5) { "BLANK (0xFF)" } else { "POPULATED" }
+                    $color = if ($chipMd5 -eq $blankMd5) { "DarkGray" } else { "Green" }
+
+                    Write-Host ("  {0,-16} {1,-8} {2,-10} 0x{3:X6}   {4,10:N1}  {5,-34} {6}" -f `
+                        $p.Name, $p.TypeStr, $p.SubTypeStr, $p.Offset, $p.SizeKB, $chipMd5, $statusStr) -ForegroundColor $color
                 }
-                else {
-                    # Check if a local binary exists for this partition
-                    $localCandidate = switch ($p.Name) {
-                        "bootloader"      { $bins.Bootloader }
-                        "partition-table" { $bins.PartTable }
-                        "otadata"         { $bins.OtaData }
-                        "ota_0"           { $bins.AppBin }
-                        "ota_1"           { $bins.AppBin }
-                        default           { $null }
-                    }
-                    if ($localCandidate -and (Test-Path $localCandidate)) {
-                        $localBytes = [System.IO.File]::ReadAllBytes($localCandidate)
-                        $subChipMd5 = $flasher.ComputeOnChipMd5($p.Offset, [uint32]$localBytes.Length)
-                        $localMd5   = [H1OS.Flasher.Esp32S3RomFlasher]::ComputeHostMd5Hex($localBytes)
-                        if ($subChipMd5 -eq $localMd5) {
-                            $statusStr = "MATCHES LOCAL $([System.IO.Path]::GetFileName($localCandidate))"
-                            $statusColor = "Green"
-                        }
-                    }
-                }
-
-                Write-Host ("  {0,-16} 0x{1:X6}   {2,10:N1}  {3,-34} {4}" -f `
-                    $p.Name, $p.Offset, $p.SizeKB, $chipMd5, $statusStr) -ForegroundColor $statusColor
+                Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
             }
-            Write-Host "  ----------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
         }
         else {
             foreach ($er in $eraseRegions) {
@@ -1827,13 +1022,14 @@ try {
             }
 
             $verify = -not $NoVerify.IsPresent
-            $preserveNvsGap = ($Profile -ne "Factory")
             foreach ($ws in $writeSegments) {
-                $flasher.FlashSegment($ws, $verify, $preserveNvsGap)
+                $flasher.FlashSegment($ws, $verify)
             }
         }
 
-        $flasher.FinishAndReboot()
+        if (-not $NoReset.IsPresent) {
+            $flasher.FinishAndReboot()
+        }
     }
     finally {
         $flasher.Dispose()
@@ -1841,7 +1037,7 @@ try {
 
     Write-Host ""
     Write-Host "=========================================================================" -ForegroundColor Green
-    Write-Host " [SUCCESS] Operation '$Profile' completed! Device is booting into H1OS.  " -ForegroundColor Green
+    Write-Host " [SUCCESS] All requested flash operations completed successfully!        " -ForegroundColor Green
     Write-Host "=========================================================================" -ForegroundColor Green
     exit 0
 }
