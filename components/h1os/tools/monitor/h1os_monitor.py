@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """
 H1OS Dedicated Serial Monitor & Telemetry Console (h1os_monitor)
-Version: 1.2.0
+Version: 1.3.0
 License: Apache-2.0
 
 High-performance, beautifully styled serial monitor for ESP32-S3 firmware development.
 Features:
-- Gorgeous Rich UI with rounded borders and columnar alignment inspired by Rich inspection panels.
-- Intelligent ESP-IDF and LVGL log parser: converts raw tags into colored pills, aligned uptime, and module tags.
-- Zero scrollback pollution during deep sleep (in-place status spinner with elapsed time).
-- 100% millisecond-precision timestamps (toggled via 'T', default: OFF).
-- Dual live Rich console display + pristine ANSI-stripped plain-text disk logging (toggled via 'L', default: OFF).
+- Pinned static header panel with zero vertical scroll drift.
+- Fully framed, rounded telemetry viewport (box.ROUNDED) matching h1os_menu aesthetics.
+- Keyboard-driven interactive scrollback (PageUp/PageDown, Up/Down, Home/End).
+- Intelligent ESP-IDF, LVGL, and ROM bootloader log parsing into colored pills, aligned uptime, and module tags.
+- Zero scrollback pollution during deep sleep (in-place status spinner with elapsed time in the header).
+- Dynamic millisecond timestamps toggled on-the-fly (key 'T', default: OFF).
+- Dual live Rich console display + pristine ANSI-stripped plain-text disk logging (key 'L', default: OFF).
 - Hardware reset on demand (key 'R') using the proven Windows usbser.sys DTR/RTS sequence.
-- Native console blank on clear (key 'C').
+- Clean buffer erase on clear (key 'C').
 - Auto-reconnect on deep-sleep wake with zero DTR/RTS glitching.
 """
 
@@ -24,8 +26,9 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from pathlib import Path
-from typing import Optional
+from typing import Deque, List, Optional
 
 try:
     import serial
@@ -37,6 +40,8 @@ except ImportError:
 try:
     from rich import box
     from rich.console import Console
+    from rich.layout import Layout
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
@@ -47,9 +52,10 @@ except ImportError:
 # Regex to strip ANSI escape codes for clean disk logging
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
-# Pattern matchers for ESP-IDF and LVGL logging protocols
-ESP_LOG_RE = re.compile(r"^([EWIDV])\s*\(([0-9]+)\)\s*([a-zA-Z0-9_]+):\s*(.*)$")
+# Pattern matchers for ESP-IDF, LVGL, and ROM bootloader logging protocols
+ESP_LOG_RE = re.compile(r"^([EWIDV])\s*\(([0-9]+)\)\s*([a-zA-Z0-9_.\-/]+):\s*(.*)$")
 LVGL_LOG_RE = re.compile(r"^\[(Info|Warn|Error|Trace|User)\]\s*\(([0-9.]+,\s*[+\-0-9]+)\)\s*([a-zA-Z0-9_]+):\s*(.*)$")
+ROM_PREFIXES = ("ESP-ROM:", "Build:", "rst:", "Saved PC:", "SPIWP:", "mode:", "load:", "entry ")
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -71,6 +77,8 @@ TAG_STYLES = {
     "hal_io": "bold white",
     "hal_i2c": "bold white",
     "main_task": "dim white",
+    "boot": "bold white",
+    "boot.esp32s3": "bold white",
 }
 
 
@@ -125,8 +133,28 @@ def auto_detect_serial_port() -> Optional[str]:
         return None
 
 
+class LogEntry:
+    """Structured telemetry log record preserving timestamp and inline badge state."""
+
+    def __init__(
+        self,
+        raw: str,
+        ts: Optional[datetime.datetime] = None,
+        is_badge: bool = False,
+        badge_tag: str = "",
+        badge_msg: str = "",
+        badge_color: str = "cyan",
+    ):
+        self.raw = raw
+        self.ts = ts or datetime.datetime.now()
+        self.is_badge = is_badge
+        self.badge_tag = badge_tag
+        self.badge_msg = badge_msg
+        self.badge_color = badge_color
+
+
 class H1OSMonitor:
-    """Zero-dot, dual-stream serial monitor with beautiful Rich formatting."""
+    """High-performance, bordered serial monitor with a pinned static header."""
 
     def __init__(
         self,
@@ -150,7 +178,17 @@ class H1OSMonitor:
         self.log_file = None
         self.log_path: Optional[Path] = None
 
+        self.history: Deque[LogEntry] = deque(maxlen=5000)
+        self.scroll_offset = 0  # 0 = live at bottom, >0 = scrolled up N lines
+        self.lock = threading.Lock()
+        self.dirty = True
+
         self.console = Console(highlight=False)
+        self.layout = Layout()
+        self.layout.split(
+            Layout(name="header", size=5),
+            Layout(name="body"),
+        )
 
         if self.enable_logging:
             self._open_log_file()
@@ -184,35 +222,56 @@ class H1OSMonitor:
             self.log_file.close()
         self.log_file = None
 
+    def _add_badge_entry(self, tag: str, message: str, color: str = "cyan"):
+        """Append an inline system badge entry to telemetry history."""
+        with self.lock:
+            self.history.append(
+                LogEntry(
+                    raw=f"[{tag}] {message}",
+                    is_badge=True,
+                    badge_tag=tag,
+                    badge_msg=message,
+                    badge_color=color,
+                )
+            )
+            self.dirty = True
+
     def toggle_logging(self):
         """Toggle disk logging on/off interactively."""
         self.enable_logging = not self.enable_logging
         if self.enable_logging:
             self._open_log_file()
-            self._print_badge("LOGGING", f"Active session recording to [bold white]{self.log_path.name if self.log_path else 'log'}[/]", "green")
+            self._add_badge_entry("LOGGING", f"Active session recording to [bold white]{self.log_path.name if self.log_path else 'log'}[/]", "green")
         else:
             saved_name = self.log_path.name if self.log_path else "log"
             self._close_log_file()
-            self._print_badge("LOGGING", f"Session saved and closed [dim]({saved_name})[/]", "yellow")
+            self._add_badge_entry("LOGGING", f"Session saved and closed [dim]({saved_name})[/]", "yellow")
         self._update_window_title()
 
     def toggle_timestamps(self):
-        """Toggle millisecond timestamps on/off interactively."""
+        """Toggle millisecond timestamps on/off dynamically across all visible lines."""
         self.enable_timestamps = not self.enable_timestamps
-        if self.enable_timestamps:
-            self._print_badge("TIMESTAMPS", "Millisecond timestamps enabled [dim]([HH:MM:SS.mmm])[/]", "cyan")
-        else:
-            self._print_badge("TIMESTAMPS", "Timestamps disabled", "yellow")
+        state_str = "ENABLED" if self.enable_timestamps else "DISABLED"
+        color = "cyan" if self.enable_timestamps else "yellow"
+        self._add_badge_entry("TIMESTAMPS", f"Millisecond timestamps {state_str}.", color)
         self._update_window_title()
+
+    def clear_screen(self):
+        """Erase scrollback buffer while preserving the static header frame."""
+        with self.lock:
+            self.history.clear()
+            self.scroll_offset = 0
+            self.dirty = True
+        self._add_badge_entry("CLEARED", "Telemetry buffer erased.", "cyan")
 
     def trigger_hardware_reset(self):
         """Pulse DTR/RTS lines to perform a clean hardware reset on ESP32-S3."""
         if not self.ser or not self.ser.is_open:
-            self._print_badge("RESET", "Cannot reset: Serial port not open.", "red")
+            self._add_badge_entry("RESET", "Cannot reset: Serial port not open.", "red")
             return
 
         try:
-            self._print_badge("RESET", "Pulsing EN low for 200 ms via DTR/RTS...", "yellow")
+            self._add_badge_entry("RESET", "Pulsing EN low for 200 ms via DTR/RTS...", "yellow")
             execute_hardware_reset(self.ser, hold_delay=0.2, settle_delay=0.2)
         except (serial.SerialException, OSError):
             # Native USB-Serial-JTAG drops connection immediately upon reset assertion
@@ -222,17 +281,44 @@ class H1OSMonitor:
                 except Exception:
                     pass
             self.ser = None
-            self._print_badge("RESET", "Target reset triggered (device re-enumerating)...", "yellow")
+            self._add_badge_entry("RESET", "Target reset triggered (device re-enumerating)...", "yellow")
         except Exception as e:
-            self._print_badge("RESET", f"Hardware reset failed: {e}", "red")
+            self._add_badge_entry("RESET", f"Hardware reset failed: {e}", "red")
 
-    def _print_badge(self, tag: str, message: str, color: str = "cyan"):
-        """Print a sleek inline badge notice."""
-        t = Text()
-        t.append(f" {tag} ", style=f"bold black on {color}")
-        t.append(" ")
-        t.append_text(Text.from_markup(message))
-        self.console.print(t)
+    def scroll_up(self, count: int = 1):
+        """Scroll history up towards older lines."""
+        with self.lock:
+            max_offset = max(0, len(self.history) - 3)
+            self.scroll_offset = min(max_offset, self.scroll_offset + count)
+            self.dirty = True
+
+    def scroll_down(self, count: int = 1):
+        """Scroll history down towards latest lines."""
+        with self.lock:
+            self.scroll_offset = max(0, self.scroll_offset - count)
+            self.dirty = True
+
+    def scroll_page_up(self):
+        """Scroll history up by one full screen page."""
+        vis = max(3, (self.console.size.height or 25) - 7)
+        self.scroll_up(vis)
+
+    def scroll_page_down(self):
+        """Scroll history down by one full screen page."""
+        vis = max(3, (self.console.size.height or 25) - 7)
+        self.scroll_down(vis)
+
+    def scroll_home(self):
+        """Jump to the very beginning of the history buffer."""
+        with self.lock:
+            self.scroll_offset = max(0, len(self.history) - 3)
+            self.dirty = True
+
+    def scroll_end(self):
+        """Jump to the bottom and resume live auto-scrolling."""
+        with self.lock:
+            self.scroll_offset = 0
+            self.dirty = True
 
     def _update_window_title(self):
         """Keep the console window title bar synchronized with live session state."""
@@ -250,72 +336,49 @@ class H1OSMonitor:
         sys.stdout.write(f"\033]0;{title_str}\007")
         sys.stdout.flush()
 
-    def render_header_panel(self):
-        """Render the primary Rich rounded panel banner styled identically to h1os_menu."""
-        port_label = self.port or "Auto-detect"
-        ts_badge = "[bold green]ON[/]" if self.enable_timestamps else "[dim]OFF[/]"
-        log_badge = f"[bold green]ACTIVE[/] [dim]({self.log_path.name})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
-        status_badge = "[bold green]ONLINE[/]" if (self.ser and self.ser.is_open) else "[bold yellow]SLEEPING[/]"
+    def _highlight_metrics(self, msg: str) -> Text:
+        """Highlight hex numbers, milliseconds, and measurements in log messages."""
+        t = Text()
+        pattern = re.compile(r"(0x[0-9a-fA-F]+|[0-9.]+\s*(?:ms|Hz|%|C|KB|MB|MHz)|ESP_[A-Z_]+)")
+        last_idx = 0
+        for match in pattern.finditer(msg):
+            start, end = match.span()
+            if start > last_idx:
+                t.append(msg[last_idx:start])
+            val = match.group(0)
+            if val.startswith("0x"):
+                t.append(val, style="bold bright_yellow")
+            elif "ESP_" in val:
+                t.append(val, style="bold red" if ("TIMEOUT" in val or "FAIL" in val) else "bold yellow")
+            else:
+                t.append(val, style="bold cyan")
+            last_idx = end
+        if last_idx < len(msg):
+            t.append(msg[last_idx:])
+        return t
 
-        log_dir_str = str(self.log_dir)
-        if len(log_dir_str) > 28:
-            log_dir_str = "..." + log_dir_str[-25:]
-
-        header_table = Table.grid(padding=(0, 1))
-        header_table.add_column("K1", style="bold cyan", width=9)
-        header_table.add_column("V1", width=29)
-        header_table.add_column("K2", style="bold cyan", width=9)
-        header_table.add_column("V2", width=25)
-
-        header_table.add_row(
-            "Target :", f"[bold white]{self.chip.upper()}[/]",
-            "Status :", status_badge,
-        )
-        header_table.add_row(
-            "Serial :", f"[bold cyan]{port_label}[/] [dim]@{self.baud}[/]",
-            "Log Dir:", f"[white]{log_dir_str}[/]",
-        )
-        header_table.add_row(
-            "Time   :", f"{ts_badge} [dim](key 'T')[/]",
-            "Logging:", f"{log_badge} [dim](key 'L')[/]",
-        )
-
-        p = Panel(
-            header_table,
-            title="[bold white]H1OS Serial Monitor & Telemetry Console[/]",
-            subtitle=f"[dim]UID: {self.session_uid[:8]}  |  [R] Reset  [C] Clear  [Q/Esc] Quit[/]",
-            border_style="cyan",
-            box=box.ROUNDED,
-            width=78,
-        )
-        self.console.print(p)
-        self._update_window_title()
-
-    def clear_screen(self):
-        """Perform native console blank and redraw the header panel."""
-        if os.name == "nt":
-            os.system("cls")
-        else:
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.flush()
-        self.render_header_panel()
-
-    def format_log_line(self, raw_line: str) -> Text:
-        """Parse raw serial line and convert into a styled Rich telemetry entry."""
-        # 1. Strip raw ANSI sequences to extract unpolluted line text
-        clean = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
+    def format_entry(self, entry: LogEntry) -> Text:
+        """Parse structured entry and render into a beautifully styled Rich telemetry line."""
         text = Text()
 
-        # Optional timestamp prefix
+        # 1. Optional Millisecond Timestamp: [HH:MM:SS.mmm]
         if self.enable_timestamps:
-            now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            text.append(f"{now_ms} ", style="dim cyan")
+            ms_str = entry.ts.strftime("%H:%M:%S.%f")[:-3]
+            text.append(f"{ms_str} ", style="dim cyan")
 
-        # 2. Match standard ESP-IDF log lines: e.g. "I (5418) h1os_lvgl: Button pressed"
+        # 2. Inline System Badge
+        if entry.is_badge:
+            text.append(f" {entry.badge_tag} ", style=f"bold black on {entry.badge_color}")
+            text.append(" ")
+            text.append_text(Text.from_markup(entry.badge_msg))
+            return text
+
+        clean = ANSI_ESCAPE_RE.sub("", entry.raw).rstrip("\r\n")
+
+        # 3. Standard ESP-IDF Log Lines: e.g. "I (5418) h1os_lvgl: Button pressed"
         m_esp = ESP_LOG_RE.match(clean)
         if m_esp:
             lvl, tick, tag, msg = m_esp.groups()
-            badge_text = f" {lvl} "
             badge_style = {
                 "E": "bold white on red",
                 "W": "bold black on yellow",
@@ -324,19 +387,16 @@ class H1OSMonitor:
                 "V": "dim bright_black",
             }.get(lvl, "dim")
 
-            text.append(badge_text, style=badge_style)
+            text.append(f" {lvl} ", style=badge_style)
             text.append(f" {tick:>5}ms ", style="dim")
 
             tag_style = TAG_STYLES.get(tag, "bold cyan")
             text.append(f"{tag:<18}", style=tag_style)
             text.append(": ", style="dim")
-
-            # Style numbers, hex, and key metrics in the message body
-            msg_text = self._highlight_metrics(msg)
-            text.append_text(msg_text)
+            text.append_text(self._highlight_metrics(msg))
             return text
 
-        # 3. Match LVGL log lines: e.g. "[Info] (4.606, +3465) lv_label_create: begin"
+        # 4. LVGL Log Lines: e.g. "[Info] (4.606, +3465) lv_label_create: begin"
         m_lvgl = LVGL_LOG_RE.match(clean)
         if m_lvgl:
             lvl, timing, fn, msg = m_lvgl.groups()
@@ -347,35 +407,87 @@ class H1OSMonitor:
             text.append_text(self._highlight_metrics(msg))
             return text
 
-        # 4. Fallback for unformatted system lines (bootloader, psychrometrics, dumps)
-        text.append_text(Text.from_ansi(raw_line.rstrip("\r\n")))
+        # 5. ESP ROM Bootloader Lines
+        if clean.startswith(ROM_PREFIXES):
+            text.append(" ROM ", style="bold black on bright_yellow")
+            text.append("           ")
+            text.append_text(self._highlight_metrics(clean))
+            return text
+
+        # 6. Fallback for unformatted lines (dumps, psychrometric tables, boot banners)
+        text.append("       ")
+        text.append_text(Text.from_ansi(clean))
         return text
 
-    def _highlight_metrics(self, msg: str) -> Text:
-        """Highlight hex numbers, milliseconds, and measurements in log messages."""
-        t = Text()
-        # Highlight hex (0x..), numbers with units (ms, Hz, %, C), and status codes
-        pattern = re.compile(r"(0x[0-9a-fA-F]+|[0-9.]+\s*(?:ms|Hz|%|C|KB|MB)|ESP_[A-Z_]+)")
-        last_idx = 0
-        for match in pattern.finditer(msg):
-            start, end = match.span()
-            if start > last_idx:
-                t.append(msg[last_idx:start])
-            val = match.group(0)
-            if val.startswith("0x"):
-                t.append(val, style="bold bright_yellow")
-            elif "ESP_" in val:
-                t.append(val, style="bold red" if "TIMEOUT" in val or "FAIL" in val else "bold yellow")
+    def _build_header_panel(self, status_text: str) -> Panel:
+        """Construct the static 5-row header panel."""
+        port_label = self.port or "Auto-detect"
+        ts_badge = "[bold green]ON[/]" if self.enable_timestamps else "[dim]OFF[/]"
+        log_badge = f"[bold green]ACTIVE[/] [dim]({self.log_path.name})[/]" if (self.enable_logging and self.log_path) else "[dim]OFF[/]"
+
+        log_dir_str = str(self.log_dir)
+        if len(log_dir_str) > 28:
+            log_dir_str = "..." + log_dir_str[-25:]
+
+        header_table = Table.grid(padding=(0, 1), expand=True)
+        header_table.add_column("K1", style="bold cyan", width=9)
+        header_table.add_column("V1", ratio=1)
+        header_table.add_column("K2", style="bold cyan", width=9)
+        header_table.add_column("V2", ratio=1)
+
+        header_table.add_row(
+            "Target :", f"[bold white]{self.chip.upper()}[/]",
+            "Status :", status_text,
+        )
+        header_table.add_row(
+            "Serial :", f"[bold cyan]{port_label}[/] [dim]@{self.baud}[/]",
+            "Log Dir:", f"[white]{log_dir_str}[/]",
+        )
+        header_table.add_row(
+            "Time   :", f"{ts_badge} [dim](key 'T')[/]",
+            "Logging:", f"{log_badge} [dim](key 'L')[/]",
+        )
+
+        return Panel(
+            header_table,
+            title="[bold white]H1OS Serial Monitor & Telemetry Console[/]",
+            subtitle=f"[dim]UID: {self.session_uid[:8]}  |  [R] Reset  [C] Clear  [Q/Esc] Quit[/]",
+            border_style="cyan",
+            box=box.ROUNDED,
+        )
+
+    def _build_telemetry_panel(self) -> Panel:
+        """Construct the bordered rounded telemetry stream panel with scroll navigation."""
+        total_h = self.console.size.height or 25
+        visible_count = max(3, total_h - 7)
+
+        with self.lock:
+            total_lines = len(self.history)
+            if self.scroll_offset == 0:
+                lines = list(self.history)[-visible_count:]
+                subtitle = f"[dim][PageUp/Down] Scroll History  |  [End] Live Stream ({total_lines} lines)[/]"
             else:
-                t.append(val, style="bold cyan")
-            last_idx = end
-        if last_idx < len(msg):
-            t.append(msg[last_idx:])
-        return t
+                end_idx = max(0, total_lines - self.scroll_offset)
+                start_idx = max(0, end_idx - visible_count)
+                lines = list(self.history)[start_idx:end_idx]
+                subtitle = f"[bold yellow]-- SCROLLBACK ({self.scroll_offset} lines above live) -- Press [End] for Live Stream[/]"
+
+            body_text = Text()
+            for entry in lines:
+                body_text.append_text(self.format_entry(entry))
+                body_text.append("\n")
+
+        return Panel(
+            body_text,
+            title="[bold cyan]Telemetry Stream[/]",
+            subtitle=subtitle,
+            border_style="cyan",
+            box=box.ROUNDED,
+        )
 
     def run(self):
         """Main execution loop supervising serial streaming, deep sleep, and keyboard input."""
-        self.clear_screen()
+        self._update_window_title()
 
         # Keyboard polling thread
         kb_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
@@ -384,124 +496,149 @@ class H1OSMonitor:
         line_buffer = bytearray()
         sleep_start_time: Optional[float] = None
         spinner_idx = 0
+        last_render_time = 0.0
 
-        while self.running:
-            # 1. Port Connection / Deep Sleep Supervisor
-            if self.ser is None or not self.ser.is_open:
-                target_port = self.port or auto_detect_serial_port()
+        with Live(self.layout, console=self.console, screen=True, auto_refresh=False) as live:
+            while self.running:
+                now = time.time()
 
-                if sleep_start_time is None:
-                    sleep_start_time = time.time()
+                # 1. Port Connection / Deep Sleep Supervisor
+                if self.ser is None or not self.ser.is_open:
+                    target_port = self.port or auto_detect_serial_port()
 
-                # Calculate elapsed time in sleep
-                elapsed_sec = int(time.time() - sleep_start_time)
-                mins = elapsed_sec // 60
-                secs = elapsed_sec % 60
-                time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
+                    if sleep_start_time is None:
+                        sleep_start_time = now
 
-                # In-place spinner update (ZERO DOTS, NO SCROLL POLLUTION)
-                spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
-                spinner_idx += 1
+                    elapsed_sec = int(now - sleep_start_time)
+                    mins = elapsed_sec // 60
+                    secs = elapsed_sec % 60
+                    time_str = f"{mins:02d}m {secs:02d}s" if mins > 0 else f"{secs:02d}s"
 
-                port_label = target_port or "active port"
-                status_msg = f"\r  {spin_char} Target in deep sleep (elapsed: {time_str}). Listening on {port_label}...   "
-                sys.stdout.write(status_msg)
-                sys.stdout.flush()
+                    spin_char = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
+                    spinner_idx += 1
 
-                # Attempt to open port with DTR/RTS held LOW (zero-reset)
-                if target_port:
-                    try:
-                        self.ser = serial.Serial(
-                            port=target_port,
-                            baudrate=self.baud,
-                            timeout=0.1,
-                            dsrdtr=False,
-                            rtscts=False,
-                        )
-                        # Explicitly hold lines low so MCU is not reset on connect
-                        set_dtr_pin(self.ser, False)
-                        set_rts_with_windows_quirk(self.ser, False)
+                    port_label = target_port or "active port"
+                    status_text = f"[bold yellow]SLEEPING ({time_str}) {spin_char}[/] [dim]Listening on {port_label}...[/]"
 
-                        # Clear in-place spinner line
-                        sys.stdout.write("\r" + " " * 85 + "\r")
-                        sys.stdout.flush()
+                    # Update UI on every tick during deep sleep
+                    self.layout["header"].update(self._build_header_panel(status_text))
+                    self.layout["body"].update(self._build_telemetry_panel())
+                    live.update(self.layout, refresh=True)
+                    self.dirty = False
 
-                        self.port = target_port
-                        reconn_msg = f"Target connected on {self.port} [dim](slept {time_str})[/]"
-                        self._print_badge("ONLINE", reconn_msg, "green")
-                        self._update_window_title()
-                        sleep_start_time = None
-                        line_buffer.clear()
-                    except (serial.SerialException, OSError) as exc:
-                        self.ser = None
-                        exc_msg = str(exc).lower()
-                        if "access is denied" in exc_msg or "permissionerror" in exc_msg:
-                            sys.stdout.write(f"\r  ⚠️  Port {target_port} locked by another session (Access Denied). Retrying...   ")
-                            sys.stdout.flush()
+                    # Attempt to open port with DTR/RTS held LOW (zero-reset on connect)
+                    if target_port:
+                        try:
+                            self.ser = serial.Serial(
+                                port=target_port,
+                                baudrate=self.baud,
+                                timeout=0.05,
+                                dsrdtr=False,
+                                rtscts=False,
+                            )
+                            # Explicitly hold lines low so MCU is not reset on connect
+                            set_dtr_pin(self.ser, False)
+                            set_rts_with_windows_quirk(self.ser, False)
 
-                time.sleep(0.15)
-                continue
-
-            # 2. Read Serial Stream
-            try:
-                available = self.ser.in_waiting
-                if available > 0:
-                    chunk = self.ser.read(available)
-                    for b in chunk:
-                        if b == ord("\n"):
-                            try:
-                                raw_line = line_buffer.decode("utf-8", errors="replace")
-                            except Exception:
-                                raw_line = line_buffer.decode("latin-1", errors="replace")
+                            self.port = target_port
+                            self._add_badge_entry("ONLINE", f"Target connected on {self.port} [dim](slept {time_str})[/]", "green")
+                            self._update_window_title()
+                            sleep_start_time = None
                             line_buffer.clear()
+                            self.dirty = True
+                        except (serial.SerialException, OSError) as exc:
+                            self.ser = None
+                            exc_msg = str(exc).lower()
+                            if "access is denied" in exc_msg or "permissionerror" in exc_msg:
+                                status_text = f"[bold red]LOCKED (Access Denied)[/] [dim]Retrying {target_port}...[/]"
+                                self.layout["header"].update(self._build_header_panel(status_text))
+                                live.update(self.layout, refresh=True)
 
-                            # Render styled telemetry line on console
-                            styled = self.format_log_line(raw_line)
-                            self.console.print(styled)
+                    time.sleep(0.12)
+                    continue
 
-                            # Persistent disk logging (ANSI stripped for 100% clean plain text)
-                            if self.enable_logging and self.log_file:
-                                clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
-                                if self.enable_timestamps:
-                                    now_ms = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                                    self.log_file.write(f"[{now_ms}] {clean_for_log}\n")
-                                else:
-                                    self.log_file.write(f"{clean_for_log}\n")
-                                self.log_file.flush()
+                # 2. Read Serial Stream
+                try:
+                    available = self.ser.in_waiting
+                    if available > 0:
+                        chunk = self.ser.read(available)
+                        for b in chunk:
+                            if b == ord("\n"):
+                                try:
+                                    raw_line = line_buffer.decode("utf-8", errors="replace")
+                                except Exception:
+                                    raw_line = line_buffer.decode("latin-1", errors="replace")
+                                line_buffer.clear()
 
-                        elif b != ord("\r"):
-                            line_buffer.append(b)
-                else:
-                    time.sleep(0.01)
+                                entry = LogEntry(raw=raw_line)
+                                with self.lock:
+                                    self.history.append(entry)
+                                    self.dirty = True
 
-            except (serial.SerialException, OSError):
-                # Target entered deep sleep and dropped USB serial PHY
-                if self.ser:
-                    try:
-                        self.ser.close()
-                    except Exception:
-                        pass
-                self.ser = None
-                sleep_start_time = time.time()
-                sys.stdout.write("\n")
-                self._print_badge("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
-                self._update_window_title()
+                                # Persistent disk logging (ANSI stripped for 100% clean plain text)
+                                if self.enable_logging and self.log_file:
+                                    clean_for_log = ANSI_ESCAPE_RE.sub("", raw_line).rstrip("\r\n")
+                                    if self.enable_timestamps:
+                                        ms_str = entry.ts.strftime("%H:%M:%S.%f")[:-3]
+                                        self.log_file.write(f"[{ms_str}] {clean_for_log}\n")
+                                    else:
+                                        self.log_file.write(f"{clean_for_log}\n")
+                                    self.log_file.flush()
+
+                            elif b != ord("\r"):
+                                line_buffer.append(b)
+
+                    # Throttle screen refresh to ~30 fps to keep serial processing lightning fast
+                    if self.dirty and (now - last_render_time >= 0.033):
+                        self.layout["header"].update(self._build_header_panel("[bold green]ONLINE[/]"))
+                        self.layout["body"].update(self._build_telemetry_panel())
+                        live.update(self.layout, refresh=True)
+                        last_render_time = now
+                        self.dirty = False
+
+                    if available == 0:
+                        time.sleep(0.01)
+
+                except (serial.SerialException, OSError):
+                    # Target entered deep sleep and dropped USB serial PHY
+                    if self.ser:
+                        try:
+                            self.ser.close()
+                        except Exception:
+                            pass
+                    self.ser = None
+                    sleep_start_time = time.time()
+                    self._add_badge_entry("SUSPEND", "Target entered deep sleep / USB PHY power gated.", "yellow")
+                    self._update_window_title()
 
     def _keyboard_listener(self):
-        """Poll keyboard asynchronously for hotkeys without blocking serial stream."""
+        """Poll keyboard asynchronously for navigation and hotkeys."""
         if os.name == "nt":
             import msvcrt
 
             while self.running:
                 if msvcrt.kbhit():
                     ch = msvcrt.getch()
-                    # Handle arrow/function escape sequences
+                    # Extended navigation keys (Up, Down, PageUp, PageDown, Home, End)
                     if ch in (b"\x00", b"\xe0"):
-                        msvcrt.getch()
+                        ch2 = msvcrt.getch()
+                        code = ord(ch2)
+                        if code == 0x48:  # Up
+                            self.scroll_up(1)
+                        elif code == 0x50:  # Down
+                            self.scroll_down(1)
+                        elif code == 0x49:  # PageUp
+                            self.scroll_page_up()
+                        elif code == 0x51:  # PageDown
+                            self.scroll_page_down()
+                        elif code == 0x47:  # Home
+                            self.scroll_home()
+                        elif code == 0x4F:  # End
+                            self.scroll_end()
                         continue
 
                     key = ch.decode("utf-8", errors="ignore").lower()
-                    if key == "q" or ch == b"\x1b" or ch == b"\x03":  # Q, ESC, Ctrl+C
+                    if key in ("q", "\x1b", "\x03"):  # Q, ESC, Ctrl+C
                         self.running = False
                         break
                     elif key == "r":
@@ -512,7 +649,9 @@ class H1OSMonitor:
                         self.toggle_logging()
                     elif key == "c":
                         self.clear_screen()
-                time.sleep(0.05)
+                    elif key == "b":
+                        self.scroll_end()
+                time.sleep(0.02)
         else:
             import select
             import termios
@@ -523,11 +662,33 @@ class H1OSMonitor:
             try:
                 tty.setcbreak(fd)
                 while self.running:
-                    r, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    r, _, _ = select.select([sys.stdin], [], [], 0.02)
                     if r:
                         ch = sys.stdin.read(1)
+                        if ch == "\x1b":
+                            # Check for escape sequences
+                            seq = ""
+                            while select.select([sys.stdin], [], [], 0.001)[0]:
+                                seq += sys.stdin.read(1)
+                            if seq == "[A":
+                                self.scroll_up(1)
+                            elif seq == "[B":
+                                self.scroll_down(1)
+                            elif seq in ("[5~", "[I"):
+                                self.scroll_page_up()
+                            elif seq in ("[6~", "[G"):
+                                self.scroll_page_down()
+                            elif seq in ("[H", "[1~"):
+                                self.scroll_home()
+                            elif seq in ("[F", "[4~"):
+                                self.scroll_end()
+                            elif not seq:
+                                self.running = False
+                                break
+                            continue
+
                         key = ch.lower()
-                        if key == "q" or ch == "\x1b" or ch == "\x03":
+                        if key in ("q", "\x03"):
                             self.running = False
                             break
                         elif key == "r":
@@ -538,6 +699,8 @@ class H1OSMonitor:
                             self.toggle_logging()
                         elif key == "c":
                             self.clear_screen()
+                        elif key == "b":
+                            self.scroll_end()
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
