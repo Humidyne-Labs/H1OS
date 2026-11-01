@@ -699,7 +699,7 @@ def spawn_serial_monitor(
                     wt_exe,
                     "nt",
                     "--profile", "PowerShell",
-                    "powershell", "-NoExit", "-Command", child_command,
+                    "powershell", "-Command", child_command,
                 ]
                 subprocess.Popen(wt_cmd, cwd=app_root_str)
                 return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in Windows Terminal."
@@ -708,7 +708,7 @@ def spawn_serial_monitor(
 
         # 2. Fallback: Standalone PowerShell window
         try:
-            ps_cmd = ["powershell.exe", "-NoExit", "-Command", child_command]
+            ps_cmd = ["powershell.exe", "-Command", child_command]
             subprocess.Popen(
                 ps_cmd,
                 cwd=app_root_str,
