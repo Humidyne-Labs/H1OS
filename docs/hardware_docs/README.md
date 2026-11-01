@@ -5,10 +5,11 @@
 
 ---
 
-# Laudandum: Unsolicited Praise
+# Laudanda: Things Worthy of Praise
+*(Unsolicited Bench Commentary)*
 
 > **To the hardware and layout team:**  
-> We spend plenty of ink across the repository errata cataloging silicone edge cases, layout quirks, and firmware workarounds. But bench work demands fairness: several deliberate engineering choices on this board saved real sanity during bring-up. The fundamentals here have genuine merit.
+> We spend plenty of ink across the repository errata cataloging silicon edge cases, layout quirks, and firmware workarounds. But bench work demands fairness: several deliberate engineering choices on this board saved real sanity during bring-up. The fundamentals here have genuine merit.
 
 ---
 
