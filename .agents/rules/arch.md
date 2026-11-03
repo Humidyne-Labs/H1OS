@@ -1,6 +1,6 @@
 # Architecture and Codebase Rules
 
-This rule enforces core development invariants across the **H1OS** (`v2.4.5-dev`) firmware and ESP32-S3 Board Support Package.
+This rule enforces core development invariants across the **H1OS** (`v2.4.9-dev`) firmware and ESP32-S3 Board Support Package.
 
 ## 1. Four-Layer Unidirectional Boundary Hierarchy
 

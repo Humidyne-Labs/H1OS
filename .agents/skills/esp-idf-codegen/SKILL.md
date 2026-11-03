@@ -3,7 +3,7 @@ name: esp-idf-codegen
 description: Conservative, verified C/C++ firmware generation and patching for ESP-IDF projects. Use whenever writing, editing, refactoring, or reviewing ESP32 / ESP-IDF C/C++ source code, drivers, or header files.
 ---
 
-# ESP-IDF Code Generation Protocol (`v2.4.5-dev`)
+# ESP-IDF Code Generation Protocol (`v2.4.9-dev`)
 
 ## 1. Operating Rules & Blast Radius
 - **Atomic Header-Implementation Coherency & Surgical Edits:** Keep edits surgical and scoped strictly to the target subsystem or feature. When changing a public or internal C/C++ prototype, struct layout, or enum, update the `.h` declaration and `.c`/`.cpp` implementation atomically so the build tree remains compilable at every step. Never perform unrelated drive-by rewrites across untouched modules.

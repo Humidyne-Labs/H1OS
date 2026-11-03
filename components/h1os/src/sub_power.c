@@ -367,6 +367,9 @@ esp_err_t sub_power_init_ulp(uint32_t flow_a_period_sec)
         rtc_gpio_deinit(HAL_PIN_RTC_INT);
 
         ESP_LOGI(TAG, "ULP-RISC-V Coprocessor initialized in Pure Event Mode (ERR-001 Mitigated)");
+    } else if (!s_ulp_adc_inited) {
+        /* Warm ULP wake: ensure ADC curve-fitting calibration handle is initialized in RAM (H1OS-AUD-07) */
+        (void)sub_power_init();
     }
     return ESP_OK;
 }

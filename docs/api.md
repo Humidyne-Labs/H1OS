@@ -3316,7 +3316,7 @@ enum sub_audio_type_t
 
 Defined in h1os/sub_audio.h:24
 
-Acoustic payload type for consolidated sub_audio_play dispatch.
+Acoustic data buffer type for consolidated sub_audio_play dispatch.
 
 | Value | Description |
 |-------|-------------|
@@ -5476,7 +5476,7 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | `const uint8_t *` | Pointer to buffer containing payload. |
+| `data` | `const uint8_t *` | Pointer to buffer containing data buffer. |
 | `len` | `size_t` | Length of data in bytes. |
 
 ---
@@ -6319,7 +6319,7 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | `const uint8_t *` | Pointer to buffer containing payload. Must not be NULL. |
+| `data` | `const uint8_t *` | Pointer to buffer containing data buffer. Must not be NULL. |
 | `len` | `size_t` | Length of data in bytes. |
 
 ---
@@ -6429,7 +6429,7 @@ ESP_OK on success.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `key` | `const char *` | Unique key identifier string. |
-| `value` | `const char *` | String payload to persist. |
+| `value` | `const char *` | String data buffer to persist. |
 
 ---
 
@@ -8061,8 +8061,8 @@ ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM. |
-| `data` | `const void *` | Pointer to payload parameters or PCM buffer. |
-| `len` | `size_t` | Length of data payload in bytes. |
+| `data` | `const void *` | Pointer to data buffer parameters or PCM buffer. |
+| `len` | `size_t` | Length of data data buffer in bytes. |
 
 ---
 
@@ -9951,9 +9951,9 @@ ESP_OK if command was queued to worker, or error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Acoustic payload type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM). |
-| `data` | `const void *` | Pointer to payload data buffer or parameters struct. |
-| `len` | `size_t` | Length of data payload in bytes. |
+| `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Acoustic data buffer type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM). |
+| `data` | `const void *` | Pointer to data buffer data buffer or parameters struct. |
+| `len` | `size_t` | Length of data data buffer in bytes. |
 
 ---
 
@@ -15835,7 +15835,7 @@ References:
   * Section 6.7: Waveform Setting & Figure 6-6: Waveform Setting Mapping (pp. 14-16)
   * Section 7: Command Table (pp. 20-33)
 
-Multi-Register Dispatch Architecture: The 159-byte payload is partitioned across five distinct SSD1681 hardware registers: +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | Register Command | Offset | Length | Hardware Subsystem / Purpose | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | 0x32 (WRITE_LUT) | 0..152 | 153 Bytes | Core Voltage LUTs (0-4), Timing (0-11), FR, XON| | 0x3F (EOPT) | 153 | 1 Byte | End of Frame Option (LUT termination behavior) | | 0x03 (GATE_VOLT) | 154 | 1 Byte | Gate Driving Voltages (VGH / VGL) | | 0x04 (SRCE_VOLT) | 155..157| 3 Bytes | Source Driving Voltages (VSH1, VSH2, VSL) | | 0x2C (WRITE_VCOM) | 158 | 1 Byte | VCOM Modulation Voltage (DCVCOM) | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+
+Multi-Register Dispatch Architecture: The 159-byte data buffer is partitioned across five distinct SSD1681 hardware registers: +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | Register Command | Offset | Length | Hardware Subsystem / Purpose | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | 0x32 (WRITE_LUT) | 0..152 | 153 Bytes | Core Voltage LUTs (0-4), Timing (0-11), FR, XON| | 0x3F (EOPT) | 153 | 1 Byte | End of Frame Option (LUT termination behavior) | | 0x03 (GATE_VOLT) | 154 | 1 Byte | Gate Driving Voltages (VGH / VGL) | | 0x04 (SRCE_VOLT) | 155..157| 3 Bytes | Source Driving Voltages (VSH1, VSH2, VSL) | | 0x2C (WRITE_VCOM) | 158 | 1 Byte | VCOM Modulation Voltage (DCVCOM) | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+
 
 Phase Voltage Bitfield Encoding (Table 6-6): Each LUT byte controls 4 phases (A, B, C, D) for that group:
 
@@ -16319,7 +16319,7 @@ Message envelope for the Core 0 -> Core 1 asynchronous UI mutation queue.
 | Return | Name | Description |
 |--------|------|-------------|
 | [`h1os_ui_fn_t`](#h1os_ui_fn_t) | [`fn`](#fn)  | Callback function to execute on Core 1 under LVGL lock. |
-| `void *` | [`arg`](#arg)  | Opaque payload pointer passed to fn. |
+| `void *` | [`arg`](#arg)  | Opaque data buffer pointer passed to fn. |
 
 ---
 
@@ -16349,7 +16349,7 @@ void * arg
 
 Defined in h1os/h1os_lvgl.h:33
 
-Opaque payload pointer passed to fn.
+Opaque data buffer pointer passed to fn.
 
 {#h1os_lifecycle_t}
 

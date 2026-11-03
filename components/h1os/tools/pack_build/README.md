@@ -76,7 +76,7 @@ The 8 MB flash layout enforces ESP-IDF boundary alignments (4 KB sector alignmen
 | **4** | `otadata` | `data` | `ota` | `0x01D000` | `0x01EFFF` | `0x002000` | 8.0 KB | Dual-sector OTA boot slot selector (`bins/ota_data_initial.bin`) |
 | **5** | `phy_init` | `data` | `phy` | `0x01F000` | `0x01FFFF` | `0x001000` | 4.0 KB | RF PHY calibration data |
 | **6** | `ota_0` | `app` | `ota_0` | `0x020000` | `0x31FFFF` | `0x300000` | 3,072.0 KB | Primary Application Slot 0 (`h1os.bin`) |
-| **7** | `ota_1` | `app` | `ota_1` | `0x320000` | `0x61FFFF` | `0x300000` | 3,072.0 KB | Secondary Application Slot 1 (OTA fallback / staging) |
+| **7** | `ota_1` | `app` | `ota_1` | `0x320000` | `0x61FFFF` | `0x300000` | 3,072.0 KB | Secondary Application Slot 1 (OTA default / staging) |
 | **8** | `storage` | `data` | `spiffs` | `0x620000` | `0x7FBFFF` | `0x1DC000` | 1,904.0 KB | User SPIFFS filesystem partition |
 | **9** | `epd_frame` | `data` | `custom` | `0x7FC000` | `0x7FFFFF` | `0x004000` | 16.0 KB | Retained 200x200 monochrome e-Paper framebuffer |
 

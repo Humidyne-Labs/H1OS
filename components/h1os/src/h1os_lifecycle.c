@@ -608,9 +608,10 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         .deep_sleep_count   = st->wake_count,
         .flow_b_count       = st->flow_b_counter,
         .button_wake_count  = st->button_wake_count,
-        .woke_from_button   = button_woke,
-        .wake_button        = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
-        .sleep_duration_sec = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
+        .woke_from_button    = button_woke,
+        .wake_button         = button_woke ? (uint8_t)ulp_last_wake_btn : (uint8_t)H1OS_WAKE_BTN_NONE,
+        .ulp_dispatch_reason = st->ulp_dispatch_reason,
+        .sleep_duration_sec  = button_woke ? st->sample_interval_sec : st->flow_b_period_sec,
         .user_data          = s_app_lifecycle.user_data,
     };
 
@@ -883,9 +884,10 @@ esp_err_t h1os_get_telemetry(h1os_telemetry_t *out_telemetry)
         out_telemetry->dew_point_c          = dew;
         out_telemetry->dew_point_f          = H1OS_CELSIUS_TO_FAHRENHEIT(dew);
         out_telemetry->dew_point_k          = H1OS_CELSIUS_TO_KELVIN(dew);
-        out_telemetry->vapor_pressure_hpa   = st->vapor_pressure_hpa;
-        out_telemetry->is_thermally_settled = !orch_flow_is_thermal_lockout();
-        out_telemetry->absolute_humidity_g  = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
+        out_telemetry->vapor_pressure_hpa     = st->vapor_pressure_hpa;
+        out_telemetry->sat_vapor_pressure_hpa = orch_math_calc_sat_vapor_pressure(t);
+        out_telemetry->is_thermally_settled   = !orch_flow_is_thermal_lockout();
+        out_telemetry->absolute_humidity_g    = orch_math_calc_absolute_humidity(st->vapor_pressure_hpa, t);
     }
 
     out_telemetry->window_low_c           = (float)st->window_low_temp_centi_c / 100.0f;
@@ -983,6 +985,27 @@ esp_err_t h1os_sleep(uint32_t sleep_sec)
         volatile orch_persisted_state_t *st = orch_state_get();
         orch_state_save_runtimes_to_nvs();
         st->last_nvs_commit_sec = st->total_sleep_sec;
+    }
+
+    /* Ensure any asynchronous Core 0 on_sync() task holding the sleep barrier completes
+     * prior to executing pre-sleep hooks on interactive or early manual sleep transitions (H1OS-AUD-01) */
+    if (s_sleep_barrier_group != NULL) {
+        EventBits_t cur_bits = xEventGroupGetBits(s_sleep_barrier_group);
+        if ((cur_bits & BARRIER_SYNC_DONE) == 0) {
+            uint32_t sync_to_ms = (s_app_lifecycle.session.sync_timeout_ms > 0U)
+                                      ? s_app_lifecycle.session.sync_timeout_ms
+                                      : LIFECYCLE_DEFAULT_SYNC_TIMEOUT_MS;
+            EventBits_t waited = xEventGroupWaitBits(s_sleep_barrier_group,
+                                                     BARRIER_SYNC_DONE,
+                                                     pdFALSE,
+                                                     pdTRUE,
+                                                     pdMS_TO_TICKS(sync_to_ms));
+            if ((waited & BARRIER_SYNC_DONE) == 0) {
+                ESP_LOGW(TAG, "h1os_sleep: async on_sync barrier timeout after %lu ms; releasing sync gate",
+                         (unsigned long)sync_to_ms);
+                h1os_lvgl_release_sync_gate();
+            }
+        }
     }
 
     ESP_LOGI(TAG, "Entering coordinated sleep sequence (%lu sec)...", (unsigned long)sleep_sec);

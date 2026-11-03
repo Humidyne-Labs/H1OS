@@ -1,6 +1,6 @@
 # Documentation Governance, Historical Memory & OSHW Attribution
 
-This rule governs documentation integrity, living memory tracking, and open-source attribution in **H1OS** (`v2.4.5-dev`).
+This rule governs documentation integrity, living memory tracking, and open-source attribution in **H1OS** (`v2.4.9-dev`).
 
 ---
 
@@ -28,5 +28,5 @@ This rule governs documentation integrity, living memory tracking, and open-sour
 
 ### Project Engineering Attribution
 - **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-- **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.5-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+- **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.9-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 - **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

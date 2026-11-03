@@ -1,6 +1,6 @@
 # Embedded C/C++ Coding Standards, Hardware Utilization & Code Aesthetics
 
-This rule governs the implementation quality, hardware-first design principles, concurrency safety, memory safety, and visual aesthetics of C/C++ firmware in **H1OS** (`v2.4.5-dev`).
+This rule governs the implementation quality, hardware-first design principles, concurrency safety, memory safety, and visual aesthetics of C/C++ firmware in **H1OS** (`v2.4.9-dev`).
 
 ---
 

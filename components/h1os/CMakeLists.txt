@@ -83,15 +83,24 @@ idf_component_register(
 set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/static_assets")
 set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/generate_1bpp_fonts.py")
 
-if(NOT EXISTS "${FONT_GEN_SCRIPT}" OR NOT EXISTS "${FONT_SRC_DIR}/Montserrat-Bold.ttf")
+if(NOT EXISTS "${FONT_GEN_SCRIPT}")
     message(FATAL_ERROR
         "\n========================================================================\n"
-        "[H1OS BUILD ERROR] Required 1-BPP typography font assets missing!\n"
-        "Expected font directory: ${FONT_SRC_DIR}\n"
-        "Missing: generate_1bpp_fonts.py or TTF/WOFF font assets.\n"
-        "Please verify the H1OS component was cloned/pulled with full tools/ tree.\n"
+        "[H1OS BUILD ERROR] Required 1-BPP font generator script missing!\n"
+        "Expected script: ${FONT_GEN_SCRIPT}\n"
         "========================================================================\n"
     )
+endif()
+
+set(FONT_DEP_FILES "${FONT_GEN_SCRIPT}")
+foreach(asset_name "Montserrat-Bold.ttf" "Montserrat-Medium.ttf" "FontAwesome5-Solid+Brands+Regular.woff")
+    if(EXISTS "${FONT_SRC_DIR}/${asset_name}")
+        list(APPEND FONT_DEP_FILES "${FONT_SRC_DIR}/${asset_name}")
+    endif()
+endforeach()
+
+if(NOT EXISTS "${FONT_SRC_DIR}/Montserrat-Bold.ttf")
+    message(STATUS "[H1OS] Vendored TTF assets not present in ${FONT_SRC_DIR}; generate_1bpp_fonts.py will resolve LVGL managed_components assets or emit deterministic 1-BPP descriptor bridges.")
 endif()
 
 set(GENERATED_FONT_SRCS
@@ -110,13 +119,11 @@ add_custom_command(
     OUTPUT ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR}
     COMMAND "${python_bin}" "${FONT_GEN_SCRIPT}"
             --font-dir "${FONT_SRC_DIR}"
+            --lvgl-dir "${CMAKE_SOURCE_DIR}/managed_components/lvgl__lvgl"
             --out-dir "${GEN_FONT_DIR}"
             --sizes 14 16 18 20 24 32
-    DEPENDS "${FONT_GEN_SCRIPT}"
-            "${FONT_SRC_DIR}/Montserrat-Bold.ttf"
-            "${FONT_SRC_DIR}/Montserrat-Medium.ttf"
-            "${FONT_SRC_DIR}/FontAwesome5-Solid+Brands+Regular.woff"
-    COMMENT "Synthesizing H1OS 1-BPP Typography & Font Licenses from Vendored Assets..."
+    DEPENDS ${FONT_DEP_FILES}
+    COMMENT "Synthesizing H1OS 1-BPP Typography & Font Licenses..."
     VERBATIM
 )
 

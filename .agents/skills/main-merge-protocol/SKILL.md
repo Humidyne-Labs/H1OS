@@ -3,7 +3,7 @@ name: main-merge-protocol
 description: Operational reference, validation checklists, and execution commands for merging code into main. Enforces the pre-merge protocol: touching CHANGELOG.md, regenerating docs/api.md with Doxygen & Moxygen, synchronizing semantic version strings across 4 files, verifying zero-warning ESP-IDF builds, and tagging releases.
 ---
 
-# Pre-Merge to Main Protocol & Release Execution (`v2.4.5-dev`)
+# Pre-Merge to Main Protocol & Release Execution (`v2.4.9-dev`)
 
 This skill provides step-by-step procedures, one-liner automation commands, and validation scripts for preparing, merging, and releasing code into the `main` branch of **H1OS**.
 
@@ -46,7 +46,7 @@ python tools/agent/sanitize.py --fix
 
 ### Step 1: Rev Semantic Version Strings (4 Locations)
 
-When bumping version (e.g., from `2.4.4-dev` to `2.4.5-dev`):
+When bumping version (e.g., from `2.4.4-dev` to `2.4.9-dev`):
 
 1. **`components/h1os/include/h1os/h1os_version.h`**:
    Update `H1OS_VERSION_MAJOR`, `H1OS_VERSION_MINOR`, `H1OS_VERSION_PATCH`, and `H1OS_VERSION_STRING`.

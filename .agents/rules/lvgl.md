@@ -1,4 +1,4 @@
-# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.5-dev`)
+# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.9-dev`)
 
 ## 1. Hardware & Silicon Display Constraints
 
@@ -96,7 +96,7 @@ $$\text{Canvas Dimension} = (\text{Base Modules} + 8\text{ Quiet Zone}) \times \
 
 ---
 
-## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.5-dev`)
+## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.9-dev`)
 
 * **Core Affinity:** The LVGL presentation task (`h1os_lvgl`) is pinned strictly to **Core 1** at FreeRTOS priority **5** (`LVGL_TASK_PRIO_PORT = 5`). Core 0 handles lifecycle orchestration, `on_sync()` wireless stacks, and background I/O.
 * **Lifecycle Hook Context (`on_boot` & `on_wake`):** During `on_boot()` and `on_wake()`, the Core 1 LVGL task has not yet been started (`h1os_lvgl_start(5, 1)` runs immediately after `on_wake()` returns). Initial screen construction inside `on_boot()` and `on_wake()` is therefore inherently single-threaded; `h1os_trigger_splash()` acquires a scoped `h1os_lvgl_lock(1000)` internally.

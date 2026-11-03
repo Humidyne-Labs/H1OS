@@ -161,7 +161,7 @@ bool  orch_math_is_plateau_settled(int16_t initial_temp_centi_c, int16_t current
     - The PCF85063A countdown timer is armed for $T_A$ in periodic pulse mode (`TIMER_PULSE_MODE_BIT`).
     - When $\text{remainder} == 0$, the timer **auto-reloads continuously in silicon** without software re-arming, accumulating $0.00\text{ ms}$ of compounding execution drift.
     - If $\text{remainder} > 0$, on slice $\text{overflow} - 1$, `bsp_wake_stub()` re-arms the hardware timer for $\text{remainder}$ seconds via `rtc_rearm_countdown_stub()`.
-  - **Single Variable Authority:** All time logic across the orchestrator, lifecycle, and power subsystems derives strictly from `st->sample_interval_sec` ($T_A$) and `st->flow_b_period_sec` ($T_B$) in RTC Slow Memory. No duplicate file-static variables or fallback constants are permitted.
+  - **Single Variable Authority:** All time logic across the orchestrator, lifecycle, and power subsystems derives strictly from `st->sample_interval_sec` ($T_A$) and `st->flow_b_period_sec` ($T_B$) in RTC Slow Memory. No duplicate file-static variables or default constants are permitted.
 
 #### Flow B Wake Profiles & Dual-Core Lifecycle Governance (`v2.4.5-dev`)
 1. **User Interactive Wake (`H1OS_WAKE_STATE_INTERACTIVE_SESSION` — `ULP_DISPATCH_MAIN_WAKE` from Button Tap):**

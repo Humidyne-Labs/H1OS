@@ -4,6 +4,23 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.9-dev] - 2026-11-02
+
+### 🛡️ Third-Party Pre-Application Lock Audit & Middleware Hardening
+* **Interactive & Early Sleep Barrier Synchronization (`H1OS-AUD-01`)** (`h1os_lifecycle.c`):
+  * Added bounded `xEventGroupWaitBits(s_sleep_barrier_group, BARRIER_SYNC_DONE, ...)` synchronization inside `h1os_sleep()` prior to `on_pre_sleep()` execution. Previously, `BARRIER_ALL_READY` was awaited exclusively on unattended `is_rtc_wake` transitions in `h1os_launch_interactive_session()`, leaving interactive or early manual `h1os_sleep()` transitions unguarded if an asynchronous `on_sync()` worker called `h1os_sync_hold()`.
+* **Wake Context & Telemetry Contract Completion (`H1OS-AUD-02`, `H1OS-AUD-03`, `H1OS-AUD-04`)** (`h1os.h`, `h1os_lvgl.h`, `h1os_lifecycle.c`):
+  * Added an anonymous union (`union { uint32_t deep_sleep_count; uint32_t wake_count; }`) and `uint8_t ulp_dispatch_reason` to `h1os_wake_context_t` in `h1os.h` (populated in `h1os_launch_interactive_session()`), reconciling the public C struct with `docs/architecture/B1_api_and_services.md` and `.agents/rules/lifecycle.md`.
+  * Added `float sat_vapor_pressure_hpa` to `h1os_telemetry_t` (populated via `orch_math_calc_sat_vapor_pressure(t)` in `h1os_get_telemetry()`), allowing Layer 4 diagnostic screens to display both actual and saturation vapor pressure without including Layer 3 `orch_math.h`.
+  * Added inline helper `h1os_lvgl_request_full_refresh(void)` to `h1os_lvgl.h` wrapping `h1os_lvgl_set_first_flush_mode(true)` for Layer 4 Light/Dark theme polarity toggles and manual ghosting scrubs.
+* **Warm-Wake ADC Curve-Fitting Calibration Initialization (`H1OS-AUD-07`)** (`sub_power.c`):
+  * Updated `sub_power_init_ulp()` to invoke `sub_power_init()` when `!s_ulp_adc_inited` during warm ULP wakes (`ESP_SLEEP_WAKEUP_ULP`), ensuring the ADC1 Channel 3 curve-fitting calibration handle in `.bss` is valid immediately during active Flow B sessions prior to deep-sleep entry.
+* **Slim-Archive & Managed-Component Typography Build Resilience (`H1OS-AUD-05`)** (`components/h1os/CMakeLists.txt`, `components/h1os/tools/fonts/generate_1bpp_fonts.py`):
+  * Updated `CMakeLists.txt` and `generate_1bpp_fonts.py` to resolve font assets across `components/h1os/tools/fonts/static_assets/` and `managed_components/lvgl__lvgl/scripts/generators/built_in_font/`, and to synthesize deterministic 1-BPP LVGL font descriptor bridges when building from slim archives where binary `.ttf`/`.woff` blobs or `npx` are omitted.
+* **Agent Verification Tooling, Version Alignment & Lexicon Audit (`H1OS-AUD-06`)** (`tools/agent/`, `tools/fonts/`, `AGENTS.md`, `ERRATA.md`, `docs/`):
+  * Restored offline verification scripts (`sanitize.py`, `check_string_width.py`, `extract_font_metrics.py`, `optimize_images.py`, `optimize_pdf.py`) and 1-BPP Montserrat CSV glyph metric tables (`14..32px`).
+  * Synchronized semantic version strings to `2.4.9-dev` across `h1os_version.h`, `components/h1os/idf_component.yml`, `README.md`, `ERRATA.md`, `AGENTS.md`, `.agents/`, and `CHANGELOG.md`, and remediated all remaining lexicon policy violations across headers, sources, and documentation.
+
 ## [2.4.8-dev] - 2026-11-01
 
 ### 🛠️ Hardware Abstraction & Audio Subsystem Handover

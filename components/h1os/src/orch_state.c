@@ -67,7 +67,7 @@ void orch_state_load_runtimes_from_nvs(void)
         return;
     }
 
-    /* Fallback to legacy u32 keys */
+    /* default to legacy u32 keys */
     uint32_t val = 0;
     if (sub_nvs_get_u32("pwr_sleep_s", &val) == ESP_OK) {
         st->total_sleep_sec = val;

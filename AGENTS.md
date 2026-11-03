@@ -1,6 +1,6 @@
 # H1OS Master Engineering Specification & Agent Invariants
 
-This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.5-dev`) on ESP32-S3.
+This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.9-dev`) on ESP32-S3.
 
 ---
 
@@ -17,7 +17,7 @@ This file constitutes the authoritative, always-active engineering and behaviora
    - **Layer 4: Application Lifecycle (`h1os_*`)**: Declarative lifecycle & dual-core sleep barrier (`h1os_start`, `h1os_sleep`, `h1os_sync_hold`, `h1os_sync_notify_complete`), Core 1 LVGL v9 UI engine & actor queue (`h1os_lvgl.h`, `h1os_ui_post`), and time sync (`h1os_time.h`).
    - *Hierarchy Rule:* Upper layers call lower layers; lower layers **NEVER** call upper layers or cross-talk.
 4. **Hardware-First Mandate ("Use the Hardware"):**
-   - **Dual-Core Affinity & Parallel Execution (`v2.4.5-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
+   - **Dual-Core Affinity & Parallel Execution (`v2.4.9-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
    - **Power Latching & Fatal Startup Recovery (`MANDATE-06`):** `BAT_CTRL` (`GPIO 17`) is asserted in `h1os_boot_hook` within 25 ms and held across deep sleep via RTC pad hold. If any cold-boot hardware initialization fails (`orch_flow_init()`, `sub_display_init()`, or `h1os_lvgl_init()`), `h1os_handle_fatal_startup_error()` invokes `on_error(err, stage)` and immediately releases `GPIO 17` (`hal_io_release_power_latch()`) on battery power (or enters `EXT0` deep sleep on `GPIO 18` when USB power is attached) so a faulted board never drains the LiPo cell.
    - **Zero-Heat Sensing:** Never poll the SHTC3 during active CPU operation. SHTC3 sampling is restricted to headless Flow A sample bursts (`~18.5 ms` at 80 MHz in `orch_wake_stub.c`) so internal silicon heat cannot conduct across the PCB trace neck before the reading completes.
    - **Never Busy-Wait (Two-Domain Synchronization Law):**
@@ -64,7 +64,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
 
 ---
 
-## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.5-dev`)
+## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.9-dev`)
 
 `h1os_start()` (or `h1os_init()`) is the **MANDATORY single entry point** and lifecycle orchestrator. All state transitions, flow arbitration, parallel synchronization, and sleep transitions must be driven through `h1os_lifecycle_t`.
 
@@ -79,7 +79,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
      - `H1OS_WAKE_STATE_BOOT`: Cold power-on reset (`boot_count` incremented; flow periods validated via `h1os_validate_flow_periods()` before `orch_flow_init()` and applied via `h1os_apply_flow_periods()` after `orch_state_reset()`).
      - `H1OS_WAKE_STATE_RTC_FLOW_B`: Headless periodic RTC Flow B wake (`flow_b_counter` incremented; executes `on_wake` + `on_sync` + parallel Core 1 e-Paper refresh, then enters deep sleep immediately upon barrier completion without starting the 30s inactivity timer).
      - `H1OS_WAKE_STATE_INTERACTIVE_SESSION`: User tactile button wake on `GPIO 0` or `GPIO 18` (`button_wake_count` incremented; runs interactive session bounded by the one-shot `esp_timer` inactivity timer `s_session_timer`).
-   - Parallel Dual-Core Sequence (`v2.4.5-dev` / `MANDATE-04`):
+   - Parallel Dual-Core Sequence (`v2.4.9-dev` / `MANDATE-04`):
      1. Core 0 validates `h1os_lifecycle_t`, runs `orch_flow_init()`, `sub_display_init()`, and `h1os_lvgl_init()` (routing any failure to `h1os_handle_fatal_startup_error()` / `on_error`).
      2. Core 0 invokes `on_boot()` (on cold boot) or `on_wake(&wake_ctx)` (while Core 1 LVGL task is not yet running, requiring no outer `h1os_lvgl_lock` wrapper; `h1os_trigger_splash()` acquires a scoped lock internally).
      3. If `session.sync_wait_ms > 0` and `on_sync` is registered, Core 0 arms the inbound pre-flush coalescing gate (`h1os_lvgl_set_sync_gate(sync_wait_ms)`).
@@ -258,7 +258,7 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 1. **Respect the Two Execution Worlds (FreeRTOS Awake vs. Bare-Metal RTC Sleep):**
    - When the system is **awake in Flow B**, let hardware interrupts, `esp_timer`, and static FreeRTOS `EventGroup` / `Queue` / `Semaphore` primitives do the waiting. Never write a `while (busy) { vTaskDelay(10); }` loop or spawn a `4 KB` FreeRTOS task just to poll a timestamp or a GPIO pin. Use `esp_timer` one-shot/periodic alarms, `GPIO_INTR_NEGEDGE`/`GPIO_INTR_ANYEDGE` ISRs, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) so both Xtensa cores can enter low-power idle states cleanly—especially when upper-layer applications run Wi-Fi and BLE stacks on Core 0.
    - When the system is **asleep in Flow A (`orch_wake_stub.c`) or the ULP (`ulp/main.c`)**, SPI NOR Flash is powered off and the MMU cache is disabled. Never call standard library functions (`memset`, `memcpy`), `esp_timer`, or FreeRTOS primitives from `orch_wake_stub.c`. Always guard fixed-trip-count bit-bang loops with `__attribute__((noinline))` and inline assembly loop clobbers (`asm volatile("" : "+r"(i))`), guard local array zeroing with `asm volatile("" : "+m"(buf[i]))` so GCC `-O2` `-ftree-loop-distribute-patterns` never synthesizes a fatal call to Flash-resident `memset`, and place `rtc_reg_barrier()` (`memw` on Xtensa, `fence` on RISC-V) between sequential peripheral register writes.
-2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.5-dev`):**
+2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.9-dev`):**
    - Core 1 owns the LVGL v9 context and SSD1681 SPI bus; Core 0 owns `on_sync()` telemetry and background peripheral I/O. Never hold `h1os_lvgl_lock()` across slow network, SD card, or I2C operations. Enqueue cross-core UI updates via `h1os_ui_post(fn, arg, timeout_ms)`, use `h1os_sync_hold()` / `h1os_sync_notify_complete()` for asynchronous radio transfers, and configure `session.sync_wait_ms` when inbound data must coalesce into a single physical e-Paper refresh before deep sleep.
 3. **Never Fight Physics with Software Fudge Factors:**
    - The SHTC3 is factory-calibrated. When the PCB is thermally settled (`|T2 - T1| <= 0.20 C` across consecutive quiescent Flow A wakes), trust the SHTC3 directly and compute true water vapor pressure ($e$), dew point ($T_{\text{dew}}$), and absolute humidity ($d_v$) using pure August-Roche-Magnus equations. Never add synthetic temperature offsets or linear tares.
@@ -276,5 +276,5 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 ## 11. Engineering Attribution & Contributors
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.5-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.9-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

@@ -3,7 +3,7 @@ name: h1os-build
 description: Authoritative build instructions, environment configuration, and execution commands for H1OS and ESP32-S3 firmware. Eliminates exploratory tool searching by providing the exact Espressif v6.1 profile script, paths, and build targets.
 ---
 
-# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.5-dev`)
+# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.9-dev`)
 
 This skill defines the canonical build procedures, paths, and environment activation for **H1OS** on ESP32-S3.
 

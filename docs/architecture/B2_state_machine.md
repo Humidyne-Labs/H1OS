@@ -136,4 +136,4 @@ To prevent unintended audio chirps and spurious screen skipping while deep sleep
   - Flow B (`flow_b_period_sec`): $300\text{s} \le B \le 86,400\text{s}$ ($24\text{ hours}$). Must be strictly greater than $A$.
   - Remainder Floor: If $\text{remainder} = B \bmod A > 0$, it must be $\ge 60\text{s}$ to justify the re-arm cycle.
 - **Unified Validation & Post-Reset Application (`REV-01`):** Both `h1os_start()` and `h1os_set_flow_periods()` funnel strictly through `h1os_validate_flow_periods()` and `h1os_apply_flow_periods()`. On cold boot, validation runs prior to `orch_flow_init()` and period application runs immediately after `orch_state_reset()` so configured periods are never clobbered. If parameters violate any bound or invariant, the call fails immediately with `ESP_ERR_INVALID_ARG`.
-- Silent fallback magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.
+- Silent default magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.

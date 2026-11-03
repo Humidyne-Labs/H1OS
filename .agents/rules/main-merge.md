@@ -34,11 +34,11 @@ Version strings must never drift across documentation, packaging metadata, and c
    #define H1OS_VERSION_MINOR   4
    #define H1OS_VERSION_PATCH   5
    #define H1OS_VERSION_TAG     "dev"
-   #define H1OS_VERSION_STRING  "2.4.5-dev"
+   #define H1OS_VERSION_STRING  "2.4.9-dev"
    ```
 2. **Component Registry Manifest (`components/h1os/idf_component.yml`):**
    ```yaml
-   version: "2.4.5-dev"
+   version: "2.4.9-dev"
    ```
 3. **Repository Readme Badge (`README.md`):**
    ```markdown
@@ -46,7 +46,7 @@ Version strings must never drift across documentation, packaging metadata, and c
    ```
 4. **Changelog Release Heading (`CHANGELOG.md`):**
    ```markdown
-   ## [2.4.5-dev] - 2026-10-28
+   ## [2.4.9-dev] - 2026-10-28
    ```
 
 ---

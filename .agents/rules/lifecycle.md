@@ -1,4 +1,4 @@
-# Master Rule: H1OS Application Lifecycle & Dual-Core Concurrency Architecture (`v2.4.5-dev`)
+# Master Rule: H1OS Application Lifecycle & Dual-Core Concurrency Architecture (`v2.4.9-dev`)
 
 ## 1. Primary Directive
 `h1os_start()` (or `h1os_init()`) is the **MANDATORY single entry point** and lifecycle orchestrator for all application firmware on H1OS.
@@ -91,7 +91,7 @@ Applications transition to sleep via `h1os_sleep()` or `h1os_shutdown()` (or aut
 
 ---
 
-## 5. Declarative C Implementation Pattern (`v2.4.5-dev`)
+## 5. Declarative C Implementation Pattern (`v2.4.9-dev`)
 
 ```c
 #include "esp_log.h"

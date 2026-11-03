@@ -3,7 +3,7 @@ name: mcp-tool-harness
 description: Operational reference and subagent orchestration for the 3-Finger ESP32-S3 and H1OS MCP Tool Suite.
 ---
 
-# 3-Finger MCP Architecture & Subagent Orchestration Skill (`v2.4.5-dev`)
+# 3-Finger MCP Architecture & Subagent Orchestration Skill (`v2.4.9-dev`)
 
 ## Overview
 This skill governs the operational procedures, subagent delegation patterns, and tool interaction models for the 3-Finger MCP embedded firmware development architecture supporting H1OS on ESP32-S3.

@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Acoustic payload type for consolidated sub_audio_play dispatch.
+ * @brief Acoustic data buffer type for consolidated sub_audio_play dispatch.
  */
 typedef enum {
     SUB_AUDIO_TONE = 0, /**< Synthesized tone pattern (freq_hz, duration_ms). */
@@ -75,9 +75,9 @@ bool sub_audio_is_ready(void);
 /**
  * @brief Dispatch audio playback command to background worker task.
  *
- * @param[in] type Acoustic payload type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM).
- * @param[in] data Pointer to payload data buffer or parameters struct.
- * @param[in] len  Length of data payload in bytes.
+ * @param[in] type Acoustic data buffer type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM).
+ * @param[in] data Pointer to data buffer data buffer or parameters struct.
+ * @param[in] len  Length of data data buffer in bytes.
  *
  * @return ESP_OK if command was queued to worker, or error code.
  */

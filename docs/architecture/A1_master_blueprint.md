@@ -61,7 +61,7 @@ The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
-- **`h1os_version.h`**: Semantic version macros (`2.4.7-dev`) and inline getters.
+- **`h1os_version.h`**: Semantic version macros (`2.4.9-dev`) and inline getters.
 - **`h1os_lifecycle.c`**: Declarative lifecycle & dual-core concurrency engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_sync_hold()`, `h1os_sync_notify_complete()`, `h1os_display_notify_quiescent()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`, plus Layer 4 peripheral wrappers (`h1os_sdcard_mount_async()`, `h1os_sdcard_unmount()`, `h1os_led_start_breathing()`, `h1os_led_stop_breathing()`, `h1os_led_set()`).
 - **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, 16-slot static `h1os_ui_post()` cross-core actor queue drained inside `h1os_lvgl_lock(100)`, inbound `sync_wait_ms` single-refresh coalescing gate, keypad indev binding, and 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.

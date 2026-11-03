@@ -86,11 +86,15 @@ typedef struct {
     uint32_t wakeup_causes;          /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
     h1os_wake_state_t wake_state;    /**< Explicit wake state classification (BOOT, INTERACTIVE, RTC_FLOW_B). */
     uint32_t boot_count;             /**< Monotonic system boot cycle count.                                  */
-    uint32_t deep_sleep_count;       /**< Monotonic total deep sleep wake cycle count (Flow A + Flow B).      */
+    union {
+        uint32_t deep_sleep_count;   /**< Monotonic total deep sleep wake cycle count (Flow A + Flow B).      */
+        uint32_t wake_count;         /**< Alias for deep_sleep_count matching B1_api_and_services.md.         */
+    };
     uint32_t flow_b_count;           /**< Monotonic unattended RTC Flow B presentation wake cycle count.      */
     uint32_t button_wake_count;      /**< Monotonic interactive tactile button wake cycle count.              */
     bool woke_from_button;           /**< True if system woke due to physical button actuation.               */
     uint8_t wake_button;             /**< Waking button ID (h1os_wake_btn_t: 0=None, 1=BOOT, 2=POWER).        */
+    uint8_t ulp_dispatch_reason;     /**< Reason code from last ULP coprocessor dispatch (h1os_ulp_reason_t). */
     uint32_t sleep_duration_sec;     /**< Configured sleep interval prior to wake in seconds.                 */
     void *user_data;                 /**< User context pointer passed to lifecycle.                           */
 } h1os_wake_context_t;
@@ -213,6 +217,7 @@ typedef struct {
     float dew_point_f;              /**< Psychrometrically calculated dew point in degrees Fahrenheit.       */
     float dew_point_k;              /**< Psychrometrically calculated dew point in Kelvin (derived).         */
     float vapor_pressure_hpa;       /**< Calculated water vapor partial pressure in hectopascals (hPa).      */
+    float sat_vapor_pressure_hpa;   /**< Calculated saturation vapor pressure in hectopascals (hPa).         */
     float absolute_humidity_g;      /**< Calculated absolute humidity in grams per cubic meter (g/m³).       */
 
     float window_low_c;             /**< Valid Window Floor (minimum over valid 32-sample window).           */
@@ -253,7 +258,7 @@ typedef struct {
 /**
  * @brief Get the H1OS semantic version string.
  *
- * @return Null-terminated semantic version string (e.g. "2.4.7-dev").
+ * @return Null-terminated semantic version string (e.g. "2.4.9-dev").
  */
 static inline const char *h1os_get_version(void)
 {

@@ -23,7 +23,7 @@ Construct function identifiers using a clear, predictable hierarchy:
 - ✅ `hal_io_release_power_latch()` — Literally releases the hardware power latch pin.
 - ✅ `sub_display_clear_to_white()` — Literally drives the electrophoretic display to pure white.
 - ✅ `sub_power_enter_deep_sleep()` — Literally configures sleep pads and enters deep sleep.
-- ❌ `orch_flow_execute_sub_sprint()` — Fails the literal test ("sprint" is athletic slang, not a physical action).
+- ❌ `orch_flow_execute_sub_sprint()` — Fails the literal test ("sample burst" is athletic slang, not a physical action).
 - ❌ `sub_display_neutralize()` — Vague, non-literal metaphor.
 - ❌ `process_tick()` / `do_work()` — Overly generic dumping grounds.
 
@@ -31,7 +31,7 @@ Construct function identifiers using a clear, predictable hierarchy:
 
 ## 2. Bucket is to Array, as Function is to Runtime Operation
 
-- **Data Structures:** Names must reflect their physical memory structure and payload:
+- **Data Structures:** Names must reflect their physical memory structure and data buffer:
   - `ring_buffer` for circular FIFO ring buffers.
   - `sample_table` for sequential lookup arrays.
   - `persisted_state` for RTC Slow Memory retention blocks.
@@ -53,7 +53,7 @@ Literal names must remain concise. Do not write 60-character sentences. Use univ
 | `cb` | Callback function pointer | `listener`, `hooker` |
 | `ms` / `us` / `sec` | Milliseconds / Microseconds / Seconds | `ticks` (unless raw RTOS timer ticks) |
 | `pwr` / `batt` / `vbat` | Power / Battery voltage | `juice`, `fuel`, `life` |
-| `sample` | Physical sensor measurement | `sprint`, `sortie`, `hit`, `sniff` |
+| `sample` | Physical sensor measurement | `sample burst`, `sample burst`, `hit`, `sniff` |
 | `err` / `ret` | Error code / Return status | `result_code`, `flag_status` |
 
 ---

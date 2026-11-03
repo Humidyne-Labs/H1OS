@@ -3,7 +3,7 @@ name: h1os-firmware-standards
 description: Authoritative engineering and coding standard for H1OS firmware. Use whenever writing, editing, refactoring, formatting, or reviewing C/C++ source code, drivers, headers, or CMake configurations for H1OS on ESP32-S3. Enforces the 3-layer safety hierarchy: Layer 1 automated style (.clang-format), Layer 2 core embedded safety rules (fixed-width types, FPU32 single precision, deterministic static RTOS memory, checked returns, bounded stacks, non-blocking ISRs, inter-core volatile coherency, dual-core actor queue & sleep barrier), and Layer 3 compiler hardening.
 ---
 
-# H1OS Firmware Engineering & Safety Standards Protocol (`v2.4.5-dev`)
+# H1OS Firmware Engineering & Safety Standards Protocol (`v2.4.9-dev`)
 
 ## 1. Core Architectural Philosophy
 Firmware reliability fails when standards are theoretical documents that developers ignore. In H1OS, engineering discipline is enforced through a strict three-layer hierarchy:

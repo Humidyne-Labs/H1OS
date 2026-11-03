@@ -182,7 +182,7 @@ esp_err_t hal_spi_write_cmd(uint8_t cmd)
 /**
  * @brief Transmits data bytes to the SSD1681 controller (DC = 1).
  *
- * @param[in]    data            Pointer to buffer containing payload.
+ * @param[in]    data            Pointer to buffer containing data buffer.
  * @param[in]    len             Length of data in bytes.
  *
  * @return ESP_OK on success.

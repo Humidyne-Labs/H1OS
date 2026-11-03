@@ -1,4 +1,4 @@
-# Master Agent Execution Rules: H1OS & ESP32-S3 Firmware Development (`v2.4.5-dev`)
+# Master Agent Execution Rules: H1OS & ESP32-S3 Firmware Development (`v2.4.9-dev`)
 
 ## 1. Core Directives & Mandates
 

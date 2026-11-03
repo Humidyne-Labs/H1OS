@@ -226,7 +226,7 @@ typedef struct __attribute__((packed)) {
 
 A single atomic blob call guarantees:
 * **All-or-Nothing Consistency:** Eliminates torn state desynchronization across brownouts.
-* **Minimum Flash Wear:** Consumes a single NVS entry header and payload per commit pass.
+* **Minimum Flash Wear:** Consumes a single NVS entry header and data buffer per commit pass.
 * **Backward Compatibility:** `orch_state_load_runtimes_from_nvs()` seamlessly falls back to legacy individual keys if `"pwr_lap_st"` is not yet initialized.
 
 ---

@@ -6,7 +6,7 @@ description: Semantic C/C++ code navigation, type inspection, definition jumps, 
 # Clangd LSP Bridge & Semantic Code Intelligence Skill
 
 ## Overview
-This skill guides the usage of **`clangd-mcp`** (`schuay/clangd-mcp`) for compiler-backed semantic C/C++ codebase analysis on **H1OS** (`v2.4.5-dev`) and ESP32-S3 firmware.
+This skill guides the usage of **`clangd-mcp`** (`schuay/clangd-mcp`) for compiler-backed semantic C/C++ codebase analysis on **H1OS** (`v2.4.9-dev`) and ESP32-S3 firmware.
 
 Instead of relying on regex or eager whole-repo LLM extraction, `clangd-mcp` connects to LLVM's `clangd` language server directly against `compile_commands.json`. It evaluates the real type system, expands macros, traces exact call hierarchies, and navigates cross-references in milliseconds with zero token overhead.
 
