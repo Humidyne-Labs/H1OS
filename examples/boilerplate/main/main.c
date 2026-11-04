@@ -40,12 +40,12 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     /* Header Bar: Project title and monotonic cycle counter */
     lv_obj_t *header = lv_label_create(scr);
     lv_label_set_text(header, "H1OS STARTER");
-    lv_obj_set_style_text_font(header, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(header, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(header, LV_ALIGN_TOP_LEFT, 6, 4);
 
     lv_obj_t *lbl_cycle = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_cycle, "#%lu", (unsigned long)s_app_state.cycle_counter);
-    lv_obj_set_style_text_font(lbl_cycle, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_cycle, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_cycle, LV_ALIGN_TOP_RIGHT, -6, 4);
 
     /* 1-Pixel Bilevel Header Separator (Y = 22) */
@@ -58,24 +58,24 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     /* Primary Thermodynamic Telemetry (Fahrenheit and Relative Humidity) */
     lv_obj_t *lbl_temp = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_temp, "%.1f°F", (double)telem->ambient_temp_f);
-    lv_obj_set_style_text_font(lbl_temp, H1OS_FONT_20, 0);
+    lv_obj_set_style_text_font(lbl_temp, HUMID1_FONT_UI_HEADER, 0);
     lv_obj_align(lbl_temp, LV_ALIGN_TOP_LEFT, 6, 32);
 
     lv_obj_t *lbl_rh = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_rh, "%.1f%%", (double)telem->ambient_rh_pct);
-    lv_obj_set_style_text_font(lbl_rh, H1OS_FONT_20, 0);
+    lv_obj_set_style_text_font(lbl_rh, HUMID1_FONT_UI_HEADER, 0);
     lv_obj_align(lbl_rh, LV_ALIGN_TOP_RIGHT, -6, 32);
 
     /* Celsius Secondary Metric */
     lv_obj_t *lbl_metric = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_metric, "(%.1f°C ambient)", (double)telem->ambient_temp_c);
-    lv_obj_set_style_text_font(lbl_metric, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_metric, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_metric, LV_ALIGN_TOP_LEFT, 6, 58);
 
     /* August-Roche-Magnus Dew Point Invariant */
     lv_obj_t *lbl_dew = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", (double)telem->dew_point_f);
-    lv_obj_set_style_text_font(lbl_dew, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_dew, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 84);
 
     /* Power Topology: VBUS Detection vs. LiPo State of Charge */
@@ -86,20 +86,20 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
         lv_label_set_text_fmt(lbl_pwr, "Battery:    %.2fV (%u%%)", (double)((float)telem->battery_mv / 1000.0f),
                               telem->battery_percent);
     }
-    lv_obj_set_style_text_font(lbl_pwr, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_pwr, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_pwr, LV_ALIGN_TOP_LEFT, 6, 108);
 
     /* Sensor Thermal Equilibrium Status */
     lv_obj_t *lbl_status = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_status, "Status:     %s", telem->is_thermally_settled ? "SETTLED" : "SETTLING");
-    lv_obj_set_style_text_font(lbl_status, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_status, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_status, LV_ALIGN_TOP_LEFT, 6, 132);
 
     /* Footer: Firmware Version Identification */
     lv_obj_t *lbl_foot = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot, "%s v%" PRIu32 ".%" PRIu32 " READY", H1OS_NAME, h1os_version_get_major(),
                           h1os_version_get_minor());
-    lv_obj_set_style_text_font(lbl_foot, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_foot, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 }
 

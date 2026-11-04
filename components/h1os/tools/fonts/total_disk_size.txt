@@ -1,0 +1,111 @@
+====================================================================================================================
+HUMIDYNE LABS / HUMIDITRON `epd-font` v1.0.9 — FLASH ROM & DISK SIZE REPORT (total_disk_size.txt)
+====================================================================================================================
+  Scheme ID                    : h1os_epd_v1_full
+  Target Display DPI           : 188.3 DPI (1 typographic pt = 1/72 inch = 2.615 px @ 188.3 DPI)
+  Total Compiled Strikes       : 60 strikes
+  Expected MCU Flash (.rodata) :      230,952 bytes  (  225.54 KB  /   0.220 MB)
+  Host .c + .h Source Disk Size:    1,984,680 bytes  ( 1938.16 KB  /   1.893 MB)
+  Compressed Strike Vault Size :      266,480 bytes  (  260.23 KB)
+--------------------------------------------------------------------------------------------------------------------
+  NOTE ON SIZE UNITS (PIXELS vs TYPOGRAPHIC POINTS):
+    - Strike suffix numbers (e.g. `_14`, `_20`, `_32`) denote the Em-Square Height in PIXELS (`ppem`),
+      matching LVGL (`lv_font_montserrat_14`) and X11 BDF (`ter-u16n.bdf` = 16px) conventions.
+    - Points conversion:  pt = px * 72 / DPI   (At 96 DPI: 12pt=16px, 18pt=24px, 24pt=32px; at 188.3 DPI: 16px=6.1pt).
+    - Line Height (`lh`) = ceil(ascent * size_px / UPEM) - floor(descent * size_px / UPEM).
+      * Lucide Icons (`UPEM=1000, asc=+1000, desc=0`) -> lh = 1.00 * size_px (32px -> lh=32px).
+      * IBM Plex (`UPEM=1000, asc=+1025, desc=-275`)  -> lh = 1.30 * size_px (32px -> lh=42px).
+====================================================================================================================
+
+1. MCU FLASH PARTITION BUDGET UTILIZATION (.rodata ROM)
+--------------------------------------------------------------------------------------------------------------------
+  Target Flash Budget            |   Budget Bytes | Used (.rodata) |   Remaining Free | Utilization | Status
+--------------------------------------------------------------------------------------------------------------------
+  64 KB (Ultra-Compact MCU)      |       65,536 B |      230,952 B |        -161.5 KB |     352.40% | EXCEEDS BUDGET!
+  128 KB (Small Cortex-M0+/M3)   |      131,072 B |      230,952 B |         -97.5 KB |     176.20% | EXCEEDS BUDGET!
+  256 KB (Standard Cortex-M4)    |      262,144 B |      230,952 B |         +30.5 KB |      88.10% | FITS
+  512 KB (ESP32 UI Partition)    |      524,288 B |      230,952 B |        +286.5 KB |      44.05% | FITS
+  1 MB (1,024 KB App Flash)      |    1,048,576 B |      230,952 B |        +798.5 KB |      22.03% | FITS
+  4 MB (ESP32-S3 Standard)       |    4,194,304 B |      230,952 B |      +3,870.5 KB |       5.51% | FITS
+  8 MB (ESP32-S3-PICO-1-N8R8)    |    8,388,608 B |      230,952 B |      +7,966.5 KB |       2.75% | FITS
+
+2. SUBTOTALS BY FONT / ICON FAMILY
+--------------------------------------------------------------------------------------------------------------------
+  Family             | Strikes | Total Glyphs |    MCU Flash (.rodata) |      Host .c Disk Size | % of Flash
+--------------------------------------------------------------------------------------------------------------------
+  sans               |      17 |        2,143 |     96,265 B (  94.0 KB) |    727,359 B ( 710.3 KB) |     41.68%
+  mono               |      10 |        1,070 |     26,110 B (  25.5 KB) |    266,780 B ( 260.5 KB) |     11.31%
+  cond               |       7 |          721 |     25,025 B (  24.4 KB) |    207,418 B ( 202.6 KB) |     10.84%
+  serif              |       3 |          309 |     13,939 B (  13.6 KB) |    107,278 B ( 104.8 KB) |      6.04%
+  math               |       2 |          286 |      6,635 B (   6.5 KB) |     67,351 B (  65.8 KB) |      2.87%
+  terminus           |       3 |          309 |      4,615 B (   4.5 KB) |     57,839 B (  56.5 KB) |      2.00%
+  icon_fa7           |       4 |          152 |      8,038 B (   7.8 KB) |     71,158 B (  69.5 KB) |      3.48%
+  icon_lucide        |       4 |          320 |     12,202 B (  11.9 KB) |    108,705 B ( 106.2 KB) |      5.28%
+  icon_phosphor      |       6 |          774 |     28,175 B (  27.5 KB) |    246,582 B ( 240.8 KB) |     12.20%
+  icon_tabler        |       4 |          280 |      9,948 B (   9.7 KB) |     91,487 B (  89.3 KB) |      4.31%
+
+3. PER-STRIKE DETAILED FLASH & DISK FOOTPRINT TABLE
+--------------------------------------------------------------------------------------------------------------------
+  Strike Symbol Name                   | Em(px) |  pt@96 | pt@DPI | LineHt | Glyphs |  Kern |  MCU Flash (.rodata) |  Host .c Disk Size
+--------------------------------------------------------------------------------------------------------------------
+  humid1_font_plex_sans_normal_12      |   12px |  9.0pt |  4.6pt |   17px |    131 |   702 |     3,958 B (  3.87 KB) |   32,937 B ( 32.2 KB)
+  humid1_font_plex_sans_normal_14      |   14px | 10.5pt |  5.4pt |   19px |    131 |   729 |     4,380 B (  4.28 KB) |   35,566 B ( 34.7 KB)
+  humid1_font_plex_sans_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    131 |   787 |     4,776 B (  4.66 KB) |   37,847 B ( 37.0 KB)
+  humid1_font_plex_sans_normal_18      |   18px | 13.5pt |  6.9pt |   24px |    131 |   937 |     5,574 B (  5.44 KB) |   42,389 B ( 41.4 KB)
+  humid1_font_plex_sans_normal_20      |   20px | 15.0pt |  7.6pt |   27px |    131 |   948 |     5,937 B (  5.80 KB) |   44,738 B ( 43.7 KB)
+  humid1_font_plex_sans_normal_24      |   24px | 18.0pt |  9.2pt |   32px |    131 | 1,131 |     7,204 B (  7.04 KB) |   51,918 B ( 50.7 KB)
+  humid1_font_plex_sans_normal_32      |   32px | 24.0pt | 12.2pt |   42px |    131 | 1,490 |    10,156 B (  9.92 KB) |   69,091 B ( 67.5 KB)
+  humid1_font_plex_sans_bold_12        |   12px |  9.0pt |  4.6pt |   17px |    131 |   696 |     4,138 B (  4.04 KB) |   34,158 B ( 33.4 KB)
+  humid1_font_plex_sans_bold_14        |   14px | 10.5pt |  5.4pt |   19px |    131 |   842 |     4,787 B (  4.67 KB) |   37,713 B ( 36.8 KB)
+  humid1_font_plex_sans_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    131 |   950 |     5,407 B (  5.28 KB) |   41,149 B ( 40.2 KB)
+  humid1_font_plex_sans_bold_18        |   18px | 13.5pt |  6.9pt |   24px |    131 |   997 |     5,914 B (  5.78 KB) |   44,393 B ( 43.4 KB)
+  humid1_font_plex_sans_bold_20        |   20px | 15.0pt |  7.6pt |   27px |    131 | 1,007 |     6,266 B (  6.12 KB) |   46,784 B ( 45.7 KB)
+  humid1_font_plex_sans_bold_24        |   24px | 18.0pt |  9.2pt |   32px |    131 | 1,277 |     7,961 B (  7.77 KB) |   56,172 B ( 54.9 KB)
+  humid1_font_plex_sans_bold_32        |   32px | 24.0pt | 12.2pt |   42px |    131 | 1,394 |    10,344 B ( 10.10 KB) |   71,206 B ( 69.5 KB)
+  humid1_font_plex_sans_italic_12      |   12px |  9.0pt |  4.6pt |   17px |    103 |   434 |     2,787 B (  2.72 KB) |   24,880 B ( 24.3 KB)
+  humid1_font_plex_sans_italic_14      |   14px | 10.5pt |  5.4pt |   19px |    103 |   469 |     3,190 B (  3.12 KB) |   27,317 B ( 26.7 KB)
+  humid1_font_plex_sans_italic_16      |   16px | 12.0pt |  6.1pt |   22px |    103 |   495 |     3,486 B (  3.40 KB) |   29,101 B ( 28.4 KB)
+  humid1_font_plex_mono_normal_12      |   12px |  9.0pt |  4.6pt |   17px |    107 |     0 |     1,493 B (  1.46 KB) |   19,345 B ( 18.9 KB)
+  humid1_font_plex_mono_normal_14      |   14px | 10.5pt |  5.4pt |   19px |    107 |     0 |     1,794 B (  1.75 KB) |   21,279 B ( 20.8 KB)
+  humid1_font_plex_mono_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    107 |     0 |     1,974 B (  1.93 KB) |   22,413 B ( 21.9 KB)
+  humid1_font_plex_mono_normal_20      |   20px | 15.0pt |  7.6pt |   27px |    107 |     0 |     2,542 B (  2.48 KB) |   26,354 B ( 25.7 KB)
+  humid1_font_plex_mono_normal_24      |   24px | 18.0pt |  9.2pt |   32px |    107 |     0 |     3,172 B (  3.10 KB) |   30,460 B ( 29.7 KB)
+  humid1_font_plex_mono_bold_14        |   14px | 10.5pt |  5.4pt |   19px |    107 |     0 |     1,880 B (  1.84 KB) |   21,788 B ( 21.3 KB)
+  humid1_font_plex_mono_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    107 |     0 |     2,069 B (  2.02 KB) |   23,055 B ( 22.5 KB)
+  humid1_font_plex_mono_bold_20        |   20px | 15.0pt |  7.6pt |   27px |    107 |     0 |     2,702 B (  2.64 KB) |   27,381 B ( 26.7 KB)
+  humid1_font_plex_mono_bold_24        |   24px | 18.0pt |  9.2pt |   32px |    107 |     0 |     3,384 B (  3.30 KB) |   31,830 B ( 31.1 KB)
+  humid1_font_plex_mono_bold_32        |   32px | 24.0pt | 12.2pt |   42px |    107 |     0 |     5,100 B (  4.98 KB) |   42,875 B ( 41.9 KB)
+  humid1_font_plex_cond_normal_14      |   14px | 10.5pt |  5.4pt |   19px |    103 |   423 |     2,917 B (  2.85 KB) |   25,819 B ( 25.2 KB)
+  humid1_font_plex_cond_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    103 |   405 |     3,027 B (  2.96 KB) |   26,686 B ( 26.1 KB)
+  humid1_font_plex_cond_normal_18      |   18px | 13.5pt |  6.9pt |   24px |    103 |   507 |     3,511 B (  3.43 KB) |   29,200 B ( 28.5 KB)
+  humid1_font_plex_cond_normal_20      |   20px | 15.0pt |  7.6pt |   27px |    103 |   672 |     4,308 B (  4.21 KB) |   33,394 B ( 32.6 KB)
+  humid1_font_plex_cond_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    103 |   460 |     3,299 B (  3.22 KB) |   28,085 B ( 27.4 KB)
+  humid1_font_plex_cond_bold_18        |   18px | 13.5pt |  6.9pt |   24px |    103 |   534 |     3,774 B (  3.69 KB) |   30,911 B ( 30.2 KB)
+  humid1_font_plex_cond_bold_20        |   20px | 15.0pt |  7.6pt |   27px |    103 |   590 |     4,189 B (  4.09 KB) |   33,323 B ( 32.5 KB)
+  humid1_font_plex_serif_normal_18     |   18px | 13.5pt |  6.9pt |   24px |    103 |   623 |     4,112 B (  4.02 KB) |   32,484 B ( 31.7 KB)
+  humid1_font_plex_serif_normal_20     |   20px | 15.0pt |  7.6pt |   27px |    103 |   617 |     4,413 B (  4.31 KB) |   34,552 B ( 33.7 KB)
+  humid1_font_plex_serif_normal_24     |   24px | 18.0pt |  9.2pt |   32px |    103 |   748 |     5,414 B (  5.29 KB) |   40,242 B ( 39.3 KB)
+  humid1_font_plex_math_regular_16     |   16px | 12.0pt |  6.1pt |   22px |    143 |     0 |     2,873 B (  2.81 KB) |   30,691 B ( 30.0 KB)
+  humid1_font_plex_math_regular_20     |   20px | 15.0pt |  7.6pt |   27px |    143 |     0 |     3,762 B (  3.67 KB) |   36,660 B ( 35.8 KB)
+  humid1_font_terminus_normal_12       |   12px |  9.0pt |  4.6pt |   12px |    103 |     0 |     1,361 B (  1.33 KB) |   18,030 B ( 17.6 KB)
+  humid1_font_terminus_normal_16       |   16px | 12.0pt |  6.1pt |   16px |    103 |     0 |     1,582 B (  1.54 KB) |   19,599 B ( 19.1 KB)
+  humid1_font_terminus_bold_16         |   16px | 12.0pt |  6.1pt |   16px |    103 |     0 |     1,672 B (  1.63 KB) |   20,210 B ( 19.7 KB)
+  humid1_icon_fa7_solid_14             |   14px | 10.5pt |  5.4pt |   16px |     38 |     0 |     1,331 B (  1.30 KB) |   13,416 B ( 13.1 KB)
+  humid1_icon_fa7_solid_16             |   16px | 12.0pt |  6.1pt |   18px |     38 |     0 |     1,582 B (  1.54 KB) |   15,042 B ( 14.7 KB)
+  humid1_icon_fa7_solid_20             |   20px | 15.0pt |  7.6pt |   21px |     38 |     0 |     2,183 B (  2.13 KB) |   18,930 B ( 18.5 KB)
+  humid1_icon_fa7_solid_24             |   24px | 18.0pt |  9.2pt |   28px |     38 |     0 |     2,942 B (  2.87 KB) |   23,770 B ( 23.2 KB)
+  humid1_icon_lucide_regular_14        |   14px | 10.5pt |  5.4pt |   14px |     80 |     0 |     2,076 B (  2.03 KB) |   20,879 B ( 20.4 KB)
+  humid1_icon_lucide_regular_16        |   16px | 12.0pt |  6.1pt |   16px |     80 |     0 |     2,379 B (  2.32 KB) |   22,819 B ( 22.3 KB)
+  humid1_icon_lucide_regular_20        |   20px | 15.0pt |  7.6pt |   20px |     80 |     0 |     3,300 B (  3.22 KB) |   28,770 B ( 28.1 KB)
+  humid1_icon_lucide_regular_24        |   24px | 18.0pt |  9.2pt |   24px |     80 |     0 |     4,447 B (  4.34 KB) |   36,237 B ( 35.4 KB)
+  humid1_icon_phosphor_regular_14      |   14px | 10.5pt |  5.4pt |   15px |    129 |     0 |     3,294 B (  3.22 KB) |   32,108 B ( 31.4 KB)
+  humid1_icon_phosphor_regular_16      |   16px | 12.0pt |  6.1pt |   16px |    129 |     0 |     3,822 B (  3.73 KB) |   35,453 B ( 34.6 KB)
+  humid1_icon_phosphor_regular_20      |   20px | 15.0pt |  7.6pt |   21px |    129 |     0 |     5,080 B (  4.96 KB) |   43,624 B ( 42.6 KB)
+  humid1_icon_phosphor_regular_24      |   24px | 18.0pt |  9.2pt |   25px |    129 |     0 |     6,736 B (  6.58 KB) |   54,190 B ( 52.9 KB)
+  humid1_icon_phosphor_fill_16         |   16px | 12.0pt |  6.1pt |   16px |    129 |     0 |     3,929 B (  3.84 KB) |   36,116 B ( 35.3 KB)
+  humid1_icon_phosphor_fill_20         |   20px | 15.0pt |  7.6pt |   21px |    129 |     0 |     5,314 B (  5.19 KB) |   45,091 B ( 44.0 KB)
+  humid1_icon_tabler_regular_14        |   14px | 10.5pt |  5.4pt |   15px |     70 |     0 |     1,727 B (  1.69 KB) |   17,958 B ( 17.5 KB)
+  humid1_icon_tabler_regular_16        |   16px | 12.0pt |  6.1pt |   17px |     70 |     0 |     1,993 B (  1.95 KB) |   19,647 B ( 19.2 KB)
+  humid1_icon_tabler_regular_20        |   20px | 15.0pt |  7.6pt |   20px |     70 |     0 |     2,668 B (  2.61 KB) |   24,049 B ( 23.5 KB)
+  humid1_icon_tabler_regular_24        |   24px | 18.0pt |  9.2pt |   25px |     70 |     0 |     3,560 B (  3.48 KB) |   29,833 B ( 29.1 KB)
+====================================================================================================================

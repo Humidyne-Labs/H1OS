@@ -75,24 +75,24 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     /* Row 1: System Reset Reason */
     lv_obj_t *lbl_k1 = lv_label_create(scr);
     lv_label_set_text(lbl_k1, "Reset");
-    lv_obj_set_style_text_font(lbl_k1, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k1, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k1, LV_ALIGN_TOP_LEFT, 6, 28);
 
     lv_obj_t *lbl_v1 = lv_label_create(scr);
     lv_label_set_text(lbl_v1, get_reset_reason_str(esp_reset_reason()));
-    lv_obj_set_style_text_font(lbl_v1, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v1, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v1, LV_ALIGN_TOP_RIGHT, -6, 28);
 
     /* Row 2: Deep Sleep Wake Event Cause */
     uint32_t causes = esp_sleep_get_wakeup_causes();
     lv_obj_t *lbl_k2 = lv_label_create(scr);
     lv_label_set_text(lbl_k2, "Wake");
-    lv_obj_set_style_text_font(lbl_k2, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k2, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k2, LV_ALIGN_TOP_LEFT, 6, 48);
 
     lv_obj_t *lbl_v2 = lv_label_create(scr);
     lv_label_set_text(lbl_v2, get_wake_causes_str(causes));
-    lv_obj_set_style_text_font(lbl_v2, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v2, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v2, LV_ALIGN_TOP_RIGHT, -6, 48);
 
     /* Row 3: ULP Coprocessor Dispatch Mode */
@@ -120,43 +120,43 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
 
     lv_obj_t *lbl_k3 = lv_label_create(scr);
     lv_label_set_text(lbl_k3, "RISC-V");
-    lv_obj_set_style_text_font(lbl_k3, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k3, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k3, LV_ALIGN_TOP_LEFT, 6, 68);
 
     lv_obj_t *lbl_v3 = lv_label_create(scr);
     lv_label_set_text(lbl_v3, ulp_str);
-    lv_obj_set_style_text_font(lbl_v3, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v3, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v3, LV_ALIGN_TOP_RIGHT, -6, 68);
 
     /* Row 4: Heap Memory (Current Free & Minimum Watermark) */
     lv_obj_t *lbl_k4 = lv_label_create(scr);
     lv_label_set_text(lbl_k4, "Heap");
-    lv_obj_set_style_text_font(lbl_k4, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k4, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k4, LV_ALIGN_TOP_LEFT, 6, 88);
 
     lv_obj_t *lbl_v4 = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_v4, "%luK (Min %luK)",
                           (unsigned long)(esp_get_free_heap_size() / 1024),
                           (unsigned long)(esp_get_minimum_free_heap_size() / 1024));
-    lv_obj_set_style_text_font(lbl_v4, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v4, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v4, LV_ALIGN_TOP_RIGHT, -6, 88);
 
     /* Row 5: FreeRTOS Presentation Task Stack High-Water Mark */
     UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
     lv_obj_t *lbl_k5 = lv_label_create(scr);
     lv_label_set_text(lbl_k5, "Stack");
-    lv_obj_set_style_text_font(lbl_k5, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k5, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k5, LV_ALIGN_TOP_LEFT, 6, 108);
 
     lv_obj_t *lbl_v5 = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_v5, "%u B HWM", (unsigned int)(hwm * sizeof(StackType_t)));
-    lv_obj_set_style_text_font(lbl_v5, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v5, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v5, LV_ALIGN_TOP_RIGHT, -6, 108);
 
     /* Row 6: Total Wake Cycles & Sensor Ingestion Failures */
     lv_obj_t *lbl_k6 = lv_label_create(scr);
     lv_label_set_text(lbl_k6, "Wakes");
-    lv_obj_set_style_text_font(lbl_k6, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k6, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k6, LV_ALIGN_TOP_LEFT, 6, 128);
 
     lv_obj_t *lbl_v6 = lv_label_create(scr);
@@ -172,13 +172,13 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
                               (unsigned long)wake_count,
                               ring_count);
     }
-    lv_obj_set_style_text_font(lbl_v6, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v6, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v6, LV_ALIGN_TOP_RIGHT, -6, 128);
 
     /* Row 7: Core Clock & SHTC3 Silicon Telemetry State */
     lv_obj_t *lbl_k7 = lv_label_create(scr);
     lv_label_set_text(lbl_k7, "CPU");
-    lv_obj_set_style_text_font(lbl_k7, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k7, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k7, LV_ALIGN_TOP_LEFT, 6, 148);
 
     lv_obj_t *lbl_v7 = lv_label_create(scr);
@@ -189,7 +189,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
                               (unsigned long)base_cpu_mhz,
                               (unsigned int)last_err);
     }
-    lv_obj_set_style_text_font(lbl_v7, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v7, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v7, LV_ALIGN_TOP_RIGHT, -6, 148);
 
     /* Footer: H1OS Architecture Release & ESP-IDF Runtime */
@@ -198,12 +198,12 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
                           h1os_version_get_major(),
                           h1os_version_get_minor(),
                           h1os_version_get_patch());
-    lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_foot_l, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
     lv_obj_t *lbl_foot_r = lv_label_create(scr);
     lv_label_set_text_fmt(lbl_foot_r, "IDF %s", esp_get_idf_version());
-    lv_obj_set_style_text_font(lbl_foot_r, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_foot_r, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot_r, LV_ALIGN_BOTTOM_RIGHT, -6, -6);
 
     h1os_lvgl_unlock();

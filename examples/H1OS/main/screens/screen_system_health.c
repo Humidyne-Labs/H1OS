@@ -34,7 +34,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     /* Row 1: Battery Rail Voltage & State of Charge */
     lv_obj_t *lbl_k1 = lv_label_create(scr);
     lv_label_set_text(lbl_k1, "Battery");
-    lv_obj_set_style_text_font(lbl_k1, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k1, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k1, LV_ALIGN_TOP_LEFT, 6, 32);
 
     lv_obj_t *lbl_v1 = lv_label_create(scr);
@@ -43,13 +43,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
                           bat_sym,
                           (double)((float)telem->battery_mv / 1000.0f),
                           telem->battery_percent);
-    lv_obj_set_style_text_font(lbl_v1, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v1, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v1, LV_ALIGN_TOP_RIGHT, -6, 32);
 
     /* Row 2: Active Power Source / Charger Telemetry */
     lv_obj_t *lbl_k2 = lv_label_create(scr);
     lv_label_set_text(lbl_k2, "Source");
-    lv_obj_set_style_text_font(lbl_k2, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k2, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k2, LV_ALIGN_TOP_LEFT, 6, 56);
 
     lv_obj_t *lbl_v2 = lv_label_create(scr);
@@ -60,13 +60,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     } else {
         lv_label_set_text(lbl_v2, "BATTERY");
     }
-    lv_obj_set_style_text_font(lbl_v2, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v2, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v2, LV_ALIGN_TOP_RIGHT, -6, 56);
 
     /* Row 3: Operational Autonomy Projection */
     lv_obj_t *lbl_k3 = lv_label_create(scr);
     lv_label_set_text(lbl_k3, "Autonomy");
-    lv_obj_set_style_text_font(lbl_k3, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k3, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k3, LV_ALIGN_TOP_LEFT, 6, 80);
 
     lv_obj_t *lbl_v3 = lv_label_create(scr);
@@ -79,13 +79,13 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     } else {
         lv_label_set_text_fmt(lbl_v3, "~%.0f Days", (double)telem->autonomy.autonomy_days);
     }
-    lv_obj_set_style_text_font(lbl_v3, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v3, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v3, LV_ALIGN_TOP_RIGHT, -6, 80);
 
     /* Row 4: Removable MicroSD Card Storage */
     lv_obj_t *lbl_k4 = lv_label_create(scr);
     lv_label_set_text(lbl_k4, "MicroSD");
-    lv_obj_set_style_text_font(lbl_k4, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k4, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k4, LV_ALIGN_TOP_LEFT, 6, 104);
 
     lv_obj_t *lbl_v4 = lv_label_create(scr);
@@ -95,18 +95,18 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     } else {
         lv_label_set_text(lbl_v4, "NO CARD");
     }
-    lv_obj_set_style_text_font(lbl_v4, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v4, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v4, LV_ALIGN_TOP_RIGHT, -6, 104);
 
     /* Row 5: On-Board SPI Flash NVS Storage */
     lv_obj_t *lbl_k5 = lv_label_create(scr);
     lv_label_set_text(lbl_k5, "Flash NVS");
-    lv_obj_set_style_text_font(lbl_k5, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_k5, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_k5, LV_ALIGN_TOP_LEFT, 6, 128);
 
     lv_obj_t *lbl_v5 = lv_label_create(scr);
     lv_label_set_text(lbl_v5, "ACTIVE");
-    lv_obj_set_style_text_font(lbl_v5, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_v5, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_v5, LV_ALIGN_TOP_RIGHT, -6, 128);
 
     /* Footer: Calendar Date & Posix Wall Clock */
@@ -117,12 +117,12 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
 
     lv_obj_t *lbl_foot_l = lv_label_create(scr);
     lv_label_set_text(lbl_foot_l, date_str);
-    lv_obj_set_style_text_font(lbl_foot_l, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_foot_l, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot_l, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 
     lv_obj_t *lbl_foot_r = lv_label_create(scr);
     lv_label_set_text(lbl_foot_r, time_str);
-    lv_obj_set_style_text_font(lbl_foot_r, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_foot_r, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot_r, LV_ALIGN_BOTTOM_RIGHT, -6, -6);
 
     h1os_lvgl_unlock();

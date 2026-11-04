@@ -41,8 +41,8 @@ set(bsp_requires
     ulp
 )
 
-set(GEN_FONT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated_fonts")
-file(MAKE_DIRECTORY "${GEN_FONT_DIR}")
+set(H1OS_DISTRO_FONT_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/fonts")
+file(GLOB H1OS_DISTRO_FONT_SRCS "${H1OS_DISTRO_FONT_DIR}/*.c")
 
 # Ensure components/h1os/project_include.cmake is evaluated BEFORE ESP-IDF's
 # internal components/bootloader/project_include.cmake creates the bootloader ExternalProject.
@@ -70,78 +70,21 @@ if(CMAKE_BUILD_EARLY_EXPANSION)
 endif()
 
 idf_component_register(
-    SRCS ${h1os_srcs}
-    INCLUDE_DIRS "include" "include/h1os" "${GEN_FONT_DIR}"
+    SRCS ${h1os_srcs} ${H1OS_DISTRO_FONT_SRCS}
+    INCLUDE_DIRS "include" "include/h1os" "tools/fonts/fonts"
     REQUIRES ${bsp_requires}
 )
 
 # -----------------------------------------------------------------------------
-# Dynamic 1-BPP Typography Generation
+# 1-BPP Bilevel EPD Typography Suite (h1os_distro / IBM Plex + Modular Icons)
 # -----------------------------------------------------------------------------
 
-# Point to vendored font assets self-contained within the component tools directory
-set(FONT_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/static_assets")
-set(FONT_GEN_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/tools/fonts/generate_1bpp_fonts.py")
-
-if(NOT EXISTS "${FONT_GEN_SCRIPT}")
-    message(FATAL_ERROR
-        "\n========================================================================\n"
-        "[H1OS BUILD ERROR] Required 1-BPP font generator script missing!\n"
-        "Expected script: ${FONT_GEN_SCRIPT}\n"
-        "========================================================================\n"
-    )
-endif()
-
-set(FONT_DEP_FILES "${FONT_GEN_SCRIPT}")
-foreach(asset_name "Montserrat-Bold.ttf" "Montserrat-Medium.ttf" "FontAwesome5-Solid+Brands+Regular.woff")
-    if(EXISTS "${FONT_SRC_DIR}/${asset_name}")
-        list(APPEND FONT_DEP_FILES "${FONT_SRC_DIR}/${asset_name}")
-    endif()
-endforeach()
-
-if(NOT EXISTS "${FONT_SRC_DIR}/Montserrat-Bold.ttf")
-    message(STATUS "[H1OS] Vendored TTF assets not present in ${FONT_SRC_DIR}; generate_1bpp_fonts.py will resolve LVGL managed_components assets or emit deterministic 1-BPP descriptor bridges.")
-endif()
-
-set(GENERATED_FONT_SRCS
-    "${GEN_FONT_DIR}/h1os_font_montserrat_14_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_montserrat_16_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_montserrat_18_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_montserrat_20_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_montserrat_24_1bpp.c"
-    "${GEN_FONT_DIR}/h1os_font_montserrat_32_1bpp.c"
-)
-set(GENERATED_FONT_HDR "${GEN_FONT_DIR}/h1os_fonts.h")
-
-idf_build_get_property(python_bin PYTHON)
-
-add_custom_command(
-    OUTPUT ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR}
-    COMMAND "${python_bin}" "${FONT_GEN_SCRIPT}"
-            --font-dir "${FONT_SRC_DIR}"
-            --lvgl-dir "${CMAKE_SOURCE_DIR}/managed_components/lvgl__lvgl"
-            --out-dir "${GEN_FONT_DIR}"
-            --sizes 14 16 18 20 24 32
-    DEPENDS ${FONT_DEP_FILES}
-    COMMENT "Synthesizing H1OS 1-BPP Typography & Font Licenses..."
-    VERBATIM
-)
-
-# Custom target ensures generators run before building component sources
-add_custom_target(generate_h1os_fonts DEPENDS ${GENERATED_FONT_SRCS} ${GENERATED_FONT_HDR})
-add_dependencies(${COMPONENT_LIB} generate_h1os_fonts)
-target_sources(${COMPONENT_LIB} PRIVATE ${GENERATED_FONT_SRCS})
-
-# -----------------------------------------------------------------------------
-# Wire H1OS Custom 1-BPP Font as LVGL Default Font
-# -----------------------------------------------------------------------------
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
 if(TARGET ${lvgl_lib})
-    target_compile_definitions(${lvgl_lib} PUBLIC "LV_FONT_DEFAULT=&h1os_font_montserrat_14_1bpp")
-    target_include_directories(${lvgl_lib} PUBLIC "${GEN_FONT_DIR}")
-    add_dependencies(${lvgl_lib} generate_h1os_fonts)
+    target_compile_definitions(${lvgl_lib} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
+    target_include_directories(${lvgl_lib} PUBLIC "${H1OS_DISTRO_FONT_DIR}")
 endif()
-target_compile_definitions(${COMPONENT_LIB} PUBLIC "LV_FONT_DEFAULT=&h1os_font_montserrat_14_1bpp")
+target_compile_definitions(${COMPONENT_LIB} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
 
 # -----------------------------------------------------------------------------
 # ULP CoProc

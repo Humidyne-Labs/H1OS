@@ -9,6 +9,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "humid1_fonts.h"
 #include "lvgl.h"
 
 #include <stdbool.h>

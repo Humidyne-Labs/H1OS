@@ -66,8 +66,8 @@ class LVGLFontMetrics:
         self._load_from_csv()
 
     def _load_from_csv(self):
-        char_csv = METRICS_DIR / f"char_widths_montserrat_{self.size}.csv"
-        kern_csv = METRICS_DIR / f"kern_pairs_montserrat_{self.size}.csv"
+        char_csv = METRICS_DIR / f"char_widths_humid1_font_plex_sans_normal_{self.size}.csv"
+        kern_csv = METRICS_DIR / f"kern_pairs_humid1_font_plex_sans_normal_{self.size}.csv"
 
         if not char_csv.is_file():
             print(f"[!] Error: Font metric table missing: {char_csv}")

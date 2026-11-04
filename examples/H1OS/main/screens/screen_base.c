@@ -40,7 +40,7 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
 
     lv_obj_t *lbl_title = lv_label_create(scr);
     lv_label_set_text(lbl_title, title);
-    lv_obj_set_style_text_font(lbl_title, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_title, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 6, 4);
 
     bool is_awake = h1os_is_session_active();
@@ -55,7 +55,7 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
 
     lv_obj_t *lbl_pg = lv_label_create(badge);
     lv_label_set_text(lbl_pg, page_str);
-    lv_obj_set_style_text_font(lbl_pg, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_pg, HUMID1_FONT_UI_BODY, 0);
     lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
     lv_obj_center(lbl_pg);
 
