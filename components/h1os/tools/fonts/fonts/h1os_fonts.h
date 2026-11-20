@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #ifndef LV_FONT_CUSTOM_DECLARE
-#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(humid1_font_plex_sans_normal_14);
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(humid1_font_plex_sans_normal_14)
 #endif
 
 #ifndef LV_FONT_DEFAULT

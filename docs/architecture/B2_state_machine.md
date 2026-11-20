@@ -1,5 +1,7 @@
 # Application Execution Flow & State Machine
 
+> **H1OS Architecture Specification** | **Document:** `B2` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 This document models the end-to-end execution flow of **H1OS** across deep sleep, the Pure Event Mode ULP-RISC-V Monitor, isolated Flow A wake stub sensor pulses, and the Flow B interactive user session (with a developer-configurable inactivity timeout defaulting to 30 seconds).
 
 ---

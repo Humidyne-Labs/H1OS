@@ -26,28 +26,14 @@ graph TD;
 
 ## 2. Invariant 1: Semantic Version Synchronization
 
-Version strings must never drift across documentation, packaging metadata, and compiled binaries. Whenever merging to `main`, the version must be revved synchronously across all four canonical locations:
+Version strings must never drift across documentation, packaging metadata, and compiled binaries. Whenever merging to `main`, synchronize the version across all managed targets via `tools/agent/bump_version.py`:
 
-1. **Firmware C Header (`components/h1os/include/h1os/h1os_version.h`):**
-   ```c
-   #define H1OS_VERSION_MAJOR   2
-   #define H1OS_VERSION_MINOR   4
-   #define H1OS_VERSION_PATCH   5
-   #define H1OS_VERSION_TAG     "dev"
-   #define H1OS_VERSION_STRING  "2.4.9-dev"
-   ```
-2. **Component Registry Manifest (`components/h1os/idf_component.yml`):**
-   ```yaml
-   version: "2.4.9-dev"
-   ```
-3. **Repository Readme Badge (`README.md`):**
-   ```markdown
-   [![Version](https://img.shields.io/badge/H1OS-v2.4.5--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
-   ```
-4. **Changelog Release Heading (`CHANGELOG.md`):**
-   ```markdown
-   ## [2.4.9-dev] - 2026-10-28
-   ```
+```powershell
+python tools/agent/bump_version.py --set X.Y.Z-tag --idf-version 6.1.1
+python tools/agent/bump_version.py --check
+```
+
+This keeps `components/h1os/include/h1os/h1os_version.h`, `components/h1os/idf_component.yml`, `README.md`, `Doxyfile`, `ERRATA.md`, `AGENTS.md`, `.agents/`, `components/h1os/tools/h1os_tool.py`, `docs/guide.md`, and all `docs/architecture/*.md` headers synchronized alongside the `## [X.Y.Z-tag] - YYYY-MM-DD` section in `CHANGELOG.md`.
 
 ---
 
@@ -85,9 +71,9 @@ Every merge to `main` must touch `CHANGELOG.md` adhering to the [Keep a Changelo
 ## 5. Invariant 4: Verified Clean Build & Memory Profiling
 
 Before merging:
-1. Compile inside `examples/H1OS` using the canonical ESP-IDF v6.1 profile script:
+1. Compile inside `examples/H1OS` using the canonical ESP-IDF v6.1.1 profile script:
    ```powershell
-   & "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; cd examples/H1OS; idf.py -B build_dev --preset dev build
+   & "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; cd examples/H1OS; idf.py -B build_dev --preset dev build
    ```
 2. Build must exit with code 0 and ZERO warnings or `-Werror` breaks.
 3. Verify memory budgets using `murdock_memory_budget` to confirm DIRAM, RTC Slow, and Flash app partition headroom remain within design limits.

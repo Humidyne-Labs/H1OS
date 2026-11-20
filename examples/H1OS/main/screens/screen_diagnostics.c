@@ -63,7 +63,9 @@ static const char *get_wake_causes_str(uint32_t causes)
 void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
     uint32_t base_cpu_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
-    h1os_lvgl_lock(100);
+    if (!h1os_lvgl_lock(100)) {
+        return;
+    }
     lv_obj_t *scr = screen_base_create("OS DIAGNOSTICS", "5/5", event_cb);
 
     uint8_t  ulp_reason    = telem ? telem->ulp_dispatch_reason : (uint8_t)ULP_DISPATCH_NONE;
@@ -96,7 +98,7 @@ void screen_diagnostics_render(const h1os_telemetry_t *telem, lv_event_cb_t even
     lv_obj_align(lbl_v2, LV_ALIGN_TOP_RIGHT, -6, 48);
 
     /* Row 3: ULP Coprocessor Dispatch Mode */
-    const char *ulp_str = "NONE";
+    const char *ulp_str;
     switch (ulp_reason) {
     case ULP_DISPATCH_SENSOR_SAMPLE:
         ulp_str = "SENSOR_SAMPLE";

@@ -4,7 +4,7 @@
     {
       "label": "ESP-IDF: Build (dev Profile)",
       "type": "shell",
-      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_dev -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.dev' build",
+      "command": ". 'C:\\esp\\v6.1.1\\esp-idf\\export.ps1'; idf.py -B build_dev -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.dev' build",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {
@@ -28,7 +28,7 @@
     {
       "label": "ESP-IDF: Build (prod Profile)",
       "type": "shell",
-      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_prod -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.prod' build",
+      "command": ". 'C:\\esp\\v6.1.1\\esp-idf\\export.ps1'; idf.py -B build_prod -D SDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.prod' build",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {
@@ -52,7 +52,7 @@
     {
       "label": "esptool: Flash (dev Profile)",
       "type": "shell",
-      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; Set-Location build_dev; python -m esptool -p COM3 -b 460800 --before default-reset --after hard-reset write-flash '@flash_args'",
+      "command": ". 'C:\\esp\\v6.1.1\\esp-idf\\export.ps1'; Set-Location build_dev; python -m esptool -p COM3 -b 460800 --before default-reset --after hard-reset write-flash '@flash_args'",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {
@@ -71,7 +71,7 @@
     {
       "label": "ESP-IDF: Monitor Serial Console",
       "type": "shell",
-      "command": ". 'C:\\esp\\v6.1\\esp-idf\\export.ps1'; idf.py -B build_dev -p COM3 monitor",
+      "command": ". 'C:\\esp\\v6.1.1\\esp-idf\\export.ps1'; idf.py -B build_dev -p COM3 monitor",
       "options": {
         "cwd": "${workspaceFolder}",
         "shell": {

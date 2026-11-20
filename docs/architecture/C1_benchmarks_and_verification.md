@@ -1,5 +1,7 @@
 # Optional / Future Hardware Verification & Benchmarking Plan
 
+> **H1OS Architecture Specification** | **Document:** `C1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 > [!NOTE]
 > **Document Scope:** This document outlines an optional, future physical bench verification plan for evaluating hardware timing and power tolerances using laboratory instrumentation (oscilloscope, inline current profiler, reference psychrometer). The figures below represent design targets and test procedures rather than active runtime assertions.
 

@@ -19,7 +19,12 @@
  */
 void screen_env_dash_render(const h1os_telemetry_t *telem, uint32_t cycle_count, lv_event_cb_t event_cb)
 {
-    h1os_lvgl_lock(100);
+    if (telem == NULL) {
+        return;
+    }
+    if (!h1os_lvgl_lock(100)) {
+        return;
+    }
     lv_obj_t *scr = screen_base_create("HUMIDYNE LABS", "1/5", event_cb);
 
     /* Primary Dashboard Reading: Ambient Temperature */

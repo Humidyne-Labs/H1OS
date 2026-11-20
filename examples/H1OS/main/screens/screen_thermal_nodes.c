@@ -18,7 +18,12 @@
  */
 void screen_thermal_nodes_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
-    h1os_lvgl_lock(100);
+    if (telem == NULL) {
+        return;
+    }
+    if (!h1os_lvgl_lock(100)) {
+        return;
+    }
     lv_obj_t *scr = screen_base_create("THERMAL NODES", "3/5", event_cb);
 
     /* Row 1: SHTC3 Ambient Sensor */

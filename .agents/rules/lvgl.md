@@ -1,4 +1,4 @@
-# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.9-dev`)
+# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.10-dev`)
 
 ## 1. Hardware & Silicon Display Constraints
 
@@ -96,7 +96,7 @@ $$\text{Canvas Dimension} = (\text{Base Modules} + 8\text{ Quiet Zone}) \times \
 
 ---
 
-## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.9-dev`)
+## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.10-dev`)
 
 * **Core Affinity:** The LVGL presentation task (`h1os_lvgl`) is pinned strictly to **Core 1** at FreeRTOS priority **5** (`LVGL_TASK_PRIO_PORT = 5`). Core 0 handles lifecycle orchestration, `on_sync()` wireless stacks, and background I/O.
 * **Lifecycle Hook Context (`on_boot` & `on_wake`):** During `on_boot()` and `on_wake()`, the Core 1 LVGL task has not yet been started (`h1os_lvgl_start(5, 1)` runs immediately after `on_wake()` returns). Initial screen construction inside `on_boot()` and `on_wake()` is therefore inherently single-threaded; `h1os_trigger_splash()` acquires a scoped `h1os_lvgl_lock(1000)` internally.
@@ -191,10 +191,10 @@ To prevent horizontal text clipping and overflow on the 200x200 display (maximum
 - **Pre-Rasterized Strike Vault & Icon Catalog:** `components/h1os/tools/fonts/humid1_epd_vault.json.gz` and `components/h1os/tools/fonts/metadata/unified_icon_names.json`.
 
 ### Verification Tools (`embedded-ops` MCP & `epd-typography` Skill)
-* **Single Glyph Lookup:** Call `embedded-ops/epd_char_info(strike="humid1_font_plex_sans_normal_14", char_query="@", workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")`.
-* **String / Row Clearance Check:** Call `embedded-ops/epd_string_budget(strike="humid1_font_plex_sans_normal_14", text="Power: CHARGED 4.00V", workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")`.
-* **Full Screen Template Automated Audit:** Call `embedded-ops/epd_audit_screens(workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")`.
-* **Icon Catalog Search:** Call `embedded-ops/epd_icon_search(query="thermometer", vendor="all", workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")`.
+* **Single Glyph Lookup:** Call `embedded-ops/epd_char_info(strike="humid1_font_plex_sans_normal_14", char_query="@", workspace_dir="<workspace_root>")`.
+* **String / Row Clearance Check:** Call `embedded-ops/epd_string_budget(strike="humid1_font_plex_sans_normal_14", text="Power: CHARGED 4.00V", workspace_dir="<workspace_root>")`.
+* **Full Screen Template Automated Audit:** Call `embedded-ops/epd_audit_screens(workspace_dir="<workspace_root>")`.
+* **Icon Catalog Search:** Call `embedded-ops/epd_icon_search(query="thermometer", vendor="all", workspace_dir="<workspace_root>")`.
 * **DuckDB SQL Query:**
   ```sql
   SELECT char, width_px FROM read_csv_auto('components/h1os/tools/fonts/metrics/char_widths_humid1_font_plex_sans_normal_14.csv') ORDER BY width_px DESC LIMIT 10;

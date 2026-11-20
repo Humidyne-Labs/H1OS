@@ -1,5 +1,7 @@
 # Document 00: Documentation System Architecture & Boundary Governance
 
+> **H1OS Architecture Specification** | **Document:** `A0` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Overview & Purpose
 This document governs the **two-tier documentation system** of **H1OS** (Class-E Luxury Environmental Telemetry Instrument Operating System). It establishes a permanent boundary between **Public Repository & Developer Guides** (for application engineers building products with H1OS) and **Internal Architectural Specifications** (for systems engineers maintaining core drivers, silicon pipelines, and coprocessor monitors).
 

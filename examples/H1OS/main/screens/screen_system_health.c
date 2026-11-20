@@ -28,7 +28,12 @@ static const char *get_battery_icon(uint8_t pct)
  */
 void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
-    h1os_lvgl_lock(100);
+    if (telem == NULL) {
+        return;
+    }
+    if (!h1os_lvgl_lock(100)) {
+        return;
+    }
     lv_obj_t *scr = screen_base_create("SYSTEM HEALTH", "4/5", event_cb);
 
     /* Row 1: Battery Rail Voltage & State of Charge */
@@ -110,7 +115,7 @@ void screen_system_health_render(const h1os_telemetry_t *telem, lv_event_cb_t ev
     lv_obj_align(lbl_v5, LV_ALIGN_TOP_RIGHT, -6, 128);
 
     /* Footer: Calendar Date & Posix Wall Clock */
-    char date_str[16] = "2026-10-25";
+    char date_str[16] = "--/--/--";
     char time_str[16] = "--:--";
     h1os_time_get_date_formatted(H1OS_DATE_FMT_MM_DD_YY, date_str, sizeof(date_str));
     h1os_time_get_formatted(H1OS_TIME_FMT_12H_MIN, time_str, sizeof(time_str));

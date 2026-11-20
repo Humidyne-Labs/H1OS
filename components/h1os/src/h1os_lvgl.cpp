@@ -60,7 +60,7 @@ static QueueHandle_t s_ui_queue = NULL;
 static volatile bool    s_sync_gate_active      = false;
 static volatile int64_t s_sync_gate_deadline_us = 0;
 
-#define LVGL_I1_PALETTE_SIZE 8
+#define LVGL_I1_PALETTE_SIZE 8U
 
 struct CpuMaxTurboScope {
     CpuMaxTurboScope()

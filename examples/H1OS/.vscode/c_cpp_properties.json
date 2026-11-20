@@ -18,7 +18,7 @@
         "path": [
           "${workspaceFolder}",
           "${workspaceFolder}/../../components/h1os",
-          "C:/esp/v6.1/esp-idf/components"
+          "C:/esp/v6.1.1/esp-idf/components"
         ],
         "limitSymbolsToIncludedHeaders": true
       }

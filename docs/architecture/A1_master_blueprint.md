@@ -1,9 +1,11 @@
 # Master Architecture Blueprint: H1OS Clean-Slate Architecture
 
+> **H1OS Architecture Specification** | **Document:** `A1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 - **Target Silicon:** ESP32-S3-PICO-1-N8R8 (Xtensa dual-core LX7 + ULP-RISC-V Coprocessor, 8MB Octal Flash, 8MB Octal PSRAM).
 - **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (Non-Touch Monochrome Display; no touch controller present or supported by H1OS).
 - **Operating System:** **H1OS** (E-Class Environmental Telemetry Instrument Operating System).
-- **Framework:** ESP-IDF v6.1 (Ninja Build System, Driver V2 APIs, FreeRTOS SMP).
+- **Framework:** ESP-IDF v6.1.1 (Ninja Build System, Driver V2 APIs, FreeRTOS SMP).
 - **Architecture Philosophy:** Strict unidirectional dependency layering, zero circular inclusions, hardware determinism, reactive coprocessor monitors, and interactive user sessions with dynamic power droop.
 
 ---
@@ -61,7 +63,7 @@ The central intelligence of H1OS. Houses persistent RTC memory, flow arbitration
 ### Layer 4: Application Lifecycle API & Services
 The public interface of H1OS exposed to developers.
 - **`h1os.h`**: Master umbrella header declaring all public types and entry points.
-- **`h1os_version.h`**: Semantic version macros (`2.4.9-dev`) and inline getters.
+- **`h1os_version.h`**: Semantic version macros (`2.4.10-dev`) and inline getters.
 - **`h1os_lifecycle.c`**: Declarative lifecycle & dual-core concurrency engine: `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_sync_hold()`, `h1os_sync_notify_complete()`, `h1os_display_notify_quiescent()`, `h1os_get_telemetry()`, `h1os_is_session_active()`, `h1os_reset_session_timer()`, `h1os_set_volume()`, plus Layer 4 peripheral wrappers (`h1os_sdcard_mount_async()`, `h1os_sdcard_unmount()`, `h1os_led_start_breathing()`, `h1os_led_stop_breathing()`, `h1os_led_set()`).
 - **`h1os_lvgl.cpp/.h`**: LVGL v9 graphics port, 16-slot static `h1os_ui_post()` cross-core actor queue drained inside `h1os_lvgl_lock(100)`, inbound `sync_wait_ms` single-refresh coalescing gate, keypad indev binding, and 240 MHz pixel-pack turbo scope with 80 MHz idle/busy-wait power droop.
 - **`h1os_time.c/.h`**: POSIX clock bridge, timezone formatting, formatted date/time strings, and pluggable external SNTP sync callback.

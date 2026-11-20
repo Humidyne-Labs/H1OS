@@ -110,7 +110,7 @@ Features:
 * Layout clamped to 78 columns for narrow terminals.
 * Explicit flashing options for both Production and Development builds.
 * Clean visual cues with 0 third-party branding.
-* Full compatibility with standard ESP-IDF v6.1 virtual environment (`rich` 15.0.0).
+* Full compatibility with standard ESP-IDF v6.1.1 virtual environment (`rich` 15.0.0).
 
 ---
 

@@ -18,7 +18,12 @@
  */
 void screen_psychrometrics_render(const h1os_telemetry_t *telem, lv_event_cb_t event_cb)
 {
-    h1os_lvgl_lock(100);
+    if (telem == NULL) {
+        return;
+    }
+    if (!h1os_lvgl_lock(100)) {
+        return;
+    }
     lv_obj_t *scr = screen_base_create("PSYCHROMETRICS", "2/5", event_cb);
 
     /* Row 1: August-Roche-Magnus Condensation Dew Point */

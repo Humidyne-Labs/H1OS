@@ -10,144 +10,148 @@
 
 #pragma once
 
-#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
-#include "lvgl.h"
-#elif defined(__has_include)
-#if __has_include("lvgl.h")
-#include "lvgl.h"
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
-#else
-#define EPD_FONT_NO_LVGL_HEADER 1
+#if !defined(LV_CONF_INTERNAL_H)
+#ifdef __has_include
+    #if __has_include("lvgl.h")
+        #ifndef LV_LVGL_H_INCLUDE_SIMPLE
+            #define LV_LVGL_H_INCLUDE_SIMPLE
+        #endif
+    #endif
 #endif
+#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
+    #include "lvgl.h"
+#elif defined(__has_include)
+    #if __has_include("lvgl/lvgl.h")
+        #include "lvgl/lvgl.h"
+    #endif
 #else
-#include "lvgl.h"
+    #include "lvgl/lvgl.h"
+#endif
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifdef EPD_FONT_NO_LVGL_HEADER
 struct _lv_font_t;
-typedef struct _lv_font_t lv_font_t;
-#endif
 
-#ifndef LV_FONT_DECLARE
-#define LV_FONT_DECLARE(font_name) extern const lv_font_t font_name
+#ifdef LV_ATTRIBUTE_EXTERN_DATA
+#define EPD_FONT_EXTERN_DECLARE(font_name) LV_ATTRIBUTE_EXTERN_DATA extern const struct _lv_font_t font_name
+#else
+#define EPD_FONT_EXTERN_DECLARE(font_name) extern const struct _lv_font_t font_name
 #endif
 
 /* =========================================================================
  * 1. Base LVGL >= 9.6.0 1-BPP Font & Modular Icon Strike Declarations
  * ========================================================================= */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_12); /* sans normal 12px (~1,757 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_14); /* sans normal 14px (~1,930 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_16); /* sans normal 16px (~2,127 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_18); /* sans normal 18px (~2,456 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_20); /* sans normal 20px (~2,735 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_24); /* sans normal 24px (~3,459 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_32); /* sans normal 32px (~5,197 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_12); /* sans bold 12px (~1,832 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_14); /* sans bold 14px (~2,030 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_16); /* sans bold 16px (~2,274 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_18); /* sans bold 18px (~2,627 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_20); /* sans bold 20px (~2,967 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_24); /* sans bold 24px (~3,766 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_bold_32); /* sans bold 32px (~5,769 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_12); /* sans italic 12px (~1,849 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_14); /* sans italic 14px (~2,023 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_16); /* sans italic 16px (~2,259 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_18); /* sans italic 18px (~2,629 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_20); /* sans italic 20px (~2,950 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_sans_italic_24); /* sans italic 24px (~3,766 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_normal_14); /* noto_sans normal 14px (~1,953 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_normal_16); /* noto_sans normal 16px (~2,206 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_normal_20); /* noto_sans normal 20px (~2,755 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_bold_14); /* noto_sans bold 14px (~2,036 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_bold_16); /* noto_sans bold 16px (~2,357 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_bold_20); /* noto_sans bold 20px (~2,953 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_italic_14); /* noto_sans italic 14px (~2,002 B ROM) */
-LV_FONT_DECLARE(humid1_font_noto_sans_italic_16); /* noto_sans italic 16px (~2,297 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_12); /* mono normal 12px (~1,659 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_14); /* mono normal 14px (~1,927 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_16); /* mono normal 16px (~2,137 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_18); /* mono normal 18px (~2,454 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_20); /* mono normal 20px (~2,717 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_24); /* mono normal 24px (~3,447 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_normal_32); /* mono normal 32px (~5,200 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_12); /* mono bold 12px (~1,721 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_14); /* mono bold 14px (~2,005 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_16); /* mono bold 16px (~2,241 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_18); /* mono bold 18px (~2,595 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_20); /* mono bold 20px (~2,901 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_24); /* mono bold 24px (~3,683 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_bold_32); /* mono bold 32px (~5,667 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_italic_12); /* mono italic 12px (~1,727 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_italic_14); /* mono italic 14px (~2,002 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_italic_16); /* mono italic 16px (~2,239 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_italic_18); /* mono italic 18px (~2,622 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_mono_italic_20); /* mono italic 20px (~2,932 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_normal_14); /* cond normal 14px (~1,849 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_normal_16); /* cond normal 16px (~2,102 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_normal_18); /* cond normal 18px (~2,315 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_normal_20); /* cond normal 20px (~2,579 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_normal_24); /* cond normal 24px (~3,230 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_bold_14); /* cond bold 14px (~1,944 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_bold_16); /* cond bold 16px (~2,220 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_bold_18); /* cond bold 18px (~2,484 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_bold_20); /* cond bold 20px (~2,753 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_bold_24); /* cond bold 24px (~3,474 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_italic_14); /* cond italic 14px (~1,914 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_italic_16); /* cond italic 16px (~2,167 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_italic_18); /* cond italic 18px (~2,405 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_cond_italic_20); /* cond italic 20px (~2,686 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_normal_16); /* serif normal 16px (~2,309 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_normal_18); /* serif normal 18px (~2,586 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_normal_20); /* serif normal 20px (~2,917 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_normal_24); /* serif normal 24px (~3,715 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_bold_16); /* serif bold 16px (~2,464 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_bold_18); /* serif bold 18px (~2,761 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_bold_20); /* serif bold 20px (~3,139 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_bold_24); /* serif bold 24px (~4,003 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_italic_16); /* serif italic 16px (~2,410 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_italic_18); /* serif italic 18px (~2,716 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_italic_20); /* serif italic 20px (~3,064 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_serif_italic_24); /* serif italic 24px (~3,910 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_math_regular_14); /* math regular 14px (~2,197 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_math_regular_16); /* math regular 16px (~2,511 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_math_regular_20); /* math regular 20px (~3,155 B ROM) */
-LV_FONT_DECLARE(humid1_font_plex_math_regular_24); /* math regular 24px (~4,038 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_normal_12); /* terminus normal 12px (~1,747 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_normal_14); /* terminus normal 14px (~2,012 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_normal_16); /* terminus normal 16px (~2,022 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_normal_20); /* terminus normal 20px (~2,365 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_bold_12); /* terminus bold 12px (~1,747 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_bold_14); /* terminus bold 14px (~2,123 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_bold_16); /* terminus bold 16px (~2,133 B ROM) */
-LV_FONT_DECLARE(humid1_font_terminus_bold_20); /* terminus bold 20px (~2,498 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_12); /* icon_fa7 solid 12px (~2,320 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_14); /* icon_fa7 solid 14px (~2,878 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_16); /* icon_fa7 solid 16px (~3,303 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_18); /* icon_fa7 solid 18px (~3,993 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_20); /* icon_fa7 solid 20px (~4,561 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_24); /* icon_fa7 solid 24px (~6,348 B ROM) */
-LV_FONT_DECLARE(humid1_icon_fa7_solid_32); /* icon_fa7 solid 32px (~10,231 B ROM) */
-LV_FONT_DECLARE(humid1_icon_lucide_regular_14); /* icon_lucide regular 14px (~2,102 B ROM) */
-LV_FONT_DECLARE(humid1_icon_lucide_regular_16); /* icon_lucide regular 16px (~2,516 B ROM) */
-LV_FONT_DECLARE(humid1_icon_lucide_regular_20); /* icon_lucide regular 20px (~3,449 B ROM) */
-LV_FONT_DECLARE(humid1_icon_lucide_regular_24); /* icon_lucide regular 24px (~4,517 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_regular_14); /* icon_phosphor regular 14px (~3,253 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_regular_16); /* icon_phosphor regular 16px (~3,790 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_regular_20); /* icon_phosphor regular 20px (~5,060 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_regular_24); /* icon_phosphor regular 24px (~6,666 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_fill_16); /* icon_phosphor fill 16px (~3,894 B ROM) */
-LV_FONT_DECLARE(humid1_icon_phosphor_fill_20); /* icon_phosphor fill 20px (~5,270 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_regular_14); /* icon_tabler regular 14px (~1,732 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_regular_16); /* icon_tabler regular 16px (~1,992 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_regular_20); /* icon_tabler regular 20px (~2,712 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_regular_24); /* icon_tabler regular 24px (~3,561 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_filled_16); /* icon_tabler filled 16px (~4,456 B ROM) */
-LV_FONT_DECLARE(humid1_icon_tabler_filled_20); /* icon_tabler filled 20px (~6,032 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_12); /* sans normal 12px (~1,757 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_14); /* sans normal 14px (~1,930 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_16); /* sans normal 16px (~2,127 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_18); /* sans normal 18px (~2,456 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_20); /* sans normal 20px (~2,735 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_24); /* sans normal 24px (~3,459 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_normal_32); /* sans normal 32px (~5,197 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_12); /* sans bold 12px (~1,832 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_14); /* sans bold 14px (~2,030 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_16); /* sans bold 16px (~2,274 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_18); /* sans bold 18px (~2,627 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_20); /* sans bold 20px (~2,967 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_24); /* sans bold 24px (~3,766 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_bold_32); /* sans bold 32px (~5,769 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_12); /* sans italic 12px (~1,849 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_14); /* sans italic 14px (~2,023 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_16); /* sans italic 16px (~2,259 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_18); /* sans italic 18px (~2,629 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_20); /* sans italic 20px (~2,950 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_sans_italic_24); /* sans italic 24px (~3,766 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_normal_14); /* noto_sans normal 14px (~1,953 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_normal_16); /* noto_sans normal 16px (~2,206 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_normal_20); /* noto_sans normal 20px (~2,755 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_bold_14); /* noto_sans bold 14px (~2,036 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_bold_16); /* noto_sans bold 16px (~2,357 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_bold_20); /* noto_sans bold 20px (~2,953 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_italic_14); /* noto_sans italic 14px (~2,002 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_noto_sans_italic_16); /* noto_sans italic 16px (~2,297 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_12); /* mono normal 12px (~1,659 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_14); /* mono normal 14px (~1,927 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_16); /* mono normal 16px (~2,137 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_18); /* mono normal 18px (~2,454 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_20); /* mono normal 20px (~2,717 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_24); /* mono normal 24px (~3,447 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_normal_32); /* mono normal 32px (~5,200 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_12); /* mono bold 12px (~1,721 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_14); /* mono bold 14px (~2,005 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_16); /* mono bold 16px (~2,241 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_18); /* mono bold 18px (~2,595 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_20); /* mono bold 20px (~2,901 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_24); /* mono bold 24px (~3,683 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_bold_32); /* mono bold 32px (~5,667 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_italic_12); /* mono italic 12px (~1,727 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_italic_14); /* mono italic 14px (~2,002 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_italic_16); /* mono italic 16px (~2,239 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_italic_18); /* mono italic 18px (~2,622 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_mono_italic_20); /* mono italic 20px (~2,932 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_normal_14); /* cond normal 14px (~1,849 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_normal_16); /* cond normal 16px (~2,102 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_normal_18); /* cond normal 18px (~2,315 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_normal_20); /* cond normal 20px (~2,579 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_normal_24); /* cond normal 24px (~3,230 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_bold_14); /* cond bold 14px (~1,944 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_bold_16); /* cond bold 16px (~2,220 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_bold_18); /* cond bold 18px (~2,484 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_bold_20); /* cond bold 20px (~2,753 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_bold_24); /* cond bold 24px (~3,474 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_italic_14); /* cond italic 14px (~1,914 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_italic_16); /* cond italic 16px (~2,167 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_italic_18); /* cond italic 18px (~2,405 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_cond_italic_20); /* cond italic 20px (~2,686 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_normal_16); /* serif normal 16px (~2,309 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_normal_18); /* serif normal 18px (~2,586 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_normal_20); /* serif normal 20px (~2,917 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_normal_24); /* serif normal 24px (~3,715 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_bold_16); /* serif bold 16px (~2,464 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_bold_18); /* serif bold 18px (~2,761 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_bold_20); /* serif bold 20px (~3,139 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_bold_24); /* serif bold 24px (~4,003 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_italic_16); /* serif italic 16px (~2,410 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_italic_18); /* serif italic 18px (~2,716 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_italic_20); /* serif italic 20px (~3,064 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_serif_italic_24); /* serif italic 24px (~3,910 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_math_regular_14); /* math regular 14px (~2,197 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_math_regular_16); /* math regular 16px (~2,511 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_math_regular_20); /* math regular 20px (~3,155 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_plex_math_regular_24); /* math regular 24px (~4,038 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_normal_12); /* terminus normal 12px (~1,747 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_normal_14); /* terminus normal 14px (~2,012 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_normal_16); /* terminus normal 16px (~2,022 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_normal_20); /* terminus normal 20px (~2,365 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_bold_12); /* terminus bold 12px (~1,747 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_bold_14); /* terminus bold 14px (~2,123 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_bold_16); /* terminus bold 16px (~2,133 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_font_terminus_bold_20); /* terminus bold 20px (~2,498 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_12); /* icon_fa7 solid 12px (~2,320 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_14); /* icon_fa7 solid 14px (~2,878 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_16); /* icon_fa7 solid 16px (~3,303 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_18); /* icon_fa7 solid 18px (~3,993 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_20); /* icon_fa7 solid 20px (~4,561 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_24); /* icon_fa7 solid 24px (~6,348 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_fa7_solid_32); /* icon_fa7 solid 32px (~10,231 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_lucide_regular_14); /* icon_lucide regular 14px (~2,102 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_lucide_regular_16); /* icon_lucide regular 16px (~2,516 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_lucide_regular_20); /* icon_lucide regular 20px (~3,449 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_lucide_regular_24); /* icon_lucide regular 24px (~4,517 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_regular_14); /* icon_phosphor regular 14px (~3,253 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_regular_16); /* icon_phosphor regular 16px (~3,790 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_regular_20); /* icon_phosphor regular 20px (~5,060 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_regular_24); /* icon_phosphor regular 24px (~6,666 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_fill_16); /* icon_phosphor fill 16px (~3,894 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_phosphor_fill_20); /* icon_phosphor fill 20px (~5,270 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_regular_14); /* icon_tabler regular 14px (~1,732 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_regular_16); /* icon_tabler regular 16px (~1,992 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_regular_20); /* icon_tabler regular 20px (~2,712 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_regular_24); /* icon_tabler regular 24px (~3,561 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_filled_16); /* icon_tabler filled 16px (~4,456 B ROM) */
+EPD_FONT_EXTERN_DECLARE(humid1_icon_tabler_filled_20); /* icon_tabler filled 20px (~6,032 B ROM) */
 
 /* =========================================================================
  * 2. Canonical HUMID1_FONT_* Semantic UI & Telemetry Role Macros (H1OS)

@@ -2,7 +2,7 @@
 
 > **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with, sponsored by, or endorsed by Waveshare Electronics)*
 >
-> **Applicable Firmware:** H1OS `v2.4.9-dev` (E-Class Environmental Operating System)
+> **Applicable Firmware:** H1OS `v2.4.10-dev` (E-Class Environmental Operating System)
 >
 > **Purpose:** Document physical PCB layout defects, electrical hazards, and architectural limitations discovered during driver bring-up, and provide engineering schematics/layout guidelines for a hardware **Rev B** redesign.
 

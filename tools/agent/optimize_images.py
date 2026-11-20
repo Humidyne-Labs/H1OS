@@ -39,7 +39,7 @@ def apply_exif_metadata(im: Image.Image) -> Image.Exif:
     exif[TAG_COPYRIGHT]  = EXIF_AUTHOR
     return exif
 
-def optimize_single_image(file_path: Path, quality: int = 85, convert_png: bool = True) -> tuple[int, int]:
+def optimize_single_image(file_path: Path, quality: int = 85, convert_png: bool = True, dry_run: bool = False) -> tuple[int, int]:
     """Optimize a single image file in place. Returns (orig_bytes, new_bytes)."""
     orig_bytes = file_path.stat().st_size
     ext = file_path.suffix.lower()
@@ -69,11 +69,12 @@ def optimize_single_image(file_path: Path, quality: int = 85, convert_png: bool 
             im.save(out_buf, format='JPEG', quality=quality, optimize=True, progressive=True, exif=exif)
             new_bytes = out_buf.getvalue()
 
-            # Write updated file with metadata and optimized encoding
-            with open(target_path, 'wb') as f:
-                f.write(new_bytes)
-            if target_path != file_path and file_path.exists():
-                file_path.unlink()
+            if not dry_run:
+                # Write updated file with metadata and optimized encoding
+                with open(target_path, 'wb') as f:
+                    f.write(new_bytes)
+                if target_path != file_path and file_path.exists():
+                    file_path.unlink()
             return orig_bytes, len(new_bytes)
 
     except Exception as e:
@@ -109,12 +110,13 @@ def main():
         # Skip font preview / generated UI icon assets
         if "preview" in p.parts or "metrics" in p.parts:
             continue
-        orig_sz, new_sz = optimize_single_image(p, quality=args.quality)
+        orig_sz, new_sz = optimize_single_image(p, quality=args.quality, dry_run=args.dry_run)
         total_before += orig_sz
         total_after += new_sz
         if new_sz < orig_sz:
             modified_count += 1
-            print(f"  ✓ {p.name}: {orig_sz/1024:.1f} KB -> {new_sz/1024:.1f} KB (saved {(orig_sz-new_sz)/1024:.1f} KB)")
+            prefix = "[dry-run] " if args.dry_run else ""
+            print(f"  ✓ {prefix}{p.name}: {orig_sz/1024:.1f} KB -> {new_sz/1024:.1f} KB (saved {(orig_sz-new_sz)/1024:.1f} KB)")
 
     saved_mb = (total_before - total_after) / (1024 * 1024)
     print(f"\n[+] Image optimization complete.")

@@ -7,18 +7,18 @@
  * License: MIT AND OFL-1.1
  ******************************************************************************/
 
-#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
-#include "lvgl.h"
-#elif defined(__has_include)
-#if __has_include("lvgl.h")
-#include "lvgl.h"
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
-#else
-#include "lvgl.h"
+#ifdef __has_include
+    #if __has_include("lvgl.h")
+        #ifndef LV_LVGL_H_INCLUDE_SIMPLE
+            #define LV_LVGL_H_INCLUDE_SIMPLE
+        #endif
+    #endif
 #endif
+
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+    #include "lvgl.h"
 #else
-#include "lvgl.h"
+    #include "lvgl/lvgl.h"
 #endif
 
 #ifndef HUMID1_ICON_FA7_SOLID_20

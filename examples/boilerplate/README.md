@@ -8,7 +8,7 @@ Minimal starter template for building custom applications atop the **H1OS Class-
 ## Features
 - **Declarative Lifecycle Engine:** Single-entry `h1os_start()` lifecycle with `on_boot`, `on_wake`, `on_sync`, `on_pre_sleep`, and `on_error` hooks.
 - **Cross-Core UI Mutation Actor Queue:** Thread-safe `h1os_ui_post()` non-blocking actor pattern from Core 0 to Core 1.
-- **200x200 Bilevel LVGL v9 UI:** Pure 1-bit monochrome display pipeline with custom typography (`H1OS_FONT_14` & `H1OS_FONT_20`).
+- **200x200 Bilevel LVGL v9 UI:** Pure 1-bit monochrome display pipeline with custom typography (`HUMID1_FONT_UI_BODY` & `HUMID1_FONT_UI_HEADER`, `epd-font` v1.0.23).
 - **Zero RF & Ultra-Low-Power Ready:** Radio-stripped footprint (`CONFIG_BT_ENABLED=n`, `CONFIG_ESP_WIFI_ENABLED=n`), ULP Pure Event Mode coprocessor wake stub, and power domain pad isolation.
 - **Isolated Build Presets:** Fully segregated `dev` (`build_dev`) and `prod` (`build_prod`) configurations with zero sdkconfig collisions.
 

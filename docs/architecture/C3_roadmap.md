@@ -1,5 +1,7 @@
 # H1OS Development Roadmap & Verification Milestones
 
+> **H1OS Architecture Specification** | **Document:** `C3` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 This roadmap tracks the development of **H1OS** (E-Class Environmental Telemetry Instrument Operating System) for the Waveshare ESP32-S3 ePaper 1.54" V2.
 
 Development follows the **Four Canonical Stages of Construction**:
@@ -83,7 +85,7 @@ Development follows the **Four Canonical Stages of Construction**:
 
 - [x] **4.1 LVGL 9 UI Integration**:
   - [x] Keypad indev binding: BOOT button toggles Screen 1 (Telemetry) $\leftrightarrow$ Screen 2 (Health).
-  - [x] 1-bit packed binary fonts (`Montserrat-Bold` across 14, 16, 18, 20, 24, 32 pt with strong autohinting).
+  - [x] 1-bit packed binary fonts (`epd-font` v1.0.23: Medium `wght: 500` IBM Plex Sans/Mono + Noto + Terminus + 4 modular icon suites with LVGL `.fallback` chaining; migrated from initial `Montserrat-Bold`).
   - [x] Non-blocking display buffer flushing callback to `sub_display`.
 - [x] **4.2 E-Class Hardware Benchmarking Architecture**:
   - [x] **Sub-Execution Timing**: Flow A on-time measurement hooks instrumented in `orch_wake_stub.c`.
@@ -109,3 +111,6 @@ Development follows the **Four Canonical Stages of Construction**:
 | **Cross-Core UI Actor Queue (`v2.4.5-dev`)** | 16-slot static `h1os_ui_post()` queue drained inside `h1os_lvgl_lock(100)` with `sync_wait_ms` coalescing | VERIFIED |
 | **Fatal Startup Battery Protection (`v2.4.5-dev`)** | `on_error` hook + `h1os_handle_fatal_startup_error()` releasing `GPIO 17` (`BAT_CTRL`) on battery fault | VERIFIED |
 | **ES8311 Zero-Offset Sleep & I2S Pad Isolation (`v2.4.6-dev`)** | Datasheet Note 4/5 clock-sequenced standby (`0x0E=0x6A`, `0x0F=0xFF`, `0x45=0x03`, `0x0D=0xFC`, `0x00=0x1F`), on-demand session parking, glitch-free `PA_EN` boot hold, and zero-leakage I2S sleep pads | VERIFIED |
+| **ESP-IDF v6.1 GPIO Handover & Native USB Flasher (`v2.4.8-dev`)** | Explicit `esp_gpio_revoke` in `sub_audio_init()` and SLIP ROM checksum/reset flasher engine | VERIFIED |
+| **Pre-Application Lock Audit (`v2.4.9-dev`)** | `H1OS-AUD-01..07`: sleep barrier sync in `h1os_sleep()`, `h1os_wake_context_t`/`h1os_telemetry_t` contracts, warm-wake ADC cal | VERIFIED |
+| **`epd-font` v1.0.23, IDF `v6.1.1` & `H1OS-STD-001` Rev 2.1 (`v2.4.10-dev`)** | Medium-weight 1-BPP font suite with `.fallback` icons (`0xF287` USB), `examples/*` safety audit, `bump_version.py`, and ESP-IDF `v6.1.1` builds | VERIFIED |

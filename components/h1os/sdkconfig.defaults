@@ -83,7 +83,7 @@ CONFIG_LV_USE_BUTTON=y
 CONFIG_LV_USE_LINE=y
 CONFIG_LV_USE_IMAGE=y
 
-# Typography: Wire H1OS 1-BPP Bilevel Montserrat Typography Suite
+# Typography: Wire H1OS 1-BPP Bilevel Typography Suite (epd-font v1.0.23)
 CONFIG_LV_FONT_USE_CUSTOM_INCLUDE=y
 CONFIG_LV_FONT_CUSTOM_INCLUDE="h1os_fonts.h"
 CONFIG_LV_USE_CUSTOM_FONT_DEFAULT=y

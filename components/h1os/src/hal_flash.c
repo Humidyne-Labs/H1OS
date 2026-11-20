@@ -86,7 +86,7 @@ esp_err_t hal_flash_write_frame(const uint8_t *frame_data, size_t len)
         return ESP_ERR_INVALID_ARG;
     }
 
-    size_t erase_size = (len + 4095) & ~4095;
+    size_t erase_size = (len + 4095U) & ~(size_t)4095U;
     if (erase_size > s_part->size) {
         erase_size = s_part->size;
     }

@@ -1,5 +1,7 @@
 # Battery Metrology, Power Management & Autonomy Engine Specification
 
+> **H1OS Architecture Specification** | **Document:** `A8` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Core Architectural Philosophy & Invariants
 
 Estimating battery State of Charge (SoC) and operating autonomy on an ultra-low-power, event-driven appliance is fundamentally challenged by the physical chemistry of Lithium-Polymer cells:

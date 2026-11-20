@@ -33,6 +33,10 @@ RTC_DATA_ATTR static app_state_t s_app_state = {0};
  */
 static void render_starter_screen(const h1os_telemetry_t *telem)
 {
+    if (telem == NULL) {
+        return;
+    }
+
     lv_obj_t *scr = lv_screen_active();
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
@@ -72,33 +76,48 @@ static void render_starter_screen(const h1os_telemetry_t *telem)
     lv_obj_set_style_text_font(lbl_metric, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_metric, LV_ALIGN_TOP_LEFT, 6, 58);
 
-    /* August-Roche-Magnus Dew Point Invariant */
-    lv_obj_t *lbl_dew = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_dew, "Dew Point:  %.1f°F", (double)telem->dew_point_f);
-    lv_obj_set_style_text_font(lbl_dew, HUMID1_FONT_UI_BODY, 0);
-    lv_obj_align(lbl_dew, LV_ALIGN_TOP_LEFT, 6, 84);
+    /* August-Roche-Magnus Dew Point Invariant (Dual Column) */
+    lv_obj_t *lbl_dew_k = lv_label_create(scr);
+    lv_label_set_text(lbl_dew_k, "Dew Point");
+    lv_obj_set_style_text_font(lbl_dew_k, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_dew_k, LV_ALIGN_TOP_LEFT, 6, 84);
 
-    /* Power Topology: VBUS Detection vs. LiPo State of Charge */
-    lv_obj_t *lbl_pwr = lv_label_create(scr);
+    lv_obj_t *lbl_dew_v = lv_label_create(scr);
+    lv_label_set_text_fmt(lbl_dew_v, "%.1f°F", (double)telem->dew_point_f);
+    lv_obj_set_style_text_font(lbl_dew_v, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_dew_v, LV_ALIGN_TOP_RIGHT, -6, 84);
+
+    /* Power Topology: VBUS Detection vs. LiPo State of Charge (Dual Column) */
+    lv_obj_t *lbl_pwr_k = lv_label_create(scr);
+    lv_label_set_text(lbl_pwr_k, telem->is_usb_powered ? "Power" : "Battery");
+    lv_obj_set_style_text_font(lbl_pwr_k, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_pwr_k, LV_ALIGN_TOP_LEFT, 6, 108);
+
+    lv_obj_t *lbl_pwr_v = lv_label_create(scr);
     if (telem->is_usb_powered) {
-        lv_label_set_text(lbl_pwr, "Power:      USB CABLE");
+        lv_label_set_text(lbl_pwr_v, "USB CABLE");
     } else {
-        lv_label_set_text_fmt(lbl_pwr, "Battery:    %.2fV (%u%%)", (double)((float)telem->battery_mv / 1000.0f),
+        lv_label_set_text_fmt(lbl_pwr_v, "%.2fV (%u%%)", (double)((float)telem->battery_mv / 1000.0f),
                               telem->battery_percent);
     }
-    lv_obj_set_style_text_font(lbl_pwr, HUMID1_FONT_UI_BODY, 0);
-    lv_obj_align(lbl_pwr, LV_ALIGN_TOP_LEFT, 6, 108);
+    lv_obj_set_style_text_font(lbl_pwr_v, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_pwr_v, LV_ALIGN_TOP_RIGHT, -6, 108);
 
-    /* Sensor Thermal Equilibrium Status */
-    lv_obj_t *lbl_status = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_status, "Status:     %s", telem->is_thermally_settled ? "SETTLED" : "SETTLING");
-    lv_obj_set_style_text_font(lbl_status, HUMID1_FONT_UI_BODY, 0);
-    lv_obj_align(lbl_status, LV_ALIGN_TOP_LEFT, 6, 132);
+    /* Sensor Thermal Equilibrium Status (Dual Column) */
+    lv_obj_t *lbl_status_k = lv_label_create(scr);
+    lv_label_set_text(lbl_status_k, "Status");
+    lv_obj_set_style_text_font(lbl_status_k, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_status_k, LV_ALIGN_TOP_LEFT, 6, 132);
+
+    lv_obj_t *lbl_status_v = lv_label_create(scr);
+    lv_label_set_text(lbl_status_v, telem->is_thermally_settled ? "SETTLED" : "SETTLING");
+    lv_obj_set_style_text_font(lbl_status_v, HUMID1_FONT_UI_BODY, 0);
+    lv_obj_align(lbl_status_v, LV_ALIGN_TOP_RIGHT, -6, 132);
 
     /* Footer: Firmware Version Identification */
     lv_obj_t *lbl_foot = lv_label_create(scr);
-    lv_label_set_text_fmt(lbl_foot, "%s v%" PRIu32 ".%" PRIu32 " READY", H1OS_NAME, h1os_version_get_major(),
-                          h1os_version_get_minor());
+    lv_label_set_text_fmt(lbl_foot, "%s v%" PRIu32 ".%" PRIu32 ".%" PRIu32 " READY", H1OS_NAME,
+                          h1os_version_get_major(), h1os_version_get_minor(), h1os_version_get_patch());
     lv_obj_set_style_text_font(lbl_foot, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_foot, LV_ALIGN_BOTTOM_LEFT, 6, -6);
 }

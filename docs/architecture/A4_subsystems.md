@@ -1,5 +1,7 @@
 # Layer 2: Hardware Subsystem Managers Specification
 
+> **H1OS Architecture Specification** | **Document:** `A4` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Overview
 Layer 2 comprises dedicated peripheral subsystem managers ("Does the thing"). Each subsystem controls one hardware domain using Layer 1 HAL primitives.
 > **Invariant Rule:** Subsystems in Layer 2 are completely isolated from each other. The display driver does NOT talk to the power manager. The audio driver manages its own dedicated PM lock rather than calling `sub_power`. All cross-subsystem coordination is handled by Layer 3 Orchestrator.

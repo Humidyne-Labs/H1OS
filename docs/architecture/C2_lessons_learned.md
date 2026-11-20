@@ -1,5 +1,7 @@
 # Lessons Learned: What Worked, What Failed, and Architectural Rationale
 
+> **H1OS Architecture Specification** | **Document:** `C2` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 This document captures the engineering decisions, dead ends, and post-mortem analysis from developing the Waveshare ESP32-S3 ePaper 1.54" V2 BSP into **H1OS**. It serves as the primary rationale for why the Clean-Slate H1OS architecture is designed the way it is.
 
 ---

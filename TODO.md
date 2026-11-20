@@ -1,6 +1,6 @@
 # H1OS Engineering Action Plan & Display Typography TODO
 
-## Current Silicon & Display Issues (`v2.4.9-dev`)
+## Current Silicon & Display Issues (`v2.4.10-dev`)
 
 During physical hardware bench testing on the Waveshare 1.54" V2 e-Paper (SSD1681 driver, 200×200 resolution, 188.3 DPI), two visual rendering issues were identified:
 
@@ -20,30 +20,30 @@ During physical hardware bench testing on the Waveshare 1.54" V2 e-Paper (SSD168
 ## Formal Resolution Plan
 
 ### Phase 1: Upstream Scheme Configuration (`epd-font`)
-- [ ] **Configure Font Weight Scaling:**
-  - In `C:\Users\Matt\Documents\GitHub\epd-font\scripts\h1os-build-distro\h1os_full.scheme.json`:
+- [x] **Configure Font Weight Scaling:**
+  - In `<epd-font-repo>/scripts/h1os-build-distro/h1os_full.scheme.json`:
   - Set `"normal_weight": 500` under `"raster_config"` (maps `sans normal`, `mono normal`, and `cond normal` to `IBMPlex*-Medium.ttf`).
-- [ ] **Configure Fallback Chaining:**
+- [x] **Configure Fallback Chaining:**
   - Set `sans normal` `"fallback": "humid1_icon_fa7_solid_{size}"`.
   - Set `sans bold` `"fallback": "humid1_font_plex_sans_normal_{size}"` (cascades automatically to FA7 solid).
   - Ensures compound strings (`LV_SYMBOL_*` + text) resolve both typography and icons from a single font pointer without splitting widgets.
-- [ ] **Incorporate Font Awesome Brands for USB (`0xF287`):**
-  - Add strike for `"family": "icon_fa7", "style": "brands"` (or merge `FontAwesome7-Brands.ttf` glyphs into `FontAwesome7-Solid.ttf`) to include `0xF287` (`usb`).
+- [x] **Incorporate Font Awesome Brands for USB (`0xF287`):**
+  - Merged `0xF287` (`usb`) into `humid1_icon_fa7_solid_*` strikes in `epd-font` v1.0.23.
 
 ### Phase 2: Distro Regeneration (`epd-font`)
-- [ ] Run `scripts\h1os-build-distro\99_run_full_pipeline.bat` (or execute `tools\fonts\humid1_generate_1bpp.py` via Python).
-- [ ] Verify generated C strike files in `dist/h1os_distro/fonts/`:
+- [x] Run `scripts\h1os-build-distro\99_run_full_pipeline.bat` (or execute `tools\fonts\humid1_generate_1bpp.py` via Python).
+- [x] Verify generated C strike files in `dist/h1os_distro/fonts/`:
   - Confirm `humid1_font_plex_sans_normal_*.c` contains `.fallback = &humid1_icon_fa7_solid_*`.
-  - Confirm `humid1_icon_fa7_solid_*.c` (or brands) contains `0xF287`.
-- [ ] Copy `dist/h1os_distro/` into `H1OS/components/h1os/tools/fonts/`.
+  - Confirm `humid1_icon_fa7_solid_*.c` contains `0xF287`.
+- [x] Copy `dist/h1os_distro/` into `H1OS/components/h1os/tools/fonts/`.
 
 ### Phase 3: Downstream Firmware Integration & Quality Assurance (`H1OS`)
-- [ ] Rebuild firmware and verify zero compiler warnings:
+- [x] Rebuild firmware and verify zero compiler warnings:
   - `idf.py -B build_dev --preset dev build`
   - `idf.py -B build_prod --preset prod build`
-- [ ] Validate layout margin budgets against the 188 px width ceiling:
-  - `python tools/agent/check_string_width.py --audit-screens`
-- [ ] Verify repository sanitization:
+- [x] Validate layout margin budgets against the 188 px width ceiling:
+  - `<epd-font-repo>/tools/agent/tools/string_info.py --workspace <workspace_root> --audit-screens`
+- [x] Verify repository sanitization:
   - `python tools/agent/sanitize.py --check` (enforce 0 identity / workstation path leaks).
 - [ ] Flash to ESP32-S3 and physically inspect the SSD1681 electrophoretic panel:
   - Verify solid 2px text legibility.

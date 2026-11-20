@@ -3,7 +3,7 @@ name: lvgl-ui
 description: Authoritative design guidelines, bilevel e-paper constraints, layout grids, font CSV paths, kerning metrics, cross-core h1os_ui_post actor queue, and string width validation tools for LVGL v9 on SSD1681.
 ---
 
-# LVGL v9 Bilevel UI Design & E-Paper Font Validation (`v2.4.9-dev`)
+# LVGL v9 Bilevel UI Design & E-Paper Font Validation (`v2.4.10-dev`)
 
 This skill defines the canonical constraints, design patterns, font metric tables, and automated validation tools for developing LVGL v9 user interfaces on the **Waveshare ESP32-S3 ePaper 1.54" V2** (SSD1681) panel.
 
@@ -16,7 +16,7 @@ This skill defines the canonical constraints, design patterns, font metric table
 - **Color Depth:** 1-bit Monochrome (`LV_COLOR_FORMAT_I1`), pure black and pure white.
 - **Draw Buffer:** Exactly 5,000 pixel bytes ($200 \times 200 \div 8\text{ bits}$) plus the 8-byte LVGL v9 palette header.
 - **Opacity Mandate:** Strict 100% opacity (`LV_OPA_COVER`). No alpha blending or partial opacities.
-- **Thread Safety & Cross-Core Actor Queue (`v2.4.9-dev`):**
+- **Thread Safety & Cross-Core Actor Queue (`v2.4.10-dev`):**
   - The LVGL presentation task (`h1os_lvgl`) is pinned to **Core 1** at FreeRTOS priority **5** (`LVGL_TASK_PRIO_PORT = 5`).
   - During `on_boot()` and `on_wake()`, Core 1 has not yet started (`h1os_lvgl_start(5, 1)` runs immediately after `on_wake()` returns), so initial screen construction requires no outer mutex lock.
   - Once Core 1 is running, Core 0 `on_sync()` and background tasks should post UI updates via `h1os_ui_post(fn, arg, timeout_ms)` (16-slot static queue drained on Core 1 inside `h1os_lvgl_lock(100)` before `lv_timer_handler()`), or wrap synchronous LVGL operations in `if (h1os_lvgl_lock(timeout_ms)) { ... h1os_lvgl_unlock(); }`.
@@ -64,18 +64,18 @@ Evaluates exact LVGL v9 pixel width and clearance against the `188 px` budget:
 embedded-ops/epd_string_budget(
   strike="humid1_font_plex_sans_normal_14",
   text="Power: CHARGED 4.00V",
-  workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS"
+  workspace_dir="<workspace_root>"
 )
 ```
 
 ### B. Automated Screen File Audit (`embedded-ops/epd_audit_screens`)
 Scans all C screen files in `examples/H1OS/main/screens/`, resolves `lv_obj_set_style_text_font` + `HUMID1_FONT_*`/`H1OS_FONT_*` macros, simulates worst-case `printf` expansion, and flags any line exceeding `188 px`:
 ```text
-embedded-ops/epd_audit_screens(workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")
+embedded-ops/epd_audit_screens(workspace_dir="<workspace_root>")
 ```
 
 ### C. Regenerate Font Assets (`epd-font` v1.0.23)
-Regenerate in `C:\Users\Matt\Documents\GitHub\epd-font` via `scripts\h1os-build-distro\02_build_fonts.bat` and `07_package_distro.bat`, then sync `dist\h1os_distro\` into `components\h1os\tools\fonts\`.
+Regenerate in `<epd-font-repo>` via `scripts\h1os-build-distro\02_build_fonts.bat` and `07_package_distro.bat`, then sync `dist\h1os_distro\` into `components\h1os\tools\fonts\`.
 
 ### D. Query Metrics via DuckDB SQL
 Query glyph or kerning metrics using DuckDB MCP:

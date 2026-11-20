@@ -7,18 +7,18 @@
  * License: MIT AND OFL-1.1
  ******************************************************************************/
 
-#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
-#include "lvgl.h"
-#elif defined(__has_include)
-#if __has_include("lvgl.h")
-#include "lvgl.h"
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
-#else
-#include "lvgl.h"
+#ifdef __has_include
+    #if __has_include("lvgl.h")
+        #ifndef LV_LVGL_H_INCLUDE_SIMPLE
+            #define LV_LVGL_H_INCLUDE_SIMPLE
+        #endif
+    #endif
 #endif
+
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+    #include "lvgl.h"
 #else
-#include "lvgl.h"
+    #include "lvgl/lvgl.h"
 #endif
 
 #ifndef HUMID1_FONT_PLEX_MATH_REGULAR_14
@@ -27,10 +27,7 @@
 
 #if HUMID1_FONT_PLEX_MATH_REGULAR_14
 
-#ifndef LV_FONT_DECLARE
-#define LV_FONT_DECLARE(font_name) extern const lv_font_t font_name
-#endif
-LV_FONT_DECLARE(humid1_font_plex_sans_normal_14);
+extern const lv_font_t humid1_font_plex_sans_normal_14;
 
 /*-----------------
  *    BITMAPS
