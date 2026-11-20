@@ -1,5 +1,7 @@
 # H1OS Firmware Engineering & Safety Standards
 
+> **H1OS Architecture Specification** | **Document:** `B3` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Architectural Philosophy
 Firmware reliability fails when standards are defined in theoretical documents that developers ignore. In H1OS, engineering discipline is enforced through a strict three-layer hierarchy:
 

@@ -52,7 +52,7 @@ static SemaphoreHandle_t s_busy_idle_sem           = NULL;
  *            - Section 7:   Command Table                                           (pp. 20-33)
  *
  *          Multi-Register Dispatch Architecture:
- *          The 159-byte payload is partitioned across five distinct SSD1681 hardware registers:
+ *          The 159-byte data buffer is partitioned across five distinct SSD1681 hardware registers:
  *          +-------------------+---------+-----------+------------------------------------------------+
  *          | Register Command  | Offset  | Length    | Hardware Subsystem / Purpose                   |
  *          +-------------------+---------+-----------+------------------------------------------------+
@@ -331,7 +331,7 @@ esp_err_t sub_display_wait_busy(TickType_t timeout_ticks)
         return ESP_ERR_TIMEOUT;
     }
 
-    /* Defensive fallback if GPIO ISR service is unavailable */
+    /* Defensive default if GPIO ISR service is unavailable */
     TickType_t start_ticks = xTaskGetTickCount();
     while (gpio_get_level(HAL_PIN_EPD_BUSY) == 1) {
         TickType_t elapsed = xTaskGetTickCount() - start_ticks;

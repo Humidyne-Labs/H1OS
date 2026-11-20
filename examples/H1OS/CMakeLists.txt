@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 # Resolve local extra components using an absolute path
 list(APPEND EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../components")
 
-# Fallback IDF_PATH validation
+# default IDF_PATH validation
 if(DEFINED ENV{IDF_PATH} AND NOT "$ENV{IDF_PATH}" STREQUAL "")
     set(IDF_PATH "$ENV{IDF_PATH}")
 elseif(NOT DEFINED IDF_PATH OR IDF_PATH STREQUAL "")

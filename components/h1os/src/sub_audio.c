@@ -1123,8 +1123,8 @@ static esp_err_t sub_audio_send_command(const audio_cmd_t *cmd, bool is_sync, ui
  * @details Enqueues the requested audio command into the background audio worker task.
  *
  * @param[in]    type            Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM.
- * @param[in]    data            Pointer to payload parameters or PCM buffer.
- * @param[in]    len             Length of data payload in bytes.
+ * @param[in]    data            Pointer to data buffer parameters or PCM buffer.
+ * @param[in]    len             Length of data data buffer in bytes.
  *
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
  */

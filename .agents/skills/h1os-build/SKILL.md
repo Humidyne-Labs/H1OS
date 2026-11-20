@@ -1,9 +1,9 @@
 ---
 name: h1os-build
-description: Authoritative build instructions, environment configuration, and execution commands for H1OS and ESP32-S3 firmware. Eliminates exploratory tool searching by providing the exact Espressif v6.1 profile script, paths, and build targets.
+description: Authoritative build instructions, environment configuration, and execution commands for H1OS and ESP32-S3 firmware. Eliminates exploratory tool searching by providing the exact Espressif v6.1.1 profile script, paths, and build targets.
 ---
 
-# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.5-dev`)
+# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.10-dev`)
 
 This skill defines the canonical build procedures, paths, and environment activation for **H1OS** on ESP32-S3.
 
@@ -16,10 +16,10 @@ This skill defines the canonical build procedures, paths, and environment activa
 ## 1. Environment & Path Specifications
 
 - **Target Chip:** ESP32-S3 (`esp32s3`)
-- **ESP-IDF Version:** v6.1 (`C:\esp\v6.1\esp-idf`)
+- **ESP-IDF Version:** v6.1.1 (`C:\esp\v6.1.1\esp-idf`)
 - **Host Tools Root:** `C:\Espressif\tools`
-- **Active Python Virtualenv:** `C:\Espressif\tools\python\v6.1\venv`
-- **Canonical Profile Script:** `C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`
+- **Active Python Virtualenv:** `C:\Espressif\tools\python\v6.1.1\venv`
+- **Canonical Profile Script:** `C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1`
 - **Project Working Directory:** `examples\H1OS`
 
 > [!WARNING]
@@ -38,13 +38,13 @@ All commands must be executed in `examples\H1OS` using PowerShell:
 ### Production Build (Default)
 Compiles `bootloader.bin`, `ulp_h1os.bin`, and `h1os.bin` into `build_prod` via the `prod` preset:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod build
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod build
 ```
 
 ### Development Build
 Compiles with debug symbols into `build_dev` via the `dev` preset:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev build
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev build
 ```
 
 ### Reconfigure / CMake Refresh & Preset Switching
@@ -61,48 +61,48 @@ Remove-Item -Force -ErrorAction SilentlyContinue sdkconfig, sdkconfig.old
 
 # 2. Reconfigure target preset:
 # Development profile (debug symbols, dev sdkconfig):
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev reconfigure
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev reconfigure
 
 # Production profile (size-optimized, production sdkconfig):
 Remove-Item -Force -ErrorAction SilentlyContinue sdkconfig, sdkconfig.old
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod reconfigure
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod reconfigure
 ```
 
 ### Firmware Memory Size Breakdown
 Reports DRAM, IRAM, DIRAM, and Flash footprint:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod size
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod size
 ```
 
 ### Comprehensive Size Diagnostic (`h1os_size`)
 Generates deep per-component, per-file, binary header breakdown and partition headroom summary without triggering Ninja builds (instant, 0% CPU):
 ```powershell
 # Instant direct inspection via idf.py CLI extension:
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_size
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_size
 
 # Direct script execution from application root:
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod
 
 # Optional: Force a full firmware rebuild before measuring:
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod --rebuild
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; python ../../components/h1os/tools/audit_size/h1os_size.py -B build_prod --rebuild
 ```
 
 ### Packaging Production Release Bundle (`h1os_pack`)
 Generates the monolithic factory binary and bundles modular batch control vectors and flasher into `dist/`:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_pack
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod h1os_pack
 ```
 
 ### Full Clean
 Removes all build artifacts if switching major SDK or toolchain versions:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod fullclean
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod fullclean
 ```
 
 ### Flash Firmware to Device
 Flashes the bootloader, partition table, and application over USB-Serial:
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1"; idf.py -B build_prod flash
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod flash
 ```
 
 ---

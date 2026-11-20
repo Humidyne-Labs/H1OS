@@ -1,14 +1,14 @@
 # H1OS: E-Class Environmental Runtime & Middleware Framework
 
-[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.1-blue.svg)](https://idf.espressif.com/)
+[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.1.1-blue.svg)](https://idf.espressif.com/)
 [![Target](https://img.shields.io/badge/Hardware-Waveshare%20ESP32--S3--ePaper--1.54%20V2-green.svg)](https://www.waveshare.com)
 [![Graphics](https://img.shields.io/badge/LVGL-v9.6.0-orange.svg)](https://lvgl.io/)
-[![Version](https://img.shields.io/badge/H1OS-v2.4.8--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
+[![Version](https://img.shields.io/badge/H1OS-v2.4.10--dev-brightgreen.svg)](components/h1os/include/h1os/h1os.h)
 [![Docs](https://img.shields.io/badge/Docs-Developer%20Guide-blue.svg)](docs/guide.md)
 [![Errata](https://img.shields.io/badge/Hardware-Errata%20%26%20Rev%20B-orange.svg)](ERRATA.md)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-An instrument-grade, event-driven embedded runtime and peripheral middleware framework built on **ESP-IDF v6.1 / FreeRTOS**.
+An instrument-grade, event-driven embedded runtime and peripheral middleware framework built on **ESP-IDF v6.1.1 / FreeRTOS**.
 
 H1OS turns the **Waveshare ESP32-S3 ePaper 1.54" V2** development board (**ESP32-S3-PICO-1-N8R8**) into an ultra-low-power **E-Class environmental telemetry platform**. It provides deterministic power sequencing, psychrometric telemetry pipelines, ULP coprocessor state machines, and a specialized 1-bit bi-tonal display pipeline.
 
@@ -189,7 +189,7 @@ Runs autonomously in Pure Event Mode (`ULP_RISCV_WAKEUP_SOURCE_GPIO`) in RTC Slo
 
 ## Build Instructions
 
-Build and flash using ESP-IDF v6.1 and Ninja:
+Build and flash using ESP-IDF v6.1.1 and Ninja:
 
 ```powershell
 cd examples/H1OS
@@ -230,7 +230,7 @@ powershell.exe -ExecutionPolicy Bypass -File "tools/usb_ctrl_punk_v2.6/Full/toky
 ## Contributors & Attribution
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-* **Principal Firmware Audit, Dual-Core Concurrency Architecture & `-O2` Wake Stub Hardening (`v2.4.4-dev` – `v2.4.7-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Principal Firmware Audit, Dual-Core Concurrency Architecture & `-O2` Wake Stub Hardening (`v2.4.4-dev` – `v2.4.10-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)
 
 ---

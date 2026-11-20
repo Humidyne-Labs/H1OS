@@ -31,7 +31,7 @@ esp_err_t sub_nvs_init(void);
  * @brief Store a null-terminated string value in NVS.
  *
  * @param[in] key   Unique key identifier string.
- * @param[in] value String payload to persist.
+ * @param[in] value String data buffer to persist.
  *
  * @return ESP_OK on success.
  */

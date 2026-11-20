@@ -14,7 +14,7 @@
 
 The SHTC3 is a stateless, low-power environmental sensor that operates using 16-bit command codes transmitted MSB first:
 
-| Command Name | 16-Bit Hex Code | Payload Transmitted | Required Post-Command Delay | Description |
+| Command Name | 16-Bit Hex Code | data buffer Transmitted | Required Post-Command Delay | Description |
 |---|---|---|---|---|
 | **WAKEUP** | `0x3517` | `[0x35, 0x17]` | **240 µs min / 500 µs stub** (`rtc_delay_us_exact(500)`) | Transitions sensor from sleep mode to idle ready state. |
 | **SLEEP** | `0xB098` | `[0xB0, 0x98]` | None (instantaneous) | Puts sensor into low-power sleep mode to prevent self-heating. |
@@ -25,7 +25,7 @@ The SHTC3 is a stateless, low-power environmental sensor that operates using 16-
 
 ---
 
-## 3. Readout Sequence & Payload Format
+## 3. Readout Sequence & data buffer Format
 
 The SHTC3 readout sequence is strictly:
 
@@ -39,7 +39,7 @@ graph LR;
     Sleep-->CRC["Verify CRC-8"];
 ```
 
-### 6-Byte Read Payload
+### 6-Byte Read data buffer
 When reading after a measurement command, the sensor returns 6 bytes:
 - `rx_buf[0]`: Temperature MSB
 - `rx_buf[1]`: Temperature LSB

@@ -4,6 +4,57 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.10-dev] - 2026-11-19
+
+### 🚀 Added
+* **`epd-font` v1.0.23 Bilevel Typography & Modular Icon Suite Integration** (`components/h1os/tools/fonts/`):
+  * Upgraded embedded 1-BPP font bundle to `epd-font` `v1.0.23` (`108` pre-generated LVGL `>= 9.6.0` strikes, `216` CSV advance/kerning metric manifests in `metrics/`, `humid1_epd_vault.json.gz`, `humid1_fw_emit.py`, `humid1_cmake_font_builder.py`, and `humid1_runtime.py`).
+  * Enabled `wght: 500` (Medium) stem weights on `IBM Plex Sans`/`Mono`/`Cond` for crisp 2-pixel strokes at 188 DPI and wired LVGL `.fallback` icon chaining across strikes including Font Awesome 7 USB (`0xF287`), Droplet (`0xF043`), Refresh (`0xF021`), Charge (`0xF0E7`), and Battery (`0xF240`–`0xF244`).
+  * Updated `humid1_fonts.h`, `h1os_fonts.h`, and emitted `.c` modules with `EPD_FONT_EXTERN_DECLARE` and `LV_FONT_CUSTOM_DECLARE` compatibility.
+* **Canonical Version Synchronizer (`tools/agent/bump_version.py`) & Standardized Architecture Headers** (`docs/architecture/*.md`):
+  * Added zero-dependency `tools/agent/bump_version.py` (`--set`, `--bump`, `--idf-version`, `--check`, `--dry-run`) to atomically synchronize semantic version strings across headers, manifests, skills/rules, `Doxyfile`, `docs/guide.md`, `CHANGELOG.md` checks, and all 17 `docs/architecture/*.md` documents.
+* **Hardware Compliance & EPD Evaluation Assets** (`docs/hardware_docs/`):
+  * Added progressive, EXIF-harmonized (`HUMIDITRON/HUMADYNE_LABS`) RoHS/EMC certificates (`material_datasheets/epd_rohs_emc/{ROHS,EMC}.jpg`) and losslessly metadata-harmonized `other/Evaluation_1.54_EPD_2Bit_Grayscale.pdf`.
+* **Production Release Archive (`dist/h1os_demo/2.4.10-dev[prod]/`)**:
+  * Packaged ESP-IDF `v6.1.1` production firmware bundle (`prod_2.4.10-dev.zip` and `h1os-v2.4.10-bundle.zip`) with monolithic factory binary, modular partition images, SHA-256 checksums, and native USB SLIP flasher.
+
+### 🔄 Changed
+* **ESP-IDF `v6.1.1` Toolchain Migration** (`.agents/`, `.vscode/`, `examples/*/.vscode/`, `profiles/`, `components/h1os/tools/partition/part_backend.py`, `README.md`, `AGENTS.md`, `docs/guide.md`, `docs/architecture/A1_master_blueprint.md`):
+  * Migrated build profiles (`Microsoft.v6.1.1.PowerShell_profile.ps1`), IDE configurations, and tool lookup paths to ESP-IDF `v6.1.1`.
+* **Audit Standard Upgrade (`H1OS-STD-001` Rev 2.1)** (`docs/architecture/D0_std_audit_framework.md`, `AGENTS.md`, `.agents/rules/lexicon.md`):
+  * Codified the LVGL/API `fallback` lexicon exception, expanded Step 2 harness verification gates (`Semgrep`, read-only `clang-tidy`, `clang-format` preservation rule, `epd-font` screen budget audit, `murdock_memory_budget`, `bump_version.py`, `sanitize.py`), and documented `v2.4.10-dev` certification in `docs/audits/h1os_audit_certification_report_v2_4_10.md`.
+* **Documentation Synchronization** (`docs/guide.md`, `docs/architecture/B1_api_and_services.md`, `docs/architecture/C3_roadmap.md`, `docs/api.md`, `TODO.md`, `Doxyfile`):
+  * Replaced obsolete Montserrat typography references and broken `examples/public/` links with `epd-font` `v1.0.23` and `examples/H1OS/main/main.c`, reconciled `B1_api_and_services.md` (`sat_vapor_pressure_hpa`, `h1os_lvgl_request_full_refresh()`), and regenerated `docs/api.md`.
+
+### 🛡️ Fixed & Hardened
+* **Showcase Application Concurrency, Lock & Null-Pointer Safety** (`examples/H1OS/main/`):
+  * Added explicit `telem == NULL` guards and checked `h1os_lvgl_lock(100)` / `h1os_lvgl_lock(1000)` returns across `main.c` (`app_on_splash`) and all 5 screen renderers; replaced non-reentrant `static h1os_telemetry_t` in `update_active_display()` with a stack-local struct.
+  * Refactored `screen_base_set_awake_badge()` in `screen_base.c` to dispatch badge state mutations via `h1os_ui_post()` (with locked direct path before Core 1 queue bringup), eliminating missed pre-sleep badge updates during SSD1681 refreshes.
+  * Resolved `clang-tidy` dead-store initialization (`ulp_str` in `screen_diagnostics.c`) and replaced hardcoded fallback date `"2026-10-25"` with `"--/--/--"` in `screen_system_health.c`.
+* **Core Signed-Unsigned & Tooling Fixes** (`components/h1os/src/hal_flash.c`, `components/h1os/src/h1os_lvgl.cpp`, `tools/agent/optimize_images.py`):
+  * Converted `4095` and `LVGL_I1_PALETTE_SIZE` constants to explicit unsigned literals (`4095U` / `~(size_t)4095U`, `8U`), clearing Semgrep `raptor-signed-unsigned-conversion` findings.
+  * Fixed `--dry-run` in `tools/agent/optimize_images.py` so dry-run evaluations do not write files or unlink source PNGs on disk.
+* **Example Projects Parity & Hygiene** (`examples/boilerplate/`, `examples/riscv_test/`):
+  * Replaced multi-space proportional font alignment in `examples/boilerplate/main/main.c` with dual left/right column labels, added `telem == NULL` guard, synced `h1os.ini` (`log_dir = logs`), and updated `examples/boilerplate/README.md`.
+  * Removed duplicate `CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y` in `examples/riscv_test/sdkconfig.defaults` and cleaned workspace path leaks across `.vscode/`, `TODO.md`, `.agents/rules/lvgl.md`, and `.agents/skills/lvgl-ui/SKILL.md`.
+
+## [2.4.9-dev] - 2026-11-02
+
+### 🛡️ Third-Party Pre-Application Lock Audit & Middleware Hardening
+* **Interactive & Early Sleep Barrier Synchronization (`H1OS-AUD-01`)** (`h1os_lifecycle.c`):
+  * Added bounded `xEventGroupWaitBits(s_sleep_barrier_group, BARRIER_SYNC_DONE, ...)` synchronization inside `h1os_sleep()` prior to `on_pre_sleep()` execution. Previously, `BARRIER_ALL_READY` was awaited exclusively on unattended `is_rtc_wake` transitions in `h1os_launch_interactive_session()`, leaving interactive or early manual `h1os_sleep()` transitions unguarded if an asynchronous `on_sync()` worker called `h1os_sync_hold()`.
+* **Wake Context & Telemetry Contract Completion (`H1OS-AUD-02`, `H1OS-AUD-03`, `H1OS-AUD-04`)** (`h1os.h`, `h1os_lvgl.h`, `h1os_lifecycle.c`):
+  * Added an anonymous union (`union { uint32_t deep_sleep_count; uint32_t wake_count; }`) and `uint8_t ulp_dispatch_reason` to `h1os_wake_context_t` in `h1os.h` (populated in `h1os_launch_interactive_session()`), reconciling the public C struct with `docs/architecture/B1_api_and_services.md` and `.agents/rules/lifecycle.md`.
+  * Added `float sat_vapor_pressure_hpa` to `h1os_telemetry_t` (populated via `orch_math_calc_sat_vapor_pressure(t)` in `h1os_get_telemetry()`), allowing Layer 4 diagnostic screens to display both actual and saturation vapor pressure without including Layer 3 `orch_math.h`.
+  * Added inline helper `h1os_lvgl_request_full_refresh(void)` to `h1os_lvgl.h` wrapping `h1os_lvgl_set_first_flush_mode(true)` for Layer 4 Light/Dark theme polarity toggles and manual ghosting scrubs.
+* **Warm-Wake ADC Curve-Fitting Calibration Initialization (`H1OS-AUD-07`)** (`sub_power.c`):
+  * Updated `sub_power_init_ulp()` to invoke `sub_power_init()` when `!s_ulp_adc_inited` during warm ULP wakes (`ESP_SLEEP_WAKEUP_ULP`), ensuring the ADC1 Channel 3 curve-fitting calibration handle in `.bss` is valid immediately during active Flow B sessions prior to deep-sleep entry.
+* **Slim-Archive & Managed-Component Typography Build Resilience (`H1OS-AUD-05`)** (`components/h1os/CMakeLists.txt`, `components/h1os/tools/fonts/generate_1bpp_fonts.py`):
+  * Updated `CMakeLists.txt` and `generate_1bpp_fonts.py` to resolve font assets across `components/h1os/tools/fonts/static_assets/` and `managed_components/lvgl__lvgl/scripts/generators/built_in_font/`, and to synthesize deterministic 1-BPP LVGL font descriptor bridges when building from slim archives where binary `.ttf`/`.woff` blobs or `npx` are omitted.
+* **Agent Verification Tooling, Version Alignment & Lexicon Audit (`H1OS-AUD-06`)** (`tools/agent/`, `tools/fonts/`, `AGENTS.md`, `ERRATA.md`, `docs/`):
+  * Restored offline verification scripts (`sanitize.py`, `check_string_width.py`, `extract_font_metrics.py`, `optimize_images.py`, `optimize_pdf.py`) and 1-BPP Montserrat CSV glyph metric tables (`14..32px`).
+  * Synchronized semantic version strings to `2.4.9-dev` across `h1os_version.h`, `components/h1os/idf_component.yml`, `README.md`, `ERRATA.md`, `AGENTS.md`, `.agents/`, and `CHANGELOG.md`, and remediated all remaining lexicon policy violations across headers, sources, and documentation.
+
 ## [2.4.8-dev] - 2026-11-01
 
 ### 🛠️ Hardware Abstraction & Audio Subsystem Handover

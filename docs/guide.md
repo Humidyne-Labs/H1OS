@@ -2,7 +2,8 @@
 
 **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with Waveshare Electronics)*  
 **Operating System:** H1OS (E-Class Environmental Telemetry Operating System)  
-**Supported Frameworks:** ESP-IDF `v6.1` | LVGL `v9.6.0`  
+**Firmware Version:** `v2.4.10-dev`  
+**Supported Frameworks:** ESP-IDF `v6.1.1` | LVGL `v9.6.0`  
 **License:** MIT  
 
 ---
@@ -166,8 +167,8 @@ $$
 ## 6. Display Architecture & Refresh Policy
 
 - **Resolution:** 200×200 pixels monochrome, non-touch (5000 bytes working RAM).
-- **Format:** `LV_COLOR_FORMAT_I1` with 1-bit packed binary typography (`H1OS_FONT_14`, `H1OS_FONT_20`, `H1OS_FONT_32`).
-- **Full-Suite Bold Typography:** Build-time synthesized `Montserrat-Bold` with `--autohint-strong` bilevel rasterization, ensuring 2-to-3-pixel solid stems that eliminate hairline stroke erosion on 188 DPI glass.
+- **Format:** `LV_COLOR_FORMAT_I1` with 1-bit packed binary typography (`HUMID1_FONT_*` / `H1OS_FONT_*` via `epd-font` v1.0.23).
+- **1-BPP EPD Typography & Iconography (`epd-font` v1.0.23):** Uses Medium-weight (`wght: 500`) IBM Plex Sans/Mono, Google Noto Sans/SemiCondensed/Serif/Math, and Terminus strikes paired with 4 modular icon suites (FA7 Solid/Brands USB `0xF287`, Lucide, Phosphor, Tabler) via LVGL `.fallback` chaining, ensuring solid 2-pixel strokes with zero hairline erosion on 188 DPI glass.
 - **Keypad Indev:** Hardware tactile buttons are exposed as `LV_INDEV_TYPE_KEYPAD`:
   - `BOOT` (GPIO 0): `LV_KEY_RIGHT` (forward carousel navigation).
   - `POWER` (GPIO 18): `LV_KEY_ENTER`.
@@ -196,4 +197,4 @@ While the main cores are in deep sleep, the ULP coprocessor runs autonomously in
 
 ## 9. Complete Application Template
 
-See [`examples/public/main/main.c`](../examples/public/main/main.c) for a complete working reference application featuring modular screen navigation, parallel `on_sync` telemetry hooks, Montserrat bold typography, and multi-node telemetry.
+See [`examples/H1OS/main/main.c`](../examples/H1OS/main/main.c) for a complete working reference application featuring modular screen navigation, parallel `on_sync` telemetry hooks, `epd-font` v1.0.23 bilevel typography, and multi-node telemetry.

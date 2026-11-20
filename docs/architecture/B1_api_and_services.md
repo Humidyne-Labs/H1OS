@@ -1,5 +1,7 @@
 # Layer 4: Application Lifecycle API & Services Specification
 
+> **H1OS Architecture Specification** | **Document:** `B1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Overview
 Layer 4 is the top-level public interface of H1OS (`h1os.h`). It isolates developers from low-level register manipulation, coprocessor details, and power sequencing by exposing:
 1. **Declarative Lifecycle Engine:** `h1os_start()`, `h1os_sleep()`, `h1os_shutdown()`, `h1os_shutdown_for_storage()`, `h1os_get_telemetry()`, and `h1os_set_volume()`.
@@ -162,6 +164,7 @@ typedef struct {
     float dew_point_f;
     float dew_point_k;
     float vapor_pressure_hpa;
+    float sat_vapor_pressure_hpa;
     float absolute_humidity_g;
 
     float window_low_c;
@@ -219,7 +222,7 @@ esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_c
   - Acquires 240 MHz turbo (`CpuMaxTurboScope`) strictly during widget tree rendering, 1-bit pixel packing, and SPI DMA transfer.
 - **Cross-Core Actor Queue & Mutex Safety (`MANDATE-04` / `REV-02`):**
   - Provides `h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms)` backed by a 16-slot static FreeRTOS queue (`xQueueCreateStatic`) that wakes Core 1 via `xTaskNotifyGive()` and drains all queued callbacks inside `h1os_lvgl_lock(100)` immediately prior to `lv_timer_handler()`.
-  - Provides recursive mutex guards `h1os_lvgl_lock(uint32_t timeout_ms)` and `h1os_lvgl_unlock()`, plus inbound single-refresh gate controls (`h1os_lvgl_set_sync_gate()`, `h1os_lvgl_release_sync_gate()`).
+  - Provides recursive mutex guards `h1os_lvgl_lock(uint32_t timeout_ms)` and `h1os_lvgl_unlock()`, inbound single-refresh gate controls (`h1os_lvgl_set_sync_gate()`, `h1os_lvgl_release_sync_gate()`), and `h1os_lvgl_request_full_refresh()` for full OTP waveform scrubs on theme polarity switches.
 
 ---
 

@@ -2407,7 +2407,7 @@ Static UI mutation queue capacity (16 msgs).
 ### LVGL_I1_PALETTE_SIZE
 
 ```cpp
-#define LVGL_I1_PALETTE_SIZE 8
+#define LVGL_I1_PALETTE_SIZE 8U
 ```
 
 Defined in h1os_lvgl.cpp:63
@@ -2447,7 +2447,7 @@ Minor version number (backward-compatible features).
 ### H1OS_VERSION_PATCH
 
 ```cpp
-#define H1OS_VERSION_PATCH 8
+#define H1OS_VERSION_PATCH 10
 ```
 
 Defined in h1os/h1os_version.h:19
@@ -2475,7 +2475,7 @@ Pre-release release track tag.
 ### H1OS_VERSION_STRING
 
 ```cpp
-#define H1OS_VERSION_STRING "2.4.8-dev"
+#define H1OS_VERSION_STRING "2.4.10-dev"
 ```
 
 Defined in h1os/h1os_version.h:21
@@ -3168,7 +3168,7 @@ High-level application wake state classification (MANDATE-04).
 enum h1os_splash_type_t
 ```
 
-Defined in h1os/h1os.h:101
+Defined in h1os/h1os.h:105
 
 Graphical splash screen trigger types.
 
@@ -3316,7 +3316,7 @@ enum sub_audio_type_t
 
 Defined in h1os/sub_audio.h:24
 
-Acoustic payload type for consolidated sub_audio_play dispatch.
+Acoustic data buffer type for consolidated sub_audio_play dispatch.
 
 | Value | Description |
 |-------|-------------|
@@ -3485,7 +3485,7 @@ SHTC3 sensor acquisition error codes reported by wake stub.
 using h1os_boot_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:113
+Defined in h1os/h1os.h:117
 
 System boot and power-on reset callback signature.
 
@@ -3505,7 +3505,7 @@ System boot and power-on reset callback signature.
 using h1os_wake_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:121
+Defined in h1os/h1os.h:125
 
 Interactive wake callback signature (Timer / RTC Alarm / Button Tap).
 
@@ -3526,7 +3526,7 @@ Interactive wake callback signature (Timer / RTC Alarm / Button Tap).
 using h1os_sync_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:132
+Defined in h1os/h1os.h:136
 
 Parallel data synchronization callback signature (MANDATE-04).
 
@@ -3549,7 +3549,7 @@ Invoked on Core 0 after Core 1 LVGL task startup so network/bus I/O overlaps in 
 using h1os_pre_sleep_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:140
+Defined in h1os/h1os.h:144
 
 Callback executed immediately prior to entering deep sleep.
 
@@ -3570,7 +3570,7 @@ Callback executed immediately prior to entering deep sleep.
 using h1os_shutdown_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:147
+Defined in h1os/h1os.h:151
 
 Callback executed immediately prior to battery power cut.
 
@@ -3590,7 +3590,7 @@ Callback executed immediately prior to battery power cut.
 using h1os_error_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:156
+Defined in h1os/h1os.h:160
 
 Fatal startup or lifecycle error callback signature (MANDATE-06).
 
@@ -3612,7 +3612,7 @@ Fatal startup or lifecycle error callback signature (MANDATE-06).
 using h1os_splash_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:164
+Defined in h1os/h1os.h:168
 
 Presentation splash screen rendering callback signature.
 
@@ -3633,7 +3633,7 @@ Presentation splash screen rendering callback signature.
 using h1os_chime_cb_t = void(*)
 ```
 
-Defined in h1os/h1os.h:172
+Defined in h1os/h1os.h:176
 
 Acoustic presentation chime playback callback signature.
 
@@ -3675,7 +3675,7 @@ Callback signature for tactile button state-change interrupts.
 using h1os_ui_fn_t = void(*)
 ```
 
-Defined in h1os/h1os_lvgl.h:26
+Defined in h1os/h1os_lvgl.h:27
 
 Asynchronous UI mutation callback signature executed on Core 1 inside the LVGL context.
 
@@ -3723,12 +3723,12 @@ ESP_OK if external time was synchronized, or error code.
 static inline const char * h1os_get_version(void)
 ```
 
-Defined in h1os/h1os.h:258
+Defined in h1os/h1os.h:263
 
 Get the H1OS semantic version string.
 
 #### Returns
-Null-terminated semantic version string (e.g. "2.4.7-dev").
+Null-terminated semantic version string (e.g. "2.4.9-dev").
 
 ---
 
@@ -3740,7 +3740,7 @@ Null-terminated semantic version string (e.g. "2.4.7-dev").
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os/h1os.h:276
+Defined in h1os/h1os.h:281
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -3768,7 +3768,7 @@ Configures hardware subsystems, determines boot/wake flow, initializes FreeRTOS 
 esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec)
 ```
 
-Defined in h1os/h1os.h:295
+Defined in h1os/h1os.h:300
 
 Dynamically configure Flow A and Flow B sleep intervals at runtime.
 
@@ -3796,7 +3796,7 @@ Enforces all silicon constraints, ordering invariants, and remainder slice floor
 void h1os_sync_hold(void)
 ```
 
-Defined in h1os/h1os.h:304
+Defined in h1os/h1os.h:309
 
 Hold the deep-sleep barrier open for an asynchronous synchronization task.
 
@@ -3812,7 +3812,7 @@ When called inside on_sync(), prevents unattended RTC Flow B wakes from entering
 void h1os_sync_notify_complete(void)
 ```
 
-Defined in h1os/h1os.h:313
+Defined in h1os/h1os.h:318
 
 Signal that Core 0 data synchronization is complete (`[BARRIER_SYNC_DONE](#barrier_sync_done)`).
 
@@ -3828,7 +3828,7 @@ Releases the pre-flush inbound sync gate (if `session.sync_wait_ms > 0`) so Core
 void h1os_display_notify_quiescent(void)
 ```
 
-Defined in h1os/h1os.h:318
+Defined in h1os/h1os.h:323
 
 Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`[BARRIER_DISPLAY_DONE](#barrier_display_done)`).
 
@@ -3842,7 +3842,7 @@ Signal that the Core 1 LVGL / SSD1681 display pipeline is quiescent (`[BARRIER_D
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os/h1os.h:332
+Defined in h1os/h1os.h:337
 
 Set audio subsystem output volume percentage.
 
@@ -3876,7 +3876,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os/h1os.h:346
+Defined in h1os/h1os.h:351
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -3906,7 +3906,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t * out_samples, size_t max_samples, size_t * out_count)
 ```
 
-Defined in h1os/h1os.h:362
+Defined in h1os/h1os.h:367
 
 Retrieve historical Tri-Node telemetry samples from the RTC Slow SRAM ring buffer in chronological order.
 
@@ -3935,7 +3935,7 @@ Designed for batch wireless telemetry publishing (Wi-Fi MQTT / BLE GATT) and loc
 esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct)
 ```
 
-Defined in h1os/h1os.h:377
+Defined in h1os/h1os.h:382
 
 Configure relative humidity target alert thresholds in centi-percent (1% = 100, e.g.
 
@@ -3967,7 +3967,7 @@ Persisted in RTC Slow SRAM so humidor out-of-bounds excursions are evaluated det
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os/h1os.h:391
+Defined in h1os/h1os.h:396
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -3997,7 +3997,7 @@ ESP_OK on success, or an error code.
 void h1os_reset_session_timer(void)
 ```
 
-Defined in h1os/h1os.h:399
+Defined in h1os/h1os.h:404
 
 Reset the interactive session inactivity timer.
 
@@ -4019,7 +4019,7 @@ Uses the hardware-backed one-shot esp_timer alarm (`esp_timer_restart` / `esp_ti
 bool h1os_is_session_active(void)
 ```
 
-Defined in h1os/h1os.h:406
+Defined in h1os/h1os.h:411
 
 Check whether an interactive inactivity countdown session is active.
 
@@ -4039,7 +4039,7 @@ true if running in an interactive user session, false during unattended wakes.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os/h1os.h:414
+Defined in h1os/h1os.h:419
 
 Orderly system shutdown and physical battery power cut.
 
@@ -4055,7 +4055,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os/h1os.h:422
+Defined in h1os/h1os.h:427
 
 Shutdown for long-term storage.
 
@@ -4077,7 +4077,7 @@ Protects e-Paper electrophoretic microcapsules against permanent dye migration a
 esp_err_t h1os_display_force_clear(void)
 ```
 
-Defined in h1os/h1os.h:434
+Defined in h1os/h1os.h:439
 
 Force a driver-level electrophoretic display clear and full waveform scrub.
 
@@ -4097,7 +4097,7 @@ ESP_OK on success, or an error code from the display driver.
 esp_err_t h1os_audio_play_raw(const int16_t * ptr, size_t len, size_t * bytes_written)
 ```
 
-Defined in h1os/h1os.h:444
+Defined in h1os/h1os.h:449
 
 Play raw 16-bit signed Mono PCM audio asynchronously from memory (C header arrays or RAM buffer).
 
@@ -4122,7 +4122,7 @@ ESP_OK on success, ESP_ERR_INVALID_ARG on NULL ptr, or I2S/DMA driver error code
 esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
 ```
 
-Defined in h1os/h1os.h:453
+Defined in h1os/h1os.h:458
 
 Synthesize and play a pure sine tone asynchronously at specified frequency and duration.
 
@@ -4146,7 +4146,7 @@ ESP_OK on success, or driver error code.
 esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
 ```
 
-Defined in h1os/h1os.h:461
+Defined in h1os/h1os.h:466
 
 Play a predefined acoustic presentation chime asynchronously.
 
@@ -4169,7 +4169,7 @@ ESP_OK on success, or driver error code.
 bool h1os_sdcard_is_mounted(void)
 ```
 
-Defined in h1os/h1os.h:468
+Defined in h1os/h1os.h:473
 
 Check if a MicroSD card is actively mounted in the FATFS filesystem.
 
@@ -4186,7 +4186,7 @@ true if mounted and ready for file I/O, false otherwise.
 esp_err_t h1os_sdcard_get_capacity_mb(uint32_t * out_capacity_mb)
 ```
 
-Defined in h1os/h1os.h:476
+Defined in h1os/h1os.h:481
 
 Retrieve total capacity of the mounted MicroSD card in megabytes.
 
@@ -4209,7 +4209,7 @@ ESP_OK on success, ESP_ERR_INVALID_STATE if card is not mounted, or ESP_ERR_INVA
 esp_err_t h1os_sdcard_mount_async(void)
 ```
 
-Defined in h1os/h1os.h:483
+Defined in h1os/h1os.h:488
 
 Asynchronously mount the MicroSD card in a background FreeRTOS task.
 
@@ -4226,7 +4226,7 @@ ESP_OK if already mounted or mount task dispatched successfully.
 esp_err_t h1os_sdcard_unmount(void)
 ```
 
-Defined in h1os/h1os.h:490
+Defined in h1os/h1os.h:495
 
 Unmount the MicroSD card and release SDMMC host peripheral resources.
 
@@ -4243,7 +4243,7 @@ ESP_OK on success.
 void h1os_led_start_breathing(uint32_t period_ms)
 ```
 
-Defined in h1os/h1os.h:497
+Defined in h1os/h1os.h:502
 
 Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3).
 
@@ -4263,7 +4263,7 @@ Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3
 void h1os_led_stop_breathing(void)
 ```
 
-Defined in h1os/h1os.h:502
+Defined in h1os/h1os.h:507
 
 Stop the status LED breathing effect and turn the LED off.
 
@@ -4277,7 +4277,7 @@ Stop the status LED breathing effect and turn the LED off.
 void h1os_led_set(bool on)
 ```
 
-Defined in h1os/h1os.h:509
+Defined in h1os/h1os.h:514
 
 Set the status LED static state (true = ON, false = OFF).
 
@@ -5476,7 +5476,7 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | `const uint8_t *` | Pointer to buffer containing payload. |
+| `data` | `const uint8_t *` | Pointer to buffer containing data buffer. |
 | `len` | `size_t` | Length of data in bytes. |
 
 ---
@@ -6319,7 +6319,7 @@ ESP_OK on success.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `data` | `const uint8_t *` | Pointer to buffer containing payload. Must not be NULL. |
+| `data` | `const uint8_t *` | Pointer to buffer containing data buffer. Must not be NULL. |
 | `len` | `size_t` | Length of data in bytes. |
 
 ---
@@ -6429,7 +6429,7 @@ ESP_OK on success.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `key` | `const char *` | Unique key identifier string. |
-| `value` | `const char *` | String payload to persist. |
+| `value` | `const char *` | String data buffer to persist. |
 
 ---
 
@@ -6957,7 +6957,7 @@ True if oscillator has run continuously, false if stopped/uncalibrated.
 esp_err_t h1os_lvgl_init(bool is_wake_cycle)
 ```
 
-Defined in h1os/h1os_lvgl.h:48
+Defined in h1os/h1os_lvgl.h:49
 
 Initialize LVGL v9 graphics subsystem, 1-bit display buffer, and keypad input driver.
 
@@ -6987,7 +6987,7 @@ ESP_OK on success, or an error code.
 void h1os_lvgl_set_first_flush_mode(bool full_refresh)
 ```
 
-Defined in h1os/h1os_lvgl.h:55
+Defined in h1os/h1os_lvgl.h:56
 
 Explicitly override whether the first flush executes a full or partial refresh.
 
@@ -6999,6 +6999,24 @@ Explicitly override whether the first flush executes a full or partial refresh.
 
 ---
 
+{#h1os_lvgl_request_full_refresh}
+
+### h1os_lvgl_request_full_refresh
+
+`static` `inline`
+
+```cpp
+static inline void h1os_lvgl_request_full_refresh(void)
+```
+
+Defined in h1os/h1os_lvgl.h:64
+
+Request a full OTP flashing waveform refresh on the next LVGL display flush.
+
+Convenience inline wrapper around h1os_lvgl_set_first_flush_mode(true) for Layer 4 theme polarity switches (Light/Dark) and manual anti-ghosting scrubs.
+
+---
+
 {#h1os_lvgl_start}
 
 ### h1os_lvgl_start
@@ -7007,7 +7025,7 @@ Explicitly override whether the first flush executes a full or partial refresh.
 esp_err_t h1os_lvgl_start(int32_t priority, int32_t core_id)
 ```
 
-Defined in h1os/h1os_lvgl.h:69
+Defined in h1os/h1os_lvgl.h:81
 
 Start the LVGL background FreeRTOS task.
 
@@ -7038,7 +7056,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_lvgl_stop(void)
 ```
 
-Defined in h1os/h1os_lvgl.h:79
+Defined in h1os/h1os_lvgl.h:91
 
 Stop the LVGL background task.
 
@@ -7067,7 +7085,7 @@ ESP_OK on success, or an error code.
 bool h1os_lvgl_lock(uint32_t timeout_ms)
 ```
 
-Defined in h1os/h1os_lvgl.h:91
+Defined in h1os/h1os_lvgl.h:103
 
 Acquire LVGL reentrant mutex lock.
 
@@ -7092,7 +7110,7 @@ True if mutex was successfully acquired within timeout, false otherwise.
 void h1os_lvgl_unlock(void)
 ```
 
-Defined in h1os/h1os_lvgl.h:98
+Defined in h1os/h1os_lvgl.h:110
 
 Release LVGL reentrant mutex lock.
 
@@ -7108,7 +7126,7 @@ Releases the mutex acquired via [h1os_lvgl_lock()](#h1os_lvgl_lock).
 esp_err_t h1os_ui_post(h1os_ui_fn_t fn, void * arg, uint32_t timeout_ms)
 ```
 
-Defined in h1os/h1os_lvgl.h:117
+Defined in h1os/h1os_lvgl.h:129
 
 Enqueue an asynchronous UI mutation callback to execute on Core 1 (`h1os_lvgl_port_task`).
 
@@ -7139,7 +7157,7 @@ Thread-safe, lock-free producer API backed by a 16-slot static FreeRTOS queue. I
 void h1os_lvgl_set_sync_gate(uint32_t wait_ms)
 ```
 
-Defined in h1os/h1os_lvgl.h:129
+Defined in h1os/h1os_lvgl.h:141
 
 Arm a pre-flush inbound synchronization gate on Core 1 for single-refresh coalescing.
 
@@ -7161,7 +7179,7 @@ When `wait_ms > 0`, the Core 1 LVGL task defers `lv_timer_handler()` (and thus p
 void h1os_lvgl_release_sync_gate(void)
 ```
 
-Defined in h1os/h1os_lvgl.h:134
+Defined in h1os/h1os_lvgl.h:146
 
 Release the pre-flush inbound synchronization gate and wake Core 1 immediately.
 
@@ -7175,7 +7193,7 @@ Release the pre-flush inbound synchronization gate and wake Core 1 immediately.
 bool h1os_lvgl_has_pending_tasks(void)
 ```
 
-Defined in h1os/h1os_lvgl.h:141
+Defined in h1os/h1os_lvgl.h:153
 
 Check if the LVGL display pipeline has pending render/flush tasks.
 
@@ -7195,7 +7213,7 @@ True on success, false otherwise.
 esp_err_t h1os_lvgl_wait_idle(uint32_t timeout_ms)
 ```
 
-Defined in h1os/h1os_lvgl.h:153
+Defined in h1os/h1os_lvgl.h:165
 
 Event-driven wait until the LVGL display pipeline completes all pending renders and flushes.
 
@@ -7220,7 +7238,7 @@ ESP_OK when pipeline is idle, ESP_ERR_TIMEOUT on expiration.
 lv_indev_t * h1os_lvgl_get_indev(void)
 ```
 
-Defined in h1os/h1os_lvgl.h:160
+Defined in h1os/h1os_lvgl.h:172
 
 Retrieve the LVGL keypad input device handle.
 
@@ -8061,8 +8079,8 @@ ESP_OK on success, ESP_ERR_TIMEOUT if queue is full, or ESP_ERR_INVALID_ARG.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Type of playback: SUB_AUDIO_TONE, SUB_AUDIO_CHIME, or SUB_AUDIO_PCM. |
-| `data` | `const void *` | Pointer to payload parameters or PCM buffer. |
-| `len` | `size_t` | Length of data payload in bytes. |
+| `data` | `const void *` | Pointer to data buffer parameters or PCM buffer. |
+| `len` | `size_t` | Length of data data buffer in bytes. |
 
 ---
 
@@ -9951,9 +9969,9 @@ ESP_OK if command was queued to worker, or error code.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Acoustic payload type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM). |
-| `data` | `const void *` | Pointer to payload data buffer or parameters struct. |
-| `len` | `size_t` | Length of data payload in bytes. |
+| `type` | [`sub_audio_type_t`](#sub_audio_type_t) | Acoustic data buffer type (SUB_AUDIO_TONE, SUB_AUDIO_CHIME, SUB_AUDIO_PCM). |
+| `data` | `const void *` | Pointer to data buffer data buffer or parameters struct. |
+| `len` | `size_t` | Length of data data buffer in bytes. |
 
 ---
 
@@ -10411,7 +10429,7 @@ ESP_OK on success.
 void sub_power_set_sleep_slices(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t overflow, uint32_t remainder_sec)
 ```
 
-Defined in sub_power.c:385
+Defined in sub_power.c:388
 
 Configure ULP slice parameters prior to entering deep sleep.
 
@@ -10434,7 +10452,7 @@ Configure ULP slice parameters prior to entering deep sleep.
 esp_err_t sub_power_enter_deep_sleep_mode(uint32_t sleep_seconds, uint64_t ext1_pins_mask, sub_power_sleep_mode_t mode)
 ```
 
-Defined in sub_power.c:402
+Defined in sub_power.c:405
 
 Configure EXT1 wake sources and enter deep sleep with operational mode arbitration.
 
@@ -10466,7 +10484,7 @@ ESP_OK on success.
 esp_err_t sub_power_enter_deep_sleep(uint32_t sleep_seconds, uint64_t ext1_pins_mask)
 ```
 
-Defined in sub_power.c:526
+Defined in sub_power.c:529
 
 Enter full cycle deep sleep with wake pin configuration.
 
@@ -10490,7 +10508,7 @@ ESP_OK on success.
 void sub_power_cut_power_latch(void)
 ```
 
-Defined in sub_power.c:531
+Defined in sub_power.c:534
 
 Cut master power latch (releases GPIO 17 BAT_CTRL).
 
@@ -10504,7 +10522,7 @@ Cut master power latch (releases GPIO 17 BAT_CTRL).
 bool sub_power_connected_usb(void)
 ```
 
-Defined in sub_power.c:537
+Defined in sub_power.c:540
 
 Check if USB VBUS connection is actively present.
 
@@ -10521,7 +10539,7 @@ True if connected to USB power.
 esp_err_t sub_power_init_dfs(sys_clk_mode_t mode)
 ```
 
-Defined in sub_power.c:548
+Defined in sub_power.c:551
 
 Initialize Dynamic Frequency Scaling (DFS) power management.
 
@@ -10544,7 +10562,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_acquire(void)
 ```
 
-Defined in sub_power.c:589
+Defined in sub_power.c:592
 
 Acquire CPU frequency lock at 240 MHz for compute/display intensive operations.
 
@@ -10561,7 +10579,7 @@ ESP_OK on success.
 esp_err_t sub_power_cpu_max_release(void)
 ```
 
-Defined in sub_power.c:599
+Defined in sub_power.c:602
 
 Release CPU frequency lock, allowing DFS to downclock to 80 MHz.
 
@@ -12104,7 +12122,7 @@ Defined in h1os/h1os_version.h:85
 Get complete version string.
 
 #### Returns
-Full version string (e.g. "2.4.8-dev").
+Full version string (e.g. "2.4.10-dev").
 
 ---
 
@@ -12611,7 +12629,7 @@ ESP_OK on success.
 static esp_err_t h1os_validate_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec, uint32_t * out_overflow, uint32_t * out_remainder)
 ```
 
-Defined in h1os_lifecycle.c:705
+Defined in h1os_lifecycle.c:706
 
 Validate Flow A and Flow B periods against all 6 MANDATE-02 silicon and slicing invariants.
 
@@ -12627,7 +12645,7 @@ Validate Flow A and Flow B periods against all 6 MANDATE-02 silicon and slicing 
 static esp_err_t h1os_apply_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec, bool reset_slice_counter)
 ```
 
-Defined in h1os_lifecycle.c:774
+Defined in h1os_lifecycle.c:775
 
 Atomically commit validated Flow A and Flow B periods to RTC Slow SRAM and ULP slice registers.
 
@@ -12967,7 +12985,7 @@ ESP_OK on success, or an error code.
 esp_err_t h1os_set_flow_periods(uint32_t flow_a_sec, uint32_t flow_b_sec)
 ```
 
-Defined in h1os_lifecycle.c:809
+Defined in h1os_lifecycle.c:810
 
 Dynamically configure Flow A and Flow B sleep intervals at runtime.
 
@@ -12995,7 +13013,7 @@ Enforces all silicon constraints, ordering invariants, and remainder slice floor
 esp_err_t h1os_start(const h1os_lifecycle_t * config)
 ```
 
-Defined in h1os_lifecycle.c:820
+Defined in h1os_lifecycle.c:821
 
 Initialize H1OS and dispatch application lifecycle.
 
@@ -13023,7 +13041,7 @@ Configures hardware subsystems, determines boot/wake flow, initializes FreeRTOS 
 esp_err_t h1os_get_telemetry(h1os_telemetry_t * out_telemetry)
 ```
 
-Defined in h1os_lifecycle.c:867
+Defined in h1os_lifecycle.c:868
 
 Retrieve current Tri-Node environmental telemetry.
 
@@ -13053,7 +13071,7 @@ Copies the latest validated psychrometric invariants, sensor readings, and batte
 esp_err_t h1os_sleep(uint32_t sleep_sec)
 ```
 
-Defined in h1os_lifecycle.c:967
+Defined in h1os_lifecycle.c:969
 
 Put the platform into ultra-low-power deep sleep.
 
@@ -13085,7 +13103,7 @@ Arms the PCF85063A countdown timer, isolates GPIO sleep pads, holds power latch,
 static void execute_system_shutdown(bool force_clean_white)
 ```
 
-Defined in h1os_lifecycle.c:1006
+Defined in h1os_lifecycle.c:1029
 
 Execute system shutdown.
 
@@ -13108,7 +13126,7 @@ Return value of type static void.
 void h1os_shutdown(void)
 ```
 
-Defined in h1os_lifecycle.c:1066
+Defined in h1os_lifecycle.c:1089
 
 Orderly system shutdown and physical battery power cut.
 
@@ -13124,7 +13142,7 @@ Invokes lifecycle on_shutdown hook, safely isolates peripherals, deactivates dis
 void h1os_shutdown_for_storage(void)
 ```
 
-Defined in h1os_lifecycle.c:1080
+Defined in h1os_lifecycle.c:1103
 
 Shutdown for long-term storage: clears display to pure white before cutting power.
 
@@ -13146,7 +13164,7 @@ Performs pure white full OTP refresh on electrophoretic display before cutting p
 esp_err_t h1os_set_volume(uint8_t volume_pct)
 ```
 
-Defined in h1os_lifecycle.c:1092
+Defined in h1os_lifecycle.c:1115
 
 Set audio subsystem output volume percentage (0% = Mute, 100% = 0 dB Max).
 
@@ -13180,7 +13198,7 @@ Controls ES8311 DAC gain and NS4168 power state. 0% volume automatically mutes t
 esp_err_t h1os_get_telemetry_history(orch_tri_node_sample_t * out_samples, size_t max_samples, size_t * out_count)
 ```
 
-Defined in h1os_lifecycle.c:1100
+Defined in h1os_lifecycle.c:1123
 
 Retrieve historical Tri-Node telemetry samples from the RTC Slow SRAM ring buffer in chronological order.
 
@@ -13209,7 +13227,7 @@ Designed for batch wireless telemetry publishing (Wi-Fi MQTT / BLE GATT) and loc
 esp_err_t h1os_set_rh_alert_bounds(uint16_t rh_low_centi_pct, uint16_t rh_high_centi_pct)
 ```
 
-Defined in h1os_lifecycle.c:1111
+Defined in h1os_lifecycle.c:1134
 
 Configure relative humidity target alert thresholds in centi-percent (1% = 100, e.g.
 
@@ -13241,7 +13259,7 @@ Persisted in RTC Slow SRAM so humidor out-of-bounds excursions are evaluated det
 esp_err_t h1os_display_force_clear(void)
 ```
 
-Defined in h1os_lifecycle.c:1128
+Defined in h1os_lifecycle.c:1151
 
 Force a driver-level electrophoretic display clear and full waveform scrub.
 
@@ -13261,7 +13279,7 @@ ESP_OK on success, or an error code from the display driver.
 esp_err_t h1os_audio_play_raw(const int16_t * ptr, size_t len, size_t * bytes_written)
 ```
 
-Defined in h1os_lifecycle.c:1142
+Defined in h1os_lifecycle.c:1165
 
 Play raw 16-bit signed Mono PCM audio asynchronously from memory (C header arrays or RAM buffer).
 
@@ -13286,7 +13304,7 @@ ESP_OK on success, ESP_ERR_INVALID_ARG on NULL ptr, or I2S/DMA driver error code
 esp_err_t h1os_audio_play_tone(uint32_t freq_hz, uint32_t duration_ms)
 ```
 
-Defined in h1os_lifecycle.c:1154
+Defined in h1os_lifecycle.c:1177
 
 Synthesize and play a pure sine tone asynchronously at specified frequency and duration.
 
@@ -13310,7 +13328,7 @@ ESP_OK on success, or driver error code.
 esp_err_t h1os_audio_play_chime(h1os_chime_type_t chime_type)
 ```
 
-Defined in h1os_lifecycle.c:1163
+Defined in h1os_lifecycle.c:1186
 
 Play a predefined acoustic presentation chime asynchronously.
 
@@ -13333,7 +13351,7 @@ ESP_OK on success, or driver error code.
 bool h1os_sdcard_is_mounted(void)
 ```
 
-Defined in h1os_lifecycle.c:1169
+Defined in h1os_lifecycle.c:1192
 
 Check if a MicroSD card is actively mounted in the FATFS filesystem.
 
@@ -13350,7 +13368,7 @@ true if mounted and ready for file I/O, false otherwise.
 esp_err_t h1os_sdcard_get_capacity_mb(uint32_t * out_capacity_mb)
 ```
 
-Defined in h1os_lifecycle.c:1174
+Defined in h1os_lifecycle.c:1197
 
 Retrieve total capacity of the mounted MicroSD card in megabytes.
 
@@ -13373,7 +13391,7 @@ ESP_OK on success, ESP_ERR_INVALID_STATE if card is not mounted, or ESP_ERR_INVA
 esp_err_t h1os_sdcard_mount_async(void)
 ```
 
-Defined in h1os_lifecycle.c:1179
+Defined in h1os_lifecycle.c:1202
 
 Asynchronously mount the MicroSD card in a background FreeRTOS task.
 
@@ -13390,7 +13408,7 @@ ESP_OK if already mounted or mount task dispatched successfully.
 esp_err_t h1os_sdcard_unmount(void)
 ```
 
-Defined in h1os_lifecycle.c:1184
+Defined in h1os_lifecycle.c:1207
 
 Unmount the MicroSD card and release SDMMC host peripheral resources.
 
@@ -13407,7 +13425,7 @@ ESP_OK on success.
 void h1os_led_start_breathing(uint32_t period_ms)
 ```
 
-Defined in h1os_lifecycle.c:1189
+Defined in h1os_lifecycle.c:1212
 
 Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3).
 
@@ -13427,7 +13445,7 @@ Start non-blocking hardware LEDC fade breathing effect on the status LED (GPIO 3
 void h1os_led_stop_breathing(void)
 ```
 
-Defined in h1os_lifecycle.c:1194
+Defined in h1os_lifecycle.c:1217
 
 Stop the status LED breathing effect and turn the LED off.
 
@@ -13441,7 +13459,7 @@ Stop the status LED breathing effect and turn the LED off.
 void h1os_led_set(bool on)
 ```
 
-Defined in h1os_lifecycle.c:1199
+Defined in h1os_lifecycle.c:1222
 
 Set the status LED static state (true = ON, false = OFF).
 
@@ -15291,7 +15309,7 @@ Defined in sub_power.c:69
 RTC_DATA_ATTR uint32_t s_cached_flow_a_sec = 0
 ```
 
-Defined in sub_power.c:374
+Defined in sub_power.c:377
 
 ---
 
@@ -15305,7 +15323,7 @@ Defined in sub_power.c:374
 RTC_DATA_ATTR uint32_t s_cached_flow_b_sec = 0
 ```
 
-Defined in sub_power.c:375
+Defined in sub_power.c:378
 
 ---
 
@@ -15835,7 +15853,7 @@ References:
   * Section 6.7: Waveform Setting & Figure 6-6: Waveform Setting Mapping (pp. 14-16)
   * Section 7: Command Table (pp. 20-33)
 
-Multi-Register Dispatch Architecture: The 159-byte payload is partitioned across five distinct SSD1681 hardware registers: +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | Register Command | Offset | Length | Hardware Subsystem / Purpose | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | 0x32 (WRITE_LUT) | 0..152 | 153 Bytes | Core Voltage LUTs (0-4), Timing (0-11), FR, XON| | 0x3F (EOPT) | 153 | 1 Byte | End of Frame Option (LUT termination behavior) | | 0x03 (GATE_VOLT) | 154 | 1 Byte | Gate Driving Voltages (VGH / VGL) | | 0x04 (SRCE_VOLT) | 155..157| 3 Bytes | Source Driving Voltages (VSH1, VSH2, VSL) | | 0x2C (WRITE_VCOM) | 158 | 1 Byte | VCOM Modulation Voltage (DCVCOM) | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+
+Multi-Register Dispatch Architecture: The 159-byte data buffer is partitioned across five distinct SSD1681 hardware registers: +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | Register Command | Offset | Length | Hardware Subsystem / Purpose | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+ | 0x32 (WRITE_LUT) | 0..152 | 153 Bytes | Core Voltage LUTs (0-4), Timing (0-11), FR, XON| | 0x3F (EOPT) | 153 | 1 Byte | End of Frame Option (LUT termination behavior) | | 0x03 (GATE_VOLT) | 154 | 1 Byte | Gate Driving Voltages (VGH / VGL) | | 0x04 (SRCE_VOLT) | 155..157| 3 Bytes | Source Driving Voltages (VSH1, VSH2, VSL) | | 0x2C (WRITE_VCOM) | 158 | 1 Byte | VCOM Modulation Voltage (DCVCOM) | +----------------&mdash;+------&mdash;+--------&mdash;+---------------------------------------------&mdash;+
 
 Phase Voltage Bitfield Encoding (Table 6-6): Each LUT byte controls 4 phases (A, B, C, D) for that group:
 
@@ -16310,7 +16328,7 @@ Defined in sub_audio.c:103
 struct h1os_ui_msg_t
 ```
 
-Defined in h1os/h1os_lvgl.h:31
+Defined in h1os/h1os_lvgl.h:32
 
 Message envelope for the Core 0 -> Core 1 asynchronous UI mutation queue.
 
@@ -16319,7 +16337,7 @@ Message envelope for the Core 0 -> Core 1 asynchronous UI mutation queue.
 | Return | Name | Description |
 |--------|------|-------------|
 | [`h1os_ui_fn_t`](#h1os_ui_fn_t) | [`fn`](#fn)  | Callback function to execute on Core 1 under LVGL lock. |
-| `void *` | [`arg`](#arg)  | Opaque payload pointer passed to fn. |
+| `void *` | [`arg`](#arg)  | Opaque data buffer pointer passed to fn. |
 
 ---
 
@@ -16333,7 +16351,7 @@ h1os_ui_fn_t fn
 
 Type: [`h1os_ui_fn_t`](#h1os_ui_fn_t)
 
-Defined in h1os/h1os_lvgl.h:32
+Defined in h1os/h1os_lvgl.h:33
 
 Callback function to execute on Core 1 under LVGL lock.
 
@@ -16347,9 +16365,9 @@ Callback function to execute on Core 1 under LVGL lock.
 void * arg
 ```
 
-Defined in h1os/h1os_lvgl.h:33
+Defined in h1os/h1os_lvgl.h:34
 
-Opaque payload pointer passed to fn.
+Opaque data buffer pointer passed to fn.
 
 {#h1os_lifecycle_t}
 
@@ -16363,7 +16381,7 @@ Opaque payload pointer passed to fn.
 struct h1os_lifecycle_t
 ```
 
-Defined in h1os/h1os.h:177
+Defined in h1os/h1os.h:181
 
 Declarative application lifecycle configuration structure.
 
@@ -16377,8 +16395,8 @@ Declarative application lifecycle configuration structure.
 | [`h1os_pre_sleep_cb_t`](#h1os_pre_sleep_cb_t) | [`on_pre_sleep`](#on_pre_sleep)  | Hook executed immediately prior to entering deep sleep. |
 | [`h1os_shutdown_cb_t`](#h1os_shutdown_cb_t) | [`on_shutdown`](#on_shutdown)  | Hook executed immediately prior to battery power cut. |
 | [`h1os_error_cb_t`](#h1os_error_cb_t) | [`on_error`](#on_error)  | Optional fatal startup/lifecycle error hook. |
-| `struct h1os_lifecycle_t::@325134365353002276205315372127306003103261015120` | [`presentation`](#presentation)  |  |
-| `struct h1os_lifecycle_t::@146034141124024227100041106135372254367321170003` | [`session`](#session)  |  |
+| `struct h1os_lifecycle_t::@143322066320147060174023334111052076305103046024` | [`presentation`](#presentation)  |  |
+| `struct h1os_lifecycle_t::@357136215355204030242306075256245044374136153046` | [`session`](#session)  |  |
 | `void *` | [`user_data`](#user_data)  | Arbitrary user context pointer passed to lifecycle hooks. |
 
 ---
@@ -16393,7 +16411,7 @@ h1os_boot_cb_t on_boot
 
 Type: [`h1os_boot_cb_t`](#h1os_boot_cb_t)
 
-Defined in h1os/h1os.h:178
+Defined in h1os/h1os.h:182
 
 System boot / power-on reset hook.
 
@@ -16409,7 +16427,7 @@ h1os_wake_cb_t on_wake
 
 Type: [`h1os_wake_cb_t`](#h1os_wake_cb_t)
 
-Defined in h1os/h1os.h:179
+Defined in h1os/h1os.h:183
 
 Interactive wake hook (Timer / RTC Alarm / Button Tap).
 
@@ -16425,7 +16443,7 @@ h1os_sync_cb_t on_sync
 
 Type: [`h1os_sync_cb_t`](#h1os_sync_cb_t)
 
-Defined in h1os/h1os.h:180
+Defined in h1os/h1os.h:184
 
 Optional parallel network/storage sync hook on Core 0.
 
@@ -16441,7 +16459,7 @@ h1os_pre_sleep_cb_t on_pre_sleep
 
 Type: [`h1os_pre_sleep_cb_t`](#h1os_pre_sleep_cb_t)
 
-Defined in h1os/h1os.h:181
+Defined in h1os/h1os.h:185
 
 Hook executed immediately prior to entering deep sleep.
 
@@ -16457,7 +16475,7 @@ h1os_shutdown_cb_t on_shutdown
 
 Type: [`h1os_shutdown_cb_t`](#h1os_shutdown_cb_t)
 
-Defined in h1os/h1os.h:182
+Defined in h1os/h1os.h:186
 
 Hook executed immediately prior to battery power cut.
 
@@ -16473,7 +16491,7 @@ h1os_error_cb_t on_error
 
 Type: [`h1os_error_cb_t`](#h1os_error_cb_t)
 
-Defined in h1os/h1os.h:183
+Defined in h1os/h1os.h:187
 
 Optional fatal startup/lifecycle error hook.
 
@@ -16484,10 +16502,10 @@ Optional fatal startup/lifecycle error hook.
 #### presentation
 
 ```cpp
-struct h1os_lifecycle_t::@325134365353002276205315372127306003103261015120 presentation
+struct h1os_lifecycle_t::@143322066320147060174023334111052076305103046024 presentation
 ```
 
-Defined in h1os/h1os.h:190
+Defined in h1os/h1os.h:194
 
 ---
 
@@ -16496,10 +16514,10 @@ Defined in h1os/h1os.h:190
 #### session
 
 ```cpp
-struct h1os_lifecycle_t::@146034141124024227100041106135372254367321170003 session
+struct h1os_lifecycle_t::@357136215355204030242306075256245044374136153046 session
 ```
 
-Defined in h1os/h1os.h:199
+Defined in h1os/h1os.h:203
 
 ---
 
@@ -16511,7 +16529,7 @@ Defined in h1os/h1os.h:199
 void * user_data
 ```
 
-Defined in h1os/h1os.h:201
+Defined in h1os/h1os.h:205
 
 Arbitrary user context pointer passed to lifecycle hooks.
 
@@ -16523,7 +16541,7 @@ Arbitrary user context pointer passed to lifecycle hooks.
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:185
+Defined in h1os/h1os.h:189
 
 ### Public Attributes
 
@@ -16546,7 +16564,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:186
+Defined in h1os/h1os.h:190
 
 Presentation splash screen rendering hook.
 
@@ -16562,7 +16580,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:187
+Defined in h1os/h1os.h:191
 
 Presentation chime playback hook.
 
@@ -16576,7 +16594,7 @@ Presentation chime playback hook.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:188
+Defined in h1os/h1os.h:192
 
 Bitmask of enabled audio chime types.
 
@@ -16590,7 +16608,7 @@ Bitmask of enabled audio chime types.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:189
+Defined in h1os/h1os.h:193
 
 Acoustic presentation master volume (0..100%).
 
@@ -16602,7 +16620,7 @@ Acoustic presentation master volume (0..100%).
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:192
+Defined in h1os/h1os.h:196
 
 ### Public Attributes
 
@@ -16625,7 +16643,7 @@ Defined in h1os/h1os.h:192
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:193
+Defined in h1os/h1os.h:197
 
 Interactive session idle sleep timeout in seconds.
 
@@ -16641,7 +16659,7 @@ sys_clk_mode_t clk_mode
 
 Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
-Defined in h1os/h1os.h:194
+Defined in h1os/h1os.h:198
 
 CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
@@ -16655,7 +16673,7 @@ CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:195
+Defined in h1os/h1os.h:199
 
 Period between headless sensor sample bursts in seconds.
 
@@ -16669,7 +16687,7 @@ Period between headless sensor sample bursts in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:196
+Defined in h1os/h1os.h:200
 
 Period between unattended display flushes in seconds.
 
@@ -16683,7 +16701,7 @@ Period between unattended display flushes in seconds.
 uint32_t sync_wait_ms
 ```
 
-Defined in h1os/h1os.h:197
+Defined in h1os/h1os.h:201
 
 Inbound sync pre-flush gate window in ms (0 = immediate flush).
 
@@ -16697,7 +16715,7 @@ Inbound sync pre-flush gate window in ms (0 = immediate flush).
 uint32_t sync_timeout_ms
 ```
 
-Defined in h1os/h1os.h:198
+Defined in h1os/h1os.h:202
 
 Max barrier wait for async on_sync completion before sleep.
 
@@ -16713,7 +16731,7 @@ Max barrier wait for async on_sync completion before sleep.
 struct h1os_telemetry_t
 ```
 
-Defined in h1os/h1os.h:207
+Defined in h1os/h1os.h:211
 
 Comprehensive environmental telemetry and system metrics snapshot.
 
@@ -16729,6 +16747,7 @@ Comprehensive environmental telemetry and system metrics snapshot.
 | `float` | [`dew_point_f`](#dew_point_f)  | Psychrometrically calculated dew point in degrees Fahrenheit. |
 | `float` | [`dew_point_k`](#dew_point_k)  | Psychrometrically calculated dew point in Kelvin (derived). |
 | `float` | [`vapor_pressure_hpa`](#vapor_pressure_hpa)  | Calculated water vapor partial pressure in hectopascals (hPa). |
+| `float` | [`sat_vapor_pressure_hpa`](#sat_vapor_pressure_hpa)  | Calculated saturation vapor pressure in hectopascals (hPa). |
 | `float` | [`absolute_humidity_g`](#absolute_humidity_g)  | Calculated absolute humidity in grams per cubic meter (g/m³). |
 | `float` | [`window_low_c`](#window_low_c)  | Valid Window Floor (minimum over valid 32-sample window). |
 | `float` | [`window_high_c`](#window_high_c)  | Valid Window Ceiling (maximum over valid 32-sample window). |
@@ -16772,7 +16791,7 @@ Comprehensive environmental telemetry and system metrics snapshot.
 float ambient_temp_c
 ```
 
-Defined in h1os/h1os.h:208
+Defined in h1os/h1os.h:212
 
 Trusted steady-state SHTC3 ambient temperature in degrees Celsius.
 
@@ -16786,7 +16805,7 @@ Trusted steady-state SHTC3 ambient temperature in degrees Celsius.
 float ambient_temp_f
 ```
 
-Defined in h1os/h1os.h:209
+Defined in h1os/h1os.h:213
 
 Trusted steady-state SHTC3 ambient temperature in degrees Fahr.
 
@@ -16800,7 +16819,7 @@ Trusted steady-state SHTC3 ambient temperature in degrees Fahr.
 float ambient_temp_k
 ```
 
-Defined in h1os/h1os.h:210
+Defined in h1os/h1os.h:214
 
 Trusted steady-state SHTC3 ambient temperature in Kelvin (derived).
 
@@ -16814,7 +16833,7 @@ Trusted steady-state SHTC3 ambient temperature in Kelvin (derived).
 float ambient_rh_pct
 ```
 
-Defined in h1os/h1os.h:211
+Defined in h1os/h1os.h:215
 
 Trusted steady-state SHTC3 relative humidity percentage (0..100%).
 
@@ -16828,7 +16847,7 @@ Trusted steady-state SHTC3 relative humidity percentage (0..100%).
 float dew_point_c
 ```
 
-Defined in h1os/h1os.h:212
+Defined in h1os/h1os.h:216
 
 Psychrometrically calculated dew point in degrees Celsius.
 
@@ -16842,7 +16861,7 @@ Psychrometrically calculated dew point in degrees Celsius.
 float dew_point_f
 ```
 
-Defined in h1os/h1os.h:213
+Defined in h1os/h1os.h:217
 
 Psychrometrically calculated dew point in degrees Fahrenheit.
 
@@ -16856,7 +16875,7 @@ Psychrometrically calculated dew point in degrees Fahrenheit.
 float dew_point_k
 ```
 
-Defined in h1os/h1os.h:214
+Defined in h1os/h1os.h:218
 
 Psychrometrically calculated dew point in Kelvin (derived).
 
@@ -16870,9 +16889,23 @@ Psychrometrically calculated dew point in Kelvin (derived).
 float vapor_pressure_hpa
 ```
 
-Defined in h1os/h1os.h:215
+Defined in h1os/h1os.h:219
 
 Calculated water vapor partial pressure in hectopascals (hPa).
+
+---
+
+{#sat_vapor_pressure_hpa}
+
+#### sat_vapor_pressure_hpa
+
+```cpp
+float sat_vapor_pressure_hpa
+```
+
+Defined in h1os/h1os.h:220
+
+Calculated saturation vapor pressure in hectopascals (hPa).
 
 ---
 
@@ -16884,7 +16917,7 @@ Calculated water vapor partial pressure in hectopascals (hPa).
 float absolute_humidity_g
 ```
 
-Defined in h1os/h1os.h:216
+Defined in h1os/h1os.h:221
 
 Calculated absolute humidity in grams per cubic meter (g/m³).
 
@@ -16898,7 +16931,7 @@ Calculated absolute humidity in grams per cubic meter (g/m³).
 float window_low_c
 ```
 
-Defined in h1os/h1os.h:218
+Defined in h1os/h1os.h:223
 
 Valid Window Floor (minimum over valid 32-sample window).
 
@@ -16912,7 +16945,7 @@ Valid Window Floor (minimum over valid 32-sample window).
 float window_high_c
 ```
 
-Defined in h1os/h1os.h:219
+Defined in h1os/h1os.h:224
 
 Valid Window Ceiling (maximum over valid 32-sample window).
 
@@ -16926,7 +16959,7 @@ Valid Window Ceiling (maximum over valid 32-sample window).
 float window_avg_shtc3_c
 ```
 
-Defined in h1os/h1os.h:220
+Defined in h1os/h1os.h:225
 
 Short-term valid SHTC3 sensor window average in degrees Celsius.
 
@@ -16940,7 +16973,7 @@ Short-term valid SHTC3 sensor window average in degrees Celsius.
 float window_avg_die_c
 ```
 
-Defined in h1os/h1os.h:221
+Defined in h1os/h1os.h:226
 
 Short-term valid MCU Die internal sensor window average.
 
@@ -16954,7 +16987,7 @@ Short-term valid MCU Die internal sensor window average.
 float temp_historical_c
 ```
 
-Defined in h1os/h1os.h:222
+Defined in h1os/h1os.h:227
 
 Long-term light EWMA historical baseline temperature.
 
@@ -16968,7 +17001,7 @@ Long-term light EWMA historical baseline temperature.
 float rh_historical_pct
 ```
 
-Defined in h1os/h1os.h:223
+Defined in h1os/h1os.h:228
 
 Long-term light EWMA historical baseline relative humidity.
 
@@ -16982,7 +17015,7 @@ Long-term light EWMA historical baseline relative humidity.
 float raw_shtc3_temp_c
 ```
 
-Defined in h1os/h1os.h:225
+Defined in h1os/h1os.h:230
 
 Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 
@@ -16996,7 +17029,7 @@ Instantaneous raw Sensirion SHTC3 temperature in degrees Celsius.
 float mcu_die_temp_c
 ```
 
-Defined in h1os/h1os.h:226
+Defined in h1os/h1os.h:231
 
 Instantaneous ESP32-S3 internal TSENS die temperature.
 
@@ -17010,7 +17043,7 @@ Instantaneous ESP32-S3 internal TSENS die temperature.
 float epd_glass_temp_c
 ```
 
-Defined in h1os/h1os.h:227
+Defined in h1os/h1os.h:232
 
 Instantaneous SSD1681 display on-glass temperature sensor reading.
 
@@ -17024,7 +17057,7 @@ Instantaneous SSD1681 display on-glass temperature sensor reading.
 float trinode_temp_c
 ```
 
-Defined in h1os/h1os.h:228
+Defined in h1os/h1os.h:233
 
 Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.
 
@@ -17038,7 +17071,7 @@ Tri-Node verification consensus: (T_valid + T_die + T_glass) / 3.0.
 float trinode_delta_c
 ```
 
-Defined in h1os/h1os.h:229
+Defined in h1os/h1os.h:234
 
 Cross-node verification delta: T_valid - T_trinode.
 
@@ -17052,7 +17085,7 @@ Cross-node verification delta: T_valid - T_trinode.
 uint8_t trinode_confidence_pct
 ```
 
-Defined in h1os/h1os.h:230
+Defined in h1os/h1os.h:235
 
 0-100% cross-node range verification confidence score.
 
@@ -17066,7 +17099,7 @@ Defined in h1os/h1os.h:230
 bool is_thermally_settled
 ```
 
-Defined in h1os/h1os.h:232
+Defined in h1os/h1os.h:237
 
 True if steady-state thermal criteria (|T2-T1| <= gate) are met.
 
@@ -17080,7 +17113,7 @@ True if steady-state thermal criteria (|T2-T1| <= gate) are met.
 uint16_t valid_trend
 ```
 
-Defined in h1os/h1os.h:233
+Defined in h1os/h1os.h:238
 
 Monotonic count of consecutive thermally settled Flow A samples.
 
@@ -17094,7 +17127,7 @@ Monotonic count of consecutive thermally settled Flow A samples.
 uint32_t sample_count
 ```
 
-Defined in h1os/h1os.h:234
+Defined in h1os/h1os.h:239
 
 Total monotonic environmental telemetry sample count.
 
@@ -17108,7 +17141,7 @@ Total monotonic environmental telemetry sample count.
 uint32_t boot_count
 ```
 
-Defined in h1os/h1os.h:235
+Defined in h1os/h1os.h:240
 
 Total monotonic system boot cycles.
 
@@ -17122,7 +17155,7 @@ Total monotonic system boot cycles.
 uint32_t wake_count
 ```
 
-Defined in h1os/h1os.h:236
+Defined in h1os/h1os.h:241
 
 Total monotonic deep sleep wake cycles (Flow A + Flow B + Button).
 
@@ -17136,7 +17169,7 @@ Total monotonic deep sleep wake cycles (Flow A + Flow B + Button).
 uint32_t flow_b_count
 ```
 
-Defined in h1os/h1os.h:237
+Defined in h1os/h1os.h:242
 
 Monotonic unattended RTC Flow B presentation wake cycles.
 
@@ -17150,7 +17183,7 @@ Monotonic unattended RTC Flow B presentation wake cycles.
 uint32_t button_wake_count
 ```
 
-Defined in h1os/h1os.h:238
+Defined in h1os/h1os.h:243
 
 Monotonic interactive tactile button wake cycles.
 
@@ -17164,7 +17197,7 @@ Monotonic interactive tactile button wake cycles.
 uint8_t ulp_dispatch_reason
 ```
 
-Defined in h1os/h1os.h:239
+Defined in h1os/h1os.h:244
 
 Reason code from last ULP coprocessor dispatch.
 
@@ -17178,7 +17211,7 @@ Reason code from last ULP coprocessor dispatch.
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:240
+Defined in h1os/h1os.h:245
 
 Active Flow A sensor sample interval in seconds.
 
@@ -17192,7 +17225,7 @@ Active Flow A sensor sample interval in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:241
+Defined in h1os/h1os.h:246
 
 Active Flow B display refresh interval in seconds.
 
@@ -17206,7 +17239,7 @@ Active Flow B display refresh interval in seconds.
 uint16_t battery_mv
 ```
 
-Defined in h1os/h1os.h:242
+Defined in h1os/h1os.h:247
 
 Sampled battery terminal voltage in millivolts.
 
@@ -17220,7 +17253,7 @@ Sampled battery terminal voltage in millivolts.
 uint16_t boot_vbat_mv
 ```
 
-Defined in h1os/h1os.h:243
+Defined in h1os/h1os.h:248
 
 Initial non-USB battery voltage captured on boot in millivolts.
 
@@ -17234,7 +17267,7 @@ Initial non-USB battery voltage captured on boot in millivolts.
 uint8_t battery_percent
 ```
 
-Defined in h1os/h1os.h:244
+Defined in h1os/h1os.h:249
 
 Estimated battery state-of-charge percentage (0..100%).
 
@@ -17248,7 +17281,7 @@ Estimated battery state-of-charge percentage (0..100%).
 bool is_usb_powered
 ```
 
-Defined in h1os/h1os.h:245
+Defined in h1os/h1os.h:250
 
 True if USB VBUS power connection is actively detected.
 
@@ -17264,7 +17297,7 @@ h1os_battery_state_t battery_state
 
 Type: [`h1os_battery_state_t`](#h1os_battery_state_t)
 
-Defined in h1os/h1os.h:246
+Defined in h1os/h1os.h:251
 
 Charge / discharge / charged operational state.
 
@@ -17280,7 +17313,7 @@ h1os_autonomy_metrics_t autonomy
 
 Type: [`h1os_autonomy_metrics_t`](#h1os_autonomy_metrics_t)
 
-Defined in h1os/h1os.h:247
+Defined in h1os/h1os.h:252
 
 Empirical battery autonomy metrics over total elapsed runtime.
 
@@ -17294,7 +17327,7 @@ Empirical battery autonomy metrics over total elapsed runtime.
 uint32_t sensor_fail_count
 ```
 
-Defined in h1os/h1os.h:248
+Defined in h1os/h1os.h:253
 
 Total count of failed wake-stub sensor sample attempts.
 
@@ -17308,7 +17341,7 @@ Total count of failed wake-stub sensor sample attempts.
 uint8_t last_sensor_error
 ```
 
-Defined in h1os/h1os.h:249
+Defined in h1os/h1os.h:254
 
 Most recent sensor error enum code ([orch_sensor_err_t](#orch_sensor_err_t)).
 
@@ -17322,7 +17355,7 @@ Most recent sensor error enum code ([orch_sensor_err_t](#orch_sensor_err_t)).
 bool is_rh_alert_active
 ```
 
-Defined in h1os/h1os.h:250
+Defined in h1os/h1os.h:255
 
 True if settled RH is outside configured humidor target bounds.
 
@@ -17438,11 +17471,12 @@ Populated during boot and passed to the application lifecycle on_wake and on_syn
 | `uint32_t` | [`wakeup_causes`](#wakeup_causes)  | Bitmap of wakeup sources (esp_sleep_get_wakeup_causes). |
 | [`h1os_wake_state_t`](#h1os_wake_state_t) | [`wake_state`](#wake_state)  | Explicit wake state classification (BOOT, INTERACTIVE, RTC_FLOW_B). |
 | `uint32_t` | [`boot_count`](#boot_count-1)  | Monotonic system boot cycle count. |
-| `uint32_t` | [`deep_sleep_count`](#deep_sleep_count)  | Monotonic total deep sleep wake cycle count (Flow A + Flow B). |
+| `union h1os_wake_context_t::@325134365353002276205315372127306003103261015120` | [`@146034141124024227100041106135372254367321170003`](#146034141124024227100041106135372254367321170003)  |  |
 | `uint32_t` | [`flow_b_count`](#flow_b_count-1)  | Monotonic unattended RTC Flow B presentation wake cycle count. |
 | `uint32_t` | [`button_wake_count`](#button_wake_count-1)  | Monotonic interactive tactile button wake cycle count. |
 | `bool` | [`woke_from_button`](#woke_from_button)  | True if system woke due to physical button actuation. |
 | `uint8_t` | [`wake_button`](#wake_button)  | Waking button ID ([h1os_wake_btn_t](#h1os_wake_btn_t): 0=None, 1=BOOT, 2=POWER). |
+| `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason-1)  | Reason code from last ULP coprocessor dispatch (h1os_ulp_reason_t). |
 | `uint32_t` | [`sleep_duration_sec`](#sleep_duration_sec)  | Configured sleep interval prior to wake in seconds. |
 | `void *` | [`user_data`](#user_data-1)  | User context pointer passed to lifecycle. |
 
@@ -17506,17 +17540,15 @@ Monotonic system boot cycle count.
 
 ---
 
-{#deep_sleep_count}
+{#146034141124024227100041106135372254367321170003}
 
-#### deep_sleep_count
+#### @146034141124024227100041106135372254367321170003
 
 ```cpp
-uint32_t deep_sleep_count
+union h1os_wake_context_t::@325134365353002276205315372127306003103261015120 @146034141124024227100041106135372254367321170003
 ```
 
-Defined in h1os/h1os.h:89
-
-Monotonic total deep sleep wake cycle count (Flow A + Flow B).
+Defined in h1os/h1os.h:92
 
 ---
 
@@ -17528,7 +17560,7 @@ Monotonic total deep sleep wake cycle count (Flow A + Flow B).
 uint32_t flow_b_count
 ```
 
-Defined in h1os/h1os.h:90
+Defined in h1os/h1os.h:93
 
 Monotonic unattended RTC Flow B presentation wake cycle count.
 
@@ -17542,7 +17574,7 @@ Monotonic unattended RTC Flow B presentation wake cycle count.
 uint32_t button_wake_count
 ```
 
-Defined in h1os/h1os.h:91
+Defined in h1os/h1os.h:94
 
 Monotonic interactive tactile button wake cycle count.
 
@@ -17556,7 +17588,7 @@ Monotonic interactive tactile button wake cycle count.
 bool woke_from_button
 ```
 
-Defined in h1os/h1os.h:92
+Defined in h1os/h1os.h:95
 
 True if system woke due to physical button actuation.
 
@@ -17570,9 +17602,23 @@ True if system woke due to physical button actuation.
 uint8_t wake_button
 ```
 
-Defined in h1os/h1os.h:93
+Defined in h1os/h1os.h:96
 
 Waking button ID ([h1os_wake_btn_t](#h1os_wake_btn_t): 0=None, 1=BOOT, 2=POWER).
+
+---
+
+{#ulp_dispatch_reason-1}
+
+#### ulp_dispatch_reason
+
+```cpp
+uint8_t ulp_dispatch_reason
+```
+
+Defined in h1os/h1os.h:97
+
+Reason code from last ULP coprocessor dispatch (h1os_ulp_reason_t).
 
 ---
 
@@ -17584,7 +17630,7 @@ Waking button ID ([h1os_wake_btn_t](#h1os_wake_btn_t): 0=None, 1=BOOT, 2=POWER).
 uint32_t sleep_duration_sec
 ```
 
-Defined in h1os/h1os.h:94
+Defined in h1os/h1os.h:98
 
 Configured sleep interval prior to wake in seconds.
 
@@ -17598,9 +17644,54 @@ Configured sleep interval prior to wake in seconds.
 void * user_data
 ```
 
-Defined in h1os/h1os.h:95
+Defined in h1os/h1os.h:99
 
 User context pointer passed to lifecycle.
+
+{#union__unnamed0__}
+
+## [union].__unnamed0__
+
+```cpp
+union [union].__unnamed0__
+```
+
+Defined in h1os/h1os.h:89
+
+### Public Attributes
+
+| Return | Name | Description |
+|--------|------|-------------|
+| `uint32_t` | [`deep_sleep_count`](#deep_sleep_count)  | Monotonic total deep sleep wake cycle count (Flow A + Flow B). |
+| `uint32_t` | [`wake_count`](#wake_count-1)  | Alias for deep_sleep_count matching B1_api_and_services.md. |
+
+---
+
+{#deep_sleep_count}
+
+#### deep_sleep_count
+
+```cpp
+uint32_t deep_sleep_count
+```
+
+Defined in h1os/h1os.h:90
+
+Monotonic total deep sleep wake cycle count (Flow A + Flow B).
+
+---
+
+{#wake_count-1}
+
+#### wake_count
+
+```cpp
+uint32_t wake_count
+```
+
+Defined in h1os/h1os.h:91
+
+Alias for deep_sleep_count matching B1_api_and_services.md.
 
 {#orch_persisted_state_t}
 
@@ -17626,11 +17717,11 @@ Retained across all deep sleep cycles and wake stub executions.
 |--------|------|-------------|
 | `uint32_t` | [`magic`](#magic)  | State validation magic word (ORCH_RTC_MAGIC). |
 | `uint32_t` | [`boot_count`](#boot_count-2)  | Total monotonic system boot cycles. |
-| `uint32_t` | [`wake_count`](#wake_count-1)  | Monotonic deep sleep wake cycle count (Flow A + Flow B + Button). |
+| `uint32_t` | [`wake_count`](#wake_count-2)  | Monotonic deep sleep wake cycle count (Flow A + Flow B + Button). |
 | `uint32_t` | [`flow_b_counter`](#flow_b_counter)  | Monotonic unattended RTC Flow B presentation wake cycle count. |
 | `uint32_t` | [`button_wake_count`](#button_wake_count-2)  | Monotonic interactive tactile button wake cycle count. |
 | `uint8_t` | [`flags`](#flags)  | Operating state flags (ORCH_FLAG_*). |
-| `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason-1)  | Reason code from last ULP coprocessor dispatch. |
+| `uint8_t` | [`ulp_dispatch_reason`](#ulp_dispatch_reason-2)  | Reason code from last ULP coprocessor dispatch. |
 | `uint16_t` | [`last_vbat_mv`](#last_vbat_mv-1)  | Last sampled battery terminal voltage in millivolts. |
 | `uint16_t` | [`boot_vbat_mv`](#boot_vbat_mv-1)  | Initial non-USB battery voltage captured on boot in millivolts. |
 | `uint32_t` | [`sample_interval_sec`](#sample_interval_sec)  | Interval between Flow A sensor samples in seconds. |
@@ -17699,7 +17790,7 @@ Total monotonic system boot cycles.
 
 ---
 
-{#wake_count-1}
+{#wake_count-2}
 
 #### wake_count
 
@@ -17755,7 +17846,7 @@ Operating state flags (ORCH_FLAG_*).
 
 ---
 
-{#ulp_dispatch_reason-1}
+{#ulp_dispatch_reason-2}
 
 #### ulp_dispatch_reason
 
@@ -18702,7 +18793,7 @@ Defined in sub_audio.c:95
 struct [struct].session
 ```
 
-Defined in h1os/h1os.h:192
+Defined in h1os/h1os.h:196
 
 ### Public Attributes
 
@@ -18725,7 +18816,7 @@ Defined in h1os/h1os.h:192
 uint32_t inactivity_timeout_sec
 ```
 
-Defined in h1os/h1os.h:193
+Defined in h1os/h1os.h:197
 
 Interactive session idle sleep timeout in seconds.
 
@@ -18741,7 +18832,7 @@ sys_clk_mode_t clk_mode
 
 Type: [`sys_clk_mode_t`](#sys_clk_mode_t)
 
-Defined in h1os/h1os.h:194
+Defined in h1os/h1os.h:198
 
 CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 
@@ -18755,7 +18846,7 @@ CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).
 uint32_t flow_a_period_sec
 ```
 
-Defined in h1os/h1os.h:195
+Defined in h1os/h1os.h:199
 
 Period between headless sensor sample bursts in seconds.
 
@@ -18769,7 +18860,7 @@ Period between headless sensor sample bursts in seconds.
 uint32_t flow_b_period_sec
 ```
 
-Defined in h1os/h1os.h:196
+Defined in h1os/h1os.h:200
 
 Period between unattended display flushes in seconds.
 
@@ -18783,7 +18874,7 @@ Period between unattended display flushes in seconds.
 uint32_t sync_wait_ms
 ```
 
-Defined in h1os/h1os.h:197
+Defined in h1os/h1os.h:201
 
 Inbound sync pre-flush gate window in ms (0 = immediate flush).
 
@@ -18797,7 +18888,7 @@ Inbound sync pre-flush gate window in ms (0 = immediate flush).
 uint32_t sync_timeout_ms
 ```
 
-Defined in h1os/h1os.h:198
+Defined in h1os/h1os.h:202
 
 Max barrier wait for async on_sync completion before sleep.
 
@@ -18837,7 +18928,7 @@ Defined in sub_audio.c:98
 struct [struct].presentation
 ```
 
-Defined in h1os/h1os.h:185
+Defined in h1os/h1os.h:189
 
 ### Public Attributes
 
@@ -18860,7 +18951,7 @@ h1os_splash_cb_t on_splash
 
 Type: [`h1os_splash_cb_t`](#h1os_splash_cb_t)
 
-Defined in h1os/h1os.h:186
+Defined in h1os/h1os.h:190
 
 Presentation splash screen rendering hook.
 
@@ -18876,7 +18967,7 @@ h1os_chime_cb_t on_chime
 
 Type: [`h1os_chime_cb_t`](#h1os_chime_cb_t)
 
-Defined in h1os/h1os.h:187
+Defined in h1os/h1os.h:191
 
 Presentation chime playback hook.
 
@@ -18890,7 +18981,7 @@ Presentation chime playback hook.
 uint8_t chime_mask
 ```
 
-Defined in h1os/h1os.h:188
+Defined in h1os/h1os.h:192
 
 Bitmask of enabled audio chime types.
 
@@ -18904,7 +18995,7 @@ Bitmask of enabled audio chime types.
 uint8_t volume_pct
 ```
 
-Defined in h1os/h1os.h:189
+Defined in h1os/h1os.h:193
 
 Acoustic presentation master volume (0..100%).
 
@@ -19084,5 +19175,50 @@ uint32_t sample_rate_hz
 ```
 
 Defined in sub_audio.c:103
+
+{#union__unnamed0__}
+
+## [union].__unnamed0__
+
+```cpp
+union [union].__unnamed0__
+```
+
+Defined in h1os/h1os.h:89
+
+### Public Attributes
+
+| Return | Name | Description |
+|--------|------|-------------|
+| `uint32_t` | [`deep_sleep_count`](#deep_sleep_count)  | Monotonic total deep sleep wake cycle count (Flow A + Flow B). |
+| `uint32_t` | [`wake_count`](#wake_count-1)  | Alias for deep_sleep_count matching B1_api_and_services.md. |
+
+---
+
+{#deep_sleep_count}
+
+#### deep_sleep_count
+
+```cpp
+uint32_t deep_sleep_count
+```
+
+Defined in h1os/h1os.h:90
+
+Monotonic total deep sleep wake cycle count (Flow A + Flow B).
+
+---
+
+{#wake_count-1}
+
+#### wake_count
+
+```cpp
+uint32_t wake_count
+```
+
+Defined in h1os/h1os.h:91
+
+Alias for deep_sleep_count matching B1_api_and_services.md.
 
 Generated by [Moxygen](https://0state.com/moxygen)

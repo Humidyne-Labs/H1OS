@@ -22,8 +22,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-VERSION = "2.4.5-dev"
-H1OS_TOOLING_VERSION = "2.4.5-dev"
+VERSION = "2.4.10-dev"
+H1OS_TOOLING_VERSION = "2.4.10-dev"
 SYSTEM_SECTIONS = {"project", "dist", "version", "partitions", "target", "build", "audit", "presets"}
 
 

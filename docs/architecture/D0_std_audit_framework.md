@@ -1,6 +1,8 @@
 # H1OS-STD-001: Embedded Firmware Audit Framework & Pitfalls Catalog
 
-* **Document ID:** `H1OS-STD-001` (Rev 2.0)
+> **H1OS Architecture Specification** | **Document:** `D0 / H1OS-STD-001 Rev 2.1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
+* **Document ID:** `H1OS-STD-001` (Rev 2.1)
 
 * **Target Platform:** ESP32-S3 Dual-Core Xtensa LX7 + ULP-RISC-V Coprocessor
 
@@ -101,9 +103,9 @@ On the dual-core ESP32-S3, tasks execute simultaneously on Core 0 (PRO_CPU) and 
 | ----- | ----- | ----- | ----- | ----- | 
 | **PIT-01-A** | `S0` | CERT `CON32-C`  BARR-C `7.2` | **Cross-Core State Mutation without Barriers:** Core 0 writes a shared flag; Core 1 reads stale cached data or reordered stores. | Verify shared variables across cores are qualified with `volatile` and protected by mutexes, spinlocks (`portMUX_TYPE`), or explicit memory fences (`__sync_synchronize()`). | 
 | **PIT-01-B** | `S0` | JPL Rule 2  MISRA `D4.1` | **Unbounded Mutex Blocking (`portMAX_DELAY`):** Low-priority task holding a peripheral mutex is starved, permanently deadlocking a supervisor task. | Search for `portMAX_DELAY` in `hal_*`, `sub_*`, and `orch_*`. Enforce explicit bounded timeouts (e.g., `pdMS_TO_TICKS(100)`) with explicit timeout recovery branches. | 
-| **PIT-01-C** | `S0` | CERT `CON40-C` | **Non-Atomic Read-Modify-Write:** Two tasks concurrently update bitfields or integer flags (e.g., \`status | = FLAG_A\`), dropping one update. | 
-| **PIT-01-D** | `S1` | CERT `CON35-C` | **Priority Inversion Hazards:** Low-priority worker task holds a shared bus lock needed by high-priority audio or UI tasks. | Verify all FreeRTOS locks protecting shared hardware resources utilize priority inheritance (`xSemaphoreCreateMutex()`), never binary semaphores. | 
-| **PIT-01-E** | `S0` | CERT `CON39-C` | **Asynchronous Task Deletion Races:** Supervisor unmounts a peripheral (e.g. SDMMC) while a worker thread is still executing inside the driver. | Ensure completion handles (`TaskHandle_t`) are `volatile`, self-clear to `NULL` only on clean exit, and are joined via bounded wait loops prior to peripheral deinit. | 
+| **PIT-01-C** | `S0` | CERT `CON40-C` | **Non-Atomic Read-Modify-Write:** Two tasks concurrently update bitfields or integer flags (e.g., `status |= FLAG_A`), dropping one update. | Verify concurrent flag/bitmask mutations use atomic primitives (`<stdatomic.h>`), `portENTER_CRITICAL(&mux)`, or mutexes. |
+| **PIT-01-D** | `S1` | CERT `CON35-C` | **Priority Inversion Hazards:** Low-priority worker task holds a shared bus lock needed by high-priority audio or UI tasks. | Verify all FreeRTOS locks protecting shared hardware resources utilize static priority-inheritance mutexes (`xSemaphoreCreateMutexStatic()` / `xSemaphoreCreateRecursiveMutexStatic()`), never binary semaphores or heap-allocated locks. |
+| **PIT-01-E** | `S0` | CERT `CON39-C` | **Asynchronous Task Deletion Races:** Supervisor unmounts a peripheral (e.g. SDMMC) while a worker thread is still executing inside the driver. | Ensure worker tasks terminate cooperatively via stop commands or atomic flags and signal completion via static binary semaphores (`xSemaphoreCreateBinaryStatic()`) rather than `vTaskDelay()` polling loops before peripheral deinit. | 
 
 ### Domain 2: Sleep, Wake & Power Domain Lifecycle
 
@@ -145,7 +147,7 @@ Deep-sleep power cycles reset general-purpose SRAM, while non-volatile storage (
 | ID | Class | External Rule | Failure Mode & Root Cause | Audit Inspection & Verification Procedure | 
 | ----- | ----- | ----- | ----- | ----- | 
 | **PIT-05-A** | `S1` | H1OS Lifecycle Invariant | **BSS Memory Reset Traps Across Deep Sleep:** Placing state variables intended to survive deep sleep into standard `.bss` or `.data` RAM, resetting them to zero on wake. | Audit variables tracking cross-wake telemetry, rolling buffers, or debounce counters. Verify explicit decoration with `RTC_DATA_ATTR` or `RTC_NOINIT_ATTR`. | 
-| **PIT-05-B** | `S1` | MISRA `R9.1` | **Cold-Boot NVS Lifecycle Inversion:** Restoring state from NVS before boot-flow determination, followed by an unconditional state init that wipes restored metrics. | Audit `h1os_lifecycle.c`. Confirm `orch_state_load_runtimes_from_nvs()` executes *after* cold-boot initialization, and that graceful shutdown flushes state to NVS. | 
+| **PIT-05-B** | `S1` | MISRA `R9.1` | **Cold-Boot NVS & Flow Period Initialization Inversion:** Restoring NVS state or committing flow periods before cold-boot `orch_state_reset()`, wiping configured intervals or persisted metrics. | Audit `h1os_lifecycle.c`. Confirm `h1os_validate_flow_periods()` runs before `orch_flow_init()`, `orch_state_load_runtimes_from_nvs()` and `h1os_apply_flow_periods()` run *after* `orch_state_reset()` (`REV-01`), `orch_persisted_state_t` stays compact (`648 B` in RTC Slow SRAM), and graceful shutdown flushes state to NVS. | 
 | **PIT-05-C** | `S0` | JPL Rule 1  MISRA `R17.2` | **Task Stack Overflow under Deep Call Chains:** Formatting strings (`snprintf`) or executing VFS/FATFS calls in small-stack tasks, corrupting adjacent heap/TCB memory. | Inspect compiler `.su` (stack usage) output. Enforce minimum stack depths: $\ge 2048\,\text{B}$ for simple tasks; $\ge 4096\,\text{B}$ for tasks performing VFS, NVS, or formatted logging. | 
 | **PIT-05-D** | `S1` | CERT `FIO42-C` | **Uncommitted NVS Transactions:** Writing keys via `nvs_set_*()` but failing to invoke `nvs_commit()` before entering deep sleep or cutting power. | Audit all NVS write paths. Ensure every `nvs_set_*` sequence is dominated by an explicit, error-checked `nvs_commit()` prior to handle closure or sleep entry. | 
 
@@ -166,9 +168,9 @@ Electrophoretic displays (e-Paper) require multi-second physical refresh sequenc
 
 | ID | Class | External Rule | Failure Mode & Root Cause | Audit Inspection & Verification Procedure | 
 | ----- | ----- | ----- | ----- | ----- | 
-| **PIT-07-A** | `S0` | Hardware Sequencing | **Deep Sleep Entry During Active EPD Refresh:** Cutting `EPD_3V3_EN` or isolating SPI pads while the SSD1681 charge pump is actively driving the panel, damaging the display or corrupting bistable state. | Audit `orch_flow.c` and `h1os_lifecycle.c`. Confirm `sub_display_wait_busy()` verifies physical panel completion (`BUSY` pin LOW) before power-down or sleep. | 
-| **PIT-07-B** | `S0` | CERT `CON32-C` | **Unguarded LVGL Internal Tree Access:** Reading display invalidation flags (`inv_p`) or mutating widgets from Core 0 while Core 1 executes `lv_timer_handler()`. | Audit `h1os_lvgl.cpp` and UI controllers. Verify all cross-task interactions with LVGL structures strictly acquire `lv_lock()` and release via `lv_unlock()`. | 
-| **PIT-07-C** | `S2` | Panel Physics | **Partial Refresh Waveform Degradation (Ghosting):** Executing unbounded consecutive partial refreshes without a periodic full waveform scrub, causing ionic charge polarization. | Confirm display orchestrators track consecutive partial refresh counts in `RTC_DATA_ATTR` and force a full refresh scrub every $N$ cycles or upon mode transitions. | 
+| **PIT-07-A** | `S0` | Hardware Sequencing | **Deep Sleep Entry During Active EPD Refresh or Pigment Settling:** Cutting `EPD_3V3_EN`, sending `0x10` Deep Sleep, or isolating SPI pads while the SSD1681 charge pump or electrophoretic pigment migration is active. | Audit `sub_display.cpp`, `orch_flow.c`, and `h1os_lifecycle.c`. Confirm `sub_display_wait_busy()` blocks on `GPIO 8` falling-edge semaphore and `sub_display_enter_deep_sleep()` enforces the mandatory `250 ms` post-`BUSY` electrophoretic settling window (`REV-04`) before sleep command `0x10`. | 
+| **PIT-07-B** | `S0` | CERT `CON32-C` | **Unguarded LVGL Internal Tree Access:** Reading display invalidation flags (`inv_p`) or mutating widgets from Core 0 while Core 1 executes `lv_timer_handler()`. | Audit `h1os_lvgl.cpp` and UI screens. Verify cross-core Core 0 $\rightarrow$ Core 1 updates enqueue via `h1os_ui_post()` (`MANDATE-04`) or check `h1os_lvgl_lock(timeout_ms)` return values symmetrically before mutating LVGL objects (`lv_lock()` / `lv_unlock()`). | 
+| **PIT-07-C** | `S2` | Panel Physics | **Partial Refresh Ghosting & Layout Margin Overflow:** Executing unbounded consecutive partial refreshes without a full OTP waveform scrub, or exceeding the `188 px` usable screen width. | Confirm `orch_display_sync` tracks consecutive partial refreshes in `RTC_DATA_ATTR` and forces a full scrub every $N$ cycles (`CONFIG_H1OS_EPD_PARTIAL_REFRESH_LIMIT`), and verify all screen strings pass the `epd-font` v1.0.23 $\le 188\text{ px}$ budget audit. | 
 
 ### Domain 8: Driver State Machine & Error Recovery
 
@@ -199,9 +201,9 @@ sequenceDiagram
     AST-->>Auditor: 0 unwaived static violations
     Auditor->>Review: 3. Evaluate 8-Domain Catalog & Empirical Invariants
     Review-->>Auditor: Concurrency, CDC, & Metrology verified
-    Auditor->>Compiler: 4. Build dev & prod (-Werror -Wdouble-promotion -fstack-usage)
-    Compiler-->>Auditor: 0 errors, 0 warnings, stack margins verified
-    Auditor->>Report: 5. Emit formal report in docs/agent_notes/audits/
+    Auditor->>Compiler: 4. Build dev & prod under IDF v6.1.1 (-Werror -Wdouble-promotion)
+    Compiler-->>Auditor: 0 errors, 0 warnings, murdock_memory_budget verified
+    Auditor->>Report: 5. Emit formal report in docs/audits/
 
 ```
 
@@ -209,51 +211,59 @@ sequenceDiagram
 
 Generate the exact commit range (`git diff <base>..<head>`). Identify all modified translation units, shared globals, FreeRTOS tasks, hardware registers, and NVS keys.
 
-### Step 2: Automated Static Pre-Flight Gate
+### Step 2: Automated Static Pre-Flight & Harness Gate
 
-Execute deterministic pattern and AST checks across all modified files before beginning manual review:
+Execute deterministic static, AST, typography, memory, version, and hygiene checks across all modified files before beginning manual review:
 
-1. **Dynamic Memory Trap (`PIT-04-C` / JPL Rule 3):**
+1. **Dynamic Memory, Unbounded Wait & Macro Traps (`PIT-04-C`, `PIT-01-B`, `PIT-03-A`, `PIT-06-B`):**
 
-   ```
-   rg "\b(malloc|calloc|realloc|free|strdup|heap_caps_malloc)\s*\(" components/ main/
-   
-   ```
-
-   *Pass Criteria:* Zero matches outside one-time boot initialization routines.
-
-2. **Unbounded Wait Trap (`PIT-01-B` / JPL Rule 2):**
-
-   ```
+   ```powershell
+   rg "\b(malloc|calloc|realloc|free|strdup|heap_caps_malloc)\s*\(" components/ examples/
    rg "portMAX_DELAY" components/h1os/src/
-   
+   rg "REG_(GET|SET)_BIT\s*\([^,]+,\s*[^)]*(_S|_V)\b" components/
    ```
 
-   *Pass Criteria:* Zero matches in peripheral drivers or orchestrator locks.
+   *Pass Criteria:* Zero unwaived matches in runtime worker/driver/ISR paths.
 
-3. **Register Macro Misuse Trap (`PIT-03-A`):**
+2. **Semgrep Multi-Language Static & Security Sweep:**
 
-   ```
-   rg "REG_(GET|SET)_BIT\s*\([^,]+,\s*[^)]*(_S|_V)\b" components/ ulp/
-   
-   ```
-
-   *Pass Criteria:* Zero matches (shift `_S` or unshifted value `_V` masks must never be passed to `REG_GET_BIT`).
-
-4. **Double Promotion Literal Trap (`PIT-06-B`):**
-
-   ```
-   rg "\b[0-9]+\.[0-9]+(?!f|F)\b" components/ main/
-   
+   ```powershell
+   semgrep scan --metrics=off --config "p/0xdea" --config "p/trailofbits" --config "p/c" --config "p/python" --config "p/security-audit" --config "p/secrets" examples/H1OS/main examples/boilerplate/main examples/riscv_test/main components/h1os/src components/h1os/include tools/agent
    ```
 
-   *Pass Criteria:* Zero unsuffixed floating-point literals in executable code.
+   *Pass Criteria:* Zero secrets, zero Python defects, zero unwaived signed-unsigned/memory/concurrency violations.
+
+3. **Clang-Tidy AST & Static Analyzer Sweep (Read-Only):**
+   Run `C:\Espressif\tools\esp-clang\esp-21.1.3_20260408\esp-clang\bin\clang-tidy.exe` read-only against a sanitized `compile_commands.json` (response files expanded, GCC-only flags stripped, Xtensa `picolibc` sysroot injected, `--checks="-*,bugprone-*,clang-analyzer-*,misc-unused-*,cert-*"`). Never invoke `--fix`.
+
+4. **Clang-Format Preservation Rule (Observational Only):**
+   **NEVER execute `clang-format -i`** over manually curated columnar source/header pairs. Formatting checks are strictly observational (`clang-format --dry-run` on newly authored helpers only); preserve existing visual block alignment verbatim.
+
+5. **EPD 1-BPP Typography & Layout Budget Audit (`epd-font` v1.0.23):**
+
+   ```powershell
+   python <epd-font-repo>/tools/agent/tools/string_info.py --workspace <workspace_root> --audit-screens
+   ```
+
+   *Pass Criteria:* Zero horizontal overflows exceeding the `188 px` usable screen budget across all screen templates.
+
+6. **Memory Budget Gate (`embedded-ops/murdock_memory_budget`):**
+   Profile compiled `.elf` binaries (`build_dev/h1os.elf` and `build_prod/h1os.elf`): DIRAM $\le 85\%$, RTC Slow SRAM $\le 4,096\text{ B}$, Flash application headroom $\ge 70\%$.
+
+7. **Version Sync, Identity Sanitization & Asset Hygiene Gates:**
+
+   ```powershell
+   python tools/agent/bump_version.py --check
+   python tools/agent/sanitize.py --check
+   ```
+
+   Execute `/shrink` (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) before committing media or datasheet PDFs.
 
 ### Step 3: 8-Domain Semantic & Physical Grounding Evaluation
 
 Walk each modified function against Section 4 (Domains 1–8) and Section 1.1 (Core Invariants):
 
-* Verify cross-core lock symmetry and `goto cleanup;` error paths (`PIT-01`, `PIT-08`).
+* Verify cross-core lock symmetry (`h1os_ui_post`, checked `h1os_lvgl_lock()` return values) and `goto cleanup;` error paths (`PIT-01`, `PIT-07`, `PIT-08`).
 
 * Verify RTC Slow SRAM persistence attributes (`RTC_DATA_ATTR`) and `nvs_commit()` pairing (`PIT-05`).
 
@@ -261,33 +271,32 @@ Walk each modified function against Section 4 (Domains 1–8) and Section 1.1 (C
 
 * Verify zero unmeasured hardware claims in comments or commit messages (Invariant 1).
 
-### Step 4: Hardened Compiler & Stack Usage Gate
+### Step 4: Hardened Compiler & Build Verification Gate
 
-All H1OS components must compile cleanly under strict diagnostic enforcement:
+All H1OS components must compile cleanly under strict diagnostic enforcement in `components/h1os/CMakeLists.txt`:
 
-```
-# Required H1OS Component Compiler Flags
+```cmake
+# Canonical H1OS Component Compiler Flags (components/h1os/CMakeLists.txt)
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wall -Wextra -Werror
+    -Wshadow
     -Wdouble-promotion          # Enforces PIT-06-B (No soft-float double promotion)
-    -Wconversion                # Enforces PIT-06-C (Catches silent integer narrowing)
-    -Wsign-conversion           # Enforces PIT-03-A / PIT-06-C (Signed/unsigned bitmask traps)
-    -Wshadow                    # Prevents variable shadowing in state machines
-    -Wunused-result             # Enforces PIT-08-A / JPL Rule 7
-    -fstack-usage               # Generates .su stack frames for PIT-05-C verification
+    -Wformat=2                  # Enforces format string & argument type safety
+    -Wno-format-nonliteral      # Permits dynamic strftime format strings
+    $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+    -Wno-missing-field-initializers
 )
-
 ```
 
-Execute clean builds for both development and production targets:
+Execute clean builds under **ESP-IDF `v6.1.1`** across showcase and example targets:
 
-```
+```powershell
+& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"
 idf.py -B build_dev --preset dev build
 idf.py -B build_prod --preset prod build
-
 ```
 
-Both builds must terminate with **0 errors and 0 warnings**, and `.su` frame deltas must remain within allocated FreeRTOS task stack margins.
+Both showcase builds (plus `examples/boilerplate` `--preset prod` and `examples/riscv_test`) must terminate with **0 errors and 0 project warnings**, and `murdock_memory_budget` margins must hold.
 
 ### Step 5: Formal Audit Certification Report
 
@@ -297,23 +306,27 @@ Every completed audit must generate an immutable verification artifact in `docs/
 
 Copy and populate the following template for all formal audit certifications:
 
-```
+```markdown
 # H1OS Audit Certification Report: [YYYY-MM-DD]-[SHORT_SLUG]
 
-* **Audit Standard:** `H1OS-STD-001 (Rev 2.0)`
+* **Audit Standard:** `H1OS-STD-001 (Rev 2.1)`
+* **Target Version / IDF:** `vX.Y.Z-tag` | ESP-IDF `v6.1.1`
 * **Target Commit / Range:** `<base-sha>..<head-sha>`
-* **Audited Modules:** `[List modified files, e.g., sub_power.c, ulp/main.c]`
+* **Audited Modules:** `[List modified files, e.g., sub_power.c, examples/H1OS/main/]`
 * **Auditor:** `[Engineer / Agent Identifier]`
 * **Final Disposition:** `[PASS | PASS WITH WAIVERS | FAIL]`
 
 ---
 
 ## 1. Automated Gate Telemetry (Steps 2 & 4)
-* **Build `build_dev`:** `[PASS - 0 Errors, 0 Warnings]`
-* **Build `build_prod`:** `[PASS - 0 Errors, 0 Warnings]`
-* **JPL Rule 3 Heap Scan:** `[0 dynamic allocations detected]`
-* **Worst-Case Stack Frame (`.su`):** `[function_name: X bytes | Task Stack Margin: +Y bytes]`
-* **RTC Slow SRAM Delta:** `[+X bytes (Total: Y / 8192 bytes)]`
+* **Build `examples/H1OS` (`dev` & `prod`):** `[PASS - 0 Errors, 0 Warnings]`
+* **Additional Examples (`boilerplate`, `riscv_test`):** `[PASS - 0 Errors, 0 Warnings]`
+* **Semgrep Multi-Language Scan:** `[Rules run, blocking/actionable findings count]`
+* **Clang-Tidy AST Sweep (Read-Only):** `[Files analyzed, actionable findings count]`
+* **EPD 1-BPP Typography Audit (`epd-font`):** `[X/X strings PASS <= 188 px, 0 overflows]`
+* **`murdock_memory_budget` (`build_dev` / `build_prod`):** `[DIRAM %, RTC Slow B, Flash headroom %]`
+* **Version Sync (`bump_version.py --check`):** `[PASS]`
+* **Sanitize Check (`sanitize.py --check`):** `[PASS - 0 leaks]`
 
 ## 2. 8-Domain Compliance Matrix (Step 3)
 
@@ -334,5 +347,4 @@ Copy and populate the following template for all formal audit certifications:
 
 ## 4. Defect Log, Remediations & Active Waivers
 * **[Defect / Waiver ID | Pitfall | Class S0-S2]:** `[Description, root cause, proof artifact, and fix commit SHA]`
-
 ```

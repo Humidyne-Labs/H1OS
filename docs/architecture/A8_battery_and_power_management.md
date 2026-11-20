@@ -1,5 +1,7 @@
 # Battery Metrology, Power Management & Autonomy Engine Specification
 
+> **H1OS Architecture Specification** | **Document:** `A8` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 ## 1. Core Architectural Philosophy & Invariants
 
 Estimating battery State of Charge (SoC) and operating autonomy on an ultra-low-power, event-driven appliance is fundamentally challenged by the physical chemistry of Lithium-Polymer cells:
@@ -226,7 +228,7 @@ typedef struct __attribute__((packed)) {
 
 A single atomic blob call guarantees:
 * **All-or-Nothing Consistency:** Eliminates torn state desynchronization across brownouts.
-* **Minimum Flash Wear:** Consumes a single NVS entry header and payload per commit pass.
+* **Minimum Flash Wear:** Consumes a single NVS entry header and data buffer per commit pass.
 * **Backward Compatibility:** `orch_state_load_runtimes_from_nvs()` seamlessly falls back to legacy individual keys if `"pwr_lap_st"` is not yet initialized.
 
 ---

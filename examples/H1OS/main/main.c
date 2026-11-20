@@ -41,7 +41,7 @@ static void keypad_event_cb(lv_event_t *e);
  */
 static void update_active_display(void)
 {
-    static h1os_telemetry_t telem;
+    h1os_telemetry_t telem = {0};
     h1os_get_telemetry(&telem);
 
     switch (s_app_state.active_page) {
@@ -263,7 +263,9 @@ static void app_on_splash(h1os_splash_type_t type, void *user_data)
         /* Release CPU 240 MHz lock during 2s splash viewing delay so CPU drops to 80 MHz */
         h1os_lvgl_unlock();
         vTaskDelay(pdMS_TO_TICKS(2 * 1000));
-        h1os_lvgl_lock(1000);
+        if (!h1os_lvgl_lock(1000)) {
+            ESP_LOGW(TAG, "Splash: failed to re-acquire LVGL lock after viewing delay");
+        }
     }
 }
 

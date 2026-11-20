@@ -41,7 +41,7 @@ CONFIG_LV_USE_ASSERT_MEM_INTEGRITY=y
 CONFIG_LV_USE_ASSERT_OBJ=y
 
 # -------------------------------------------------------------------------
-# FreeRTOS Verification & Static Sentry Checks
+# FreeRTOS Verification & Static Guard Checks
 # -------------------------------------------------------------------------
 CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y

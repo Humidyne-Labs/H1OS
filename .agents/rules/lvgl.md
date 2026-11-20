@@ -1,4 +1,4 @@
-# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.5-dev`)
+# Master Rule: LVGL 9 Bilevel UI Design & E-Paper Constraints Specification (`v2.4.10-dev`)
 
 ## 1. Hardware & Silicon Display Constraints
 
@@ -61,8 +61,8 @@ Y = 200 px +-------------------------------------------------------+
 ## 4. Typography & Font Constraints
 
 1. **Minimum Readable Font Size Mandate (≥ 14 px Height):**
-   - **Minimum font height is 14 pixels** (e.g. `LV_FONT_MONTSERRAT_14` / `H1OS_FONT_14`).
-   - Fonts smaller than 14 px (e.g. 8pt, 10pt, 12pt) are **STRICTLY FORBIDDEN**. At 188 DPI, glyph strokes narrower than 2 physical pixels blur into illegibility during differential partial updates.
+   - **Minimum font height is 14 pixels** (e.g. `HUMID1_FONT_UI_BODY` / `H1OS_FONT_14`, symbol `humid1_font_plex_sans_normal_14`, pre-rendered 1-bpp LVGL v9+ strikes in `components/h1os/tools/fonts/`).
+   - Fonts smaller than 14 px (e.g. 8pt, 10pt, 12pt) for body copy blur into illegibility during differential partial updates at 188.15 DPI.
 2. **Emphasis Hierarchy:**
    - Large Telemetry Metric: 24 px to 32 px height.
    - Header & Subtitle: 14 px height bold / uppercase.
@@ -96,7 +96,7 @@ $$\text{Canvas Dimension} = (\text{Base Modules} + 8\text{ Quiet Zone}) \times \
 
 ---
 
-## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.5-dev`)
+## 7. Thread Safety, Dual-Core Affinity & `h1os_ui_post()` Actor Queue (`v2.4.10-dev`)
 
 * **Core Affinity:** The LVGL presentation task (`h1os_lvgl`) is pinned strictly to **Core 1** at FreeRTOS priority **5** (`LVGL_TASK_PRIO_PORT = 5`). Core 0 handles lifecycle orchestration, `on_sync()` wireless stacks, and background I/O.
 * **Lifecycle Hook Context (`on_boot` & `on_wake`):** During `on_boot()` and `on_wake()`, the Core 1 LVGL task has not yet been started (`h1os_lvgl_start(5, 1)` runs immediately after `on_wake()` returns). Initial screen construction inside `on_boot()` and `on_wake()` is therefore inherently single-threaded; `h1os_trigger_splash()` acquires a scoped `h1os_lvgl_lock(1000)` internally.
@@ -181,40 +181,21 @@ void ui_render_telemetry_screen(const char *title, float temp_c, float rh_pct, f
 
 ---
 
-## 9. Font Metric Tables & String Width Verification Tools
+## 9. Font Metric CSV Tables & EPD Typography Verification
 
 To prevent horizontal text clipping and overflow on the 200x200 display (maximum allowable width $\le 188.0\text{ px}$):
 
-### Font Metric CSV Tables (`tools/fonts/`)
-- **Character Advance Widths & Bounding Boxes:**
-  - `tools/fonts/char_widths_montserrat_14.csv`
-  - `tools/fonts/char_widths_montserrat_16.csv`
-  - `tools/fonts/char_widths_montserrat_18.csv`
-  - `tools/fonts/char_widths_montserrat_20.csv`
-  - `tools/fonts/char_widths_montserrat_24.csv`
-  - `tools/fonts/char_widths_montserrat_32.csv`
-- **Class Kerning Pairs (3,400+ pairs per font):**
-  - `tools/fonts/kern_pairs_montserrat_14.csv`
-  - `tools/fonts/kern_pairs_montserrat_16.csv`
-  - `tools/fonts/kern_pairs_montserrat_18.csv`
-  - `tools/fonts/kern_pairs_montserrat_20.csv`
-  - `tools/fonts/kern_pairs_montserrat_24.csv`
-  - `tools/fonts/kern_pairs_montserrat_32.csv`
+### Packaged Font Metric CSV Tables (`components/h1os/tools/fonts/metrics/`)
+- **108 Per-Strike Advance Width & BBox CSVs:** `components/h1os/tools/fonts/metrics/char_widths_<symbol>.csv` (e.g., `char_widths_humid1_font_plex_sans_normal_14.csv`, `char_widths_humid1_font_plex_mono_bold_20.csv`).
+- **108 Per-Strike Kerning CSVs:** `components/h1os/tools/fonts/metrics/kern_pairs_<symbol>.csv`.
+- **Pre-Rasterized Strike Vault & Icon Catalog:** `components/h1os/tools/fonts/humid1_epd_vault.json.gz` and `components/h1os/tools/fonts/metadata/unified_icon_names.json`.
 
-### Verification Tools
-* **Single String Width Calculation (CLI):**
-  ```powershell
-  python tools/agent/check_string_width.py --size 14 "Power: CHARGED 4.00V"
-  ```
-* **Full Screen Template Automated Audit:**
-  ```powershell
-  python tools/agent/check_string_width.py --audit-screens
-  ```
-* **Font Metric Extractor:**
-  ```powershell
-  python tools/agent/extract_font_metrics.py
-  ```
+### Verification Tools (`embedded-ops` MCP & `epd-typography` Skill)
+* **Single Glyph Lookup:** Call `embedded-ops/epd_char_info(strike="humid1_font_plex_sans_normal_14", char_query="@", workspace_dir="<workspace_root>")`.
+* **String / Row Clearance Check:** Call `embedded-ops/epd_string_budget(strike="humid1_font_plex_sans_normal_14", text="Power: CHARGED 4.00V", workspace_dir="<workspace_root>")`.
+* **Full Screen Template Automated Audit:** Call `embedded-ops/epd_audit_screens(workspace_dir="<workspace_root>")`.
+* **Icon Catalog Search:** Call `embedded-ops/epd_icon_search(query="thermometer", vendor="all", workspace_dir="<workspace_root>")`.
 * **DuckDB SQL Query:**
   ```sql
-  SELECT char, width_px FROM 'tools/fonts/char_widths_montserrat_14.csv' ORDER BY width_px DESC LIMIT 10;
+  SELECT char, width_px FROM read_csv_auto('components/h1os/tools/fonts/metrics/char_widths_humid1_font_plex_sans_normal_14.csv') ORDER BY width_px DESC LIMIT 10;
   ```

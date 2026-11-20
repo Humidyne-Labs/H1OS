@@ -9,6 +9,8 @@
 #include "h1os/h1os_lvgl.h"
 #include "screens.h"
 
+#include <stdint.h>
+
 static lv_obj_t *s_active_badge     = NULL;
 static lv_obj_t *s_active_badge_lbl = NULL;
 
@@ -40,7 +42,7 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
 
     lv_obj_t *lbl_title = lv_label_create(scr);
     lv_label_set_text(lbl_title, title);
-    lv_obj_set_style_text_font(lbl_title, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_title, HUMID1_FONT_UI_BODY, 0);
     lv_obj_align(lbl_title, LV_ALIGN_TOP_LEFT, 6, 4);
 
     bool is_awake = h1os_is_session_active();
@@ -55,7 +57,7 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
 
     lv_obj_t *lbl_pg = lv_label_create(badge);
     lv_label_set_text(lbl_pg, page_str);
-    lv_obj_set_style_text_font(lbl_pg, H1OS_FONT_14, 0);
+    lv_obj_set_style_text_font(lbl_pg, HUMID1_FONT_UI_BODY, 0);
     lv_obj_set_style_text_color(lbl_pg, is_awake ? lv_color_white() : lv_color_black(), 0);
     lv_obj_center(lbl_pg);
 
@@ -73,25 +75,45 @@ lv_obj_t *screen_base_create(const char *title, const char *page_str, lv_event_c
 }
 
 /**
+ * @brief LVGL context callback applying the awake session badge polarity.
+ *
+ * @param[in]    arg             Boolean awake state encoded via uintptr_t.
+ */
+static void apply_awake_badge_lvgl(void *arg)
+{
+    bool is_awake = ((uintptr_t)arg != 0U);
+    if (s_active_badge == NULL || s_active_badge_lbl == NULL) {
+        return;
+    }
+    if (lv_obj_is_valid(s_active_badge) && lv_obj_is_valid(s_active_badge_lbl)) {
+        lv_obj_set_style_bg_color(s_active_badge, is_awake ? lv_color_black() : lv_color_white(), 0);
+        lv_obj_set_style_text_color(s_active_badge_lbl, is_awake ? lv_color_white() : lv_color_black(), 0);
+        lv_obj_invalidate(s_active_badge);
+        s_badge_is_awake = is_awake;
+    }
+}
+
+/**
  * @brief Sets awake session pill badge in top-right header.
  *
  * @param[in]    is_awake        True if interactive session active, false for unattended sleep.
  */
 void screen_base_set_awake_badge(bool is_awake)
 {
-    if (s_active_badge == NULL || s_active_badge_lbl == NULL)
+    if (s_active_badge == NULL || s_active_badge_lbl == NULL) {
         return;
+    }
 
-    if (s_badge_is_awake == is_awake)
+    if (s_badge_is_awake == is_awake) {
         return;
+    }
 
-    if (h1os_lvgl_lock(100)) {
-        if (lv_obj_is_valid(s_active_badge) && lv_obj_is_valid(s_active_badge_lbl)) {
-            lv_obj_set_style_bg_color(s_active_badge, is_awake ? lv_color_black() : lv_color_white(), 0);
-            lv_obj_set_style_text_color(s_active_badge_lbl, is_awake ? lv_color_white() : lv_color_black(), 0);
-            lv_obj_invalidate(s_active_badge);
-            s_badge_is_awake = is_awake;
+    void *badge_arg = (void *)(uintptr_t)(is_awake ? 1U : 0U);
+    esp_err_t post_err = h1os_ui_post(apply_awake_badge_lvgl, badge_arg, 100);
+    if (post_err == ESP_ERR_INVALID_STATE) {
+        if (h1os_lvgl_lock(500)) {
+            apply_awake_badge_lvgl(badge_arg);
+            h1os_lvgl_unlock();
         }
-        h1os_lvgl_unlock();
     }
 }

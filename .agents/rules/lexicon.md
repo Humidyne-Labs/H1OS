@@ -28,7 +28,7 @@ Informal jargon, military slang, pop-culture metaphors, and ideological commenta
 | **scaffold purge** | **refactoring / pruning / deprecation / removal** | Deleting obsolete legacy code and stubs. |
 | **neutralize** | **clear / discharge / de-energize / reset** | Clearing display RAM, resetting DC bias, or de-asserting GPIO rails. |
 | **kill / terminate (non-POSIX)** | **halt / disable / abort / power cut** | Graceful shutdown or gate de-assertion. |
-| **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic. |
+| **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic *(Exception: `fallback` is permitted when referencing inherited upstream API identifiers/keywords such as LVGL `lv_font_t.fallback`, `epd-font` `.scheme.json` `"fallback"`, and Python stdlib `ConfigParser(..., fallback=...)`.)* |
 | **doctrine / dogma** | **standard / architecture / principle / specification** | Non-technical, cultish, or ideological framing. |
 | **bones / the muscle / the vanity** | **contracts / subsystems / presentation layer** | Anatomical slang / informal construction metaphors. |
 | **cadence** | **interval / period / frequency / cycle timing** | Timer, sleep cycle, refresh rate, or polling timing. |

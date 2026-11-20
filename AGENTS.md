@@ -1,6 +1,6 @@
 # H1OS Master Engineering Specification & Agent Invariants
 
-This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.5-dev`) on ESP32-S3.
+This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.10-dev`) on ESP32-S3.
 
 ---
 
@@ -17,14 +17,14 @@ This file constitutes the authoritative, always-active engineering and behaviora
    - **Layer 4: Application Lifecycle (`h1os_*`)**: Declarative lifecycle & dual-core sleep barrier (`h1os_start`, `h1os_sleep`, `h1os_sync_hold`, `h1os_sync_notify_complete`), Core 1 LVGL v9 UI engine & actor queue (`h1os_lvgl.h`, `h1os_ui_post`), and time sync (`h1os_time.h`).
    - *Hierarchy Rule:* Upper layers call lower layers; lower layers **NEVER** call upper layers or cross-talk.
 4. **Hardware-First Mandate ("Use the Hardware"):**
-   - **Dual-Core Affinity & Parallel Execution (`v2.4.5-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
+   - **Dual-Core Affinity & Parallel Execution (`v2.4.10-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
    - **Power Latching & Fatal Startup Recovery (`MANDATE-06`):** `BAT_CTRL` (`GPIO 17`) is asserted in `h1os_boot_hook` within 25 ms and held across deep sleep via RTC pad hold. If any cold-boot hardware initialization fails (`orch_flow_init()`, `sub_display_init()`, or `h1os_lvgl_init()`), `h1os_handle_fatal_startup_error()` invokes `on_error(err, stage)` and immediately releases `GPIO 17` (`hal_io_release_power_latch()`) on battery power (or enters `EXT0` deep sleep on `GPIO 18` when USB power is attached) so a faulted board never drains the LiPo cell.
    - **Zero-Heat Sensing:** Never poll the SHTC3 during active CPU operation. SHTC3 sampling is restricted to headless Flow A sample bursts (`~18.5 ms` at 80 MHz in `orch_wake_stub.c`) so internal silicon heat cannot conduct across the PCB trace neck before the reading completes.
    - **Never Busy-Wait (Two-Domain Synchronization Law):**
      - **Awake FreeRTOS Domain (`hal_*`, `sub_*`, `orch_flow.c`, `h1os_*`):** Never spawn dedicated polling tasks or `vTaskDelay()` spin-wait loops to monitor timeouts, task exits, or hardware `BUSY`/button pins. Always use `esp_timer` (`esp_timer_start_once` / `esp_timer_start_periodic` / `esp_timer_restart`) for asynchronous timeouts and periodic state machines, GPIO edge interrupts (`gpio_isr_handler_add`) + hardware glitch filters (`gpio_new_pin_glitch_filter`) + `xSemaphoreTake` / `ulTaskNotifyTake` for hardware ready/busy/button lines, static `EventGroup` barriers (`xEventGroupCreateStatic`) for multi-subsystem sleep synchronization, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) for cross-task teardown synchronization.
      - **Bare-Metal Sleep Domain (`orch_wake_stub.c` & `ulp/main.c`):** FreeRTOS, `esp_timer`, and `gptimer` interrupt vectors reside in Flash/IRAM and are unmapped or powered down during deep sleep. Inside `RTC_IRAM_ATTR` and ULP code, straight-line bounded `ccount`/register polling with `rtc_reg_barrier()` (`memw` / `fence`) and `__attribute__((noinline))` loop barriers is mandatory.
 5. **Compiler Diagnostics & Two-Strike Resolution Protocol:**
-   - Always verify compilation with the canonical ESP-IDF profile (C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1). If CMakePresets.json exists in the application directory (e.g. examples/H1OS), always pass both -B and --preset (e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build).
+   - Always verify compilation with the canonical ESP-IDF profile (C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1). If CMakePresets.json exists in the application directory (e.g. examples/H1OS), always pass both -B and --preset (e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build).
    - Keep header (`.h`) declarations and source (`.c`/`.cpp`) definitions atomically synchronized so the project compiles cleanly after every logical change.
    - If a build fails, isolate the exact diagnostic line and propose one targeted fix. If it fails a second time, **STOP IMMEDIATELY**, state the diagnostic verbatim, and request confirmation.
 
@@ -50,7 +50,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
 | **scaffold purge / purge** | **removal / erase / clear / refactoring / pruning** | Deleting obsolete code, wiping configuration, or clearing caches. |
 | **neutralize** | **clear / discharge / de-energize / reset** | Clearing display RAM, resetting DC bias, or de-asserting GPIO rails. |
 | **kill / terminate (non-POSIX)**| **halt / disable / abort / power cut** | Graceful shutdown or gate de-assertion. |
-| **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic. |
+| **fallback / fall back** | **default / recovery mode / safe state** | Fault handling logic *(Exception: `fallback` is permitted when referencing inherited upstream API identifiers/keywords such as LVGL `lv_font_t.fallback`, `epd-font` `.scheme.json` `"fallback"`, and Python stdlib `ConfigParser(..., fallback=...)`.)* |
 | **doctrine / dogma** | **standard / architecture / principle / specification**| Non-technical, cultish, or ideological framing. |
 | **bones / muscle / vanity** | **contracts / subsystems / presentation layer** | Anatomical slang / informal construction metaphors. |
 | **cadence** | **interval / period / frequency / cycle timing** | Timer, sleep cycle, refresh rate, or polling timing. |
@@ -64,7 +64,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
 
 ---
 
-## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.5-dev`)
+## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.10-dev`)
 
 `h1os_start()` (or `h1os_init()`) is the **MANDATORY single entry point** and lifecycle orchestrator. All state transitions, flow arbitration, parallel synchronization, and sleep transitions must be driven through `h1os_lifecycle_t`.
 
@@ -79,7 +79,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
      - `H1OS_WAKE_STATE_BOOT`: Cold power-on reset (`boot_count` incremented; flow periods validated via `h1os_validate_flow_periods()` before `orch_flow_init()` and applied via `h1os_apply_flow_periods()` after `orch_state_reset()`).
      - `H1OS_WAKE_STATE_RTC_FLOW_B`: Headless periodic RTC Flow B wake (`flow_b_counter` incremented; executes `on_wake` + `on_sync` + parallel Core 1 e-Paper refresh, then enters deep sleep immediately upon barrier completion without starting the 30s inactivity timer).
      - `H1OS_WAKE_STATE_INTERACTIVE_SESSION`: User tactile button wake on `GPIO 0` or `GPIO 18` (`button_wake_count` incremented; runs interactive session bounded by the one-shot `esp_timer` inactivity timer `s_session_timer`).
-   - Parallel Dual-Core Sequence (`v2.4.5-dev` / `MANDATE-04`):
+   - Parallel Dual-Core Sequence (`v2.4.10-dev` / `MANDATE-04`):
      1. Core 0 validates `h1os_lifecycle_t`, runs `orch_flow_init()`, `sub_display_init()`, and `h1os_lvgl_init()` (routing any failure to `h1os_handle_fatal_startup_error()` / `on_error`).
      2. Core 0 invokes `on_boot()` (on cold boot) or `on_wake(&wake_ctx)` (while Core 1 LVGL task is not yet running, requiring no outer `h1os_lvgl_lock` wrapper; `h1os_trigger_splash()` acquires a scoped lock internally).
      3. If `session.sync_wait_ms > 0` and `on_sync` is registered, Core 0 arms the inbound pre-flush coalescing gate (`h1os_lvgl_set_sync_gate(sync_wait_ms)`).
@@ -103,14 +103,14 @@ All UI code targets the Waveshare ESP32-S3 ePaper 1.54" V2 panel (SSD1681 driver
 * **Usable Margins & Maximum Width:** $X = 6\text{ px}$ to $194\text{ px}$. Maximum string width is strictly **$\le 188.0\text{ px}$**.
 * **Color Depth:** 1-bit Monochrome (`LV_COLOR_FORMAT_I1`), pure black and pure white. Draw buffer: exactly 5,000 bytes (plus 8-byte LVGL v9 palette header in the draw buffer).
 * **100% Opacity Mandate:** Opacity must always be `LV_OPA_COVER` (100%). Alpha blending, partial opacity (`LV_OPA_50`), and pseudo-random dithering are strictly prohibited.
-* **Typography:** Minimum font height is **14 pixels** (e.g. `H1OS_FONT_14`). Fonts <14 px blur into illegibility during differential updates.
-* **Proportional Font Rules:** Montserrat font metrics are proportional with 4-bit fractional advance widths and class kerning. Never use multiple spaces for alignment; use dual column labels or single-space padding.
+* **Typography:** Minimum font height is **14 pixels** (e.g. `HUMID1_FONT_UI_BODY` / `H1OS_FONT_14`, symbol `humid1_font_plex_sans_normal_14`). Fonts <14 px blur into illegibility during differential updates.
+* **Proportional Font Rules:** IBM Plex Sans metrics use 4-bit fractional advance widths (`adv_w_fp4`, `(adv_w_fp4 + kern_fp4 + 8) >> 4`), while IBM Plex Mono & Terminus provide tabular widths for aligned readouts. Never use multiple spaces for proportional alignment; use dual column labels or tabular mono strikes.
 * **Layout Grid (200 px Total):** Header ($Y = 0..20\text{ px}$ with 1 px bottom border), Body ($Y = 22..148\text{ px}$), Footer ($Y = 150..200\text{ px}$).
 * **Cross-Core UI Mutation & Thread Safety (`MANDATE-04` / `REV-02`):**
   - **Preferred Non-Blocking Actor Pattern (Core 0 $\rightarrow$ Core 1):** Background tasks, `on_sync` handlers, and network callbacks on Core 0 should enqueue UI updates via `h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms)` (16-slot static FreeRTOS queue). Core 1 wakes immediately via `xTaskNotifyGive()` and executes every queued callback **inside `h1os_lvgl_lock(100)`** immediately before `lv_timer_handler()`.
   - **Direct Recursive Mutex Pattern:** When synchronous locking is required outside `on_wake`/`on_boot` or `h1os_ui_post`, wrap LVGL calls in `if (h1os_lvgl_lock(timeout_ms)) { ... h1os_lvgl_unlock(); }` (always passing an explicit `uint32_t timeout_ms` parameter).
   - **Single-Refresh Inbound Coalescing:** When `on_sync` fetches remote data to display on the current wake's screen, set `lifecycle.session.sync_wait_ms` (e.g. `250 ms`). Core 1 delays its first `lv_timer_handler()` flush until `h1os_sync_notify_complete()` releases the gate (or `sync_wait_ms` expires), coalescing `on_wake` + `on_sync` UI updates into a **single physical SSD1681 refresh**.
-* **Font Validation Tools:** Verify all strings against layout boundaries using `python tools/agent/check_string_width.py --audit-screens` and CSV metrics in `tools/fonts/`.
+* **Font Validation Tools:** Verify all strings, icons, and screen layouts via `embedded-ops` MCP tools (`epd_char_info`, `epd_string_budget`, `epd_audit_screens`, `epd_icon_search`, `epd_font_inventory`), the global `epd-typography` skill, and packaged CSV manifests in `components/h1os/tools/fonts/metrics/`.
 
 ---
 
@@ -164,7 +164,7 @@ Direct commits to `main` are strictly prohibited. Before merging any branch into
 2. **Asset Optimization & Metadata Invariant (`/shrink` or `/quant`):** Execute the repository asset shrink pipeline (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) prior to staging or committing changes. All photographic evidence must be stamped with all-caps EXIF attribution (`HUMIDITRON/HUMADYNE_LABS`) and progressive JPEG quantization. PDFs are strictly preserved in their original compressed format with lossless metadata harmonization.
 3. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via idf.py -B build_dev --preset dev build (if CMakePresets.json exists, always pass both -B and --preset, e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build). You must build the examples inside examples/H1OS (the showcase project directory) to avoid polluting the repository root.
 4. **Mandatory `sdkconfig` Removal Invariant:** Always remove `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
-5. **Synchronize 4 Version Strings:** Update `h1os_version.h`, `idf_component.yml`, `README.md`, and `CHANGELOG.md`.
+5. **Synchronize Version Strings:** Run `python tools/agent/bump_version.py --set X.Y.Z-tag` (updating `h1os_version.h`, `idf_component.yml`, `README.md`, `Doxyfile`, `ERRATA.md`, `AGENTS.md`, `.agents/`, `docs/guide.md`, and all `docs/architecture/*.md` headers) and verify via `python tools/agent/bump_version.py --check` alongside `CHANGELOG.md`.
 6. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
 7. **Touch Changelog:** Record changes in `CHANGELOG.md` under Keep a Changelog categories (`Added`, `Changed`, `Fixed & Hardened`, `Removed`).
 8. **Tag Release:** Push annotated tag `vX.Y.Z-tag` to remote.
@@ -205,49 +205,9 @@ Cross-reference the canonical system blueprint documents before modifying archit
 
 ---
 
-## 9. MCP Tool Harness: Scope, Architecture & Strategic Planning
+## 9. MCP Tool Harness & Static Audits
 
-The 3-Finger MCP tool suite equips the agent with compiler-grade AST intelligence, binary memory profiling, hardware telemetry SQL, and formal mathematical solvers. Using the right tool eliminates guesswork, prevents token burn, and guarantees physical correctness.
-
-### 1. Semantic Code Intelligence (`clangd`)
-* **Available Tools:** `find_symbol`, `get_definition`, `find_references`, `get_type_info`, `get_callers`, `get_callees`, `list_file_symbols`.
-* **Purpose & Application:** AST-accurate C/C++ semantic navigation backed by LLVM 18 and `compile_commands.json`. Resolves active `#ifdef` configurations, struct layouts, type hierarchies, and full incoming/outgoing call graphs.
-* **Why Preferred Over `grep`:**
-  - `grep` is syntactic and blind: it returns false positives in comments, string literals, inactive `#if 0` blocks, and similarly named variables across unrelated files.
-  - `clangd` is semantic and exact: `get_definition` jumps straight to the true compiler definition; `find_references` lists exact call sites; `get_type_info` provides precise struct packing and byte offsets.
-* **Workflow Example:**
-  - ❌ *Bad:* Running `grep -r "sensor_fail_count"` across all files, reading 50 lines of context per match.
-  - ✅ *Good:* Calling `get_definition` on `orch_sensor_err_t` to verify enum values, then `find_references` on `sensor_fail_count` to map every assignment in `orch_wake_stub.c`.
-
-### 2. Embedded Diagnostics & Memory Budgets (`embedded-ops`)
-* **Available Tools:** `murdock_memory_budget`, `ba_serial_capture_and_decode`, `clangd_touch_reload`.
-* **Purpose & Application:** Binary inspection and runtime verification.
-  - `murdock_memory_budget`: Evaluates compiled `h1os.elf` using `xtensa-esp32s3-elf-size` and `nm` to return structured JSON byte counts for DRAM, DIRAM, RTC Slow, and Flash partition headroom.
-  - `ba_serial_capture_and_decode`: Captures serial boot sequences and automatically runs `xtensa-esp32s3-elf-addr2line` to decode panic backtraces to `file:line (function)`.
-  - `clangd_touch_reload`: Busts clangd AST cache after CMake reconfigures without restarting sessions.
-* **Why Preferred Over Host Text Dumps:** Eliminates manual calculation of linker map addresses; immediately catches RTC Slow SRAM overflow (>4 KB) before hardware deployment.
-
-### 3. Telemetry & Tabular Analytics (`duckdb`)
-* **Available Tools:** `query`.
-* **Purpose & Application:** High-performance in-memory SQL analytics directly against disk CSV and Parquet files without database imports or file-locking conflicts.
-* **Why Preferred Over Ad-Hoc Scripts:**
-  - Allows instant multi-file aggregation (e.g., font metric audits, temperature delta queries over 10-hour chamber tests) in a single turn without writing throwaway Python parsing scripts.
-* **Workflow Example:**
-  - ❌ *Bad:* Writing a 40-line Python script to load `char_widths_montserrat_14.csv`, sort by width, and print the top 5 widest characters.
-  - ✅ *Good:* Executing `SELECT char, width_px FROM 'tools/fonts/char_widths_montserrat_14.csv' ORDER BY width_px DESC LIMIT 5;` via DuckDB.
-
-### 4. Mathematical Grounding & Formal Verification (`science`)
-* **Available Tools:** `derive_fixed_point_polynomial`, `solve_z3_assertions`, `fit_thermal_rc`, `eval_symbolic_math`.
-* **Purpose & Application:**
-  - `derive_fixed_point_polynomial`: Derives Chebyshev/Padé minimax polynomial approximations for FPU-less ULP RISC-V in Q16.16/Q8.24 with Horner evaluation C code and error bounds.
-  - `solve_z3_assertions`: Formal SMT verification proving freedom from race conditions and GPIO latch deadlocks.
-  - `fit_thermal_rc`: Empirical curve-fitting of sensor thermal step responses ($\tau$).
-* **Why Preferred Over Heuristic Guessing:** Produces mathematically optimal, cycle-efficient fixed-point approximations rather than trial-and-error lookup tables.
-
-### 5. Documentation & Technical Reference (`local-index` & `espressif-documentation`)
-* **Available Tools:** `search_code_advanced`, `find_files`, `get_file_summary`, `search_espressif_sources`.
-* **Purpose & Application:** Precision search across repository architecture docs, IC datasheets (SHTC3, PCF85063A, ES8311, SSD1681), and Espressif Technical Reference Manuals.
-* **Tool Quirk:** `local-index/search_code_advanced` strictly requires argument `pattern: str` (do not pass `query`).
+Global MCP tool routing (`clangd`, `esp-idf-eim`, `embedded-ops`, `duckdb`, `espressif-documentation`, `esp-component-registry`, `deepwiki`, `semgrep`, `playwright`, `mcp-compass`) and static analysis audit pipelines are managed globally by the **`embedded-harness`** plugin (`~/.gemini/config/plugins/embedded-harness/`).
 
 ---
 
@@ -258,7 +218,7 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 1. **Respect the Two Execution Worlds (FreeRTOS Awake vs. Bare-Metal RTC Sleep):**
    - When the system is **awake in Flow B**, let hardware interrupts, `esp_timer`, and static FreeRTOS `EventGroup` / `Queue` / `Semaphore` primitives do the waiting. Never write a `while (busy) { vTaskDelay(10); }` loop or spawn a `4 KB` FreeRTOS task just to poll a timestamp or a GPIO pin. Use `esp_timer` one-shot/periodic alarms, `GPIO_INTR_NEGEDGE`/`GPIO_INTR_ANYEDGE` ISRs, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) so both Xtensa cores can enter low-power idle states cleanly—especially when upper-layer applications run Wi-Fi and BLE stacks on Core 0.
    - When the system is **asleep in Flow A (`orch_wake_stub.c`) or the ULP (`ulp/main.c`)**, SPI NOR Flash is powered off and the MMU cache is disabled. Never call standard library functions (`memset`, `memcpy`), `esp_timer`, or FreeRTOS primitives from `orch_wake_stub.c`. Always guard fixed-trip-count bit-bang loops with `__attribute__((noinline))` and inline assembly loop clobbers (`asm volatile("" : "+r"(i))`), guard local array zeroing with `asm volatile("" : "+m"(buf[i]))` so GCC `-O2` `-ftree-loop-distribute-patterns` never synthesizes a fatal call to Flash-resident `memset`, and place `rtc_reg_barrier()` (`memw` on Xtensa, `fence` on RISC-V) between sequential peripheral register writes.
-2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.5-dev`):**
+2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.10-dev`):**
    - Core 1 owns the LVGL v9 context and SSD1681 SPI bus; Core 0 owns `on_sync()` telemetry and background peripheral I/O. Never hold `h1os_lvgl_lock()` across slow network, SD card, or I2C operations. Enqueue cross-core UI updates via `h1os_ui_post(fn, arg, timeout_ms)`, use `h1os_sync_hold()` / `h1os_sync_notify_complete()` for asynchronous radio transfers, and configure `session.sync_wait_ms` when inbound data must coalesce into a single physical e-Paper refresh before deep sleep.
 3. **Never Fight Physics with Software Fudge Factors:**
    - The SHTC3 is factory-calibrated. When the PCB is thermally settled (`|T2 - T1| <= 0.20 C` across consecutive quiescent Flow A wakes), trust the SHTC3 directly and compute true water vapor pressure ($e$), dew point ($T_{\text{dew}}$), and absolute humidity ($d_v$) using pure August-Roche-Magnus equations. Never add synthetic temperature offsets or linear tares.
@@ -276,5 +236,5 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 ## 11. Engineering Attribution & Contributors
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.5-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.10-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

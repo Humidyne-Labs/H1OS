@@ -32,7 +32,7 @@ The SSD1681 uses two distinct SPI device configurations on `SPI2_HOST`:
 
 ## 3. SSD1681 Register Map & Commands
 
-| Register Address | Command Name | Description | Parameters / Payload |
+| Register Address | Command Name | Description | Parameters / data buffer |
 |---|---|---|---|
 | **0x01** | `DRIVER_OUTPUT_CONTROL` | Configures multiplexer line count | 3 Bytes: `[0xC7, 0x00, 0x00]` (200 Mux lines) |
 | **0x03** | `GATE_VOLTAGE_CONTROL` | Gate driving voltage | 1 Byte: `0x17` (+19V / -19V) |
@@ -47,7 +47,7 @@ The SSD1681 uses two distinct SPI device configurations on `SPI2_HOST`:
 | **0x24** | `WRITE_RAM_NEW` | Writes New Frame to display RAM | 5,000 Bytes |
 | **0x26** | `WRITE_RAM_OLD` | Writes Previous Frame to shadow RAM | 5,000 Bytes |
 | **0x2C** | `VCOM_VOLTAGE_CONTROL` | Sets VCOM driving voltage | 1 Byte: `0x28` (-1.0V) |
-| **0x32** | `WRITE_LUT_REGISTER` | Custom waveform LUT payload | 153 Bytes (`WF_PARTIAL_1IN54[0..152]`) |
+| **0x32** | `WRITE_LUT_REGISTER` | Custom waveform LUT data buffer | 153 Bytes (`WF_PARTIAL_1IN54[0..152]`) |
 | **0x37** | `DISPLAY_OPTION` | Partial Ping-Pong scan options | 10 Bytes: `[0, 0, 0, 0, 0, 0x40, 0, 0, 0, 0]` |
 | **0x3C** | `BORDER_WAVEFORM_CONTROL` | Border pin driving waveform | 1 Byte: `0x05` (Full OTP), `0x80` (Partial LUT0 Floating) |
 | **0x3F** | `EOPT_REGISTER` | End of frame pulse control | 1 Byte: `0x02` (`WF_PARTIAL_1IN54[153]`) |

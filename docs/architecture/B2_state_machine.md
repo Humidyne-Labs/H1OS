@@ -1,5 +1,7 @@
 # Application Execution Flow & State Machine
 
+> **H1OS Architecture Specification** | **Document:** `B2` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+
 This document models the end-to-end execution flow of **H1OS** across deep sleep, the Pure Event Mode ULP-RISC-V Monitor, isolated Flow A wake stub sensor pulses, and the Flow B interactive user session (with a developer-configurable inactivity timeout defaulting to 30 seconds).
 
 ---
@@ -136,4 +138,4 @@ To prevent unintended audio chirps and spurious screen skipping while deep sleep
   - Flow B (`flow_b_period_sec`): $300\text{s} \le B \le 86,400\text{s}$ ($24\text{ hours}$). Must be strictly greater than $A$.
   - Remainder Floor: If $\text{remainder} = B \bmod A > 0$, it must be $\ge 60\text{s}$ to justify the re-arm cycle.
 - **Unified Validation & Post-Reset Application (`REV-01`):** Both `h1os_start()` and `h1os_set_flow_periods()` funnel strictly through `h1os_validate_flow_periods()` and `h1os_apply_flow_periods()`. On cold boot, validation runs prior to `orch_flow_init()` and period application runs immediately after `orch_state_reset()` so configured periods are never clobbered. If parameters violate any bound or invariant, the call fails immediately with `ESP_ERR_INVALID_ARG`.
-- Silent fallback magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.
+- Silent default magic numbers (`300s`, `120s`, `30s`) are strictly prohibited across the codebase.

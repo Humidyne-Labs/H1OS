@@ -9,6 +9,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "humid1_fonts.h"
 #include "lvgl.h"
 
 #include <stdbool.h>
@@ -30,7 +31,7 @@ typedef void (*h1os_ui_fn_t)(void *arg);
  */
 typedef struct {
     h1os_ui_fn_t fn;  /**< Callback function to execute on Core 1 under LVGL lock. */
-    void        *arg; /**< Opaque payload pointer passed to fn.                    */
+    void        *arg; /**< Opaque data buffer pointer passed to fn.                    */
 } h1os_ui_msg_t;
 
 /**
@@ -53,6 +54,17 @@ esp_err_t h1os_lvgl_init(bool is_wake_cycle);
  * @param[in] full_refresh True for full OTP flashing refresh, False for differential partial.
  */
 void h1os_lvgl_set_first_flush_mode(bool full_refresh);
+
+/**
+ * @brief Request a full OTP flashing waveform refresh on the next LVGL display flush.
+ *
+ * @details Convenience inline wrapper around h1os_lvgl_set_first_flush_mode(true) for
+ *          Layer 4 theme polarity switches (Light/Dark) and manual anti-ghosting scrubs.
+ */
+static inline void h1os_lvgl_request_full_refresh(void)
+{
+    h1os_lvgl_set_first_flush_mode(true);
+}
 
 /**
  * @brief Start the LVGL background FreeRTOS task.

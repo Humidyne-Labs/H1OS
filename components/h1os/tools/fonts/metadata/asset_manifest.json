@@ -1,0 +1,586 @@
+{
+  "manifest_version": "1.0.22",
+  "repository": "https://github.com/Humidyne-Labs/epd-font",
+  "license": "MIT",
+  "generator": "build_static_ttf_assets.py",
+  "cu2qu_max_err": 1.0,
+  "total_ttf_files": 112,
+  "catalog_counts": {
+    "icon_fa7": 2349,
+    "icon_lucide": 2043,
+    "icon_phosphor": 1513,
+    "icon_tabler": 6257,
+    "icon_tabler_filled": 1054,
+    "terminus": 1355
+  },
+  "licenses": [
+    "FontAwesome7_LICENSE.txt",
+    "Lucide_ISC_LICENSE.txt",
+    "Noto_OFL.txt",
+    "Phosphor_MIT_LICENSE.txt",
+    "Tabler_MIT_LICENSE.txt",
+    "Terminus_OFL.txt"
+  ],
+  "assets": [
+    {
+      "filename": "FontAwesome7-Brands.ttf",
+      "size_bytes": 219052,
+      "sha256": "9ad9548c116857f34af66a3da70291063a9ba722ec79725740d27cab1c4ddc49"
+    },
+    {
+      "filename": "FontAwesome7-Regular.ttf",
+      "size_bytes": 84448,
+      "sha256": "27b945b3ae1a73f0c38f8b7e41d236d9f664bebca26081d15e0906ce8f149007"
+    },
+    {
+      "filename": "FontAwesome7-Solid.ttf",
+      "size_bytes": 404204,
+      "sha256": "21bfb88e29549913c72f377cce8860fd50e31f11604948a0f754cc1c6b1a5129"
+    },
+    {
+      "filename": "IBMPlexMath-Regular.ttf",
+      "size_bytes": 162360,
+      "sha256": "c6708aa09138806e02c22c1739f32560f77db0374791b7da226b75a4381210c2"
+    },
+    {
+      "filename": "IBMPlexMono-Bold.ttf",
+      "size_bytes": 72088,
+      "sha256": "90b25f02415e4fe1eeea180b124a136efa0cab5c640000c285081dbfefb3da90"
+    },
+    {
+      "filename": "IBMPlexMono-BoldItalic.ttf",
+      "size_bytes": 74832,
+      "sha256": "3a775703a694f57ed07f24287802d659feef618aac947c642aa01c2d05cd99ca"
+    },
+    {
+      "filename": "IBMPlexMono-ExtraBold.ttf",
+      "size_bytes": 53792,
+      "sha256": "47cd652123536acb2ad52d7c3dd76efe1afc880e1a01bcc376953491c19e7f62"
+    },
+    {
+      "filename": "IBMPlexMono-ExtraBoldItalic.ttf",
+      "size_bytes": 56764,
+      "sha256": "d8dc0d1b0d4ed266e7e87db35ef69a79aa2ba7ae7da8376b3a0381cdad329f3b"
+    },
+    {
+      "filename": "IBMPlexMono-Italic.ttf",
+      "size_bytes": 75056,
+      "sha256": "134fdde6689211a727e98303f23cbe5c678e4593d2bc14e5fbe3ce9decdc8e4f"
+    },
+    {
+      "filename": "IBMPlexMono-Medium.ttf",
+      "size_bytes": 71880,
+      "sha256": "64ad4aa4f854676bdd3a9d682a657dcfa667975e41f51259d4c96e0c867a8d01"
+    },
+    {
+      "filename": "IBMPlexMono-MediumItalic.ttf",
+      "size_bytes": 74604,
+      "sha256": "0e3e8cf8984c868d0a8bec27e360b45145039f7e167e74461a536d0155ff6f70"
+    },
+    {
+      "filename": "IBMPlexMono-Regular.ttf",
+      "size_bytes": 71584,
+      "sha256": "b2527aee18f0874026b5c0f0f55cce482f90848de8ac23537c6bf30baa8b779b"
+    },
+    {
+      "filename": "IBMPlexMono-SemiBold.ttf",
+      "size_bytes": 72016,
+      "sha256": "8d6f8e04a092228ffa69fb80115eeee7672341db80e8069670c71a9e22658e94"
+    },
+    {
+      "filename": "IBMPlexMono-SemiBoldItalic.ttf",
+      "size_bytes": 74688,
+      "sha256": "4bfb00bfddba3600b14cd17d5000560c6b8194fec2cf4729d5d5a68008ca31fb"
+    },
+    {
+      "filename": "IBMPlexSans-Bold.ttf",
+      "size_bytes": 50004,
+      "sha256": "6581b347471e5e38cf5210eecfe985755dc33b02d7108a4900570de2904ca3a9"
+    },
+    {
+      "filename": "IBMPlexSans-BoldItalic.ttf",
+      "size_bytes": 52476,
+      "sha256": "d5cb4cab0eeb9cb57739e2f8766711e306763fe1877bd7ff761686fb45665e78"
+    },
+    {
+      "filename": "IBMPlexSans-ExtraBold.ttf",
+      "size_bytes": 40424,
+      "sha256": "84334a7e91d01514c3da0b624a3819f556d8da5b8a4df6e35344b26842b55447"
+    },
+    {
+      "filename": "IBMPlexSans-ExtraBoldItalic.ttf",
+      "size_bytes": 43256,
+      "sha256": "73b673ef1c579fbdd3c416820f3da0152409e1538c56ce7c3c0dd28abcd67cd4"
+    },
+    {
+      "filename": "IBMPlexSans-Italic.ttf",
+      "size_bytes": 52916,
+      "sha256": "ac8828a95c7b06ab70dce635633a4eba5688911ab91e0cc6f49764fd4beac442"
+    },
+    {
+      "filename": "IBMPlexSans-Medium.ttf",
+      "size_bytes": 49732,
+      "sha256": "01de41bc4bf5143c988c405d01a7aa3a20a50601f39b10f8ef6fd6863691628c"
+    },
+    {
+      "filename": "IBMPlexSans-MediumItalic.ttf",
+      "size_bytes": 52092,
+      "sha256": "515e79aecf8f0060305f949e62bcfe3eb0158febdf2efee4e70ddd6951ec1fb3"
+    },
+    {
+      "filename": "IBMPlexSans-Regular.ttf",
+      "size_bytes": 50096,
+      "sha256": "e9f8e1c46d39283d0bd4b2933647f4736f549471683cc86c44c99c0dcc839be1"
+    },
+    {
+      "filename": "IBMPlexSans-SemiBold.ttf",
+      "size_bytes": 49864,
+      "sha256": "6d48a060dd07b2961346c92284b4d66e988e3da80d0a0f9255f10ee16f90d5ce"
+    },
+    {
+      "filename": "IBMPlexSans-SemiBoldItalic.ttf",
+      "size_bytes": 52404,
+      "sha256": "64db6c91212fa1571133cf6b8fe32a435c67ae63979580d4a6046c1866a78baf"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-Bold.ttf",
+      "size_bytes": 50640,
+      "sha256": "fd51269af02de2149de309a56c23b15f44655294c861f007e9c22b2444cd3edd"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-BoldItalic.ttf",
+      "size_bytes": 54112,
+      "sha256": "5212df8f1b16d674aeb82c79c888942f449064b5b0f38312445fcc05becb5804"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-ExtraBold.ttf",
+      "size_bytes": 40392,
+      "sha256": "ff451832fa0ca9f920c702c94248fc37139169f61ee20402a234dbf86702c850"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-ExtraBoldItalic.ttf",
+      "size_bytes": 43188,
+      "sha256": "c77e457e9dfba9e4409644cdde40cd02bb065797f96e6bd1ff489d14dc5d3468"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-Italic.ttf",
+      "size_bytes": 53896,
+      "sha256": "f9d2050d48cbca433efddfac509770cfdf82c2a2efb740380b50096cd243b267"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-MedItal.ttf",
+      "size_bytes": 53100,
+      "sha256": "52ce99775020c1b081eb90c9deecc61a72836b4f778fd12e44d8ed19eecccd12"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-Medium.ttf",
+      "size_bytes": 50056,
+      "sha256": "7ea43a6099db3b140cb19e106f287a51b5ff869246b06334a9237f9110ea6713"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-Regular.ttf",
+      "size_bytes": 50420,
+      "sha256": "e964f3e1737a741368ecff4befac5790083a79f7b89e7998511eb5ec7b2c0047"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-SemiBold.ttf",
+      "size_bytes": 50116,
+      "sha256": "0a42a463aa6d57dbdce35b8d30b2eab231b97c3613612ab41531d25d1c8564c0"
+    },
+    {
+      "filename": "IBMPlexSansCondensed-SemiBoldItalic.ttf",
+      "size_bytes": 52888,
+      "sha256": "998c332c0b2055335e6bf59140b44064f0fd822b5abe9748528e77c3ff001347"
+    },
+    {
+      "filename": "IBMPlexSerif-Bold.ttf",
+      "size_bytes": 55972,
+      "sha256": "7e2842323106c2743f68658016f71343231648d439570539f748821df9e751c3"
+    },
+    {
+      "filename": "IBMPlexSerif-BoldItalic.ttf",
+      "size_bytes": 58456,
+      "sha256": "6f93bfd4c4b5ef7e21323e0f44f7dc936a65d653f217616f615319e93e9d51d2"
+    },
+    {
+      "filename": "IBMPlexSerif-ExtraBold.ttf",
+      "size_bytes": 43156,
+      "sha256": "0fbe6c93c0042df6922ffba8f0a12634494546ece20b61e8cc0902abeb0cfb5a"
+    },
+    {
+      "filename": "IBMPlexSerif-ExtraBoldItalic.ttf",
+      "size_bytes": 46208,
+      "sha256": "f95ed3a63fe89d84b0b88a7f31b2ab6692a4dc09112f7041634894235abaf614"
+    },
+    {
+      "filename": "IBMPlexSerif-Italic.ttf",
+      "size_bytes": 58172,
+      "sha256": "224cf66611b494172e0d33063f1a905d3433f622ed1e7fdd953fbac743f42eca"
+    },
+    {
+      "filename": "IBMPlexSerif-Medium.ttf",
+      "size_bytes": 55068,
+      "sha256": "46f43580080399c2afd2e6aa5c51053dc5382d6f232e4d230985c0c10c90cf8e"
+    },
+    {
+      "filename": "IBMPlexSerif-MediumItalic.ttf",
+      "size_bytes": 57804,
+      "sha256": "44aa8ec5efe02a262a1443b3c83001982106b03fa023fe81574b57080d858244"
+    },
+    {
+      "filename": "IBMPlexSerif-Regular.ttf",
+      "size_bytes": 55400,
+      "sha256": "5e6674bfd9dc7fb92754998676414449c1fca94f070aadd6d4f45fb06769e93d"
+    },
+    {
+      "filename": "IBMPlexSerif-SemiBold.ttf",
+      "size_bytes": 55220,
+      "sha256": "470d541526e027921d1e048682617d6a42a32d703025face717f54203ca48300"
+    },
+    {
+      "filename": "IBMPlexSerif-SemiBoldItalic.ttf",
+      "size_bytes": 58152,
+      "sha256": "c43c8d399ca4cfb616c8b47e5888146ffa262de23f38db981807b5e324745e83"
+    },
+    {
+      "filename": "Lucide-Regular.ttf",
+      "size_bytes": 979580,
+      "sha256": "23730b56d04bc009e9ecf6a0598ef9d82a3ba4ba055d4d9115976e4a385eff7e"
+    },
+    {
+      "filename": "NotoSans-Black.ttf",
+      "size_bytes": 42040,
+      "sha256": "90d7bf6b2f800feea3aedb0076c2163c565a4d68f2b16ab7a9a47987df8a9fd3"
+    },
+    {
+      "filename": "NotoSans-Bold.ttf",
+      "size_bytes": 41792,
+      "sha256": "026b33bf2c7d3346dc9231c8afbf5c431b385774901b7060201c7ee13ab1423b"
+    },
+    {
+      "filename": "NotoSans-CondensedBlack.ttf",
+      "size_bytes": 41932,
+      "sha256": "ec73d0d87a1e49f3bd0c11d37c1f573e0bb22db484770e72b6c888103effe1b4"
+    },
+    {
+      "filename": "NotoSans-CondensedSemiBold.ttf",
+      "size_bytes": 41852,
+      "sha256": "9f981cf40c12830da781f8cf2310bc5279f59494cbfe902836494239e891d2ab"
+    },
+    {
+      "filename": "NotoSans-CondensedSemiBoldItalic.ttf",
+      "size_bytes": 41648,
+      "sha256": "75fc3c49b353aeaeea26eeff500e4401a3f5ce969cd3f6c2cec4bb2a6061c7ba"
+    },
+    {
+      "filename": "NotoSans-ExtraBold.ttf",
+      "size_bytes": 41984,
+      "sha256": "1241f7cdedbd70a8430926279473f893538acd2ca78efffaf92e63185512d5ce"
+    },
+    {
+      "filename": "NotoSans-Medium.ttf",
+      "size_bytes": 42680,
+      "sha256": "79d5ad46af0672bdb0b6fb9da5ab3e632a9dcb8e3df89260802c2e2ea7755b01"
+    },
+    {
+      "filename": "NotoSans-MediumItalic.ttf",
+      "size_bytes": 41936,
+      "sha256": "e349913bbd1f4e26765d6d3c77a4786fde42406a47976b5b19233c75270e8fe5"
+    },
+    {
+      "filename": "NotoSans-Regular.ttf",
+      "size_bytes": 42516,
+      "sha256": "f9ace50d53a265736aa9ce552d99f483d5adfd691002b9e407a785bf60736371"
+    },
+    {
+      "filename": "NotoSans-SemiBoldItalic.ttf",
+      "size_bytes": 41740,
+      "sha256": "2918c20ba9faa608aaae9b6c0b56807052333966de3333765aa2017943709250"
+    },
+    {
+      "filename": "NotoSans-SemiCondensedBlack.ttf",
+      "size_bytes": 42000,
+      "sha256": "5bb20fd215b2e657cfb1228c6ec55964c08da063437b2b0636c9ab974eba14af"
+    },
+    {
+      "filename": "NotoSans-SemiCondensedExtraBold.ttf",
+      "size_bytes": 41956,
+      "sha256": "a41763e7c86901cffe30c6eb0ee226a92a7220159d4c93c3b03b4413e7f0c6c5"
+    },
+    {
+      "filename": "NotoSans-SemiCondensedMedium.ttf",
+      "size_bytes": 42612,
+      "sha256": "021857c1cb24668ac03cf96d5b4cef703fe32bc8b76008a91b289c617e049229"
+    },
+    {
+      "filename": "NotoSans-SemiCondensedSemiBoldItalic.ttf",
+      "size_bytes": 41708,
+      "sha256": "a382bd4cb7703d51369cd64e2cbb20cf9a863067119881f60c065aa138418f0d"
+    },
+    {
+      "filename": "NotoSansMath-Regular.ttf",
+      "size_bytes": 63076,
+      "sha256": "9c34a065b220a07473d90c7c7fed5b8545ceb923bf741a5196337429aa4c04ca"
+    },
+    {
+      "filename": "NotoSansMono-Black.ttf",
+      "size_bytes": 85076,
+      "sha256": "656a9ede2625e7ecd6bdbc65e48c19c5fb648c639e0f7fdcc82bb8aa46246d28"
+    },
+    {
+      "filename": "NotoSansMono-ExtraBold.ttf",
+      "size_bytes": 84992,
+      "sha256": "32e83f1e64392745ff8abd1b5c63f32a3341fd4d9c2a7487ea667f54385280e5"
+    },
+    {
+      "filename": "NotoSansMono-Medium.ttf",
+      "size_bytes": 83640,
+      "sha256": "2d901903cefa645533113d5ad9e4c1e81da3afe59eff04ba32b34b07ae71c1c1"
+    },
+    {
+      "filename": "NotoSerif-Black.ttf",
+      "size_bytes": 50108,
+      "sha256": "8d9ef553f1426150fa14d5a94d7cd8c15eaffa6e63cb0970137bf309d992957b"
+    },
+    {
+      "filename": "NotoSerif-Medium.ttf",
+      "size_bytes": 48336,
+      "sha256": "b8d72bb549e2f7556bdd733a78822b9747d0a39e3c13aff6f08c57aba9c629c8"
+    },
+    {
+      "filename": "NotoSerif-MediumItalic.ttf",
+      "size_bytes": 50684,
+      "sha256": "cab896e17e37c05eb4f674529c7a3abdb68db350a044370d63f1bf159a6c975d"
+    },
+    {
+      "filename": "NotoSerif-SemiBoldItalic.ttf",
+      "size_bytes": 51636,
+      "sha256": "81c39c41b9e911915acf5c1841dfc48d64b42b2e450de1b13ec9a0f0f1526c12"
+    },
+    {
+      "filename": "Phosphor-Bold.ttf",
+      "size_bytes": 495308,
+      "sha256": "10a0a1cb4f8156a420f9f84cf34c4e9871e58ed2ddea1f6a8079ad07243a7fb2"
+    },
+    {
+      "filename": "Phosphor-Fill.ttf",
+      "size_bytes": 449252,
+      "sha256": "a53f5d2630cab5e3b7536ecb9d69d71519a2190298c22b1f8d770dd37bc2940a"
+    },
+    {
+      "filename": "Phosphor-Light.ttf",
+      "size_bytes": 536628,
+      "sha256": "a10ef7a0631da04626fca2eab921d14b391749fddfa3465749368f21b28fd46c"
+    },
+    {
+      "filename": "Phosphor-Regular.ttf",
+      "size_bytes": 488636,
+      "sha256": "06b91e022b7ee899a63efced879392a74f0bacbda54e4467e9f663220d173a10"
+    },
+    {
+      "filename": "Phosphor-Thin.ttf",
+      "size_bytes": 535152,
+      "sha256": "f40473506b4ab4fcfd2b5c32fb235f9e22def891e58e01da866e1e18974e79f2"
+    },
+    {
+      "filename": "Tabler-Filled.ttf",
+      "size_bytes": 234108,
+      "sha256": "143c3bf87336e9cafb400094a581fb6a054539ea3c93c4c6cf00ccf2024a1adb"
+    },
+    {
+      "filename": "Tabler-Light300.ttf",
+      "size_bytes": 1849444,
+      "sha256": "bf56c35cfcce83c96843e1595b4ba13aee84fa0223159dad08be7c73a589b425"
+    },
+    {
+      "filename": "Tabler-Regular.ttf",
+      "size_bytes": 1835440,
+      "sha256": "b94165ceaa38041acd2b8bf842f637b58f3bdba7f1186ca9a98fd94c511f5d04"
+    },
+    {
+      "filename": "Tabler-Thin200.ttf",
+      "size_bytes": 1850496,
+      "sha256": "09bfd2b54635597643783180d901a624cd7ae638d284fdfb1238fc57587119b1"
+    },
+    {
+      "filename": "Terminus-Bold-10.ttf",
+      "size_bytes": 102416,
+      "sha256": "b128cca884a62c0c6ba27c7e0b0537f51cf4fb6ead61c38576960c1e41b28036"
+    },
+    {
+      "filename": "Terminus-Bold-12.ttf",
+      "size_bytes": 102416,
+      "sha256": "1ad04ece926af5aede34d429709c312059fcc1c315f0319c195723bb4b44acd1"
+    },
+    {
+      "filename": "Terminus-Bold-14.ttf",
+      "size_bytes": 100708,
+      "sha256": "c43e0feae468e35699b43dacfe0ec44795a13248fa7a7901e4eb403d83c394dc"
+    },
+    {
+      "filename": "Terminus-Bold-16.ttf",
+      "size_bytes": 101508,
+      "sha256": "490c47a3b774328d350f2a5ba0870fd7016145d86da16b982d6cd4a597b6755e"
+    },
+    {
+      "filename": "Terminus-Bold-18.ttf",
+      "size_bytes": 107848,
+      "sha256": "11b6cd80ff18002543d20c88d5bcda066d204024b9b04ff9b31dd16c399cd310"
+    },
+    {
+      "filename": "Terminus-Bold-20.ttf",
+      "size_bytes": 108560,
+      "sha256": "85131e6decf7675d543dcfc4d6a97254806e5e9bae9d2faeb47475ce66c9f7a2"
+    },
+    {
+      "filename": "Terminus-Bold-22.ttf",
+      "size_bytes": 120368,
+      "sha256": "2a23bf8488c87011d1467b8e71381986537758f46dd4bafcedc5f287b43984c1"
+    },
+    {
+      "filename": "Terminus-Bold-24.ttf",
+      "size_bytes": 124232,
+      "sha256": "a7425043a9352cf01e1b358100da53d361e22000dace053f120af0a620d38f4c"
+    },
+    {
+      "filename": "Terminus-Bold-26.ttf",
+      "size_bytes": 124232,
+      "sha256": "7558d2987f71235cbd7e48b8398e4a791036493e08d270b4d948dc2294909161"
+    },
+    {
+      "filename": "Terminus-Bold-28.ttf",
+      "size_bytes": 131360,
+      "sha256": "5e6cfc5977ae014bc03c2561dfbe0e278aa05fa2f39f6184a6adb41b3e5fc201"
+    },
+    {
+      "filename": "Terminus-Bold-30.ttf",
+      "size_bytes": 131360,
+      "sha256": "c5f1722f7bc38e3a5acd0a2aaf37553b9d1a02f2c8f31ea9730fdbf9c9d7de4c"
+    },
+    {
+      "filename": "Terminus-Bold-32.ttf",
+      "size_bytes": 137156,
+      "sha256": "a1049bfdd1b56a5f6bf65f29df35ac38d1aeabdd44412de60a7e5e1707a3ee0d"
+    },
+    {
+      "filename": "Terminus-Bold-34.ttf",
+      "size_bytes": 137156,
+      "sha256": "4109722fdd976fff12d888ead9ea7b67576befa23007a5110cd19d5ba4907de0"
+    },
+    {
+      "filename": "Terminus-Bold-36.ttf",
+      "size_bytes": 117644,
+      "sha256": "d1e0780f2075e55785534bfd0912c0cfbcb15bc2b1a9cc12ab58c82d2d574e28"
+    },
+    {
+      "filename": "Terminus-Bold-38.ttf",
+      "size_bytes": 117644,
+      "sha256": "e3a50c66e16b77676b729ead52f578d806131a1529cd65fbec3df48f34344f33"
+    },
+    {
+      "filename": "Terminus-Bold-40.ttf",
+      "size_bytes": 118492,
+      "sha256": "e41e82ee553f4a1bb5de3ce0f2492514d793a87449f759cf2a27661205af16c2"
+    },
+    {
+      "filename": "Terminus-Bold.ttf",
+      "size_bytes": 101508,
+      "sha256": "490c47a3b774328d350f2a5ba0870fd7016145d86da16b982d6cd4a597b6755e"
+    },
+    {
+      "filename": "Terminus-Normal-10.ttf",
+      "size_bytes": 102440,
+      "sha256": "e15c8247a7c26666691306286e913530b67cd1ae5c2fca9a5ae9d5f3982ae2f7"
+    },
+    {
+      "filename": "Terminus-Normal-12.ttf",
+      "size_bytes": 102440,
+      "sha256": "a1be61678919bba57ce7d7a0b35fe01e395d624b2d617ecac6f08c0516aca280"
+    },
+    {
+      "filename": "Terminus-Normal-14.ttf",
+      "size_bytes": 110052,
+      "sha256": "ed71dc619c124d809b3512d08dcde92ff15a95af2ca700bd92330879e212c83b"
+    },
+    {
+      "filename": "Terminus-Normal-16.ttf",
+      "size_bytes": 110900,
+      "sha256": "cd2bb8ea9686084ee2bd40bd2bf9565d810ac8b5f7b2629b7b0993701feefc03"
+    },
+    {
+      "filename": "Terminus-Normal-18.ttf",
+      "size_bytes": 117836,
+      "sha256": "678b7c8fbdfd16bfcd0c398a6722ce430d525ee9761f1db914b9774565e22966"
+    },
+    {
+      "filename": "Terminus-Normal-20.ttf",
+      "size_bytes": 118564,
+      "sha256": "84559223c325699ad23b0a2a421f038a92badca1ea91523d8b9b15aefa1c7a0e"
+    },
+    {
+      "filename": "Terminus-Normal-22.ttf",
+      "size_bytes": 135384,
+      "sha256": "b26fa8d3f33b92226f1ac1ce5f8bebd261fec07649127b88f454b96a294f4db1"
+    },
+    {
+      "filename": "Terminus-Normal-24.ttf",
+      "size_bytes": 140204,
+      "sha256": "19118ca1168a7d9c56f710449b563d548f01d1e467bbc258dd248f8f76df1e49"
+    },
+    {
+      "filename": "Terminus-Normal-26.ttf",
+      "size_bytes": 140204,
+      "sha256": "033a6f043af7e3cfbd3600bdad127b6ec20d0558fc49a4dacab62f9eadde0f53"
+    },
+    {
+      "filename": "Terminus-Normal-28.ttf",
+      "size_bytes": 133116,
+      "sha256": "5f4ffca4e37a0c34fab332dc1cd967d957d7eeb44dd0613d927d9264a9a3f2f8"
+    },
+    {
+      "filename": "Terminus-Normal-30.ttf",
+      "size_bytes": 133116,
+      "sha256": "f0c213e4fa8ed65b1f57784666542bbafd588fc48ca362fcdd5e9bbaa9e64416"
+    },
+    {
+      "filename": "Terminus-Normal-32.ttf",
+      "size_bytes": 137660,
+      "sha256": "74c651e4acf449b1d181a7c244764312d4295cd7d44fda35f5c4544b145eddde"
+    },
+    {
+      "filename": "Terminus-Normal-34.ttf",
+      "size_bytes": 137660,
+      "sha256": "782c8bb6cafa87bed916505af941c41e34ebda404eeda2c1b7025dd3f7caf8ca"
+    },
+    {
+      "filename": "Terminus-Normal-36.ttf",
+      "size_bytes": 124836,
+      "sha256": "683a84a9077053aec6a23a382b88143b36af3ce8f6258c14cc65614945ce6075"
+    },
+    {
+      "filename": "Terminus-Normal-38.ttf",
+      "size_bytes": 124836,
+      "sha256": "439a606b1620745ffbcd49c816311c0f953a2aae04f74f05c4b915036767f6f7"
+    },
+    {
+      "filename": "Terminus-Normal-40.ttf",
+      "size_bytes": 125532,
+      "sha256": "92f3b4088e3c41f8a2d3c4fc9498b66c957a12c0d3523aea036e8478184ec782"
+    },
+    {
+      "filename": "Terminus-Regular.ttf",
+      "size_bytes": 110900,
+      "sha256": "cd2bb8ea9686084ee2bd40bd2bf9565d810ac8b5f7b2629b7b0993701feefc03"
+    },
+    {
+      "filename": "Terminus-VGA-14.ttf",
+      "size_bytes": 100752,
+      "sha256": "da39263d6d2694f64a4ef9cbf24b71ebb7dceb6d3f15c718f9cbc1cb4a2e8d9b"
+    },
+    {
+      "filename": "Terminus-VGA-16.ttf",
+      "size_bytes": 101544,
+      "sha256": "47cbca548467be8df39ca12342d70944ce16be124e07d7bf9df3528f2d04d9bb"
+    }
+  ]
+}

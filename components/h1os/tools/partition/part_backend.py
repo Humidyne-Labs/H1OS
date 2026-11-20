@@ -154,6 +154,7 @@ def find_tool(tool_name: str, comp_subpath: str) -> Optional[Path]:
         pass
 
     candidates = [
+        Path("C:/esp/v6.1.1/esp-idf") / comp_subpath / f"{tool_name}.py",
         Path("C:/esp/v6.1/esp-idf") / comp_subpath / f"{tool_name}.py",
         Path("C:/esp/esp-idf") / comp_subpath / f"{tool_name}.py",
     ]
