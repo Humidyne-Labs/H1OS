@@ -1,6 +1,6 @@
 # Layer 4: Application Lifecycle API & Services Specification
 
-> **H1OS Architecture Specification** | **Document:** `B1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `B1` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Overview
 Layer 4 is the top-level public interface of H1OS (`h1os.h`). It isolates developers from low-level register manipulation, coprocessor details, and power sequencing by exposing:

@@ -88,24 +88,31 @@ typedef enum {
 } audio_cmd_type_t;
 
 typedef struct {
-    audio_cmd_type_t type;
-    union {
-        struct {
-            uint32_t frequency_hz;
-            uint32_t duration_ms;
-        } tone;
-        struct {
-            uint8_t chime_type;
-        } chime;
-        struct {
-            const int16_t *samples;
-            size_t sample_count;
-            uint32_t sample_rate_hz;
-        } pcm;
-    } params;
+    uint32_t frequency_hz;
+    uint32_t duration_ms;
+} audio_cmd_tone_t;
 
-    SemaphoreHandle_t done_sem;
-    esp_err_t *result;
+typedef struct {
+    uint8_t chime_type;
+} audio_cmd_chime_t;
+
+typedef struct {
+    const int16_t *samples;
+    size_t sample_count;
+    uint32_t sample_rate_hz;
+} audio_cmd_pcm_t;
+
+typedef union {
+    audio_cmd_tone_t  tone;
+    audio_cmd_chime_t chime;
+    audio_cmd_pcm_t   pcm;
+} audio_cmd_params_t;
+
+typedef struct {
+    audio_cmd_type_t   type;
+    audio_cmd_params_t params;
+    SemaphoreHandle_t  done_sem;
+    esp_err_t         *result;
 } audio_cmd_t;
 
 typedef struct {
@@ -1240,6 +1247,7 @@ esp_err_t sub_audio_deinit(void)
         }
         (void)xSemaphoreTake(s_audio_stop_sem, pdMS_TO_TICKS(500));
         if (s_audio_task_handle != NULL) {
+            // [H1OS-WAIVER: PIT-01-E | Class: S2 | Reason: Emergency timeout halt only if cooperative AUDIO_CMD_STOP and s_audio_stop_sem wait expires | Proof: sub_audio.c:1235-1241 500ms timeout]
             vTaskDelete(s_audio_task_handle);
             s_audio_task_handle = NULL;
         }

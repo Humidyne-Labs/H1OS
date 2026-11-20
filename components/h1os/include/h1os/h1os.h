@@ -86,10 +86,7 @@ typedef struct {
     uint32_t wakeup_causes;          /**< Bitmap of wakeup sources (esp_sleep_get_wakeup_causes).             */
     h1os_wake_state_t wake_state;    /**< Explicit wake state classification (BOOT, INTERACTIVE, RTC_FLOW_B). */
     uint32_t boot_count;             /**< Monotonic system boot cycle count.                                  */
-    union {
-        uint32_t deep_sleep_count;   /**< Monotonic total deep sleep wake cycle count (Flow A + Flow B).      */
-        uint32_t wake_count;         /**< Alias for deep_sleep_count matching B1_api_and_services.md.         */
-    };
+    uint32_t wake_count;             /**< Monotonic total deep sleep wake cycle count (Flow A + Flow B + Button). */
     uint32_t flow_b_count;           /**< Monotonic unattended RTC Flow B presentation wake cycle count.      */
     uint32_t button_wake_count;      /**< Monotonic interactive tactile button wake cycle count.              */
     bool woke_from_button;           /**< True if system woke due to physical button actuation.               */
@@ -176,31 +173,40 @@ typedef void (*h1os_splash_cb_t)(h1os_splash_type_t type, void *user_data);
 typedef void (*h1os_chime_cb_t)(h1os_chime_type_t type, void *user_data);
 
 /**
+ * @brief Presentation splash, audio chime, and master volume configuration.
+ */
+typedef struct {
+    h1os_splash_cb_t on_splash; /**< Presentation splash screen rendering hook.     */
+    h1os_chime_cb_t  on_chime;  /**< Presentation chime playback hook.              */
+    uint8_t          chime_mask; /**< Bitmask of enabled audio chime types.          */
+    uint8_t          volume_pct; /**< Acoustic presentation master volume (0..100%). */
+} h1os_presentation_config_t;
+
+/**
+ * @brief Lifecycle session timeout, clock scaling, flow slicing, and sync configuration.
+ */
+typedef struct {
+    uint32_t       inactivity_timeout_sec; /**< Interactive session idle sleep timeout in seconds.              */
+    sys_clk_mode_t clk_mode;               /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
+    uint32_t       flow_a_period_sec;      /**< Period between headless sensor sample bursts in seconds.        */
+    uint32_t       flow_b_period_sec;      /**< Period between unattended display flushes in seconds.           */
+    uint32_t       sync_wait_ms;           /**< Inbound sync pre-flush gate window in ms (0 = immediate flush). */
+    uint32_t       sync_timeout_ms;        /**< Max barrier wait for async on_sync completion before sleep.     */
+} h1os_session_config_t;
+
+/**
  * @brief Declarative application lifecycle configuration structure.
  */
 typedef struct {
-    h1os_boot_cb_t on_boot;           /**< System boot / power-on reset hook.                      */
-    h1os_wake_cb_t on_wake;           /**< Interactive wake hook (Timer / RTC Alarm / Button Tap). */
-    h1os_sync_cb_t on_sync;           /**< Optional parallel network/storage sync hook on Core 0.  */
+    h1os_boot_cb_t      on_boot;      /**< System boot / power-on reset hook.                      */
+    h1os_wake_cb_t      on_wake;      /**< Interactive wake hook (Timer / RTC Alarm / Button Tap). */
+    h1os_sync_cb_t      on_sync;      /**< Optional parallel network/storage sync hook on Core 0.  */
     h1os_pre_sleep_cb_t on_pre_sleep; /**< Hook executed immediately prior to entering deep sleep. */
-    h1os_shutdown_cb_t on_shutdown;   /**< Hook executed immediately prior to battery power cut.   */
-    h1os_error_cb_t on_error;         /**< Optional fatal startup/lifecycle error hook.            */
+    h1os_shutdown_cb_t  on_shutdown;  /**< Hook executed immediately prior to battery power cut.   */
+    h1os_error_cb_t     on_error;     /**< Optional fatal startup/lifecycle error hook.            */
 
-    struct {
-        h1os_splash_cb_t on_splash; /**< Presentation splash screen rendering hook.     */
-        h1os_chime_cb_t on_chime;   /**< Presentation chime playback hook.              */
-        uint8_t chime_mask;         /**< Bitmask of enabled audio chime types.          */
-        uint8_t volume_pct;         /**< Acoustic presentation master volume (0..100%). */
-    } presentation;
-
-    struct {
-        uint32_t inactivity_timeout_sec; /**< Interactive session idle sleep timeout in seconds.              */
-        sys_clk_mode_t clk_mode;         /**< CPU clock scaling mode (SYS_CLK_MODE_DYNAMIC by default).       */
-        uint32_t flow_a_period_sec;      /**< Period between headless sensor sample bursts in seconds.        */
-        uint32_t flow_b_period_sec;      /**< Period between unattended display flushes in seconds.           */
-        uint32_t sync_wait_ms;           /**< Inbound sync pre-flush gate window in ms (0 = immediate flush). */
-        uint32_t sync_timeout_ms;        /**< Max barrier wait for async on_sync completion before sleep.     */
-    } session;
+    h1os_presentation_config_t presentation; /**< Presentation splash, chime hooks, and volume settings. */
+    h1os_session_config_t      session;      /**< Session timeout, clock mode, flow periods & sync wait. */
 
     void *user_data; /**< Arbitrary user context pointer passed to lifecycle hooks.       */
 } h1os_lifecycle_t;

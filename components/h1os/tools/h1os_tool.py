@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 H1OS Unified Developer Tooling Dispatcher & Configuration Engine (h1os_tool)
-Version: 2.4.1
 License: Apache-2.0
 
 Authoritative master entry point for H1OS developer operations:
@@ -16,14 +15,15 @@ import datetime
 from dataclasses import dataclass
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
-VERSION = "2.4.10-dev"
-H1OS_TOOLING_VERSION = "2.4.10-dev"
+VERSION = "2.4.11-dev"
+H1OS_TOOLING_VERSION = "2.4.11-dev"
 SYSTEM_SECTIONS = {"project", "dist", "version", "partitions", "target", "build", "audit", "presets"}
 
 
@@ -88,7 +88,7 @@ def run_tool_command(
         return (False, f"Command timed out after {timeout_sec} seconds: {' '.join(cmd)}")
     except FileNotFoundError:
         return (False, f"Command executable not found: {cmd[0] if cmd else ''}")
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return (False, f"Execution error: {e}")
 
 
@@ -134,22 +134,22 @@ class H1OSConfig:
                 self.project_dir / "h1os.ini",
                 Path.cwd().resolve() / "h1os.ini",
             ]
-            self.ini_path = None
+            found_ini: Optional[Path] = None
             for cand in candidates:
                 if cand.is_file():
-                    self.ini_path = cand
+                    found_ini = cand
                     break
-
-        if not self.ini_path or not self.ini_path.is_file():
-            print(f"\n[ERROR] H1OS configuration file 'h1os.ini' was not found in: {self.project_dir}", file=sys.stderr)
-            print("Please create h1os.ini from components/h1os/h1os.ini.template or pass --config <path>.\n", file=sys.stderr)
-            sys.exit(1)
+            if not found_ini or not found_ini.is_file():
+                print(f"\n[ERROR] H1OS configuration file 'h1os.ini' was not found in: {self.project_dir}", file=sys.stderr)
+                print("Please create h1os.ini from components/h1os/h1os.ini.template or pass --config <path>.\n", file=sys.stderr)
+                sys.exit(1)
+            self.ini_path = found_ini
 
         # 3. Parse INI file
         self.parser = configparser.ConfigParser()
         try:
             self.parser.read(str(self.ini_path), encoding="utf-8")
-        except Exception as e:
+        except (OSError, configparser.Error) as e:
             print(f"\n[ERROR] Failed to parse {self.ini_path}: {e}\n", file=sys.stderr)
             sys.exit(1)
 
@@ -205,7 +205,7 @@ class H1OSConfig:
                     description=desc,
                 )
 
-        # Fallback to legacy [build] section if no profile sections were found
+        # Default legacy [build] section if no profile sections were found
         if not self.profiles and self.parser.has_section("build"):
             b_prod = self.parser.get("build", "build_dir_prod", fallback="build_prod").strip()
             b_dev = self.parser.get("build", "build_dir_dev", fallback="build_dev").strip()
@@ -256,7 +256,7 @@ class H1OSConfig:
         self.port = self.parser.get("target", "port", fallback="").strip()
         try:
             self.baud = self.parser.getint("target", "baud")
-        except Exception:
+        except (ValueError, configparser.Error):
             print(f"\n[ERROR] Mandatory setting 'baud' missing or invalid under [target] in {self.ini_path}.", file=sys.stderr)
             sys.exit(1)
         conf_log_dir = self.parser.get("target", "log_dir", fallback="").strip()
@@ -317,7 +317,7 @@ class H1OSConfig:
                     print(f"\n[ERROR] Version regex '{v_regex}' did not match any content in: {v_target}", file=sys.stderr)
                     sys.exit(1)
                 self.version = match.group(1).lstrip("v")
-            except Exception as e:
+            except (OSError, re.error) as e:
                 print(f"\n[ERROR] Failed to read version file {v_target}: {e}", file=sys.stderr)
                 sys.exit(1)
 
@@ -336,7 +336,7 @@ class H1OSConfig:
             )
             if res.returncode == 0 and res.stdout.strip():
                 return res.stdout.strip()
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             pass
         return "unknown"
 
@@ -351,7 +351,7 @@ class H1OSConfig:
             )
             if res.returncode == 0 and res.stdout.strip():
                 return res.stdout.strip().lstrip("v")
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             pass
         return ""
 
@@ -371,7 +371,7 @@ class H1OSConfig:
                 if prof.build_dir == b_target:
                     return prof
 
-        # Default fallback
+        # Default selection
         if "prod" in self.profiles:
             return self.profiles["prod"]
         if self.profiles:
@@ -611,7 +611,6 @@ def run_build(
     if clean:
         print(f"\n[*] Executing Clean on: {b_dir}")
         if b_dir.exists():
-            import shutil
             shutil.rmtree(str(b_dir), ignore_errors=True)
             print(f"    [+] Erased build directory: {b_dir}")
         dep_lock = config.app_root / "dependencies.lock"
@@ -620,19 +619,26 @@ def run_build(
             print(f"    [+] Erased: {dep_lock}")
         mg_comp = config.app_root / "managed_components"
         if mg_comp.is_dir():
-            import shutil
             shutil.rmtree(str(mg_comp), ignore_errors=True)
             print(f"    [+] Erased: {mg_comp}")
 
-    py_exe = get_idf_python_exe()
+    py_path = Path(get_idf_python_exe()).resolve()
+    if not py_path.is_file() or py_path.name.lower() not in {"python", "python.exe"}:
+        print(f"ERROR: Invalid Python interpreter resolved for idf.py: {py_path}", file=sys.stderr)
+        return 1
+    idf_script = idf_py.resolve()
+    if not idf_script.is_file():
+        print(f"ERROR: idf.py script not found: {idf_script}", file=sys.stderr)
+        return 1
+
     action = "reconfigure" if reconfig_only else "build"
-    cmd = [py_exe, str(idf_py), "-C", str(config.app_root), "-B", str(b_dir)]
+    cmd = [str(py_path), str(idf_script), "-C", str(config.app_root), "-B", str(b_dir)]
     if eff_preset:
         cmd.extend(["--preset", eff_preset])
     cmd.append(action)
 
     print(f"\n[*] Executing ESP-IDF {'Reconfigure' if reconfig_only else 'Build'}: {' '.join(cmd)}\n")
-    res = subprocess.run(cmd)
+    res = subprocess.run(cmd, check=False)  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
     return res.returncode
 
 
@@ -643,14 +649,12 @@ def run_clean(
     clean_all: bool = False,
 ) -> int:
     """Erase target build directory, dependencies, or all profiles without rebuilding."""
-    import shutil
-
     if clean_all:
         print("\n[*] Executing Clean on ALL configured profiles and dependencies...")
-        for prof in config.profiles.values():
-            if prof.build_dir.exists():
-                shutil.rmtree(str(prof.build_dir), ignore_errors=True)
-                print(f"    [+] Erased build directory: {prof.build_dir}")
+        for prof_item in config.profiles.values():
+            if prof_item.build_dir.exists():
+                shutil.rmtree(str(prof_item.build_dir), ignore_errors=True)
+                print(f"    [+] Erased build directory: {prof_item.build_dir}")
         dep_lock = config.app_root / "dependencies.lock"
         if dep_lock.is_file():
             dep_lock.unlink()
@@ -662,7 +666,7 @@ def run_clean(
         print("[+] Clean All complete.\n")
         return 0
 
-    prof = config.resolve_profile(profile, build_dir)
+    prof: Optional[H1OSProfile] = config.resolve_profile(profile, build_dir)
     if build_dir:
         b_dir = Path(build_dir).resolve()
     elif prof:
@@ -703,14 +707,14 @@ def auto_detect_serial_port() -> Optional[str]:
         if non_com1:
             return non_com1[0]
         return ports[0].device
-    except Exception:
+    except (ImportError, OSError):
         return None
 
 
 def spawn_serial_monitor(
     config: H1OSConfig,
     profile: Optional[str] = None,
-    build_dir: Optional[Union[str, Path]] = None,
+    build_dir: str | Path | None = None,
     port: Optional[str] = None,
     baud: Optional[int] = None,
     timestamps: bool = False,
@@ -721,16 +725,9 @@ def spawn_serial_monitor(
     if not monitor_script.is_file():
         return False, f"H1OS monitor script not found: {monitor_script}"
 
-    prof = config.resolve_profile(profile, build_dir)
-    if build_dir:
-        b_dir = Path(build_dir).resolve()
-    elif prof:
-        b_dir = prof.build_dir
-    else:
-        first_prof = list(config.profiles.values())[0] if config.profiles else None
-        b_dir = first_prof.build_dir if first_prof else None
+    config.resolve_profile(profile, str(build_dir) if build_dir is not None else None)
 
-    eff_port = port or config.port
+    eff_port: Optional[str] = port or config.port
     if not eff_port:
         eff_port = auto_detect_serial_port()
 
@@ -751,6 +748,7 @@ def spawn_serial_monitor(
     app_root_str = str(config.app_root)
     child_args = [f"'{a}'" if (" " in a or "\\" in a) else a for a in mon_args]
     child_command = f"& {child_args[0]} " + " ".join(child_args[1:])
+    args_str = " ".join(shlex.quote(a) for a in mon_args)
 
     if os.name == "nt":
         # 1. Prefer Windows Terminal (wt.exe) with PowerShell profile for flicker-free DirectX rendering
@@ -765,10 +763,10 @@ def spawn_serial_monitor(
                 ]
                 subprocess.Popen(wt_cmd, cwd=app_root_str)
                 return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in Windows Terminal."
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 pass
 
-        # 2. Fallback: Standalone PowerShell window
+        # 2. Standalone PowerShell window
         try:
             ps_cmd = ["powershell.exe", "-Command", child_command]
             subprocess.Popen(
@@ -777,7 +775,7 @@ def spawn_serial_monitor(
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in PowerShell."
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             try:
                 cmd = ["conhost.exe"] + mon_args
                 subprocess.Popen(
@@ -786,15 +784,15 @@ def spawn_serial_monitor(
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
                 return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in external terminal."
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError) as e:
                 return False, f"Failed to spawn external monitor window: {e}"
 
     elif sys.platform == "darwin":
-        osa_script = f'tell application "Terminal" to do script "cd \'{app_root_str}\' && {args_str}"'
+        osa_script = f'tell application "Terminal" to do script "cd {shlex.quote(app_root_str)} && {args_str}"'
         try:
             subprocess.Popen(["osascript", "-e", osa_script])
             return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in macOS Terminal."
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             return False, f"Failed to spawn macOS Terminal: {e}"
 
     else:
@@ -802,12 +800,12 @@ def spawn_serial_monitor(
             if shutil.which(term):
                 try:
                     if term == "gnome-terminal":
-                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd '{app_root_str}' && {args_str}; exec bash"]
+                        cmd = [term, "--title=H1OS Serial Monitor", "--", "bash", "-c", f"cd {shlex.quote(app_root_str)} && {args_str}; exec bash"]
                     else:
-                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd \"{app_root_str}\" && {args_str}; exec bash'"]
+                        cmd = [term, "-T", "H1OS Serial Monitor", "-e", f"bash -c 'cd {shlex.quote(app_root_str)} && {args_str}; exec bash'"]
                     subprocess.Popen(cmd)
                     return True, f"Spawned H1OS Serial Monitor on {eff_port or 'auto-detect'} in {term}."
-                except Exception as e:
+                except (OSError, subprocess.SubprocessError) as e:
                     return False, f"Failed to spawn {term}: {e}"
         return False, "No graphical terminal emulator found (tried x-terminal-emulator, gnome-terminal, konsole, xterm)."
 

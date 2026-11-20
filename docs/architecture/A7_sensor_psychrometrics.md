@@ -1,6 +1,6 @@
 # Tri-Node Temperature & Psychrometric Sensor Operation Specification
 
-> **H1OS Architecture Specification** | **Document:** `A7` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A7` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Core Design Philosophy & Architectural Invariants
 

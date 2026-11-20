@@ -1,6 +1,6 @@
 # Layer 3: ULP-RISC-V Coprocessor Hardware Monitor Specification
 
-> **H1OS Architecture Specification** | **Document:** `A6` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A6` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Overview
 The ULP-RISC-V Coprocessor acts as the **Reactive Hardware Monitor** in the ESP32-S3 RTC domain. While the dual-core Xtensa LX7 processors are in deep sleep, the ULP coprocessor sleeps alongside them in RTC Slow Memory.

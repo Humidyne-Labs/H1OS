@@ -50,7 +50,7 @@ The optimal architecture uses **modular action scripts referenced by a master sc
 2. **Master Timeline (`tools/thermal_sim/scenario.json`)**:
    - Declares the compounding schedule on pure battery power: e.g. "run `flow_a` every 60s", "run `flow_b` every 300s", "trigger chime at t=600s".
    - As time advances, the engine compounds the heat pulses from active battery discharge and simulates physical cooling during deep sleep intervals.
-3. **Single-File Fallback**:
+3. **Single-File Default Mode**:
    - The visualizer also allows running in "All-In-One" mode where presets are pre-loaded in the UI dropdown so you can test instantly without touching files.
 
 ---

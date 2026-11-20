@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 H1OS Interactive Developer Tooling Console (h1os_menu)
-Version: 2.4.2
 License: Apache-2.0
 
 Interactive Rich console with arrow-key keyboard navigation
@@ -12,14 +11,14 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Add tools directory to sys.path so we can import h1os_tool directly
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import (
+from h1os_tool import (  # noqa: E402
     H1OS_TOOLING_VERSION,
     H1OSConfig,
     check_tooling_dependencies,
@@ -31,6 +30,23 @@ from h1os_tool import (
     run_size,
     spawn_serial_monitor,
 )
+from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu  # noqa: E402
+from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle  # noqa: E402
+
+try:  # noqa: E402
+    from menu.console_events import (
+        ConsoleEventDispatcher,
+        EventType,
+        get_single_key,
+        restore_default_console_mode,
+    )
+except ImportError:
+    from console_events import (
+        ConsoleEventDispatcher,
+        EventType,
+        get_single_key,
+        restore_default_console_mode,
+    )
 
 # Pre-flight check: display pip command if dependencies missing and exit safely
 if not check_tooling_dependencies():
@@ -47,26 +63,6 @@ try:
 except ImportError:
     HAVE_RICH = False
 
-from partition.h1os_part import parse_csv_partitions, run_partition_manager_menu
-from partition.part_backend import execute_dual_slot_deploy, execute_otatool_toggle
-
-try:
-    from menu.console_events import (
-        ConsoleEventDispatcher,
-        ConsoleEvent,
-        EventType,
-        get_single_key,
-        restore_default_console_mode,
-    )
-except ImportError:
-    from console_events import (
-        ConsoleEventDispatcher,
-        ConsoleEvent,
-        EventType,
-        get_single_key,
-        restore_default_console_mode,
-    )
-
 VERSION = H1OS_TOOLING_VERSION
 read_nav_key = get_single_key
 
@@ -74,7 +70,7 @@ read_nav_key = get_single_key
 def clear_screen() -> None:
     """Clear terminal screen to eliminate visual artifacts across menu transitions."""
     if os.name == "nt":
-        os.system("cls")
+        subprocess.run(["cmd", "/c", "cls"], shell=False, check=False)
     else:
         sys.stdout.write("\033[2J\033[H")
         sys.stdout.flush()
@@ -549,8 +545,8 @@ def run_interactive_menu(
                                 return item["action"]
 
 
-def run_plain_fallback(config: H1OSConfig) -> str:
-    """Plain console fallback if rich is absent or non-interactive."""
+def run_plain_console(config: H1OSConfig) -> str:
+    """Plain console mode if rich is absent or non-interactive."""
     menu_items = build_dynamic_menu_items(config)
 
     print("\n" + "=" * 78)
@@ -690,7 +686,7 @@ def run_profile_selection_menu(
             "status": "-",
         })
 
-    # Plain fallback if rich is absent or non-interactive
+    # Plain console mode if rich is absent or non-interactive
     if not console or not sys.stdin.isatty():
         print(f"\n--- {title} ---")
         print(f"  {subtitle}")
@@ -769,7 +765,7 @@ def main():
         if console and sys.stdin.isatty():
             action = run_interactive_menu(config, console, header_panel=header_panel)
         else:
-            action = run_plain_fallback(config)
+            action = run_plain_console(config)
 
         if action == "quit":
             if console:

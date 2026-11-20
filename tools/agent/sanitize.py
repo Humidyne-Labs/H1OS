@@ -18,6 +18,7 @@ Features:
 """
 
 import argparse
+import gzip
 import io
 import os
 import re
@@ -25,11 +26,11 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 
 # ==============================================================================
@@ -97,13 +98,13 @@ class NameConfig:
             self.config_path = target_file
             self._parse_file(target_file)
         else:
-            # Fallback default rules from local environment if no config file exists
+            # Default rules from local environment if no config file exists
             env_user = os.environ.get("USERNAME") or os.environ.get("USER")
             self.raw_targets = [env_user] if env_user else []
             self._compile_rules()
 
     def _parse_file(self, file_path: Path):
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#") or line.startswith("//"):
@@ -217,9 +218,12 @@ class SanitizerEngine:
         "dev_build",
         "prod_build",
         ".cache",
+        ".mypy_cache",
         ".pytest_cache",
+        ".ruff_cache",
         "__pycache__",
         ".espressif",
+        "doxygen",
         "venv",
         ".venv",
         "node_modules",
@@ -249,9 +253,10 @@ class SanitizerEngine:
         ".zip", ".tar", ".gz", ".tgz", ".bz2", ".whl"
     }
 
-    def __init__(self, config: NameConfig, root_dir: Path):
+    def __init__(self, config: NameConfig, root_dir: Path, include_dist: bool = False):
         self.config = config
         self.root_dir = root_dir
+        self.include_dist = include_dist
 
         self.text_violations: List[FileViolation] = []
         self.archive_violations: List[ArchiveViolation] = []
@@ -273,7 +278,7 @@ class SanitizerEngine:
                 chunk = f.read(8192)
                 if b"\0" in chunk:
                     return True
-        except Exception:
+        except OSError:
             return True
         return False
 
@@ -282,9 +287,9 @@ class SanitizerEngine:
         matches: List[TextMatch] = []
 
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
-        except Exception:
+        except OSError:
             return None
 
         for idx, line in enumerate(lines, start=1):
@@ -403,10 +408,9 @@ class SanitizerEngine:
     def fix_text_file(self, path: Path) -> int:
         """Applies replacements in-place preserving original line endings. Returns count of fixes."""
         try:
-            with open(path, "rb") as f:
-                raw_bytes = f.read()
+            with open(path, "rb") as in_f:
+                raw_bytes = in_f.read()
 
-            newline = b"\r\n" if b"\r\n" in raw_bytes else b"\n"
             content = raw_bytes.decode("utf-8", errors="replace")
 
             # 1. Apply smart path normalization first
@@ -415,22 +419,22 @@ class SanitizerEngine:
 
             # 2. Apply name rules (longest first)
             for rule in self.config.rules:
-                def repl_cb(match):
+                def repl_cb(match: re.Match[str], _rule: NameRule = rule) -> str:
                     nonlocal total_replacements
                     word = match.group(0)
                     if self.config.is_ignored(word):
                         return word
                     total_replacements += 1
-                    return rule.replacement
+                    return _rule.replacement
 
                 mod_content = rule.pattern.sub(repl_cb, mod_content)
 
             if total_replacements > 0:
-                with open(path, "wb") as f:
-                    f.write(mod_content.encode("utf-8"))
+                with open(path, "wb") as out_f:
+                    out_f.write(mod_content.encode("utf-8"))
 
             return total_replacements
-        except Exception as e:
+        except (OSError, UnicodeError) as e:
             print(f"Error fixing {path}: {e}", file=sys.stderr)
             return 0
 
@@ -484,15 +488,15 @@ class SanitizerEngine:
                                                     details=f"Contains matched token '{matched}' -> '{rule.replacement}'"
                                                 ))
                                                 break
-                        except Exception:
-                            pass
-        except Exception as e:
-            pass
+                        except (OSError, zipfile.BadZipFile, RuntimeError):
+                            continue
+        except (OSError, zipfile.BadZipFile) as exc:
+            print(f"Warning: unable to scan archive {rel}: {exc}", file=sys.stderr)
 
     def _scan_tar(self, path: Path, rel: str):
         try:
-            mode = "r:*" if path.suffix in [".gz", ".tgz", ".bz2"] else "r:"
-            with tarfile.open(path, mode) as tf:
+            tf_ctx = tarfile.open(path, "r:*") if path.suffix in [".gz", ".tgz", ".bz2"] else tarfile.open(path, "r:")
+            with tf_ctx as tf:
                 for member in tf.getmembers():
                     # 1. Header ownership check (uname / gname)
                     for rule in self.config.rules:
@@ -544,10 +548,35 @@ class SanitizerEngine:
                                                         details=f"Contains matched token '{matched}' -> '{rule.replacement}'"
                                                     ))
                                                     break
-                            except Exception:
-                                pass
-        except Exception:
-            pass
+                            except (OSError, tarfile.TarError, EOFError):
+                                continue
+        except (OSError, tarfile.TarError) as exc:
+            if path.suffix.lower() == ".gz" and not path.name.endswith(".tar.gz"):
+                self._scan_gzip_blob(path, rel)
+                return
+            print(f"Warning: unable to scan archive {rel}: {exc}", file=sys.stderr)
+
+    def _scan_gzip_blob(self, path: Path, rel: str):
+        try:
+            with gzip.open(path, "rb") as gz:
+                raw = gz.read(4 * 1024 * 1024)
+            if b"\0" in raw:
+                return
+            text = raw.decode("utf-8", errors="replace")
+            for rule in self.config.rules:
+                for m in rule.pattern.finditer(text):
+                    matched = m.group(0)
+                    if not self.config.is_ignored(matched):
+                        self.archive_violations.append(ArchiveViolation(
+                            archive_path=path,
+                            relative_path=rel,
+                            member_name=path.stem,
+                            violation_type="content",
+                            details=f"Contains matched token '{matched}' -> '{rule.replacement}'"
+                        ))
+                        break
+        except (OSError, EOFError, zlib.error, UnicodeError) as exc:
+            print(f"Warning: unable to scan gzip blob {rel}: {exc}", file=sys.stderr)
 
     def fix_archive(self, path: Path) -> bool:
         """Sanitizes an archive in-place (rewriting member names, contents, and Tar uname/gname)."""
@@ -578,26 +607,32 @@ class SanitizerEngine:
                                 for rule in self.config.rules:
                                     text = rule.pattern.sub(rule.replacement, text)
                                 raw = text.encode("utf-8")
-                            except Exception:
+                            except UnicodeDecodeError:
                                 pass
 
                         zout.writestr(new_name, raw)
 
             shutil.move(str(temp_file), str(path))
             return True
-        except Exception as e:
+        except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
+            print(f"Error sanitizing zip {path}: {exc}", file=sys.stderr)
             if temp_file.exists():
                 temp_file.unlink()
             return False
 
     def _fix_tar(self, path: Path) -> bool:
         temp_file = path.with_suffix(path.suffix + ".tmp_sanitized")
-        read_mode = "r:*" if path.suffix in [".gz", ".tgz", ".bz2"] else "r:"
-        write_mode = "w:gz" if path.suffix in [".gz", ".tgz"] else ("w:bz2" if path.suffix == ".bz2" else "w:")
 
         try:
-            with tarfile.open(path, read_mode) as tin:
-                with tarfile.open(temp_file, write_mode) as tout:
+            tin_ctx = tarfile.open(path, "r:*") if path.suffix in [".gz", ".tgz", ".bz2"] else tarfile.open(path, "r:")
+            if path.suffix in [".gz", ".tgz"]:
+                tout_ctx = tarfile.open(temp_file, "w:gz")
+            elif path.suffix == ".bz2":
+                tout_ctx = tarfile.open(temp_file, "w:bz2")
+            else:
+                tout_ctx = tarfile.open(temp_file, "w:")
+            with tin_ctx as tin:
+                with tout_ctx as tout:
                     for member in tin.getmembers():
                         # Reset ownership header
                         member.uname = self.config.default_replacement.lower()
@@ -619,7 +654,7 @@ class SanitizerEngine:
                                     for rule in self.config.rules:
                                         text = rule.pattern.sub(rule.replacement, text)
                                     raw = text.encode("utf-8")
-                                except Exception:
+                                except UnicodeDecodeError:
                                     pass
 
                             member.size = len(raw)
@@ -629,7 +664,8 @@ class SanitizerEngine:
 
             shutil.move(str(temp_file), str(path))
             return True
-        except Exception as e:
+        except (OSError, tarfile.TarError, RuntimeError) as exc:
+            print(f"Error sanitizing tar {path}: {exc}", file=sys.stderr)
             if temp_file.exists():
                 temp_file.unlink()
             return False
@@ -650,9 +686,9 @@ class SanitizerEngine:
                     continue
                 parts = line.split("|", 5)
                 if len(parts) >= 6:
-                    h, an, ae, cn, ce, subj = parts
+                    h, an, ae, _cn, _ce, subj = parts
                     for rule in self.config.rules:
-                        for field_val in [an, ae, cn, ce]:
+                        for field_val in [an, ae, _cn, _ce]:
                             for m in rule.pattern.finditer(field_val):
                                 matched = m.group(0)
                                 if not self.config.is_ignored(matched):
@@ -663,11 +699,10 @@ class SanitizerEngine:
                                         subject=subj[:60]
                                     ))
                                     break
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as exc:
+            print(f"Warning: git history scan failed: {exc}", file=sys.stderr)
 
     def scan_pdf_metadata(self, path: Path):
-        rel = path.relative_to(self.root_dir).as_posix()
         try:
             with open(path, "rb") as f:
                 header = f.read(1024 * 256)  # Read first 256KB
@@ -679,8 +714,8 @@ class SanitizerEngine:
                         val = m.group(1)
                         if rule.pattern.search(val) and not self.config.is_ignored(val):
                             self.pdf_violations.append((path, f"PDF Tag {tag}: '{val}' matches target"))
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"Warning: unable to read PDF metadata for {path}: {exc}", file=sys.stderr)
 
     # --------------------------------------------------------------------------
     # Repository Walker
@@ -695,8 +730,13 @@ class SanitizerEngine:
         self.total_scanned_archives = 0
 
         for root, dirs, files in os.walk(self.root_dir):
-            # Prune ignored directories
-            dirs[:] = [d for d in dirs if d not in self.IGNORED_DIRS and not d.startswith(".git")]
+            # Prune ignored directories (optionally allow root-level dist/ when --include-dist is set)
+            at_repo_root = Path(root) == self.root_dir
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".git")
+                and (d not in self.IGNORED_DIRS or (d == "dist" and at_repo_root and self.include_dist))
+            ]
 
             for file_name in files:
                 file_path = Path(root) / file_name
@@ -820,6 +860,7 @@ def main():
     parser.add_argument("--replacement", type=str, default="Humiditron", help="Replacement string (case-sensitive)")
     parser.add_argument("--root", type=Path, default=REPO_ROOT, help="Root directory of repository to scan")
     parser.add_argument("--skip-git-history", action="store_true", help="Skip auditing git commit history")
+    parser.add_argument("--include-dist", action="store_true", help="Include root dist/ release archives in the scan")
 
     args = parser.parse_args()
 
@@ -833,7 +874,7 @@ def main():
         config._add_rule(args.target, args.replacement)
 
     # Initialize engine
-    engine = SanitizerEngine(config=config, root_dir=args.root)
+    engine = SanitizerEngine(config=config, root_dir=args.root, include_dist=args.include_dist)
 
     print(f"Initiating Repository Scan from: {args.root}")
     engine.scan_all(include_git_history=not args.skip_git_history)

@@ -4,6 +4,38 @@ All notable changes to the ESP32-S3 Board Support Package (BSP), firmware archit
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.11-dev] - 2026-11-20
+
+### 🚀 Added
+* **Audit Standard `H1OS-STD-001 Rev 2.2` & Automated 14-Gate Harness** (`tools/agent/run_audit.py`, `docs/architecture/D0_std_audit_framework.md`, `AGENTS.md`, `.agents/`):
+  * Expanded `H1OS-STD-001` from 8 to 9 domains with **Domain 9: Build & Host Tooling Integrity (`PIT-09-A..D`)**, codified `eim run` single-shot ESP-IDF `v6.1.1` invocation, and documented `-Wundef` exclusion rationale under IDF `v6.1.1` headers.
+  * Added unified CLI harness `tools/agent/run_audit.py` orchestrating 4-layer include validation (`--layers`), `[H1OS-WAIVER]` schema enforcement (`--waivers`), Semgrep (`--semgrep`), read-only `esp-clang` Clang-Tidy (`--clang-tidy`), Cppcheck `2.22.0` `threadsafety` & observational MISRA C:2012 (`--cppcheck`, `--misra`), Python QA (`--python`), `.su` stack depth (`--stack`), `.rtc.text` ELF section isolation (`--rtc-sections`), engineering lexicon (`--lexicon`), EPD typography (`--typography`), version sync (`--version`), sanitization (`--sanitize`), and offline test execution (`--tests`).
+  * Added repo-level static analyzer configurations (`.clang-tidy`, `tools/audit/semgrep_h1os.yml`, `.semgrepignore`, `tools/audit/cppcheck_suppressions.txt`, `pyproject.toml`).
+* **Offline Tooling & Host C11 Regression Suites** (`tests/tools/`, `tests/firmware_host/`):
+  * Added `tests/firmware_host/` (`test_orch_math.c`, `test_flow_and_ocv.c`, `stubs/esp_attr.h`) compiled strictly under `clang -std=c11 -Wall -Wextra -Werror -Wdouble-promotion` to validate August-Roche-Magnus psychrometrics, EWMA bounds, thermal plateau settling, the 13-point LiPo OCV table, and all 6 `MANDATE-02` flow-slicing invariants.
+  * Added 8 offline `pytest` modules under `tests/tools/` covering `bump_version.py`, `sanitize.py`, `optimize_images.py`, `h1os_pack.py`, `part_backend.py`, `epd-font` v1.0.23 schemes/CSV metrics, `run_audit.py`, and host C11 compilation.
+* **Certification Report & Production Release Bundle** (`docs/audits/h1os_audit_certification_report_v2_4_11.md`, `dist/h1os_demo/2.4.11-dev[prod]/`):
+  * Documented full `v2.4.11-dev` verification telemetry and packaged `prod_2.4.11-dev.zip` / `h1os-v2.4.11-bundle.zip` via `h1os_pack.py --verify-clean-git`.
+
+### 🔄 Changed
+* **Public API & Doxygen Cleanliness** (`components/h1os/include/h1os/h1os.h`, `components/h1os/src/h1os_lifecycle.c`, `components/h1os/src/sub_power.c`, `components/h1os/src/sub_audio.c`, `Doxyfile`, `docs/api.md`):
+  * Eliminated anonymous structs/unions and internal `@<digits>` Doxygen identifiers: extracted `h1os_presentation_config_t` and `h1os_session_config_t`, unified `h1os_wake_context_t` on `uint32_t wake_count`, and named internal structs (`sub_power_lipo_knot_t`, `audio_cmd_tone_t`, `audio_cmd_chime_t`, `audio_cmd_pcm_t`, `audio_cmd_params_t`).
+  * Configured `Doxyfile` (`EXTRACT_STATIC = NO`, `EXTRACT_LOCAL_CLASSES = NO`, public `INPUT = components/h1os/include README.md`) and added `docs/doxygen/` to `.gitignore`, regenerating a clean public-API [docs/api.md](docs/api.md).
+* **Hardened Compiler Diagnostics & Stack Usage Emission** (`components/h1os/CMakeLists.txt`, `examples/H1OS/main/CMakeLists.txt`, `examples/boilerplate/main/CMakeLists.txt`):
+  * Enabled `-fstack-usage`, `-Wvla`, `-Wduplicated-cond`, `-Wduplicated-branches`, `-Wlogical-op`, and `-Wnull-dereference` across H1OS firmware and showcase examples.
+
+### 🛡️ Fixed & Hardened
+* **Python Build Framework Security, Typing & Partition Validation** (`components/h1os/idf_ext.py`, `components/h1os/tools/`, `tools/agent/`):
+  * Eliminated `shell=True` subprocess calls, `os.system("cls")`, hardcoded `C:/esp/v6.1/esp-idf` default paths, undefined symbols (`args_str`, `Any`), and late-binding closure bugs; brought all managed Python scripts to zero `ruff` and `mypy` errors.
+  * Added 64 KB (`0x10000`) `app` partition alignment enforcement to `validate_partition_layout()` in `part_backend.py` and `--verify-clean-git` release gating in `h1os_pack.py`.
+  * Enhanced `tools/agent/sanitize.py` with `--include-dist` gzipped JSON scanning (`.json.gz`), ignored `doxygen`/cache intermediate directories, and standardized non-API lexicon phrasing across tooling and `examples/riscv_test/main/main.c`.
+* **Documented Inline Safety Waivers** (`components/h1os/src/h1os_lvgl.cpp`, `components/h1os/src/sub_audio.c`, `examples/riscv_test/main/main.c`):
+  * Annotated timeout-guarded worker teardown halts (`PIT-01-E`) and interactive bench button wait loop (`PIT-08-A`) with formal `[H1OS-WAIVER]` entries.
+
+### 🗑️ Removed
+* **Obsolete Task Tracker (`TODO.md`, `tools/agent/bump_version.py`):**
+  * Removed `TODO.md` and its version-anchor entry in `tools/agent/bump_version.py`.
+
 ## [2.4.10-dev] - 2026-11-19
 
 ### 🚀 Added

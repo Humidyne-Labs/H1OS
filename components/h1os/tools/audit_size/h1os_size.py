@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 H1OS Firmware Binary Size & Memory Footprint Diagnostic Inspector (h1os_size)
-Version: 2.4.5-dev
 License: Apache-2.0
 """
 import argparse
@@ -9,24 +8,26 @@ import datetime
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional
 
 # Ensure components/h1os/tools is importable
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import (
+from h1os_tool import (  # noqa: E402
+    H1OSConfig,
     H1OS_TOOLING_VERSION,
     check_tooling_dependencies,
-    H1OSConfig,
 )
 
 VERSION = H1OS_TOOLING_VERSION
-OUTPUT_STREAMS = {}
-LOG_FILE_PATH = None
+OUTPUT_STREAMS: Dict[str, str] = {}
+LOG_FILE_PATH: Optional[Path] = None
 
 try:
     from rich.console import Console
@@ -45,8 +46,8 @@ def log_write(text: str):
         try:
             with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
                 f.write(text)
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"[WARN] Failed writing log {LOG_FILE_PATH}: {exc}", file=sys.stderr)
 
 
 def get_idf_python_exe() -> str:
@@ -85,13 +86,15 @@ def get_check_sizes_path() -> Path:
     return script_p
 
 
-def run_command(key: str, title: str, cmd: str, cwd=None):
-    banner = f"\n{'='*65}\n{title}\nCommand: {cmd}\n{'='*65}\n"
+def run_command(key: str, title: str, cmd: str | List[str], cwd=None):
+    argv = shlex.split(cmd, posix=(os.name != "nt")) if isinstance(cmd, str) else list(cmd)
+    cmd_disp = cmd if isinstance(cmd, str) else " ".join(argv)
+    banner = f"\n{'='*65}\n{title}\nCommand: {cmd_disp}\n{'='*65}\n"
     log_write(banner)
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
+            argv,
+            shell=False,
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -104,7 +107,7 @@ def run_command(key: str, title: str, cmd: str, cwd=None):
         log_write(output)
         OUTPUT_STREAMS[key] = output
         return result.returncode
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         err_msg = f"[FAILED] Exception running command: {e}\n"
         log_write(err_msg)
         OUTPUT_STREAMS[key] = err_msg
@@ -122,8 +125,8 @@ def find_target_artifacts(build_dir: Path) -> tuple:
             bin_p = (build_dir / app_bin_name) if app_bin_name else (build_dir / f"{proj_name}.bin")
             map_p = build_dir / f"{proj_name}.map"
             return (map_p if map_p.exists() else None, bin_p if bin_p.exists() else None)
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            print(f"[WARN] Failed reading {desc_file}: {exc}", file=sys.stderr)
 
     map_p = build_dir / "h1os.map"
     bin_p = build_dir / "h1os.bin"
@@ -336,8 +339,8 @@ def main():
     except SystemExit:
         if args.config_path:
             sys.exit(1)
-    except Exception:
-        pass
+    except OSError:
+        cfg = None
 
     # Resolve build directory
     if not args.build_dir and cfg:
@@ -403,12 +406,12 @@ def main():
     idf_py = get_idf_py_path()
     check_sizes_script = get_check_sizes_path()
 
-    idf_cmd = f'"{py_exe}" "{idf_py}" -C "{project_root}" -B "{build_dir_path}"'
+    idf_cmd = [py_exe, str(idf_py), "-C", str(project_root), "-B", str(build_dir_path)]
 
     # 1. Optional explicit rebuild (only when explicitly requested via --rebuild)
     if args.rebuild:
         log_write("\n[REBUILD] Executing full firmware build as requested...\n")
-        run_command("build", "0. REBUILD FIRMWARE", f"{idf_cmd} build", cwd=str(project_root))
+        run_command("build", "0. REBUILD FIRMWARE", idf_cmd + ["build"], cwd=str(project_root))
 
     # 2. Strict Artifact Sanity Check: Never guess or trigger an implicit build
     map_path, bin_path = find_target_artifacts(build_dir_path)
@@ -427,7 +430,7 @@ def main():
         for m in missing_artifacts:
             err_msg += f"  - Missing: {m}\n"
         err_msg += (
-            "\nZero-fallback policy prohibits silent background compilation during size audit.\n"
+            "\nZero-implicit-build policy prohibits silent background compilation during size audit.\n"
             "Please compile firmware first via 'idf.py build' or CMakePresets (or pass --rebuild).\n"
         )
         print(err_msg, file=sys.stderr)
@@ -435,7 +438,7 @@ def main():
             try:
                 with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
                     f.write(err_msg)
-            except Exception:
+            except OSError:
                 pass
         sys.exit(1)
 
@@ -449,24 +452,20 @@ def main():
 
     # Step A: Partition table check
     if check_sizes_script and part_bin.exists() and bin_path:
-        cmd = f'"{py_exe}" "{check_sizes_script}" --offset 0x8000 partition --type app "{part_bin}" "{bin_path}"'
-        run_command("partition", "1. APP PARTITION HEADROOM CHECK", cmd)
+        cmd_part = [py_exe, str(check_sizes_script), "--offset", "0x8000", "partition", "--type", "app", str(part_bin), str(bin_path)]
+        run_command("partition", "1. APP PARTITION HEADROOM CHECK", cmd_part)
 
     # Step B: Overall memory breakdown (esp_idf_size)
-    cmd_size = f'"{py_exe}" -m esp_idf_size "{map_path}"'
-    run_command("size", "2. OVERALL MEMORY BREAKDOWN", cmd_size)
+    run_command("size", "2. OVERALL MEMORY BREAKDOWN", [py_exe, "-m", "esp_idf_size", str(map_path)])
 
     # Step C: Per-component breakdown (esp_idf_size --archives)
-    cmd_comp = f'"{py_exe}" -m esp_idf_size --archives "{map_path}"'
-    run_command("components", "3. PER-COMPONENT BREAKDOWN", cmd_comp)
+    run_command("components", "3. PER-COMPONENT BREAKDOWN", [py_exe, "-m", "esp_idf_size", "--archives", str(map_path)])
 
     # Step D: Per-file breakdown (esp_idf_size --files)
-    cmd_files = f'"{py_exe}" -m esp_idf_size --files "{map_path}"'
-    run_command("files", "4. PER-FILE BREAKDOWN", cmd_files)
+    run_command("files", "4. PER-FILE BREAKDOWN", [py_exe, "-m", "esp_idf_size", "--files", str(map_path)])
 
     # Step E: Binary image headers (esptool image-info)
-    cmd_hdr = f'"{py_exe}" -m esptool image-info "{bin_path}"'
-    run_command("headers", "5. BINARY IMAGE HEADERS (esptool)", cmd_hdr)
+    run_command("headers", "5. BINARY IMAGE HEADERS (esptool)", [py_exe, "-m", "esptool", "image-info", str(bin_path)])
 
     # Render metrics dashboard
     summary_text = render_summary()
@@ -474,8 +473,8 @@ def main():
         try:
             with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
                 f.write(summary_text)
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"[WARN] Failed writing summary to {LOG_FILE_PATH}: {exc}", file=sys.stderr)
 
     if HAVE_RICH:
         console = Console()

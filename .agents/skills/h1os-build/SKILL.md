@@ -3,7 +3,7 @@ name: h1os-build
 description: Authoritative build instructions, environment configuration, and execution commands for H1OS and ESP32-S3 firmware. Eliminates exploratory tool searching by providing the exact Espressif v6.1.1 profile script, paths, and build targets.
 ---
 
-# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.10-dev`)
+# H1OS & ESP32-S3 Firmware Build Guide (`v2.4.11-dev`)
 
 This skill defines the canonical build procedures, paths, and environment activation for **H1OS** on ESP32-S3.
 
@@ -19,17 +19,18 @@ This skill defines the canonical build procedures, paths, and environment activa
 - **ESP-IDF Version:** v6.1.1 (`C:\esp\v6.1.1\esp-idf`)
 - **Host Tools Root:** `C:\Espressif\tools`
 - **Active Python Virtualenv:** `C:\Espressif\tools\python\v6.1.1\venv`
-- **Canonical Profile Script:** `C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1`
+- **Canonical Single-Shot CLI (`eim`):** `eim run '<cmd>; exit $LASTEXITCODE' v6.1.1` (available on `PATH` for stateless shell execution without dot-sourcing profiles)
+- **Interactive PowerShell Profile Script:** `C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1`
 - **Project Working Directory:** `examples\H1OS`
 
 > [!WARNING]
-> On Windows, running `idf.py` requires access to `C:\Espressif\tools`. In AI agent terminals, commands running ESP-IDF builds MUST set `BypassSandbox: true`.
+> On Windows, `eim run "cmd" v6.1.1` masks inner tool non-zero exit codes unless wrapped in single quotes with trailing `; exit $LASTEXITCODE`. When invoking `idf.py` or host toolchains, set `BypassSandbox: true` if tool access outside workspace is gated.
 
 ---
 
 ## 2. Canonical One-Liner Commands
 
-All commands must be executed in `examples\H1OS` using PowerShell:
+All single-shot commands can run directly from repo root using `eim run` (recommended for CI and autonomous shells) or inside `examples\H1OS` after sourcing the PowerShell profile:
 
 > [!IMPORTANT]
 > **CMakePresets Mandate:**
@@ -38,12 +39,20 @@ All commands must be executed in `examples\H1OS` using PowerShell:
 ### Production Build (Default)
 Compiles `bootloader.bin`, `ulp_h1os.bin`, and `h1os.bin` into `build_prod` via the `prod` preset:
 ```powershell
+# Single-shot via eim (from repo root):
+eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_prod --preset prod build; exit $LASTEXITCODE' v6.1.1
+
+# Or interactive session inside examples\H1OS:
 & "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_prod --preset prod build
 ```
 
 ### Development Build
-Compiles with debug symbols into `build_dev` via the `dev` preset:
+Compiles with debug symbols and `.su` stack usage into `build_dev` via the `dev` preset:
 ```powershell
+# Single-shot via eim (from repo root):
+eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1
+
+# Or interactive session inside examples\H1OS:
 & "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; idf.py -B build_dev --preset dev build
 ```
 

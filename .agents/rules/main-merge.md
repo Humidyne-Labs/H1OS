@@ -12,8 +12,9 @@ Before executing a merge into `main`, the developer or autonomous agent **MUST**
 
 ```mermaid
 graph TD;
-    A0["0a. Identity & Name Audit<br/>(python tools/agent/sanitize.py --check)"] --> A0b["0b. Asset Shrink & Quantization<br/>(/shrink: optimize_images + optimize_pdf)"];
-    A0b --> A["1. Code & Build Verification<br/>(idf.py -B build_dev --preset dev build in examples/H1OS: 0 warnings, 0 errors)"];
+    A0["0a. Identity & Name Audit<br/>(python tools/agent/sanitize.py --check --include-dist)"] --> A0b["0b. Asset Shrink & Quantization<br/>(/shrink: optimize_images + optimize_pdf)"];
+    A0b --> A0c["0c. Full Audit Harness Gate<br/>(python tools/agent/run_audit.py --all)"];
+    A0c --> A["1. Code & Build Verification<br/>(eim run idf.py dev/prod/examples: 0 warnings, 0 errors)"];
     A --> B["2. Rev Semantic Version Strings<br/>(h1os_version.h, idf_component.yml, README.md)"];
     B --> C["3. Regenerate docs/api.md<br/>(doxygen Doxyfile + moxygen)"];
     C --> D["4. Touch & Update CHANGELOG.md<br/>(Keep a Changelog format with timestamp)"];
@@ -68,15 +69,20 @@ Every merge to `main` must touch `CHANGELOG.md` adhering to the [Keep a Changelo
 
 ---
 
-## 5. Invariant 4: Verified Clean Build & Memory Profiling
+## 5. Invariant 4: Verified Clean Build, Audit Harness & Memory Profiling
 
 Before merging:
-1. Compile inside `examples/H1OS` using the canonical ESP-IDF v6.1.1 profile script:
+1. Compile all showcase/example targets via `eim run` (ESP-IDF `v6.1.1`):
    ```powershell
-   & "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; cd examples/H1OS; idf.py -B build_dev --preset dev build
+   eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1
+   eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_prod --preset prod build; exit $LASTEXITCODE' v6.1.1
    ```
 2. Build must exit with code 0 and ZERO warnings or `-Werror` breaks.
-3. Verify memory budgets using `murdock_memory_budget` to confirm DIRAM, RTC Slow, and Flash app partition headroom remain within design limits.
+3. Run the unified verification harness (`H1OS-STD-001 Rev 2.2`):
+   ```powershell
+   python tools/agent/run_audit.py --all
+   ```
+4. Verify memory budgets using `murdock_memory_budget` (`embedded-ops`) to confirm DIRAM, RTC Slow, and Flash app partition headroom remain within design limits.
 
 ---
 

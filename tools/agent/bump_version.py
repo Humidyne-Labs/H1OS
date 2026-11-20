@@ -277,10 +277,6 @@ def _build_rules(repo_root: Path, include_idf: bool) -> List[Tuple[str, List[Fie
             ],
         ),
         (
-            "TODO.md",
-            [ver_rule("TODO header version", r"^(## Current Silicon & Display Issues \(`v)([^`]+)(`\))$")],
-        ),
-        (
             "docs/guide.md",
             [
                 ver_rule("guide Firmware Version", r"^(\*\*Firmware Version:\*\* `v)([^`]+)(`\s*)$"),
@@ -404,10 +400,10 @@ def apply_bump(
         new_text = orig_text
 
         for rule in file_rules:
-            new_text, count = rule.pattern.subn(
-                lambda m, r=rule: r.render(target_ver, idf_version, m),
-                new_text,
-            )
+            def _sub_cb(m: re.Match[str], r: FieldRule = rule) -> str:
+                return r.render(target_ver, idf_version, m)
+
+            new_text, count = rule.pattern.subn(_sub_cb, new_text)
             if count == 0:
                 errors.append(f"{rel} [{rule.label}]: anchor pattern matched 0 times")
 
@@ -476,7 +472,7 @@ def main() -> int:
     try:
         repo_root = find_repo_root()
         current_ver = None if args.set else read_current_version_from_header(repo_root)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         print(f"[!] Initialization error: {exc}", file=sys.stderr)
         return 1
 
@@ -489,7 +485,9 @@ def main() -> int:
         idf_ver = m.group(1)
 
     if args.check:
-        assert current_ver is not None
+        if current_ver is None:
+            print("[!] Missing version header state for --check.", file=sys.stderr)
+            return 1
         return check_sync(repo_root, current_ver, idf_ver)
 
     if args.set:
@@ -499,7 +497,9 @@ def main() -> int:
             print(f"[!] {exc}", file=sys.stderr)
             return 1
     else:
-        assert current_ver is not None
+        if current_ver is None:
+            print("[!] Missing version header state for --bump.", file=sys.stderr)
+            return 1
         tag = current_ver.tag if args.tag is None else args.tag.strip()
         if args.bump == "major":
             target_ver = SemVer(current_ver.major + 1, 0, 0, tag)

@@ -27,3 +27,12 @@ run_monitor.bat
 sanitize_names.txt
 tools/agent/sanitize_names.txt
 tools/agent/.sanitize_names
+
+# Tooling & Verification Caches
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated Documentation Intermediates
+docs/doxygen/

@@ -1,6 +1,6 @@
 # H1OS Development Roadmap & Verification Milestones
 
-> **H1OS Architecture Specification** | **Document:** `C3` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `C3` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 This roadmap tracks the development of **H1OS** (E-Class Environmental Telemetry Instrument Operating System) for the Waveshare ESP32-S3 ePaper 1.54" V2.
 

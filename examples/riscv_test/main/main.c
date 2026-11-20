@@ -183,7 +183,7 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     } else if (d->ulp_rdy_timeout != 0) {
         verdict = "FAIL: ULP RDY_FOR_WAKEUP TIMEOUT";
     } else if (is_timer_wake && d->ulp_completed == 0) {
-        verdict = "FALLBACK WAKE: 30s TIMER (ULP trigger missed or coprocessor hung)";
+        verdict = "RECOVERY WAKE: 30s TIMER (ULP trigger missed or coprocessor hung)";
     } else if (is_ulp_wake && d->magic == ULP_TEST_MAGIC && d->ulp_completed == 1) {
         if (stage == TEST_MODE_TIMER_ONLY) {
             verdict = (d->ulp_timer_wake_count > 0) ? "PASS" : "FAIL: TIMER WAKE NOT COUNTED";
@@ -210,7 +210,7 @@ static void dump_telemetry_report(uint32_t stage, uint32_t causes, test_shared_d
     printf("========================================================================\n");
     printf(" Boot Count / Sleep Wake # : %lu\n", (unsigned long)s_boot_count);
     printf(" Main Wake Causes Bitmask  : 0x%08lX (ULP: %s, TIMER: %s, TRAP: %s)\n", (unsigned long)causes,
-           is_ulp_wake ? "YES" : "NO", is_timer_wake ? "YES (30s FALLBACK)" : "NO",
+           is_ulp_wake ? "YES" : "NO", is_timer_wake ? "YES (30s RECOVERY)" : "NO",
            is_trap_wake ? "YES (CRASH!)" : "NO");
     printf(" Shared Structure Magic    : 0x%08lX (%s)\n", (unsigned long)d->magic,
            (d->magic == ULP_TEST_MAGIC) ? "VALID" : "CORRUPTED");
@@ -344,7 +344,7 @@ static void arm_stage_2_event_mode(test_shared_data_t *d)
 {
     ESP_LOGI(TAG, "========================================================================");
     ESP_LOGI(TAG, ">>> PREPARING STAGE 2: Pure Event Mode (RTC GPIO 18) <<<");
-    ESP_LOGI(TAG, "PMU Sleep Timer is DISABLED. 30-second fallback timer armed.");
+    ESP_LOGI(TAG, "PMU Sleep Timer is DISABLED. 30-second recovery timer armed.");
     ESP_LOGI(TAG, "ACTION REQUIRED: Press tactile PWR (GPIO 18) button to wake!");
     ESP_LOGI(TAG, "========================================================================");
 
@@ -518,6 +518,7 @@ void app_main(void)
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
 
+            // [H1OS-WAIVER: PIT-08-A | Class: S2 | Reason: Interactive bench diagnostic loop waits indefinitely for operator BOOT button release | Proof: examples/riscv_test/main/main.c:511-524]
             while (gpio_get_level(PIN_BUTTON_BOOT) == 0) {
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
