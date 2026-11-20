@@ -103,14 +103,14 @@ All UI code targets the Waveshare ESP32-S3 ePaper 1.54" V2 panel (SSD1681 driver
 * **Usable Margins & Maximum Width:** $X = 6\text{ px}$ to $194\text{ px}$. Maximum string width is strictly **$\le 188.0\text{ px}$**.
 * **Color Depth:** 1-bit Monochrome (`LV_COLOR_FORMAT_I1`), pure black and pure white. Draw buffer: exactly 5,000 bytes (plus 8-byte LVGL v9 palette header in the draw buffer).
 * **100% Opacity Mandate:** Opacity must always be `LV_OPA_COVER` (100%). Alpha blending, partial opacity (`LV_OPA_50`), and pseudo-random dithering are strictly prohibited.
-* **Typography:** Minimum font height is **14 pixels** (e.g. `H1OS_FONT_14`). Fonts <14 px blur into illegibility during differential updates.
-* **Proportional Font Rules:** Montserrat font metrics are proportional with 4-bit fractional advance widths and class kerning. Never use multiple spaces for alignment; use dual column labels or single-space padding.
+* **Typography:** Minimum font height is **14 pixels** (e.g. `HUMID1_FONT_UI_BODY` / `H1OS_FONT_14`, symbol `humid1_font_plex_sans_normal_14`). Fonts <14 px blur into illegibility during differential updates.
+* **Proportional Font Rules:** IBM Plex Sans metrics use 4-bit fractional advance widths (`adv_w_fp4`, `(adv_w_fp4 + kern_fp4 + 8) >> 4`), while IBM Plex Mono & Terminus provide tabular widths for aligned readouts. Never use multiple spaces for proportional alignment; use dual column labels or tabular mono strikes.
 * **Layout Grid (200 px Total):** Header ($Y = 0..20\text{ px}$ with 1 px bottom border), Body ($Y = 22..148\text{ px}$), Footer ($Y = 150..200\text{ px}$).
 * **Cross-Core UI Mutation & Thread Safety (`MANDATE-04` / `REV-02`):**
   - **Preferred Non-Blocking Actor Pattern (Core 0 $\rightarrow$ Core 1):** Background tasks, `on_sync` handlers, and network callbacks on Core 0 should enqueue UI updates via `h1os_ui_post(h1os_ui_fn_t fn, void *arg, uint32_t timeout_ms)` (16-slot static FreeRTOS queue). Core 1 wakes immediately via `xTaskNotifyGive()` and executes every queued callback **inside `h1os_lvgl_lock(100)`** immediately before `lv_timer_handler()`.
   - **Direct Recursive Mutex Pattern:** When synchronous locking is required outside `on_wake`/`on_boot` or `h1os_ui_post`, wrap LVGL calls in `if (h1os_lvgl_lock(timeout_ms)) { ... h1os_lvgl_unlock(); }` (always passing an explicit `uint32_t timeout_ms` parameter).
   - **Single-Refresh Inbound Coalescing:** When `on_sync` fetches remote data to display on the current wake's screen, set `lifecycle.session.sync_wait_ms` (e.g. `250 ms`). Core 1 delays its first `lv_timer_handler()` flush until `h1os_sync_notify_complete()` releases the gate (or `sync_wait_ms` expires), coalescing `on_wake` + `on_sync` UI updates into a **single physical SSD1681 refresh**.
-* **Font Validation Tools:** Verify all strings against layout boundaries using `python tools/agent/check_string_width.py --audit-screens` and CSV metrics in `tools/fonts/`.
+* **Font Validation Tools:** Verify all strings, icons, and screen layouts via `embedded-ops` MCP tools (`epd_char_info`, `epd_string_budget`, `epd_audit_screens`, `epd_icon_search`, `epd_font_inventory`), the global `epd-typography` skill, and packaged CSV manifests in `components/h1os/tools/fonts/metrics/`.
 
 ---
 
@@ -205,49 +205,9 @@ Cross-reference the canonical system blueprint documents before modifying archit
 
 ---
 
-## 9. MCP Tool Harness: Scope, Architecture & Strategic Planning
+## 9. MCP Tool Harness & Static Audits
 
-The 3-Finger MCP tool suite equips the agent with compiler-grade AST intelligence, binary memory profiling, hardware telemetry SQL, and formal mathematical solvers. Using the right tool eliminates guesswork, prevents token burn, and guarantees physical correctness.
-
-### 1. Semantic Code Intelligence (`clangd`)
-* **Available Tools:** `find_symbol`, `get_definition`, `find_references`, `get_type_info`, `get_callers`, `get_callees`, `list_file_symbols`.
-* **Purpose & Application:** AST-accurate C/C++ semantic navigation backed by LLVM 18 and `compile_commands.json`. Resolves active `#ifdef` configurations, struct layouts, type hierarchies, and full incoming/outgoing call graphs.
-* **Why Preferred Over `grep`:**
-  - `grep` is syntactic and blind: it returns false positives in comments, string literals, inactive `#if 0` blocks, and similarly named variables across unrelated files.
-  - `clangd` is semantic and exact: `get_definition` jumps straight to the true compiler definition; `find_references` lists exact call sites; `get_type_info` provides precise struct packing and byte offsets.
-* **Workflow Example:**
-  - ❌ *Bad:* Running `grep -r "sensor_fail_count"` across all files, reading 50 lines of context per match.
-  - ✅ *Good:* Calling `get_definition` on `orch_sensor_err_t` to verify enum values, then `find_references` on `sensor_fail_count` to map every assignment in `orch_wake_stub.c`.
-
-### 2. Embedded Diagnostics & Memory Budgets (`embedded-ops`)
-* **Available Tools:** `murdock_memory_budget`, `ba_serial_capture_and_decode`, `clangd_touch_reload`.
-* **Purpose & Application:** Binary inspection and runtime verification.
-  - `murdock_memory_budget`: Evaluates compiled `h1os.elf` using `xtensa-esp32s3-elf-size` and `nm` to return structured JSON byte counts for DRAM, DIRAM, RTC Slow, and Flash partition headroom.
-  - `ba_serial_capture_and_decode`: Captures serial boot sequences and automatically runs `xtensa-esp32s3-elf-addr2line` to decode panic backtraces to `file:line (function)`.
-  - `clangd_touch_reload`: Busts clangd AST cache after CMake reconfigures without restarting sessions.
-* **Why Preferred Over Host Text Dumps:** Eliminates manual calculation of linker map addresses; immediately catches RTC Slow SRAM overflow (>4 KB) before hardware deployment.
-
-### 3. Telemetry & Tabular Analytics (`duckdb`)
-* **Available Tools:** `query`.
-* **Purpose & Application:** High-performance in-memory SQL analytics directly against disk CSV and Parquet files without database imports or file-locking conflicts.
-* **Why Preferred Over Ad-Hoc Scripts:**
-  - Allows instant multi-file aggregation (e.g., font metric audits, temperature delta queries over 10-hour chamber tests) in a single turn without writing throwaway Python parsing scripts.
-* **Workflow Example:**
-  - ❌ *Bad:* Writing a 40-line Python script to load `char_widths_montserrat_14.csv`, sort by width, and print the top 5 widest characters.
-  - ✅ *Good:* Executing `SELECT char, width_px FROM 'tools/fonts/char_widths_montserrat_14.csv' ORDER BY width_px DESC LIMIT 5;` via DuckDB.
-
-### 4. Mathematical Grounding & Formal Verification (`science`)
-* **Available Tools:** `derive_fixed_point_polynomial`, `solve_z3_assertions`, `fit_thermal_rc`, `eval_symbolic_math`.
-* **Purpose & Application:**
-  - `derive_fixed_point_polynomial`: Derives Chebyshev/Padé minimax polynomial approximations for FPU-less ULP RISC-V in Q16.16/Q8.24 with Horner evaluation C code and error bounds.
-  - `solve_z3_assertions`: Formal SMT verification proving freedom from race conditions and GPIO latch deadlocks.
-  - `fit_thermal_rc`: Empirical curve-fitting of sensor thermal step responses ($\tau$).
-* **Why Preferred Over Heuristic Guessing:** Produces mathematically optimal, cycle-efficient fixed-point approximations rather than trial-and-error lookup tables.
-
-### 5. Documentation & Technical Reference (`local-index` & `espressif-documentation`)
-* **Available Tools:** `search_code_advanced`, `find_files`, `get_file_summary`, `search_espressif_sources`.
-* **Purpose & Application:** Precision search across repository architecture docs, IC datasheets (SHTC3, PCF85063A, ES8311, SSD1681), and Espressif Technical Reference Manuals.
-* **Tool Quirk:** `local-index/search_code_advanced` strictly requires argument `pattern: str` (do not pass `query`).
+Global MCP tool routing (`clangd`, `esp-idf-eim`, `embedded-ops`, `duckdb`, `espressif-documentation`, `esp-component-registry`, `deepwiki`, `semgrep`, `playwright`, `mcp-compass`) and static analysis audit pipelines are managed globally by the **`embedded-harness`** plugin (`~/.gemini/config/plugins/embedded-harness/`).
 
 ---
 

@@ -1,59 +1,105 @@
 {
-  "catalog_version": "1.0.9",
-  "description": "Humiditron / humid1 Text & Technical Font Catalog (IBM Plex + 24 Terminus Strikes)",
+  "catalog_version": "1.0.22",
+  "description": "Humiditron / humid1 Text & Technical Font Catalog (IBM Plex wght 100..800 + 24 Terminus Strikes)",
   "families": {
     "sans": [
-      "IBMPlexSans-Thin.ttf",
-      "IBMPlexSans-ExtraLight.ttf",
-      "IBMPlexSans-Light.ttf",
       "IBMPlexSans-Regular.ttf",
-      "IBMPlexSans-Text.ttf",
       "IBMPlexSans-Medium.ttf",
       "IBMPlexSans-SemiBold.ttf",
       "IBMPlexSans-Bold.ttf",
+      "IBMPlexSans-ExtraBold.ttf",
       "IBMPlexSans-Italic.ttf",
-      "IBMPlexSans-TextItalic.ttf",
       "IBMPlexSans-MediumItalic.ttf",
       "IBMPlexSans-SemiBoldItalic.ttf",
-      "IBMPlexSans-BoldItalic.ttf"
+      "IBMPlexSans-BoldItalic.ttf",
+      "IBMPlexSans-ExtraBoldItalic.ttf"
     ],
     "cond": [
-      "IBMPlexSansCondensed-Light.ttf",
+      "NotoSans-SemiCondensedMedium.ttf",
+      "NotoSans-SemiCondensedExtraBold.ttf",
+      "NotoSans-SemiCondensedBlack.ttf",
+      "NotoSans-SemiCondensedSemiBoldItalic.ttf",
+      "NotoSans-CondensedSemiBold.ttf",
+      "NotoSans-CondensedBlack.ttf",
+      "NotoSans-CondensedSemiBoldItalic.ttf",
       "IBMPlexSansCondensed-Regular.ttf",
-      "IBMPlexSansCondensed-Text.ttf",
       "IBMPlexSansCondensed-Medium.ttf",
       "IBMPlexSansCondensed-SemiBold.ttf",
       "IBMPlexSansCondensed-Bold.ttf",
+      "IBMPlexSansCondensed-ExtraBold.ttf",
       "IBMPlexSansCondensed-Italic.ttf",
       "IBMPlexSansCondensed-MedItal.ttf",
-      "IBMPlexSansCondensed-BoldItalic.ttf"
+      "IBMPlexSansCondensed-SemiBoldItalic.ttf",
+      "IBMPlexSansCondensed-BoldItalic.ttf",
+      "IBMPlexSansCondensed-ExtraBoldItalic.ttf"
     ],
     "mono": [
-      "IBMPlexMono-Light.ttf",
       "IBMPlexMono-Regular.ttf",
-      "IBMPlexMono-Text.ttf",
       "IBMPlexMono-Medium.ttf",
       "IBMPlexMono-SemiBold.ttf",
       "IBMPlexMono-Bold.ttf",
+      "IBMPlexMono-ExtraBold.ttf",
       "IBMPlexMono-Italic.ttf",
       "IBMPlexMono-MediumItalic.ttf",
-      "IBMPlexMono-BoldItalic.ttf"
+      "IBMPlexMono-SemiBoldItalic.ttf",
+      "IBMPlexMono-BoldItalic.ttf",
+      "IBMPlexMono-ExtraBoldItalic.ttf"
     ],
     "serif": [
-      "IBMPlexSerif-Light.ttf",
+      "NotoSerif-Medium.ttf",
+      "NotoSerif-Black.ttf",
+      "NotoSerif-MediumItalic.ttf",
+      "NotoSerif-SemiBoldItalic.ttf",
       "IBMPlexSerif-Regular.ttf",
-      "IBMPlexSerif-Text.ttf",
       "IBMPlexSerif-Medium.ttf",
       "IBMPlexSerif-SemiBold.ttf",
       "IBMPlexSerif-Bold.ttf",
+      "IBMPlexSerif-ExtraBold.ttf",
       "IBMPlexSerif-Italic.ttf",
       "IBMPlexSerif-MediumItalic.ttf",
-      "IBMPlexSerif-BoldItalic.ttf"
+      "IBMPlexSerif-SemiBoldItalic.ttf",
+      "IBMPlexSerif-BoldItalic.ttf",
+      "IBMPlexSerif-ExtraBoldItalic.ttf"
     ],
     "math": [
+      "NotoSansMath-Regular.ttf",
       "IBMPlexMath-Regular.ttf"
     ],
+    "noto_sans": [
+      "NotoSans-Regular.ttf",
+      "NotoSans-Medium.ttf",
+      "NotoSans-Bold.ttf",
+      "NotoSans-ExtraBold.ttf",
+      "NotoSans-Black.ttf",
+      "NotoSans-MediumItalic.ttf",
+      "NotoSans-SemiBoldItalic.ttf"
+    ],
+    "noto_cond": [
+      "NotoSans-SemiCondensedMedium.ttf",
+      "NotoSans-SemiCondensedExtraBold.ttf",
+      "NotoSans-SemiCondensedBlack.ttf",
+      "NotoSans-SemiCondensedSemiBoldItalic.ttf",
+      "NotoSans-CondensedSemiBold.ttf",
+      "NotoSans-CondensedBlack.ttf",
+      "NotoSans-CondensedSemiBoldItalic.ttf"
+    ],
+    "noto_mono": [
+      "NotoSansMono-Medium.ttf",
+      "NotoSansMono-ExtraBold.ttf",
+      "NotoSansMono-Black.ttf"
+    ],
+    "noto_serif": [
+      "NotoSerif-Medium.ttf",
+      "NotoSerif-Black.ttf",
+      "NotoSerif-MediumItalic.ttf",
+      "NotoSerif-SemiBoldItalic.ttf"
+    ],
+    "noto_math": [
+      "NotoSansMath-Regular.ttf"
+    ],
     "terminus": [
+      "Terminus-Normal-10.ttf",
+      "Terminus-Bold-10.ttf",
       "Terminus-Normal-12.ttf",
       "Terminus-Bold-12.ttf",
       "Terminus-Normal-14.ttf",
@@ -70,12 +116,20 @@
       "Terminus-Bold-22.ttf",
       "Terminus-Normal-24.ttf",
       "Terminus-Bold-24.ttf",
+      "Terminus-Normal-26.ttf",
+      "Terminus-Bold-26.ttf",
       "Terminus-Normal-28.ttf",
       "Terminus-Bold-28.ttf",
+      "Terminus-Normal-30.ttf",
+      "Terminus-Bold-30.ttf",
       "Terminus-Normal-32.ttf",
       "Terminus-Bold-32.ttf",
+      "Terminus-Normal-34.ttf",
+      "Terminus-Bold-34.ttf",
       "Terminus-Normal-36.ttf",
       "Terminus-Bold-36.ttf",
+      "Terminus-Normal-38.ttf",
+      "Terminus-Bold-38.ttf",
       "Terminus-Normal-40.ttf",
       "Terminus-Bold-40.ttf"
     ]

@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.23",
+  "hw_scheme_id": "generic_hw",
+  "description": "Generic target hardware specification scheme for ROM size approximations, evaluation benchmarks, and archival builds with a single 3 MByte (3,145,728 bytes) partition.",
+  "chip_name": "Generic-32bit-MCU",
+  "soc_vendor": "Generic Embedded Target",
+  "partition_bytes": 3145728,
+  "display": {
+    "panel": "Waveshare 1.54in V2 Monochrome EPD (SSD1681)",
+    "width_px": 200,
+    "height_px": 200,
+    "dpi": 188.15,
+    "safe_margin_px": 6,
+    "color_depth_bpp": 1,
+    "lvgl_color_format": "LV_COLOR_FORMAT_I1"
+  }
+}

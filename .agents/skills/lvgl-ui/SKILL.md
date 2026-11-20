@@ -45,58 +45,44 @@ Y = 200 px +-------------------------------------------------------+
 
 ---
 
-## 3. Font Metric CSV Tables (`tools/fonts/`)
+## 3. Packaged Font Metric CSV Tables (`components/h1os/tools/fonts/metrics/`)
 
-Montserrat is a **proportional (variable-width)** font with 4-bit fractional advance widths and class-based kerning. Never use multiple spaces for horizontal alignment—use separate column labels or single-space padding.
+IBM Plex Sans is a **proportional (variable-width)** font with 4-bit fractional advance widths (`adv_w_fp4`, exact LVGL v9 step `(adv_w_fp4 + kern_fp4 + 8) >> 4`), while IBM Plex Mono & Terminus provide fixed tabular widths for aligned readouts. Never use multiple spaces for proportional horizontal alignment—use separate column labels or tabular mono strikes.
 
-### Character Advance Widths & Bounding Boxes
-- `tools/fonts/char_widths_montserrat_14.csv`
-- `tools/fonts/char_widths_montserrat_16.csv`
-- `tools/fonts/char_widths_montserrat_18.csv`
-- `tools/fonts/char_widths_montserrat_20.csv`
-- `tools/fonts/char_widths_montserrat_24.csv`
-- `tools/fonts/char_widths_montserrat_32.csv`
-
-### Class Kerning Pair Adjustments (3,400+ pairs per font)
-- `tools/fonts/kern_pairs_montserrat_14.csv`
-- `tools/fonts/kern_pairs_montserrat_16.csv`
-- `tools/fonts/kern_pairs_montserrat_18.csv`
-- `tools/fonts/kern_pairs_montserrat_20.csv`
-- `tools/fonts/kern_pairs_montserrat_24.csv`
-- `tools/fonts/kern_pairs_montserrat_32.csv`
+### Active Metric Manifests & Strike Vault
+- **108 Advance Width & BBox CSVs:** `components/h1os/tools/fonts/metrics/char_widths_<symbol>.csv` (e.g., `char_widths_humid1_font_plex_sans_normal_14.csv`, `char_widths_humid1_font_plex_mono_bold_20.csv`).
+- **108 Kerning CSVs:** `components/h1os/tools/fonts/metrics/kern_pairs_<symbol>.csv`.
+- **Headers & Vault:** `components/h1os/tools/fonts/fonts/{humid1_fonts.h,h1os_fonts.h}` (`HUMID1_FONT_*`, `H1OS_FONT_*`) and `components/h1os/tools/fonts/humid1_epd_vault.json.gz`.
 
 ---
 
-## 4. Layout Verification & Tool Execution
+## 4. Layout Verification (`embedded-ops` MCP & `epd-typography` Skill)
 
-### A. Check Single String Width (CLI)
-Calculates exact sub-pixel string width $\sum(\text{adv\_w} + \text{kern})$ with per-character breakdown:
-```powershell
-# Evaluate string against 188px limit in Montserrat-14 (default):
-python tools/agent/check_string_width.py "Power: CHARGED 4.00V"
-
-# Evaluate in a different font size (e.g. 20pt hero text):
-python tools/agent/check_string_width.py --size 20 "72.5% RH"
+### A. Single String / Two-Column Row Budget (`embedded-ops/epd_string_budget`)
+Evaluates exact LVGL v9 pixel width and clearance against the `188 px` budget:
+```text
+embedded-ops/epd_string_budget(
+  strike="humid1_font_plex_sans_normal_14",
+  text="Power: CHARGED 4.00V",
+  workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS"
+)
 ```
 
-### B. Automated Screen File Audit (`--audit-screens`)
-Scans all C screen files in `examples/H1OS/main/` (and `screens/`), extracts string formatting templates, simulates worst-case parameter expansion, and asserts that no string exceeds $188.0\text{ px}$:
-```powershell
-python tools/agent/check_string_width.py --audit-screens
+### B. Automated Screen File Audit (`embedded-ops/epd_audit_screens`)
+Scans all C screen files in `examples/H1OS/main/screens/`, resolves `lv_obj_set_style_text_font` + `HUMID1_FONT_*`/`H1OS_FONT_*` macros, simulates worst-case `printf` expansion, and flags any line exceeding `188 px`:
+```text
+embedded-ops/epd_audit_screens(workspace_dir="C:/Users/Matt/Documents/GitHub/H1OS")
 ```
 
-### C. Re-Extract Font Metrics & Kerning CSVs
-Re-generates all 12 CSV tables from generated LVGL 1bpp C font files:
-```powershell
-python tools/agent/extract_font_metrics.py
-```
+### C. Regenerate Font Assets (`epd-font` v1.0.23)
+Regenerate in `C:\Users\Matt\Documents\GitHub\epd-font` via `scripts\h1os-build-distro\02_build_fonts.bat` and `07_package_distro.bat`, then sync `dist\h1os_distro\` into `components\h1os\tools\fonts\`.
 
 ### D. Query Metrics via DuckDB SQL
 Query glyph or kerning metrics using DuckDB MCP:
 ```sql
--- Widest ASCII characters in Montserrat-14:
-SELECT char, width_px FROM 'tools/fonts/char_widths_montserrat_14.csv' WHERE unicode_dec < 128 ORDER BY width_px DESC LIMIT 8;
+-- Widest ASCII characters in IBM Plex Sans 14px:
+SELECT char, width_px FROM read_csv_auto('components/h1os/tools/fonts/metrics/char_widths_humid1_font_plex_sans_normal_14.csv') WHERE unicode_dec < 128 ORDER BY width_px DESC LIMIT 8;
 
 -- Negative kerning adjustments (tighter pairs):
-SELECT left_char, right_char, kern_px FROM 'tools/fonts/kern_pairs_montserrat_14.csv' WHERE kern_px < 0 ORDER BY kern_px ASC LIMIT 10;
+SELECT left_char, right_char, kern_px FROM read_csv_auto('components/h1os/tools/fonts/metrics/kern_pairs_humid1_font_plex_sans_normal_14.csv') WHERE kern_px < 0 ORDER BY kern_px ASC LIMIT 10;
 ```

@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.23",
+  "hw_scheme_id": "esp32s3-N8R8",
+  "description": "Target hardware specification scheme for Espressif ESP32-S3-N8R8 (H1OS & humid1-os reference hardware platform) with a single 3 MByte (3,145,728 bytes) font/asset Flash partition.",
+  "chip_name": "ESP32-S3-N8R8",
+  "soc_vendor": "Espressif Systems",
+  "partition_bytes": 3145728,
+  "display": {
+    "panel": "Waveshare 1.54in V2 Monochrome EPD (SSD1681)",
+    "width_px": 200,
+    "height_px": 200,
+    "dpi": 188.15,
+    "safe_margin_px": 6,
+    "color_depth_bpp": 1,
+    "lvgl_color_format": "LV_COLOR_FORMAT_I1"
+  }
+}
