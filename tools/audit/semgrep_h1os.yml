@@ -1,0 +1,69 @@
+rules:
+  - id: h1os-unchecked-lvgl-lock
+    languages: [c, cpp]
+    severity: ERROR
+    message: >-
+      h1os_lvgl_lock() return value must be checked before mutating LVGL objects
+      and paired symmetrically with h1os_lvgl_unlock() (PIT-07-B / DEF-2410-02).
+    pattern: h1os_lvgl_lock($T);
+
+  - id: h1os-layer-boundary-hal-sub
+    languages: [c, cpp]
+    severity: ERROR
+    message: >-
+      Four-layer hierarchy violation: Layer 1 (hal_*) and Layer 2 (sub_*)
+      must never include Layer 3 (orch_*) or Layer 4 (h1os_*) headers.
+    paths:
+      include:
+        - "components/h1os/src/hal_*.c"
+        - "components/h1os/src/hal_*.cpp"
+        - "components/h1os/src/sub_*.c"
+        - "components/h1os/src/sub_*.cpp"
+        - "components/h1os/include/h1os/hal_*.h"
+        - "components/h1os/include/h1os/sub_*.h"
+    pattern-regex: '#\s*include\s*"h1os/(orch_|h1os_)[^"]+"'
+
+  - id: h1os-double-precision-math-fn
+    languages: [c, cpp]
+    severity: WARNING
+    message: >-
+      Use single-precision *f math function (expf, logf, sinf, cosf, powf,
+      sqrtf, fabsf) for ESP32-S3 FPU32 instead of double-precision math (PIT-06-B).
+    paths:
+      include:
+        - "components/h1os/src/**"
+        - "examples/H1OS/main/**"
+        - "examples/boilerplate/main/**"
+    pattern-either:
+      - pattern: sin($X)
+      - pattern: cos($X)
+      - pattern: tan($X)
+      - pattern: exp($X)
+      - pattern: log($X)
+      - pattern: log10($X)
+      - pattern: pow($X, $Y)
+      - pattern: sqrt($X)
+      - pattern: fabs($X)
+
+  - id: h1os-lvgl-partial-opacity
+    languages: [c, cpp]
+    severity: ERROR
+    message: >-
+      Bilevel 1-BPP SSD1681 display pipeline requires 100% opacity (LV_OPA_COVER).
+      Partial alpha / dithering is prohibited.
+    paths:
+      include:
+        - "examples/H1OS/main/**"
+        - "examples/boilerplate/main/**"
+        - "components/h1os/src/**"
+    pattern-either:
+      - pattern: LV_OPA_0
+      - pattern: LV_OPA_10
+      - pattern: LV_OPA_20
+      - pattern: LV_OPA_30
+      - pattern: LV_OPA_40
+      - pattern: LV_OPA_50
+      - pattern: LV_OPA_60
+      - pattern: LV_OPA_70
+      - pattern: LV_OPA_80
+      - pattern: LV_OPA_90

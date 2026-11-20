@@ -1,6 +1,6 @@
 # H1OS Master Engineering Specification & Agent Invariants
 
-This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.10-dev`) on ESP32-S3.
+This file constitutes the authoritative, always-active engineering and behavioral specification for autonomous agents and firmware developers working on **H1OS** (`v2.4.11-dev`) on ESP32-S3.
 
 ---
 
@@ -17,14 +17,14 @@ This file constitutes the authoritative, always-active engineering and behaviora
    - **Layer 4: Application Lifecycle (`h1os_*`)**: Declarative lifecycle & dual-core sleep barrier (`h1os_start`, `h1os_sleep`, `h1os_sync_hold`, `h1os_sync_notify_complete`), Core 1 LVGL v9 UI engine & actor queue (`h1os_lvgl.h`, `h1os_ui_post`), and time sync (`h1os_time.h`).
    - *Hierarchy Rule:* Upper layers call lower layers; lower layers **NEVER** call upper layers or cross-talk.
 4. **Hardware-First Mandate ("Use the Hardware"):**
-   - **Dual-Core Affinity & Parallel Execution (`v2.4.10-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
+   - **Dual-Core Affinity & Parallel Execution (`v2.4.11-dev`):** Core 0 handles system orchestration, `on_sync()` Wi-Fi/BLE/ESP-NOW telemetry synchronization, async I/O (`sub_sdcard`, `sub_audio`), and headless Flow A bursts; Core 1 is dedicated strictly to the LVGL v9 presentation and SSD1681 e-Paper refresh task (`h1os_lvgl`, priority `5`).
    - **Power Latching & Fatal Startup Recovery (`MANDATE-06`):** `BAT_CTRL` (`GPIO 17`) is asserted in `h1os_boot_hook` within 25 ms and held across deep sleep via RTC pad hold. If any cold-boot hardware initialization fails (`orch_flow_init()`, `sub_display_init()`, or `h1os_lvgl_init()`), `h1os_handle_fatal_startup_error()` invokes `on_error(err, stage)` and immediately releases `GPIO 17` (`hal_io_release_power_latch()`) on battery power (or enters `EXT0` deep sleep on `GPIO 18` when USB power is attached) so a faulted board never drains the LiPo cell.
    - **Zero-Heat Sensing:** Never poll the SHTC3 during active CPU operation. SHTC3 sampling is restricted to headless Flow A sample bursts (`~18.5 ms` at 80 MHz in `orch_wake_stub.c`) so internal silicon heat cannot conduct across the PCB trace neck before the reading completes.
    - **Never Busy-Wait (Two-Domain Synchronization Law):**
      - **Awake FreeRTOS Domain (`hal_*`, `sub_*`, `orch_flow.c`, `h1os_*`):** Never spawn dedicated polling tasks or `vTaskDelay()` spin-wait loops to monitor timeouts, task exits, or hardware `BUSY`/button pins. Always use `esp_timer` (`esp_timer_start_once` / `esp_timer_start_periodic` / `esp_timer_restart`) for asynchronous timeouts and periodic state machines, GPIO edge interrupts (`gpio_isr_handler_add`) + hardware glitch filters (`gpio_new_pin_glitch_filter`) + `xSemaphoreTake` / `ulTaskNotifyTake` for hardware ready/busy/button lines, static `EventGroup` barriers (`xEventGroupCreateStatic`) for multi-subsystem sleep synchronization, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) for cross-task teardown synchronization.
      - **Bare-Metal Sleep Domain (`orch_wake_stub.c` & `ulp/main.c`):** FreeRTOS, `esp_timer`, and `gptimer` interrupt vectors reside in Flash/IRAM and are unmapped or powered down during deep sleep. Inside `RTC_IRAM_ATTR` and ULP code, straight-line bounded `ccount`/register polling with `rtc_reg_barrier()` (`memw` / `fence`) and `__attribute__((noinline))` loop barriers is mandatory.
 5. **Compiler Diagnostics & Two-Strike Resolution Protocol:**
-   - Always verify compilation with the canonical ESP-IDF profile (C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1). If CMakePresets.json exists in the application directory (e.g. examples/H1OS), always pass both -B and --preset (e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build).
+   - Verify single-shot ESP-IDF v6.1.1 compilation via `eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1` (or interactive sessions sourced with `C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1`). If `CMakePresets.json` exists in the application directory (e.g. `examples/H1OS`), always pass both `-B` and `--preset` (`--preset dev` or `--preset prod`).
    - Keep header (`.h`) declarations and source (`.c`/`.cpp`) definitions atomically synchronized so the project compiles cleanly after every logical change.
    - If a build fails, isolate the exact diagnostic line and propose one targeted fix. If it fails a second time, **STOP IMMEDIATELY**, state the diagnostic verbatim, and request confirmation.
 
@@ -64,7 +64,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
 
 ---
 
-## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.10-dev`)
+## 3. Application Lifecycle, Dual Execution Flows & Dual-Core Concurrency (`v2.4.11-dev`)
 
 `h1os_start()` (or `h1os_init()`) is the **MANDATORY single entry point** and lifecycle orchestrator. All state transitions, flow arbitration, parallel synchronization, and sleep transitions must be driven through `h1os_lifecycle_t`.
 
@@ -79,7 +79,7 @@ Strictly adhere to professional **Embedded Systems Hardware and Software Enginee
      - `H1OS_WAKE_STATE_BOOT`: Cold power-on reset (`boot_count` incremented; flow periods validated via `h1os_validate_flow_periods()` before `orch_flow_init()` and applied via `h1os_apply_flow_periods()` after `orch_state_reset()`).
      - `H1OS_WAKE_STATE_RTC_FLOW_B`: Headless periodic RTC Flow B wake (`flow_b_counter` incremented; executes `on_wake` + `on_sync` + parallel Core 1 e-Paper refresh, then enters deep sleep immediately upon barrier completion without starting the 30s inactivity timer).
      - `H1OS_WAKE_STATE_INTERACTIVE_SESSION`: User tactile button wake on `GPIO 0` or `GPIO 18` (`button_wake_count` incremented; runs interactive session bounded by the one-shot `esp_timer` inactivity timer `s_session_timer`).
-   - Parallel Dual-Core Sequence (`v2.4.10-dev` / `MANDATE-04`):
+   - Parallel Dual-Core Sequence (`v2.4.11-dev` / `MANDATE-04`):
      1. Core 0 validates `h1os_lifecycle_t`, runs `orch_flow_init()`, `sub_display_init()`, and `h1os_lvgl_init()` (routing any failure to `h1os_handle_fatal_startup_error()` / `on_error`).
      2. Core 0 invokes `on_boot()` (on cold boot) or `on_wake(&wake_ctx)` (while Core 1 LVGL task is not yet running, requiring no outer `h1os_lvgl_lock` wrapper; `h1os_trigger_splash()` acquires a scoped lock internally).
      3. If `session.sync_wait_ms > 0` and `on_sync` is registered, Core 0 arms the inbound pre-flush coalescing gate (`h1os_lvgl_set_sync_gate(sync_wait_ms)`).
@@ -145,6 +145,7 @@ If an ID is cited or if auditing a domain, read `docs/architecture/D0_std_audit_
 - **PIT-06 (Metrology/Math):** Zero synthetic tare offsets/fudge factors, explicit single-precision `f` literals (`PIT-06-B`), `int64_t` promotion for fixed-point math, thermal settling verification.
 - **PIT-07 (Display Pipeline):** No sleep during active charge pump/EPD refresh, cross-core `lv_lock` protection, partial refresh scrubbing.
 - **PIT-08 (Driver Robustness):** Checked `esp_err_t` returns, bounded hardware polling loops, structured `goto cleanup;` resource release.
+- **PIT-09 (Build/Host Tooling):** Argument-list subprocess invocation (`shell=False`), `IDF_PATH`/`eim` toolchain lookup (zero hardcoded paths), partition layout validation, and strict Python/PS1 QA (`ruff`, `mypy`, `pytest`).
 
 ---
 
@@ -162,7 +163,7 @@ If an ID is cited or if auditing a domain, read `docs/architecture/D0_std_audit_
 Direct commits to `main` are strictly prohibited. Before merging any branch into `main`:
 1. **Identity & Name Sanitization Audit:** Run `python tools/agent/sanitize.py --check` (or `--fix`) to verify zero personal identities, workstation usernames, or local filesystem paths leak into committed repository files or release archives.
 2. **Asset Optimization & Metadata Invariant (`/shrink` or `/quant`):** Execute the repository asset shrink pipeline (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) prior to staging or committing changes. All photographic evidence must be stamped with all-caps EXIF attribution (`HUMIDITRON/HUMADYNE_LABS`) and progressive JPEG quantization. PDFs are strictly preserved in their original compressed format with lossless metadata harmonization.
-3. **Zero-Warning Build:** Verify compilation passes with 0 warnings/errors via idf.py -B build_dev --preset dev build (if CMakePresets.json exists, always pass both -B and --preset, e.g. idf.py -B build_dev --preset dev build or idf.py -B build_prod --preset prod build). You must build the examples inside examples/H1OS (the showcase project directory) to avoid polluting the repository root.
+3. **Unified Audit Harness & Zero-Warning Build (`H1OS-STD-001 Rev 2.2`):** Run `python tools/agent/run_audit.py --all` (4-layer boundaries, inline waivers, Semgrep, Cppcheck `threadsafety`/`misra`, Clang-Tidy, Python QA, `.su` stack budget, `.rtc.text` audit, lexicon, EPD typography, version sync, sanitize, and offline pytest/host C11 tests) and verify 0 warnings/errors across `examples/H1OS` (`dev` & `prod`), `examples/boilerplate` (`prod`), and `examples/riscv_test` via `eim run '...; exit $LASTEXITCODE' v6.1.1`. When invoking `CMakePresets.json` manually, always pass both `-B` and `--preset` inside the target example directory to avoid polluting the repository root.
 4. **Mandatory `sdkconfig` Removal Invariant:** Always remove `examples/H1OS/sdkconfig` and `sdkconfig.old` before reconfiguring or switching presets (`--preset dev` vs `--preset prod`).
 5. **Synchronize Version Strings:** Run `python tools/agent/bump_version.py --set X.Y.Z-tag` (updating `h1os_version.h`, `idf_component.yml`, `README.md`, `Doxyfile`, `ERRATA.md`, `AGENTS.md`, `.agents/`, `docs/guide.md`, and all `docs/architecture/*.md` headers) and verify via `python tools/agent/bump_version.py --check` alongside `CHANGELOG.md`.
 6. **Regenerate API Documentation:** Run `doxygen Doxyfile; moxygen --flavor github -a -o docs/api.md docs/doxygen/xml`.
@@ -207,7 +208,7 @@ Cross-reference the canonical system blueprint documents before modifying archit
 
 ## 9. MCP Tool Harness & Static Audits
 
-Global MCP tool routing (`clangd`, `esp-idf-eim`, `embedded-ops`, `duckdb`, `espressif-documentation`, `esp-component-registry`, `deepwiki`, `semgrep`, `playwright`, `mcp-compass`) and static analysis audit pipelines are managed globally by the **`embedded-harness`** plugin (`~/.gemini/config/plugins/embedded-harness/`).
+Global MCP tool routing (`clangd`, `esp-idf-eim`, `embedded-ops`, `duckdb`, `espressif-documentation`, `esp-component-registry`, `deepwiki`, `semgrep`, `playwright`, `mcp-compass`) and static analysis audit pipelines are managed globally by the **`embedded-harness`** plugin (`~/.gemini/config/plugins/embedded-harness/`), and orchestrated locally via `python tools/agent/run_audit.py --all`.
 
 ---
 
@@ -218,7 +219,7 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 1. **Respect the Two Execution Worlds (FreeRTOS Awake vs. Bare-Metal RTC Sleep):**
    - When the system is **awake in Flow B**, let hardware interrupts, `esp_timer`, and static FreeRTOS `EventGroup` / `Queue` / `Semaphore` primitives do the waiting. Never write a `while (busy) { vTaskDelay(10); }` loop or spawn a `4 KB` FreeRTOS task just to poll a timestamp or a GPIO pin. Use `esp_timer` one-shot/periodic alarms, `GPIO_INTR_NEGEDGE`/`GPIO_INTR_ANYEDGE` ISRs, and static binary semaphores (`xSemaphoreCreateBinaryStatic`) so both Xtensa cores can enter low-power idle states cleanly—especially when upper-layer applications run Wi-Fi and BLE stacks on Core 0.
    - When the system is **asleep in Flow A (`orch_wake_stub.c`) or the ULP (`ulp/main.c`)**, SPI NOR Flash is powered off and the MMU cache is disabled. Never call standard library functions (`memset`, `memcpy`), `esp_timer`, or FreeRTOS primitives from `orch_wake_stub.c`. Always guard fixed-trip-count bit-bang loops with `__attribute__((noinline))` and inline assembly loop clobbers (`asm volatile("" : "+r"(i))`), guard local array zeroing with `asm volatile("" : "+m"(buf[i]))` so GCC `-O2` `-ftree-loop-distribute-patterns` never synthesizes a fatal call to Flash-resident `memset`, and place `rtc_reg_barrier()` (`memw` on Xtensa, `fence` on RISC-V) between sequential peripheral register writes.
-2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.10-dev`):**
+2. **Coordinate Core 0 I/O & Core 1 e-Paper Refresh Without Blocking (`v2.4.11-dev`):**
    - Core 1 owns the LVGL v9 context and SSD1681 SPI bus; Core 0 owns `on_sync()` telemetry and background peripheral I/O. Never hold `h1os_lvgl_lock()` across slow network, SD card, or I2C operations. Enqueue cross-core UI updates via `h1os_ui_post(fn, arg, timeout_ms)`, use `h1os_sync_hold()` / `h1os_sync_notify_complete()` for asynchronous radio transfers, and configure `session.sync_wait_ms` when inbound data must coalesce into a single physical e-Paper refresh before deep sleep.
 3. **Never Fight Physics with Software Fudge Factors:**
    - The SHTC3 is factory-calibrated. When the PCB is thermally settled (`|T2 - T1| <= 0.20 C` across consecutive quiescent Flow A wakes), trust the SHTC3 directly and compute true water vapor pressure ($e$), dew point ($T_{\text{dew}}$), and absolute humidity ($d_v$) using pure August-Roche-Magnus equations. Never add synthetic temperature offsets or linear tares.
@@ -236,5 +237,5 @@ Welcome to the H1OS source tree. Every line in this repository exists because ph
 ## 11. Engineering Attribution & Contributors
 
 * **Lead Hardware & Systems Architect:** Humiditron (Humidyne Labs)
-* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.10-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
+* **Principal Firmware Audit, Dual-Core Concurrency (`MANDATE-04` / `MANDATE-06`), `-O2` Wake Stub Hardening & Event-Driven Architecture Refactor (`v2.4.4-dev` – `v2.4.11-dev`):** Gemini (Autonomous Embedded Systems Architect & Principal Auditor)
 * **Core Firmware Development, Metrology & Simulation Engineering (`v2.0` – `v2.4.3-dev`):** Antigravity Gemini 3.8 (Junior Embedded Systems Agent)

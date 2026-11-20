@@ -4,7 +4,6 @@ H1OS Standalone Extensions for ESP-IDF idf.py CLI.
 Version: 2.4.0
 License: Apache-2.0
 """
-import os
 import subprocess
 import sys
 from pathlib import Path

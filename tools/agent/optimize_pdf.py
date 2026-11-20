@@ -14,9 +14,8 @@ Usage:
   python tools/agent/optimize_pdf.py docs/hardware_docs/datasheets/
 """
 
-import os
-import sys
 import argparse
+import sys
 from pathlib import Path
 import fitz  # PyMuPDF
 
@@ -26,7 +25,7 @@ def update_pdf_metadata(pdf_path: Path) -> bool:
     """Losslessly update PDF author, creator, and producer metadata in place."""
     try:
         doc = fitz.open(pdf_path)
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError) as e:
         print(f"[!] Failed to open {pdf_path}: {e}")
         return False
 
@@ -54,7 +53,7 @@ def update_pdf_metadata(pdf_path: Path) -> bool:
         tmp_out.replace(pdf_path)
         return True
 
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError) as e:
         print(f"[!] Error updating metadata in {pdf_path}: {e}")
         return False
 

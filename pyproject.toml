@@ -1,0 +1,42 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+    "components/h1os/tools/fonts",
+    "build",
+    "build_*",
+    "managed_components",
+    "dist",
+    "docs",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "S", "BLE", "UP"]
+ignore = [
+    "E501",   # Preserve manual line lengths
+    "S603",   # subprocess.run with shell=False list is standard in CLI tooling
+    "S607",   # Partial executable paths resolved via PATH / eim (e.g. git, idf.py)
+    "UP006",  # Allow typing.List/Dict generics across existing tools
+    "UP035",  # Allow typing module imports
+    "UP045",  # Allow Optional[...] alongside X | None
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+explicit_package_bases = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = false
+exclude = [
+    "components/h1os/tools/fonts",
+    "build",
+    "build_.*",
+    "managed_components",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/tools"]
+addopts = "-q"

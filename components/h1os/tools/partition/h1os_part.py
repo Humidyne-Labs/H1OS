@@ -9,11 +9,10 @@ multi-format partition dumping (bin/hex/view), and OTA slot switching.
 import argparse
 import datetime
 import os
+import subprocess
 import sys
-import tempfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure components/h1os/tools is importable
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -21,22 +20,20 @@ TOOLS_DIR = CURRENT_DIR.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import H1OSConfig, H1OS_TOOLING_VERSION, check_tooling_dependencies
-from partition.part_backend import (
+from h1os_tool import H1OSConfig, H1OS_TOOLING_VERSION, check_tooling_dependencies  # noqa: E402
+from partition.part_backend import (  # noqa: E402
     PartitionEntry,
-    parse_size_str,
-    parse_offset_str,
-    parse_csv_partitions,
+    execute_otatool_read,
+    execute_otatool_switch,
     execute_parttool_erase,
     execute_parttool_read,
     execute_parttool_write,
-    execute_otatool_read,
-    execute_otatool_switch,
+    parse_app_descriptor,
+    parse_csv_partitions,
     parse_otadata_info,
     read_flash_header,
-    parse_app_descriptor,
 )
-from partition.part_hexdump import (
+from partition.part_hexdump import (  # noqa: E402
     format_canonical_hexdump,
     render_live_hex_view,
 )
@@ -55,10 +52,10 @@ try:
 except ImportError:
     HAVE_RICH = False
 
-try:
-    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
+try:  # noqa: E402
+    from menu.console_events import ConsoleEventDispatcher, EventType, get_single_key
 except ImportError:
-    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType, get_single_key
+    from console_events import ConsoleEventDispatcher, EventType, get_single_key
 
 VERSION = H1OS_TOOLING_VERSION
 
@@ -169,7 +166,6 @@ def render_partition_bar(
     unallocated = max(0, flash_size_bytes - total_used)
 
     pct_used = (total_used / flash_size_bytes) * 100.0
-    pct_unalloc = (unallocated / flash_size_bytes) * 100.0
 
     bar_items = []
     # Add bootloader & partition table block with non-breaking spaces
@@ -269,7 +265,7 @@ read_single_key = get_single_key
 def clear_screen() -> None:
     """Clear terminal screen to eliminate visual artifacts across menu transitions."""
     if os.name == "nt":
-        os.system("cls")
+        subprocess.run(["cmd", "/c", "cls"], shell=False, check=False)
     else:
         sys.stdout.write("\033[2J\033[H")
         sys.stdout.flush()
@@ -425,7 +421,7 @@ def run_live_partition_usage_audit(
                 desc = parse_app_descriptor(data)
                 if desc and desc.get("sha256"):
                     local_bins[desc["sha256"]] = (prof.name, cand, len(data))
-            except Exception:
+            except (OSError, ValueError):
                 pass
 
     if not HAVE_RICH or not console:
@@ -533,8 +529,8 @@ def run_live_partition_usage_audit(
 
         elif p.subtype == "ota":
             bar = render_pct_bar(100.0)
-            s0_val = ota_info.get('slot0_seq', '-')
-            s1_val = ota_info.get('slot1_seq', '-')
+            s0_val = str(ota_info.get("slot0_seq", "-"))
+            s1_val = str(ota_info.get("slot1_seq", "-"))
             seq_display = f"S0:{s0_val[:4]} S1:{s1_val[:4]}"
             table.add_row(
                 p.name,
@@ -712,7 +708,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
     """Run interactive Partition Manager sub-menu loop with smooth Live rendering."""
     part_file = config.partition_file
     if not part_file or not part_file.is_file():
-        # Fallback search in project root or component
+        # Secondary search in project root or component
         cand = config.app_root / "partitions.csv"
         if cand.is_file():
             part_file = cand
@@ -905,7 +901,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                                 f"[bold red]ERROR:[/] Image size ({img_size:,} bytes) exceeds partition '{target.name}' capacity ({target.size:,} bytes)!"
                             )
                         else:
-                            print(f"ERROR: Image exceeds partition capacity!")
+                            print("ERROR: Image exceeds partition capacity!")
                     else:
                         confirmed = prompt_confirmation(
                             console,
@@ -1011,13 +1007,13 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
                 if console:
                     console.print(Panel(msg, title="[bold green]Physical Alignment Audit[/]", border_style="green", width=TERM_WIDTH))
                 else:
-                    print(f"\nPASS: All partitions aligned and within bounds.\n")
+                    print("\nPASS: All partitions aligned and within bounds.\n")
             else:
                 warn_text = "\n".join(f"• [bold red]{w}[/]" for w in warnings)
                 if console:
                     console.print(Panel(warn_text, title="[bold red]Alignment Warnings Detected[/]", border_style="red", width=TERM_WIDTH))
                 else:
-                    print(f"\nALIGNMENT WARNINGS:\n" + "\n".join(warnings) + "\n")
+                    print("\nALIGNMENT WARNINGS:\n" + "\n".join(warnings) + "\n")
             pause_prompt(console)
 
         elif action_key == "8":
@@ -1028,7 +1024,7 @@ def run_partition_manager_menu(config: H1OSConfig, console: Optional["Console"] 
 
 def prompt_dump_mode(console: Optional["Console"]) -> Optional[str]:
     """Prompt user to select partition dump output format via interactive menu."""
-    options = [
+    options: List[Dict[str, Any]] = [
         {
             "key": "1",
             "label": "Raw Binary Stream (.bin)",
@@ -1065,7 +1061,7 @@ def prompt_dump_mode(console: Optional["Console"]) -> Optional[str]:
 
 def prompt_ota_slot(console: Optional["Console"]) -> Optional[int]:
     """Prompt user to select target OTA boot slot via interactive menu."""
-    options = [
+    options: List[Dict[str, Any]] = [
         {
             "key": "0",
             "label": "Slot 0 (ota_0)",

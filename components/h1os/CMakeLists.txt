@@ -108,6 +108,12 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wdouble-promotion
     -Wformat=2
     -Wno-format-nonliteral
+    -Wvla
+    -Wduplicated-cond
+    -Wduplicated-branches
+    -Wlogical-op
+    -Wnull-dereference
+    -fstack-usage
     $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
     -Wno-missing-field-initializers
 )

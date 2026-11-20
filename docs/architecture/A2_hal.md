@@ -1,6 +1,6 @@
 # Layer 1: Hardware Abstraction Layer (HAL) Specification
 
-> **H1OS Architecture Specification** | **Document:** `A2` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A2` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Overview
 Layer 1 is the lowest layer of H1OS. It is written in pure C, interacts directly with the ESP-IDF hardware drivers, and enforces the following architectural invariant:

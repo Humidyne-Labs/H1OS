@@ -9,7 +9,7 @@ smooth Live terminal hex inspector with mouse wheel scrolling and keyboard navig
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 # Ensure tools directory is in sys.path
 TOOLS_DIR = Path(__file__).resolve().parent.parent
@@ -29,9 +29,9 @@ except ImportError:
     HAVE_RICH = False
 
 try:
-    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+    from menu.console_events import ConsoleEventDispatcher, EventType
 except ImportError:
-    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+    from console_events import ConsoleEventDispatcher, EventType
 
 
 def format_canonical_hexdump(data: bytes, base_offset: int = 0) -> str:
@@ -81,7 +81,7 @@ def render_live_hex_view(
             print("Partition data buffer is empty (0 bytes).")
         return
 
-    # Fallback if rich is absent or non-interactive
+    # Plain output if rich is absent or non-interactive
     if not HAVE_RICH or not console or not sys.stdin.isatty():
         dump_text = format_canonical_hexdump(data[:512], base_offset=base_offset)
         print(f"\n--- HEX DUMP PREVIEW: {partition_name} (First 512 of {len(data)} bytes) ---")

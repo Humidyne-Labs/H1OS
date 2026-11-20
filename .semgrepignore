@@ -1,0 +1,10 @@
+build/
+build_*/
+managed_components/
+docs/doxygen/
+dist/
+.git/
+__pycache__/
+.venv/
+venv/
+components/h1os/tools/fonts/

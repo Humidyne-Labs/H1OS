@@ -15,10 +15,9 @@ Usage:
   python tools/agent/optimize_images.py --file path/to/image.jpg
 """
 
-import os
-import sys
-import io
 import argparse
+import io
+import sys
 from pathlib import Path
 from PIL import Image
 
@@ -77,7 +76,7 @@ def optimize_single_image(file_path: Path, quality: int = 85, convert_png: bool 
                     file_path.unlink()
             return orig_bytes, len(new_bytes)
 
-    except Exception as e:
+    except (OSError, ValueError) as e:
         print(f"[!] Skipped {file_path}: {e}")
 
     return orig_bytes, orig_bytes
@@ -119,7 +118,7 @@ def main():
             print(f"  ✓ {prefix}{p.name}: {orig_sz/1024:.1f} KB -> {new_sz/1024:.1f} KB (saved {(orig_sz-new_sz)/1024:.1f} KB)")
 
     saved_mb = (total_before - total_after) / (1024 * 1024)
-    print(f"\n[+] Image optimization complete.")
+    print("\n[+] Image optimization complete.")
     print(f"    Files optimized : {modified_count} / {len(files_to_process)}")
     print(f"    Payload before   : {total_before / (1024*1024):.2f} MB")
     print(f"    Payload after    : {total_after / (1024*1024):.2f} MB")

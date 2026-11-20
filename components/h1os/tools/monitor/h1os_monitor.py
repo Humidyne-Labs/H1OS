@@ -22,7 +22,6 @@ Features:
 
 import argparse
 import datetime
-import os
 import re
 import sys
 import threading
@@ -30,14 +29,14 @@ import time
 import uuid
 from collections import deque
 from pathlib import Path
-from typing import Deque, List, Optional
+from typing import Deque, Optional
 
 # Ensure tools directory is in sys.path
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import H1OS_TOOLING_VERSION, check_tooling_dependencies
+from h1os_tool import H1OS_TOOLING_VERSION, check_tooling_dependencies  # noqa: E402
 
 # Pre-flight check for required packages (rich, pyserial)
 if not check_tooling_dependencies():
@@ -45,20 +44,20 @@ if not check_tooling_dependencies():
 
 VERSION = H1OS_TOOLING_VERSION
 
-import serial
-import serial.tools.list_ports
-from rich import box
-from rich.console import Console
-from rich.layout import Layout
-from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+import serial  # noqa: E402
+import serial.tools.list_ports  # noqa: E402
+from rich import box  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.layout import Layout  # noqa: E402
+from rich.live import Live  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.table import Table  # noqa: E402
+from rich.text import Text  # noqa: E402
 
-try:
-    from menu.console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+try:  # noqa: E402
+    from menu.console_events import ConsoleEventDispatcher, EventType
 except ImportError:
-    from console_events import ConsoleEventDispatcher, ConsoleEvent, EventType
+    from console_events import ConsoleEventDispatcher, EventType
 
 
 # Regex to strip ANSI escape codes for clean disk logging
@@ -113,7 +112,7 @@ def execute_hardware_reset(port: serial.Serial, hold_delay: float = 0.2, settle_
         from esp_pylib.serial_reset import hard_reset
         hard_reset(port, hold_delay=hold_delay, post_release_delay=settle_delay)
     except ImportError:
-        # Fallback implementation of Espressif's proven hard_reset
+        # Native implementation of Espressif's proven hard_reset
         set_dtr_pin(port, False)  # IO0 = HIGH
         set_rts_with_windows_quirk(port, True)  # EN = LOW (reset asserted)
         time.sleep(hold_delay)
@@ -142,7 +141,7 @@ def auto_detect_serial_port() -> Optional[str]:
         if non_com1:
             return non_com1[0]
         return ports[0].device
-    except Exception:
+    except (ImportError, OSError):
         return None
 
 
@@ -295,11 +294,11 @@ class H1OSMonitor:
             if self.ser:
                 try:
                     self.ser.close()
-                except Exception:
+                except (serial.SerialException, OSError):
                     pass
             self.ser = None
             self._add_badge_entry("RESET", "Target reset triggered (device re-enumerating)...", "yellow")
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             self._add_badge_entry("RESET", f"Hardware reset failed: {e}", "red")
 
     def scroll_up(self, count: int = 1):
@@ -435,7 +434,7 @@ class H1OSMonitor:
             text.append_text(self._highlight_metrics(clean))
             return text
 
-        # 6. Fallback for unformatted lines (dumps, psychrometric tables, boot banners)
+        # 6. Default handler for unformatted lines (dumps, psychrometric tables, boot banners)
         text.append("       ")
         text.append_text(Text.from_ansi(clean))
         return text
@@ -610,7 +609,7 @@ class H1OSMonitor:
                                 if b == ord("\n"):
                                     try:
                                         raw_line = line_buffer.decode("utf-8", errors="replace")
-                                    except Exception:
+                                    except UnicodeDecodeError:
                                         raw_line = line_buffer.decode("latin-1", errors="replace")
                                     line_buffer.clear()
 
@@ -651,7 +650,7 @@ class H1OSMonitor:
                         if self.ser:
                             try:
                                 self.ser.close()
-                            except Exception:
+                            except (serial.SerialException, OSError):
                                 pass
                         self.ser = None
                         sleep_start_time = time.time()
@@ -715,7 +714,7 @@ class H1OSMonitor:
         if self.ser and self.ser.is_open:
             try:
                 self.ser.close()
-            except Exception:
+            except (serial.SerialException, OSError):
                 pass
         self._close_log_file()
         self.console.print("\n[bold cyan]H1OS Serial Monitor closed.[/bold cyan]")

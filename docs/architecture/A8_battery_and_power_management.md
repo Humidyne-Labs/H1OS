@@ -1,6 +1,6 @@
 # Battery Metrology, Power Management & Autonomy Engine Specification
 
-> **H1OS Architecture Specification** | **Document:** `A8` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A8` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Core Architectural Philosophy & Invariants
 

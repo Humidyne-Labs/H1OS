@@ -1,6 +1,6 @@
 # Layer 1: Silicon Hold Domains & Low-Power Sleep Architecture
 
-> **H1OS Architecture Specification** | **Document:** `A3` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A3` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Overview & Problem Statement
 

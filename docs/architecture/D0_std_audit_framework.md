@@ -1,12 +1,12 @@
 # H1OS-STD-001: Embedded Firmware Audit Framework & Pitfalls Catalog
 
-> **H1OS Architecture Specification** | **Document:** `D0 / H1OS-STD-001 Rev 2.1` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `D0 / H1OS-STD-001 Rev 2.2` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
-* **Document ID:** `H1OS-STD-001` (Rev 2.1)
+* **Document ID:** `H1OS-STD-001` (Rev 2.2)
 
 * **Target Platform:** ESP32-S3 Dual-Core Xtensa LX7 + ULP-RISC-V Coprocessor
 
-* **Target Firmware:** H1OS (Layer 1 HAL, Layer 2 Subsystems, Layer 3 Orchestrator, Layer 4 Application/LVGL)
+* **Target Firmware:** H1OS (Layer 1 HAL, Layer 2 Subsystems, Layer 3 Orchestrator, Layer 4 Application/LVGL) & Build Tooling
 
 * **Normative References:** JPL Institutional Coding Standard (Power of Ten), MISRA C:2012/2023, SEI CERT C, BARR-C:2018
 
@@ -16,7 +16,7 @@
 
 Vague directives such as *"perform an audit"* or *"check the code"* lead to superficial reviews that overlook critical race conditions, clock domain synchronization bugs, and low-power hardware traps.
 
-This standard defines a **deterministic, reproducible auditing process** anchored to industry-grade safety-critical coding frameworks. It establishes concrete failure modes, severity classifications, register-level pitfalls, mechanized compiler/AST verification gates, and formal reporting procedures across **eight foundational embedded engineering domains**.
+This standard defines a **deterministic, reproducible auditing process** anchored to industry-grade safety-critical coding frameworks. It establishes concrete failure modes, severity classifications, register-level pitfalls, mechanized compiler/AST verification gates, and formal reporting procedures across **nine foundational embedded engineering domains**.
 
 ### 1.1 Core Engineering Invariants
 
@@ -68,20 +68,21 @@ Unannotated violations or waivers lacking a concrete `Reason` and `Proof` artifa
 
 ## 3. Normative Standards Cross-Reference Matrix
 
-The H1OS 8-Domain Catalog maps directly to established safety-critical C/C++ coding standards:
+The H1OS 9-Domain Catalog maps directly to established safety-critical C/C++ coding and host-tooling standards:
 
 | H1OS Domain | Normative External Standards | Primary Enforced Directives & Rules | 
 | ----- | ----- | ----- | 
-| **D1: Concurrency & FreeRTOS** | JPL Rule 2, CERT C (`CON`), MISRA Dir 4.10 | Fixed loop/wait upper bounds; prevention of data races, non-atomic RMW, and priority inversion. | 
+| **D1: Concurrency & FreeRTOS** | JPL Rule 2, CERT C (`CON`), MISRA Dir 4.10 | Fixed loop/wait upper bounds; prevention of data races (`Cppcheck --addon=threadsafety`), non-atomic RMW, and priority inversion. | 
 | **D2: Sleep, Wake & Power** | BARR-C:2018 (Sec 7), Hardware Errata | Deterministic pin state isolation, pad hold enforcement, and physical debounce verification. | 
 | **D3: Coprocessor & CDC** | CERT `DCL22-C`, MISRA Rule 12.2 | `volatile` hardware access, strict bitmask vs. shift macro typing, and slow-clock domain hold times. | 
 | **D4: Bus Topologies** | JPL Rule 3, MISRA Dir 4.12 | Zero runtime heap allocation in bus drivers; shared-rail electrical isolation invariants. | 
-| **D5: Memory & Persistence** | JPL Rule 1 & 3, MISRA Rule 17.2 | No recursion; static stack depth proofs (`.su`); explicit RTC Slow SRAM & NVS commit boundaries. | 
-| **D6: Metrology & Precision** | CERT `INT32-C` / `FLP36-C`, IEEE 754 | Signed integer overflow prevention (`int64_t` promotion), single-precision `f` enforcement, zero fudge factors. | 
-| **D7: Display Pipeline** | CERT `CON32-C`, Hardware Timing | Mutual exclusion (`lv_lock`) across cores; asynchronous high-voltage charge pump completion gates. | 
-| **D8: Driver State & Errors** | JPL Rule 7, MISRA Rule 17.7, CERT `ERR33-C` | Mandatory checking of all non-void return values (`esp_err_t`); deterministic resource cleanup on error exits. | 
+| **D5: Memory & Persistence** | JPL Rule 1 & 3, MISRA Rule 17.2 | No recursion; static stack depth proofs (`-fstack-usage` `.su` / `murdock_stack_budget`); `.rtc.text` isolation (`murdock_rtc_section_audit`); explicit NVS commits. | 
+| **D6: Metrology & Precision** | CERT `INT32-C` / `FLP36-C`, IEEE 754 | Signed integer overflow prevention (`int64_t` promotion), single-precision `f` enforcement, zero fudge factors, host C11 unit verification. | 
+| **D7: Display Pipeline** | CERT `CON32-C`, Hardware Timing | Mutual exclusion (`lv_lock`) across cores; asynchronous high-voltage charge pump completion gates; $\le 188\text{ px}$ typography checks. | 
+| **D8: Driver State & Errors** | JPL Rule 7, MISRA Rule 17.7, CERT `ERR33-C` | Mandatory checking of all non-void return values (`esp_err_t`); deterministic resource cleanup on error exits; read-only `clang-tidy` & Semgrep checks. | 
+| **D9: Build & Host Tooling** | OWASP / CERT `ENV`, PEP 8, Static Typing | Elimination of `shell=True`/`os.system` command injection, hardcoded IDF paths, Zip-Slip extraction, unvalidated partition layouts, silent `except Exception: pass`, and missing type checks (`ruff`, `mypy`, `pytest`). | 
 
-## 4. The 8-Domain Firmware Pitfalls Catalog
+## 4. The 9-Domain Firmware & Tooling Pitfalls Catalog
 
 ```mermaid
 graph TD;
@@ -93,6 +94,7 @@ graph TD;
     Audit --> D6["6. Metrology & Numerical Precision"];
     Audit --> D7["7. Display Pipeline & Async Refresh"];
     Audit --> D8["8. Driver State Machine & Error Handling"];
+    Audit --> D9["9. Build & Host Tooling Integrity"];
 ```
 
 ### Domain 1: Multicore Concurrency & FreeRTOS Synchronization
@@ -182,6 +184,17 @@ Firmware must fail safely and deterministically without leaving peripherals in h
 | **PIT-08-B** | `S0` | JPL Rule 2 | **Unbounded Hardware Status Polling:** Polling a hardware pin or status register (`while (gpio_get_level(BUSY))`) without a timeout counter, bricking the system if a trace fails. | Inspect all `while` and `for` loops waiting on hardware state. Every loop must terminate on an explicit cycle/tick bound and return `ESP_ERR_TIMEOUT`. | 
 | **PIT-08-C** | `S0` | CERT `MEM31-C`  MISRA `R15.5` | **Early Exit Resource Leakage:** Returning early from a function on an error condition without releasing acquired FreeRTOS mutexes, PM locks, or SPI bus locks. | Audit all error return paths in drivers. Enforce structured `goto cleanup;` patterns or RAII wrappers to guarantee mutexes (`xSemaphoreGive`) and PM locks are released. | 
 
+### Domain 9: Build & Host Tooling Integrity (`components/h1os/tools/`, `tools/agent/`)
+
+Automated build, partition, packaging, monitoring, and asset tools run with full host workstation privileges and construct flashable binary images; defects in Python or PowerShell tooling risk corrupting flash partitions, injecting OS shell commands, or masking CI failures.
+
+| ID | Class | External Rule | Failure Mode & Root Cause | Audit Inspection & Verification Procedure |
+| :--- | :--- | :--- | :--- | :--- |
+| **PIT-09-A** | `S0` | CERT `ENV33-C` / OWASP | **Subprocess Shell Injection:** Invoking `subprocess.run(..., shell=True)`, `os.system()`, or interpolated command strings in host tooling (`h1os_tool.py`, `h1os_pack.py`). | Enforce argument-list `subprocess.run([...], shell=False)` exclusively via Semgrep `py-subprocess-shell-true`, `py-os-system`, and `ruff S602/S603/S605`. |
+| **PIT-09-B** | `S1` | CWE-22 / Portability | **Hardcoded Host Paths & Unsafe Archive Extraction:** Hardcoding `C:/esp/v6.1/...` SDK paths or extracting `.zip`/`.tar` members without path-traversal checks. | Resolve ESP-IDF tools via `IDF_PATH`/`IDF_PYTHON_ENV_PATH`/`eim` and validate archive member paths before writes (`py-hardcoded-idf-version-path`, `py-unsafe-zip-extract`, `sanitize.py --include-dist`). |
+| **PIT-09-C** | `S1` | Hardware Flash Safety | **Unvalidated Partition Tables & Flash Manifests:** Flashing or generating partition tables with `< 0x9000` bootloader overlaps, overlapping regions, $>8\text{ MB}$ overflow, or unaligned `app` offsets (`!= 0x10000`). | Enforce `part_backend.validate_partition_layout()` across CSV partition parsing and offline pytest regression checks against `examples/H1OS/partitions.csv`. |
+| **PIT-09-D** | `S2` | PEP 8 / Type Safety | **Silent Exception Swallowing & Unchecked Tooling:** Using `except Exception: pass`, unchecked `Optional`/union types, or unverified PowerShell flash scripts. | Enforce `py-silent-except-pass`, `uvx ruff check`, `uvx mypy`, PowerShell AST parse verification on `flasher.ps1`, and offline `pytest` verification. |
+
 ## 5. Standard Operating Procedure (SOP) & Mechanized Gates
 
 Auditors (human engineers or automated verification agents) must execute the following five-stage verification pipeline in strict sequential order:
@@ -190,78 +203,67 @@ Auditors (human engineers or automated verification agents) must execute the fol
 sequenceDiagram
     participant Auditor as Auditor (Engineer / Agent)
     participant Git as Step 1: Diff Scoping
-    participant AST as Step 2: Automated Pre-Flight Gate
-    participant Review as Step 3: 8-Domain & Physics Review
+    participant AST as Step 2: Automated Harness Gate
+    participant Review as Step 3: 9-Domain & Physics Review
     participant Compiler as Step 4: Hardened Compiler & Stack Gate
     participant Report as Step 5: Audit Certification Report
 
     Auditor->>Git: 1. Extract target diff & symbol impact graph
     Git-->>Auditor: Modified files, functions, & state attributes
-    Auditor->>AST: 2. Run regex/AST traps (PIT-01-B, 03-A, 04-C, 05-D)
-    AST-->>Auditor: 0 unwaived static violations
-    Auditor->>Review: 3. Evaluate 8-Domain Catalog & Empirical Invariants
-    Review-->>Auditor: Concurrency, CDC, & Metrology verified
-    Auditor->>Compiler: 4. Build dev & prod under IDF v6.1.1 (-Werror -Wdouble-promotion)
-    Compiler-->>Auditor: 0 errors, 0 warnings, murdock_memory_budget verified
+    Auditor->>AST: 2. Execute run_audit.py (Semgrep, Cppcheck, Clang-Tidy, Ruff/Mypy, Pytest)
+    AST-->>Auditor: 0 blocking violations & validated waivers
+    Auditor->>Review: 3. Evaluate 9-Domain Catalog & Empirical Invariants
+    Review-->>Auditor: Concurrency, CDC, Metrology, & Tooling verified
+    Auditor->>Compiler: 4. Build all 4 targets via eim run (IDF v6.1.1) + Stack/RTC checks
+    Compiler-->>Auditor: 0 errors, 0 warnings, .su & murdock_memory_budget verified
     Auditor->>Report: 5. Emit formal report in docs/audits/
 
 ```
 
 ### Step 1: Diff Scoping & Impact Graph
 
-Generate the exact commit range (`git diff <base>..<head>`). Identify all modified translation units, shared globals, FreeRTOS tasks, hardware registers, and NVS keys.
+Generate the exact commit range (`git diff <base>..<head>`). Identify all modified translation units, shared globals, FreeRTOS tasks, hardware registers, Python tooling scripts, and NVS keys.
 
 ### Step 2: Automated Static Pre-Flight & Harness Gate
 
-Execute deterministic static, AST, typography, memory, version, and hygiene checks across all modified files before beginning manual review:
+Execute deterministic multi-tool static, AST, C/C++ analyzer, Python QA, typography, layer, waiver, lexicon, version, and host-unit verification via the unified audit runner:
 
-1. **Dynamic Memory, Unbounded Wait & Macro Traps (`PIT-04-C`, `PIT-01-B`, `PIT-03-A`, `PIT-06-B`):**
+```powershell
+python tools/agent/run_audit.py --all --build-dir examples/H1OS/build_dev
+```
 
-   ```powershell
-   rg "\b(malloc|calloc|realloc|free|strdup|heap_caps_malloc)\s*\(" components/ examples/
-   rg "portMAX_DELAY" components/h1os/src/
-   rg "REG_(GET|SET)_BIT\s*\([^,]+,\s*[^)]*(_S|_V)\b" components/
-   ```
+This unified harness orchestrates the following mandatory gates:
 
-   *Pass Criteria:* Zero unwaived matches in runtime worker/driver/ISR paths.
+1. **4-Layer Unidirectional Boundary & Waiver Gate (`--layers`, `--waivers`):**
+   - Verifies `#include` hierarchy across `components/h1os/{include/h1os,src}`: Layer 1 (`hal_*`) never includes `sub_*`/`orch_*`/`h1os_*`; Layer 2 (`sub_*`) never cross-includes sibling `sub_*` or `orch_*`/`h1os_*`; Layer 3 (`orch_*`) never includes `h1os_*`.
+   - Validates every `[H1OS-WAIVER: PIT-XX-Y | Class: S1|S2 | Reason: ... | Proof: ...]` annotation and rejects malformed or `Class: S0` waivers.
 
-2. **Semgrep Multi-Language Static & Security Sweep:**
+2. **Semgrep Embedded & Host-Tooling Sweep (`--semgrep`):**
+   Combines global embedded-harness rulesets (`esp32s3_embedded.yml`, `python_build_tooling.yml`), repo rules (`tools/audit/semgrep_h1os.yml`), and upstream packs (`p/c`, `p/python`, `p/security-audit`, `p/secrets`). Matches covered by a validated inline `[H1OS-WAIVER]` are reported as `WAIVED`; unwaived `ERROR` findings fail the gate.
 
-   ```powershell
-   semgrep scan --metrics=off --config "p/0xdea" --config "p/trailofbits" --config "p/c" --config "p/python" --config "p/security-audit" --config "p/secrets" examples/H1OS/main examples/boilerplate/main examples/riscv_test/main components/h1os/src components/h1os/include tools/agent
-   ```
+3. **Cppcheck `2.22.0` Static & Threadsafety / MISRA C:2012 Sweep (`--cppcheck`, `--misra`):**
+   Runs read-only against a sanitized `compile_commands.json` (`@` response files expanded, `-isystem` normalized to `-I`, `-Dasm(x)=` injected for GNU `asm()` linker symbols, temporary `--cppcheck-build-dir` so no `.dump` artifacts enter the workspace) using `tools/audit/cppcheck_suppressions.txt`:
+   - **Blocking (`--addon=threadsafety` + core `[error]`/`[warning]`):** Zero unsuppressed H1OS errors or `threadsafety` warnings.
+   - **Observational (`--addon=misra`):** Summarizes H1OS MISRA C:2012 findings grouped by `Mandatory`, `Required`, and `Advisory` categories without breaking on ESP-IDF macro conventions.
 
-   *Pass Criteria:* Zero secrets, zero Python defects, zero unwaived signed-unsigned/memory/concurrency violations.
+4. **Clang-Tidy AST Sweep (`--clang-tidy`, Read-Only):**
+   Runs `C:\Espressif\tools\esp-clang\esp-21.1.3_20260408\esp-clang\bin\clang-tidy.exe` read-only (`FormatStyle: none` in `.clang-tidy`; never `--fix`) against sanitized `build_dev/compile_commands.json` targeting `--target=xtensa-esp-elf -mcpu=esp32s3` with Xtensa `picolibc` headers. Zero compiler/diagnostic errors permitted.
 
-3. **Clang-Tidy AST & Static Analyzer Sweep (Read-Only):**
-   Run `C:\Espressif\tools\esp-clang\esp-21.1.3_20260408\esp-clang\bin\clang-tidy.exe` read-only against a sanitized `compile_commands.json` (response files expanded, GCC-only flags stripped, Xtensa `picolibc` sysroot injected, `--checks="-*,bugprone-*,clang-analyzer-*,misc-unused-*,cert-*"`). Never invoke `--fix`.
+5. **Clang-Format Preservation Rule (Observational Only):**
+   **NEVER execute `clang-format -i` or `ruff format`** over manually curated columnar source/header pairs or Python modules. Preserve existing visual block alignment verbatim.
 
-4. **Clang-Format Preservation Rule (Observational Only):**
-   **NEVER execute `clang-format -i`** over manually curated columnar source/header pairs. Formatting checks are strictly observational (`clang-format --dry-run` on newly authored helpers only); preserve existing visual block alignment verbatim.
+6. **Python QA, PowerShell AST & Offline Test Suites (`--python`, `--tests`):**
+   - `uvx ruff check --output-format=concise` and `uvx mypy` (`pyproject.toml`) across `components/h1os/idf_ext.py`, `components/h1os/tools` (excluding vendored `fonts/`), `tools/agent`, and `tests/tools`.
+   - PowerShell `[System.Management.Automation.Language.Parser]::ParseFile` AST syntax verification on `components/h1os/tools/pack_build/flasher.ps1`.
+   - Offline `pytest` suite (`tests/tools/`) including C11 host-compiled tests (`tests/firmware_host/test_orch_math.c` & `test_flow_and_ocv.c` via `clang -std=c11 -Wall -Wextra -Werror -Wdouble-promotion`) verifying August-Roche-Magnus math, 13-point LiPo OCV interpolation, and all 6 `MANDATE-02` flow-slicing invariants.
 
-5. **EPD 1-BPP Typography & Layout Budget Audit (`epd-font` v1.0.23):**
+7. **EPD 1-BPP Typography, Lexicon, Version Sync & Sanitization (`--typography`, `--lexicon`, `--version`, `--sanitize`):**
+   - Checks static UI label strings against packaged `components/h1os/tools/fonts/metrics/*.csv` ($\le 188.0\text{ px}$ budget, $\ge 14\text{ px}$ minimum font height) alongside `embedded-ops` `epd_audit_screens`.
+   - Enforces Section 2 engineering lexicon compliance, `python tools/agent/bump_version.py --check --idf-version 6.1.1`, and `python tools/agent/sanitize.py --check --include-dist` (`0` identity leaks). Execute `/shrink` (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) before committing media or datasheet PDFs.
 
-   ```powershell
-   python <epd-font-repo>/tools/agent/tools/string_info.py --workspace <workspace_root> --audit-screens
-   ```
+### Step 3: 9-Domain Semantic & Physical Grounding Evaluation
 
-   *Pass Criteria:* Zero horizontal overflows exceeding the `188 px` usable screen budget across all screen templates.
-
-6. **Memory Budget Gate (`embedded-ops/murdock_memory_budget`):**
-   Profile compiled `.elf` binaries (`build_dev/h1os.elf` and `build_prod/h1os.elf`): DIRAM $\le 85\%$, RTC Slow SRAM $\le 4,096\text{ B}$, Flash application headroom $\ge 70\%$.
-
-7. **Version Sync, Identity Sanitization & Asset Hygiene Gates:**
-
-   ```powershell
-   python tools/agent/bump_version.py --check
-   python tools/agent/sanitize.py --check
-   ```
-
-   Execute `/shrink` (`tools/agent/optimize_images.py` and `tools/agent/optimize_pdf.py`) before committing media or datasheet PDFs.
-
-### Step 3: 8-Domain Semantic & Physical Grounding Evaluation
-
-Walk each modified function against Section 4 (Domains 1–8) and Section 1.1 (Core Invariants):
+Walk each modified module against Section 4 (Domains 1–9) and Section 1.1 (Core Invariants):
 
 * Verify cross-core lock symmetry (`h1os_ui_post`, checked `h1os_lvgl_lock()` return values) and `goto cleanup;` error paths (`PIT-01`, `PIT-07`, `PIT-08`).
 
@@ -269,9 +271,11 @@ Walk each modified function against Section 4 (Domains 1–8) and Section 1.1 (C
 
 * Verify fixed-point intermediate casts (`int64_t`) across worst-case physical bounds (`PIT-06-C`).
 
+* Verify Python subprocess invocation (`shell=False`), partition validation (`validate_partition_layout`), and path handling (`PIT-09`).
+
 * Verify zero unmeasured hardware claims in comments or commit messages (Invariant 1).
 
-### Step 4: Hardened Compiler & Build Verification Gate
+### Step 4: Hardened Compiler, Stack Budget & RTC Wake-Stub Verification Gate
 
 All H1OS components must compile cleanly under strict diagnostic enforcement in `components/h1os/CMakeLists.txt`:
 
@@ -284,19 +288,31 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wformat=2                  # Enforces format string & argument type safety
     -Wno-format-nonliteral      # Permits dynamic strftime format strings
     $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+    -Wvla                       # Forbids variable-length stack arrays
+    -Wduplicated-cond
+    -Wduplicated-branches
+    -Wlogical-op
+    -Wnull-dereference
+    -fstack-usage               # Emits per-TU .su stack frame measurements
     -Wno-missing-field-initializers
 )
 ```
 
-Execute clean builds under **ESP-IDF `v6.1.1`** across showcase and example targets:
+> **Note on `-Wundef`:** `-Wundef` is intentionally omitted under ESP-IDF `v6.1.1` because upstream IDF system headers trigger pre-existing `-Werror=undef` breaks (`esp_attr.h`, `esp_log_*.h`, `freertos/idf_additions.h`).
+
+Execute clean builds across all four showcase and example targets under **ESP-IDF `v6.1.1`** using `eim run` (always propagating `; exit $LASTEXITCODE` on Windows PowerShell):
 
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"
-idf.py -B build_dev --preset dev build
-idf.py -B build_prod --preset prod build
+eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1
+eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_prod --preset prod build; exit $LASTEXITCODE' v6.1.1
+eim run 'idf.py -C examples/boilerplate -B examples/boilerplate/build_prod --preset prod build; exit $LASTEXITCODE' v6.1.1
+eim run 'idf.py -C examples/riscv_test -B examples/riscv_test/build build; exit $LASTEXITCODE' v6.1.1
 ```
 
-Both showcase builds (plus `examples/boilerplate` `--preset prod` and `examples/riscv_test`) must terminate with **0 errors and 0 project warnings**, and `murdock_memory_budget` margins must hold.
+All four builds must exit `0` with **0 errors and 0 project warnings**. Then verify compiled ELF and stack headroom via `run_audit.py` (`--stack`, `--rtc-sections`) and `embedded-ops` MCP tools:
+* **`murdock_memory_budget`** (`build_dev` & `build_prod`): DIRAM $\le 85\%$, RTC Slow SRAM $\le 4,096\text{ B}$, Flash application headroom $\ge 70\%$.
+* **`murdock_stack_budget` (`-fstack-usage` `.su`):** `0` dynamic frames; maximum H1OS frame $\le 1,024\text{ B}$.
+* **`murdock_rtc_section_audit` (`.rtc.text`):** `0` unsafe calls or `l32r` literal references into Flash or DRAM.
 
 ### Step 5: Formal Audit Certification Report
 
@@ -309,26 +325,31 @@ Copy and populate the following template for all formal audit certifications:
 ```markdown
 # H1OS Audit Certification Report: [YYYY-MM-DD]-[SHORT_SLUG]
 
-* **Audit Standard:** `H1OS-STD-001 (Rev 2.1)`
+* **Audit Standard:** `H1OS-STD-001 (Rev 2.2)`
 * **Target Version / IDF:** `vX.Y.Z-tag` | ESP-IDF `v6.1.1`
 * **Target Commit / Range:** `<base-sha>..<head-sha>`
-* **Audited Modules:** `[List modified files, e.g., sub_power.c, examples/H1OS/main/]`
+* **Audited Modules:** `[List modified files, e.g., sub_power.c, tools/agent/run_audit.py]`
 * **Auditor:** `[Engineer / Agent Identifier]`
 * **Final Disposition:** `[PASS | PASS WITH WAIVERS | FAIL]`
 
 ---
 
-## 1. Automated Gate Telemetry (Steps 2 & 4)
-* **Build `examples/H1OS` (`dev` & `prod`):** `[PASS - 0 Errors, 0 Warnings]`
-* **Additional Examples (`boilerplate`, `riscv_test`):** `[PASS - 0 Errors, 0 Warnings]`
-* **Semgrep Multi-Language Scan:** `[Rules run, blocking/actionable findings count]`
-* **Clang-Tidy AST Sweep (Read-Only):** `[Files analyzed, actionable findings count]`
-* **EPD 1-BPP Typography Audit (`epd-font`):** `[X/X strings PASS <= 188 px, 0 overflows]`
+## 1. Automated Gate Telemetry (`run_audit.py` & Steps 2/4)
+* **Build `examples/H1OS` (`dev` & `prod` via `eim run`):** `[PASS - 0 Errors, 0 Warnings]`
+* **Additional Examples (`boilerplate`, `riscv_test` via `eim run`):** `[PASS - 0 Errors, 0 Warnings]`
+* **4-Layer Boundaries & Inline Waivers (`--layers`, `--waivers`):** `[PASS - 0 violations, N valid waivers]`
+* **Semgrep Multi-Language Scan (`--semgrep`):** `[PASS - 0 blocking ERRORs, N advisory, M waived]`
+* **Cppcheck `2.22.0` (`--cppcheck`, `threadsafety`):** `[PASS - 0 errors/warnings across N TUs]`
+* **Cppcheck MISRA C:2012 (`--misra`, Observational):** `[Mandatory=N, Required=M, Advisory=K]`
+* **Clang-Tidy AST Sweep (`--clang-tidy`, Read-Only):** `[PASS - 0 errors, N advisory warnings]`
+* **Python QA & PowerShell AST (`--python`):** `[PASS - ruff=0, mypy=0, flasher.ps1 AST=0]`
+* **Pytest Tooling & Host C11 Tests (`--tests`):** `[PASS - X passed]`
+* **Static Stack & `.rtc.text` Audit (`--stack`, `--rtc-sections`, `embedded-ops`):** `[PASS - max=N B, dynamic=0; 0 Flash/DRAM leaks]`
 * **`murdock_memory_budget` (`build_dev` / `build_prod`):** `[DIRAM %, RTC Slow B, Flash headroom %]`
-* **Version Sync (`bump_version.py --check`):** `[PASS]`
-* **Sanitize Check (`sanitize.py --check`):** `[PASS - 0 leaks]`
+* **EPD 1-BPP Typography & Lexicon (`--typography`, `--lexicon`):** `[PASS - X strings <= 188 px; 0 lexicon hits]`
+* **Version Sync & Sanitize (`--version`, `--sanitize`):** `[PASS - vX.Y.Z-tag; 0 leaks]`
 
-## 2. 8-Domain Compliance Matrix (Step 3)
+## 2. 9-Domain Compliance Matrix (Step 3)
 
 | Domain | Applicable | Pitfalls Evaluated | Evidence & File:Line References | Verdict |
 | :--- | :---: | :--- | :--- | :---: |
@@ -340,6 +361,7 @@ Copy and populate the following template for all formal audit certifications:
 | **D6: Metrology & Precision** | `[Yes/No]` | `PIT-06-A..D` | `[e.g., orch_math.c:95 int64_t promotion verified]` | `[PASS/FAIL/N/A]` |
 | **D7: Display Pipeline** | `[Yes/No]` | `PIT-07-A..C` | `[e.g., h1os_lvgl.cpp:118 lv_lock() symmetry]` | `[PASS/FAIL/N/A]` |
 | **D8: Driver State & Errors** | `[Yes/No]` | `PIT-08-A..C` | `[e.g., sub_sd.c:180 goto cleanup releases mutex]` | `[PASS/FAIL/N/A]` |
+| **D9: Build & Host Tooling** | `[Yes/No]` | `PIT-09-A..D` | `[e.g., run_audit.py --python/--tests green]` | `[PASS/FAIL/N/A]` |
 
 ## 3. Empirical Grounding & Metrology Audit (Invariants 1 & 2)
 * **Physical Claims / Timings Added:** `[None | List claims & cite bench instrument log]`

@@ -28,7 +28,7 @@ def load_ignore_patterns(root_dir: Path) -> list[str]:
     for ignore_file in ignore_files:
         if ignore_file.exists():
             print(f"Loaded ignore rules from: {ignore_file.name}")
-            with open(ignore_file, "r", encoding="utf-8") as f:
+            with open(ignore_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#"):
@@ -109,7 +109,7 @@ for pdf_path in pdf_files:
         out_file.write_text(md_text, encoding="utf-8")
         print(f" -> Saved: {out_file.relative_to(REPO_ROOT)}\n")
         converted_count += 1
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError) as e:
         print(f" -> [ERROR] Failed to convert {pdf_path.name}: {e}\n")
 
 print(

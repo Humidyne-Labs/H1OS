@@ -1,0 +1,38 @@
+# H1OS Cppcheck 2.22.0 Suppressions (Read-Only Analysis)
+missingIncludeSystem
+unmatchedSuppression
+
+# Fixed external callback signatures (LVGL lv_event_cb_t, h1os_ui_fn_t, FreeRTOS tasks)
+constParameterCallback
+
+# Public H1OS SDK functions exposed in component library headers
+unusedFunction
+
+# POSIX gamma() symbol name collision on local psychrometric variable float gamma in orch_math.c
+threadsafety-unsafe-call:components/h1os/src/orch_math.c:77
+threadsafety-unsafe-call:components/h1os/src/orch_math.c:79
+
+# Local float env envelope variable collides with Cppcheck name-based env check in sub_audio.c
+threadsafety-unsafe-call:components/h1os/src/sub_audio.c
+
+# Core 0 single-threaded formatting ring buffers in orch_flow.c
+threadsafety-threadsafety:components/h1os/src/orch_flow.c
+
+# Core 1 LVGL-task-only persistent debouncing state in h1os_lvgl.cpp
+threadsafety-threadsafety:components/h1os/src/h1os_lvgl.cpp:214
+
+# Core 0 time initialization and read-only month lookup table in h1os_time.c
+threadsafety-unsafe-call:components/h1os/src/h1os_time.c:38
+threadsafety-threadsafety:components/h1os/src/h1os_time.c:224
+threadsafety-threadsafety:components/h1os/src/h1os_time.c:237
+
+# Core 1 LVGL-task-only persistent lv_line_set_points arrays in UI screens
+threadsafety-threadsafety:examples/H1OS/main/screens/screen_base.c:68
+threadsafety-threadsafety:examples/H1OS/main/screens/screen_env_dash.c:49
+
+# Verified C-API void*/TaskHandle_t casts at LVGL/FreeRTOS/panel boundary
+dangerousTypeCast:components/h1os/src/h1os_lvgl.cpp
+dangerousTypeCast:components/h1os/src/sub_display.cpp
+
+# ESP-IDF embedded binary linker symbol range calculation (_binary_ulp_h1os_bin_end - _start)
+subtractPointers:components/h1os/src/sub_power.c

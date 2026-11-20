@@ -531,6 +531,7 @@ esp_err_t h1os_lvgl_stop(void)
             (void)xSemaphoreTake(s_lvgl_stop_sem, pdMS_TO_TICKS(LVGL_SHUTDOWN_TIMEOUT_MS));
         }
         if (s_lvgl_task_handle != NULL) {
+            // [H1OS-WAIVER: PIT-01-E | Class: S2 | Reason: Emergency timeout halt only if cooperative s_lvgl_stop_sem wait expires | Proof: h1os_lvgl.cpp:525-532 and LVGL_SHUTDOWN_TIMEOUT_MS]
             vTaskDelete(s_lvgl_task_handle);
             s_lvgl_task_handle = NULL;
         }

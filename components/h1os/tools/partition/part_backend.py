@@ -2,12 +2,13 @@
 """
 H1OS Partition Tooling Backend
 ==============================
-Thin, zero-fallback execution layer wrapping ESP-IDF's parttool.py and otatool.py.
+Thin, zero-guesswork execution layer wrapping ESP-IDF's parttool.py and otatool.py.
 Handles live progress streaming, clean OTA state parsing, and firmware image introspection.
 """
 
 import binascii
 from dataclasses import dataclass
+import glob
 import os
 import re
 import struct
@@ -15,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure components/h1os/tools is importable
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -23,7 +24,7 @@ TOOLS_DIR = CURRENT_DIR.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import H1OSConfig
+from h1os_tool import H1OSConfig  # noqa: E402
 
 
 @dataclass
@@ -89,7 +90,7 @@ def parse_csv_partitions(csv_path: Path, table_offset: int = 0x8000) -> List[Par
     # ESP-IDF default: first partition starts at table_offset + 0x1000
     current_offset = table_offset + 0x1000
 
-    with open(csv_path, "r", encoding="utf-8") as f:
+    with open(csv_path, encoding="utf-8") as f:
         for line in f:
             clean = line.strip()
             if not clean or clean.startswith("#"):
@@ -131,17 +132,48 @@ def parse_csv_partitions(csv_path: Path, table_offset: int = 0x8000) -> List[Par
     return partitions
 
 
-def find_tool(tool_name: str, comp_subpath: str) -> Optional[Path]:
-    """Locate tool script in ESP-IDF installation directory."""
+def _discover_idf_roots() -> List[Path]:
+    """Discover installed ESP-IDF roots dynamically via IDF_PATH, EIM config, or disk scan."""
+    roots: List[Path] = []
     idf_path_env = os.environ.get("IDF_PATH")
     if idf_path_env:
-        cand = Path(idf_path_env) / comp_subpath / f"{tool_name}.py"
+        roots.append(Path(idf_path_env))
+
+    import json
+    for cfg_path in (Path("C:/Espressif/tools/eim_idf.json"), Path.home() / ".espressif" / "tools" / "eim_idf.json"):
+        if cfg_path.is_file():
+            try:
+                data = json.loads(cfg_path.read_text(encoding="utf-8"))
+                selected = data.get("idfSelectedId")
+                installed = data.get("idfInstalled") or []
+                for entry in installed:
+                    p_str = entry.get("path") if isinstance(entry, dict) else None
+                    if not p_str:
+                        continue
+                    if selected and entry.get("id") == selected:
+                        roots.insert(0, Path(p_str))
+                    else:
+                        roots.append(Path(p_str))
+            except (OSError, json.JSONDecodeError, TypeError):
+                pass
+
+    for hit in sorted(glob.glob("C:/esp/v*/esp-idf"), reverse=True):
+        roots.append(Path(hit))
+    roots.append(Path("C:/esp/esp-idf"))
+    return roots
+
+
+def find_tool(tool_name: str, comp_subpath: str) -> Optional[Path]:
+    """Locate tool script in ESP-IDF installation directory."""
+    for root in _discover_idf_roots():
+        cand = root / comp_subpath / f"{tool_name}.py"
         if cand.is_file():
             return cand
 
     try:
+        where_cmd = "where" if os.name == "nt" else "which"
         res = subprocess.run(
-            ["where", f"{tool_name}.py"],
+            [where_cmd, f"{tool_name}.py"],
             capture_output=True,
             text=True,
             check=False,
@@ -150,19 +182,36 @@ def find_tool(tool_name: str, comp_subpath: str) -> Optional[Path]:
             p = Path(res.stdout.strip().splitlines()[0])
             if p.is_file():
                 return p
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
 
-    candidates = [
-        Path("C:/esp/v6.1.1/esp-idf") / comp_subpath / f"{tool_name}.py",
-        Path("C:/esp/v6.1/esp-idf") / comp_subpath / f"{tool_name}.py",
-        Path("C:/esp/esp-idf") / comp_subpath / f"{tool_name}.py",
-    ]
-    for c in candidates:
-        if c.is_file():
-            return c
-
     return None
+
+
+def validate_partition_layout(
+    partitions: List[PartitionEntry],
+    flash_size_bytes: int = 0x800000,
+) -> List[str]:
+    """Validate 4KB sector alignment, bootloader/table reservation, overlap, and Flash bounds."""
+    errors: List[str] = []
+    reserved_end = 0x9000
+    ordered = sorted(partitions, key=lambda p: p.offset)
+    prev: Optional[PartitionEntry] = None
+    for part in ordered:
+        if part.offset < reserved_end:
+            errors.append(f"Partition '{part.name}' offset 0x{part.offset:X} overlaps reserved bootloader/table (<0x9000)")
+        if (part.offset % 0x1000) != 0:
+            errors.append(f"Partition '{part.name}' offset 0x{part.offset:X} is not 4KB-aligned")
+        if part.type.lower() == "app" and (part.offset % 0x10000) != 0:
+            errors.append(f"App partition '{part.name}' offset 0x{part.offset:X} is not 64KB-aligned (0x10000)")
+        if part.size <= 0 or (part.size % 0x1000) != 0:
+            errors.append(f"Partition '{part.name}' size 0x{part.size:X} is invalid or not 4KB-aligned")
+        if part.end_offset > flash_size_bytes:
+            errors.append(f"Partition '{part.name}' end 0x{part.end_offset:X} exceeds flash size 0x{flash_size_bytes:X}")
+        if prev is not None and part.offset < prev.end_offset:
+            errors.append(f"Partition '{part.name}' (0x{part.offset:X}) overlaps '{prev.name}' (ends 0x{prev.end_offset:X})")
+        prev = part
+    return errors
 
 
 def get_parttool_path() -> Optional[Path]:
@@ -211,7 +260,7 @@ def execute_parttool_erase(
             return True, f"Successfully erased partition '{partition_name}'."
         err_msg = res.stderr.strip() or res.stdout.strip()
         return False, f"parttool erase failed (code {res.returncode}):\n{err_msg}"
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return False, f"Failed to execute parttool erase: {e}"
 
 
@@ -254,7 +303,7 @@ def execute_parttool_read(
             return True, f"Read {size:,} bytes from '{partition_name}' to {output_path.name}."
         err_msg = res.stderr.strip() or res.stdout.strip()
         return False, f"parttool read failed (code {res.returncode}):\n{err_msg}"
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return False, f"Failed to execute parttool read: {e}"
 
 
@@ -301,13 +350,14 @@ def execute_parttool_write(
                 text=True,
                 bufsize=1,
             )
-            output_lines = []
-            for line in proc.stdout:
-                line_str = line.rstrip()
-                output_lines.append(line_str)
-                if line_str:
-                    print(f"  [esptool] {line_str}")
-                    sys.stdout.flush()
+            output_lines: List[str] = []
+            if proc.stdout is not None:
+                for line in proc.stdout:
+                    line_str = line.rstrip()
+                    output_lines.append(line_str)
+                    if line_str:
+                        print(f"  [esptool] {line_str}")
+                        sys.stdout.flush()
             proc.wait()
             if proc.returncode == 0:
                 return True, f"Successfully wrote {input_path.stat().st_size:,} bytes to '{partition_name}'."
@@ -319,7 +369,7 @@ def execute_parttool_write(
                 return True, f"Successfully wrote {input_path.stat().st_size:,} bytes to '{partition_name}'."
             err_msg = res.stderr.strip() or res.stdout.strip()
             return False, f"parttool write failed (code {res.returncode}):\n{err_msg}"
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return False, f"Failed to execute parttool write: {e}"
 
 
@@ -380,7 +430,7 @@ def read_otadata_bytes(
 
     temp_path.unlink(missing_ok=True)
 
-    # 2. Direct physical flash read fallback
+    # 2. Direct physical flash read path
     otadata_offset = 0x1D000
     if config.partition_file and config.partition_file.is_file():
         parts = parse_csv_partitions(config.partition_file)
@@ -418,7 +468,7 @@ def write_otadata_bytes(
             temp_path.unlink(missing_ok=True)
             return True, "Successfully wrote otadata via parttool."
 
-        # 2. Direct flash write fallback via esptool
+        # 2. Direct flash write path via esptool
         otadata_offset = 0x1D000
         if config.partition_file and config.partition_file.is_file():
             parts = parse_csv_partitions(config.partition_file)
@@ -442,7 +492,7 @@ def write_otadata_bytes(
             return True, f"Successfully wrote otadata to flash at 0x{otadata_offset:X}."
         err_out = res.stderr.strip() or res.stdout.strip()
         return False, f"esptool write-flash failed (code {res.returncode}):\n{err_out}"
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         temp_path.unlink(missing_ok=True)
         return False, f"Exception while writing otadata: {e}"
 
@@ -452,7 +502,7 @@ def execute_otatool_read(
     port: Optional[str] = None,
     baud: Optional[int] = None,
 ) -> Tuple[bool, str]:
-    """Read raw OTA state machine status with zero-guesswork native fallback."""
+    """Read raw OTA state machine status with zero-guesswork native read path."""
     ok, data = read_otadata_bytes(config, port=port, baud=baud)
     if not ok:
         # If reading fails, try official otatool script as secondary attempt
@@ -470,7 +520,7 @@ def execute_otatool_read(
                 res = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 if res.returncode == 0 and res.stdout.strip():
                     return True, res.stdout.strip()
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 pass
         return False, "Could not read otadata partition from device (check serial connection and port)."
 
@@ -619,7 +669,7 @@ def execute_dual_slot_deploy(
 ) -> Tuple[bool, str]:
     """Flash two compiled binaries to ota_0 and ota_1 in sequence and configure active boot slot."""
     print("\n" + "=" * 70)
-    print(f"[*] Dual-Slot OTA Deployment: 2 Binaries -> ota_0 & ota_1")
+    print("[*] Dual-Slot OTA Deployment: 2 Binaries -> ota_0 & ota_1")
     print(f"    Port: {port or config.port or 'Auto-detect'} | Baud: {baud or config.baud or 460800}")
     print("=" * 70)
 
@@ -629,7 +679,7 @@ def execute_dual_slot_deploy(
     ok0, msg0 = execute_parttool_write(config, "ota_0", slot0_bin, port=port, baud=baud, stream=True)
     if not ok0:
         return False, f"Failed writing '{slot0_label}' to ota_0:\n{msg0}"
-    print(f"[+] Slot 0 (ota_0) written and verified successfully.")
+    print("[+] Slot 0 (ota_0) written and verified successfully.")
     sys.stdout.flush()
 
     # 2. Flash Slot 1
@@ -638,7 +688,7 @@ def execute_dual_slot_deploy(
     ok1, msg1 = execute_parttool_write(config, "ota_1", slot1_bin, port=port, baud=baud, stream=True)
     if not ok1:
         return False, f"Failed writing '{slot1_label}' to ota_1:\n{msg1}"
-    print(f"[+] Slot 1 (ota_1) written and verified successfully.")
+    print("[+] Slot 1 (ota_1) written and verified successfully.")
     sys.stdout.flush()
 
     # 3. Configure Active Slot
@@ -699,7 +749,7 @@ def read_flash_header(
             return True, data
         temp_path.unlink(missing_ok=True)
         return False, b""
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         temp_path.unlink(missing_ok=True)
         return False, b""
 
@@ -736,6 +786,8 @@ def parse_app_descriptor(raw_bytes: bytes) -> Optional[Dict[str, Any]]:
         "idf_ver": idf_ver,
         "entry_addr": hex(entry_addr),
         "seg_count": seg_count,
+        "sec_ver": sec_ver,
+        "hash_appended": hash_appended,
         "sha256": sha256_hex,
         "sha256_short": sha256_hex[:16] + "...",
     }

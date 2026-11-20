@@ -49,10 +49,12 @@ static bool              s_ulp_adc_inited = false;
 static adc_cali_handle_t s_cali_handle    = NULL;
 static bool              s_cali_valid     = false;
 
-static const struct {
+typedef struct {
     uint16_t mv;
     uint16_t soc_x10;
-} s_lipo_table[] = {
+} sub_power_lipo_knot_t;
+
+static const sub_power_lipo_knot_t s_lipo_table[] = {
     {4200, 1000},
     {4120, 950},
     {4040, 880},

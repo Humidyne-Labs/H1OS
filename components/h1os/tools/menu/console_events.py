@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 
 class EventType(enum.Enum):
@@ -247,6 +247,8 @@ class ConsoleEventDispatcher:
 
     def _listener_posix(self) -> None:
         """Listen for POSIX terminal events via termios, select, and SIGWINCH."""
+        if sys.platform == "win32":
+            return
         import select
         import termios
         import tty
@@ -262,8 +264,10 @@ class ConsoleEventDispatcher:
 
         try:
             import signal
-            signal.signal(signal.SIGWINCH, handle_sigwinch)
-        except Exception:
+            sigwinch = getattr(signal, "SIGWINCH", None)
+            if sigwinch is not None:
+                signal.signal(sigwinch, handle_sigwinch)
+        except (OSError, ValueError):
             pass
 
         try:
@@ -353,17 +357,17 @@ def restore_default_console_mode() -> None:
         try:
             sys.stdout.write("\x1b[?1006l\x1b[?1000l")
             sys.stdout.flush()
-        except Exception:
+        except OSError:
             pass
 
 
 def get_single_key(timeout: Optional[float] = None) -> str:
-    """Read a single keyboard key event across platforms with fallback."""
+    """Read a single keyboard key event across platforms with default input mode."""
     if not sys.stdin.isatty():
         try:
             line = sys.stdin.readline().strip().upper()
             return line if line else "ENTER"
-        except Exception:
+        except (OSError, EOFError):
             return "QUIT"
 
     with ConsoleEventDispatcher(enable_mouse=False, enable_resize=False) as dispatcher:

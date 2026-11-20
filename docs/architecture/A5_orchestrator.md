@@ -1,6 +1,6 @@
 # Layer 3: System Pipeline & Orchestrator Specification
 
-> **H1OS Architecture Specification** | **Document:** `A5` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `A5` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 ## 1. Overview
 Layer 3 is the central orchestration brain of H1OS. It maintains persistent state across deep sleep cycles, coordinates all Layer 2 subsystems, executes psychrometric algorithms, and arbitrates between **Flow A (Headless Sensor Sample Burst in RTC Wake Stub)** and **Flow B (Interactive User Session or Unattended UI Refresh)**.

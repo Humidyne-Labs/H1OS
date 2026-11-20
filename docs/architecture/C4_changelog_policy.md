@@ -1,6 +1,6 @@
 # Document 10: Changelog Policy & SemVer Management
 
-> **H1OS Architecture Specification** | **Document:** `C4` | **Firmware Version:** `v2.4.10-dev` | **ESP-IDF:** `v6.1.1`
+> **H1OS Architecture Specification** | **Document:** `C4` | **Firmware Version:** `v2.4.11-dev` | **ESP-IDF:** `v6.1.1`
 
 This document defines the release schedule, versioning policy, and modification tracking standard for **H1OS**.
 

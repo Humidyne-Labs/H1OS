@@ -605,7 +605,7 @@ static esp_err_t h1os_launch_interactive_session(orch_flow_type_t flow)
         .wakeup_causes      = causes,
         .wake_state         = wake_state,
         .boot_count         = st->boot_count,
-        .deep_sleep_count   = st->wake_count,
+        .wake_count         = st->wake_count,
         .flow_b_count       = st->flow_b_counter,
         .button_wake_count  = st->button_wake_count,
         .woke_from_button    = button_woke,

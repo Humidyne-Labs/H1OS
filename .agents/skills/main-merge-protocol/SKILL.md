@@ -3,7 +3,7 @@ name: main-merge-protocol
 description: Operational reference, validation checklists, and execution commands for merging code into main. Enforces the pre-merge protocol: touching CHANGELOG.md, regenerating docs/api.md with Doxygen & Moxygen, synchronizing semantic version strings across 4 files, verifying zero-warning ESP-IDF builds, and tagging releases.
 ---
 
-# Pre-Merge to Main Protocol & Release Execution (`v2.4.10-dev`)
+# Pre-Merge to Main Protocol & Release Execution (`v2.4.11-dev`)
 
 This skill provides step-by-step procedures, one-liner automation commands, and validation scripts for preparing, merging, and releasing code into the `main` branch of **H1OS**.
 
@@ -13,10 +13,10 @@ This skill provides step-by-step procedures, one-liner automation commands, and 
 
 | Step | Action | Tools / Files Involved | Verification |
 | :--- | :--- | :--- | :--- |
-| **0a. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check` | Zero leaks in code, archives, or git logs |
+| **0a. Identity Audit** | Sanitize & Strip Names | `python tools/agent/sanitize.py --check --include-dist` | Zero leaks in code, archives, or git logs |
 | **0b. Asset Shrink Gate** | Quantize Docs & Images | `/shrink` or `tools/agent/optimize_*.py` | Lossless PDF meta, EXIF stamped |
-| **1. Invariant Check** | Firmware Safety Audit | `.agents/rules/coding.md`, `.agents/skills/h1os-firmware-standards` | 14 Safety Invariants validated |
-| **2. Clean Build** | Compile firmware | `idf.py -B build_dev --preset dev build` in `examples\H1OS` | Exit code 0, 0 warnings/errors |
+| **1. Automated Harness** | Full `H1OS-STD-001` Sweep | `python tools/agent/run_audit.py --all` | All 14 gates PASS (Semgrep, Cppcheck, Clang-Tidy, Ruff/Mypy, Stack/RTC, Tests) |
+| **2. Clean Build** | Compile firmware (`eim`) | `eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1` | Exit code 0, 0 warnings/errors |
 | **3. Memory Audit** | Profile memory regions | `murdock_memory_budget` (`embedded-ops`) | DIRAM $\le 85\%$, RTC Slow $\le 4\text{ KB}$ |
 | **4. Rev Version** | Bump semantic version | `python tools/agent/bump_version.py --set X.Y.Z-tag` | `--check` passes across all targets + `CHANGELOG.md` |
 | **5. Regen API Docs** | Doxygen + Moxygen | `doxygen Doxyfile`, `moxygen` $\rightarrow$ `docs/api.md` | `docs/api.md` updated |
@@ -91,12 +91,13 @@ Insert the new release ledger block directly above the previous release in `CHAN
 
 ---
 
-### Step 4: Verify Compilation & Memory Headroom
+### Step 4: Verify Compilation, Unified Audit Harness & Memory Headroom
 
-Run incremental build via canonical profile inside `examples\H1OS`:
+Run builds via `eim run` (ESP-IDF `v6.1.1`) followed by the full audit runner:
 
 ```powershell
-& "C:\Espressif\tools\Microsoft.v6.1.1.PowerShell_profile.ps1"; Set-Location "examples\H1OS"; idf.py -B build_dev --preset dev build
+eim run 'idf.py -C examples/H1OS -B examples/H1OS/build_dev --preset dev build; exit $LASTEXITCODE' v6.1.1
+python tools/agent/run_audit.py --all
 ```
 
 Then query MCP memory profiling tool:

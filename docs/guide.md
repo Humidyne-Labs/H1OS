@@ -2,7 +2,7 @@
 
 **Target Hardware:** Waveshare ESP32-S3 ePaper 1.54" V2 (`ESP32-S3-PICO-1-N8R8`, Non-Touch) *(Independent project; not affiliated with Waveshare Electronics)*  
 **Operating System:** H1OS (E-Class Environmental Telemetry Operating System)  
-**Firmware Version:** `v2.4.10-dev`  
+**Firmware Version:** `v2.4.11-dev`  
 **Supported Frameworks:** ESP-IDF `v6.1.1` | LVGL `v9.6.0`  
 **License:** MIT  
 

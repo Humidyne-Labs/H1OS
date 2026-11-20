@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
 H1OS Firmware Release Packaging Engine (h1os_pack)
-Version: 2.4.5-dev
 License: Apache-2.0
 """
 import argparse
 import hashlib
 import json
-import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,10 +18,10 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from h1os_tool import (
+from h1os_tool import (  # noqa: E402
+    H1OSConfig,
     H1OS_TOOLING_VERSION,
     check_tooling_dependencies,
-    H1OSConfig,
 )
 
 VERSION = H1OS_TOOLING_VERSION
@@ -72,8 +71,8 @@ def detect_app_bin_in_dir(build_dir: Path) -> Path:
             proj_name = data.get("project_name")
             if proj_name and (build_dir / f"{proj_name}.bin").exists():
                 return (build_dir / f"{proj_name}.bin").resolve()
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            print(f"[WARN] Unable to parse {proj_desc}: {exc}", file=sys.stderr)
 
     default_bin = build_dir / "h1os.bin"
     return default_bin.resolve() if default_bin.exists() else None
@@ -90,12 +89,11 @@ def resolve_version(app_root: Path, comp_dir: Path) -> str:
             try:
                 for line in header.read_text(encoding="utf-8").splitlines():
                     if "H1OS_VERSION_STRING" in line or "H1OS_VERSION_STR" in line:
-                        import re
                         m = re.search(r'"([^"]+)"', line)
                         if m:
                             return m.group(1).lstrip("v")
-            except Exception:
-                pass
+            except OSError as exc:
+                print(f"[WARN] Failed reading {header}: {exc}", file=sys.stderr)
 
     try:
         res = subprocess.run(
@@ -108,8 +106,8 @@ def resolve_version(app_root: Path, comp_dir: Path) -> str:
         tag = res.stdout.strip().lstrip("v")
         if tag:
             return tag
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"[WARN] git describe unavailable: {exc}", file=sys.stderr)
 
     print("\n[ERROR] Unable to resolve semantic version. Specify -V <version> or define H1OS_VERSION_STRING in h1os_version.h.", file=sys.stderr)
     sys.exit(1)
@@ -127,8 +125,8 @@ def get_git_commit(working_dir: Path) -> str:
         )
         if res.returncode == 0 and res.stdout.strip():
             return res.stdout.strip()
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
     return "unknown"
 
 
@@ -254,6 +252,12 @@ def parse_args():
         default=None,
         help="Custom suffix for the release zip file",
     )
+    parser.add_argument(
+        "--verify-clean-git",
+        action="store_true",
+        default=False,
+        help="Fail packaging if git working tree has uncommitted tracked changes",
+    )
     return parser.parse_args()
 
 
@@ -269,8 +273,8 @@ def main():
     except SystemExit:
         if args.config_path:
             sys.exit(1)
-    except Exception:
-        pass
+    except OSError:
+        cfg = None
 
     # Resolve build directory
     if not args.build_dir and cfg:
@@ -311,6 +315,17 @@ def main():
     app_title = (cfg.app_name.upper() if (cfg and cfg.app_name) else app_stem.upper())
 
     git_commit = get_git_commit(app_root)
+    if args.verify_clean_git:
+        st = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=str(app_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if st.returncode != 0 or st.stdout.strip():
+            print("[ERROR] --verify-clean-git set, but working tree has uncommitted changes.", file=sys.stderr)
+            sys.exit(1)
     raw_version = (cfg.version if (cfg and cfg.version) else None) or resolve_version(app_root, comp_dir)
     version = args.version.lstrip("v") if args.version else raw_version
 
@@ -353,8 +368,8 @@ def main():
                 shutil.rmtree(child, ignore_errors=True)
             else:
                 child.unlink(missing_ok=True)
-        except Exception:
-            pass
+        except OSError as exc:
+            print(f"[WARN] Could not remove {child}: {exc}", file=sys.stderr)
     bins_dir = dist_root / "bins"
     bins_dir.mkdir(parents=True, exist_ok=True)
 
@@ -383,7 +398,7 @@ def main():
         table_bins.add_column("Flash Offset", style="yellow", ratio=2)
         table_bins.add_column("Partition Binary", style="bold white", ratio=4)
         table_bins.add_column("Size", style="cyan", justify="right", ratio=3)
-        for off_int, off_hex, rel, abs_p in flash_info["binaries"]:
+        for _off_int, off_hex, rel, abs_p in flash_info["binaries"]:
             sz = abs_p.stat().st_size
             table_bins.add_row(off_hex, Path(rel).name, format_bytes(sz))
         table_bins.add_row("0x0 (Monolithic)", factory_bin_name, format_bytes(len(buf)))
@@ -480,9 +495,9 @@ def main():
     else:
         print(f"    [+] Verified partition table: bins/{part_bin.name}")
         if flasher_ps1.exists():
-            print(f"    [+] Created engine/flasher.ps1")
+            print("    [+] Created engine/flasher.ps1")
         if flash_bat.exists():
-            print(f"    [+] Created flash.bat")
+            print("    [+] Created flash.bat")
         if zip_path:
             print(f"    [+] Created Release Zip: {zip_path}")
         print(f"\n[SUCCESS] {app_title} v{version} Release Bundle ready at: {dist_root}\n")
