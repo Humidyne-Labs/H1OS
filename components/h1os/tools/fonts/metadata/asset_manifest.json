@@ -1,10 +1,10 @@
 {
-  "manifest_version": "1.0.22",
+  "manifest_version": "1.0.23",
   "repository": "https://github.com/Humidyne-Labs/epd-font",
   "license": "MIT",
   "generator": "build_static_ttf_assets.py",
   "cu2qu_max_err": 1.0,
-  "total_ttf_files": 112,
+  "total_ttf_files": 169,
   "catalog_counts": {
     "icon_fa7": 2349,
     "icon_lucide": 2043,
@@ -14,7 +14,18 @@
     "terminus": 1355
   },
   "licenses": [
+    "Bitter_OFL.txt",
+    "FiraCode_OFL.txt",
+    "FiraMono_OFL.txt",
+    "FiraSansCondensed_OFL.txt",
+    "FiraSans_OFL.txt",
     "FontAwesome7_LICENSE.txt",
+    "IBMPlex_Math_OFL.txt",
+    "IBMPlex_Mono_OFL.txt",
+    "IBMPlex_Sans_OFL.txt",
+    "IBMPlex_Serif_OFL.txt",
+    "InterTight_OFL.txt",
+    "JetBrainsMono_OFL.txt",
     "Lucide_ISC_LICENSE.txt",
     "Noto_OFL.txt",
     "Phosphor_MIT_LICENSE.txt",
@@ -23,19 +34,204 @@
   ],
   "assets": [
     {
+      "filename": "Bitter-Bold.ttf",
+      "size_bytes": 202264,
+      "sha256": "ad2e34b55b68da793e299ea78cc10d277b154e5c14650b3f8c77c3c0b4981821"
+    },
+    {
+      "filename": "Bitter-BoldItalic.ttf",
+      "size_bytes": 194364,
+      "sha256": "2e5b4a0c3a287658b9238b36f3bbaefc6bcc504b512b33f7005006d9f6ec48af"
+    },
+    {
+      "filename": "Bitter-ExtraBold.ttf",
+      "size_bytes": 202268,
+      "sha256": "8cd6708944fde3d900b25672b34ee73b7fce25e69d4118e9640e6e0596eb9294"
+    },
+    {
+      "filename": "Bitter-ExtraBoldItalic.ttf",
+      "size_bytes": 194444,
+      "sha256": "19c2f866e2889a0a49d3a513ea6aa243f2b4e37626412b419ed239ad11b8eafc"
+    },
+    {
+      "filename": "Bitter-Italic.ttf",
+      "size_bytes": 194464,
+      "sha256": "5989ed88e07a172d02eb95423cc4d15d3b3c71e2feb4573ebc7ae1497bb66fbb"
+    },
+    {
+      "filename": "Bitter-Medium.ttf",
+      "size_bytes": 202248,
+      "sha256": "2aeed27c965e26e13d63921c89a60c3ba98c5934d5fe5b5d89b0575833d0a3c2"
+    },
+    {
+      "filename": "Bitter-MediumItalic.ttf",
+      "size_bytes": 194456,
+      "sha256": "dabbc068252524295f05dfbf38877b5a8339192f7c7c761897251a1242b55419"
+    },
+    {
+      "filename": "Bitter-Regular.ttf",
+      "size_bytes": 201980,
+      "sha256": "b8e348320d938e496eca069660abbd0a931d3213fb0112fb5d43af5dddf2a0eb"
+    },
+    {
+      "filename": "Bitter-SemiBold.ttf",
+      "size_bytes": 202220,
+      "sha256": "17bd070f942cb45cfed29f450d57c412795b51b24223a2501aed8e4d7254dc70"
+    },
+    {
+      "filename": "Bitter-SemiBoldItalic.ttf",
+      "size_bytes": 194304,
+      "sha256": "80e575f0b80d6246761b1c616d651e688c54336c38e75b3021b4bf9572dcb571"
+    },
+    {
+      "filename": "FiraCode-Bold.ttf",
+      "size_bytes": 189468,
+      "sha256": "ed5787426d2c4c927bbb7286dbf3bfbca7f7ad3b941d4a31d8491d945307c599"
+    },
+    {
+      "filename": "FiraCode-Medium.ttf",
+      "size_bytes": 188784,
+      "sha256": "24ab59d525e0ec85d32c6a9bb7a2af3b593e4a50cb5bcfa0c8600366bebd9239"
+    },
+    {
+      "filename": "FiraCode-Regular.ttf",
+      "size_bytes": 188820,
+      "sha256": "f360d4e47c907d9a18da32de67029fb281f0665a64381cadfcf40b421329d4fa"
+    },
+    {
+      "filename": "FiraCode-SemiBold.ttf",
+      "size_bytes": 189132,
+      "sha256": "ced5c54f46a2bfa6cd842ec33ce3c8d814a944e8aa634790e4800d7b77d6aaed"
+    },
+    {
+      "filename": "FiraMono-Bold.ttf",
+      "size_bytes": 206488,
+      "sha256": "61f0ca3ae72a83deb807040f314e1b8b4e40b08213df243db9fd430095cab305"
+    },
+    {
+      "filename": "FiraMono-Medium.ttf",
+      "size_bytes": 173428,
+      "sha256": "a5bc1a2db2f65946049de615ecc08603d788eb0c02b520f4ed95f05a5cc58532"
+    },
+    {
+      "filename": "FiraMono-Regular.ttf",
+      "size_bytes": 174596,
+      "sha256": "2e00b0cf3106a3d792f35711b7722740b76c02ee7300ea8c60f940584b7a8ac9"
+    },
+    {
+      "filename": "FiraSans-Bold.ttf",
+      "size_bytes": 489720,
+      "sha256": "a4d8e149ecdd4874a0726eb0af894488b3b31c423d6b0017c8f415ed1b795b45"
+    },
+    {
+      "filename": "FiraSans-BoldItalic.ttf",
+      "size_bytes": 506864,
+      "sha256": "1b96c16db9819bcaa9d588068bb397bb6e977c4874965d3d50d789a1943757eb"
+    },
+    {
+      "filename": "FiraSans-ExtraBold.ttf",
+      "size_bytes": 497028,
+      "sha256": "0a26cff904d790f7ade2bffaf227b5fecdbeffdac1695fdbd640e086fe4e7152"
+    },
+    {
+      "filename": "FiraSans-ExtraBoldItalic.ttf",
+      "size_bytes": 536744,
+      "sha256": "eb26df1afeec1f817977c8729b4a1ba5ef07d7c821d39cbff6348e491c748f5f"
+    },
+    {
+      "filename": "FiraSans-Italic.ttf",
+      "size_bytes": 472396,
+      "sha256": "a4204f9a8029c1c55daa5385ac95936f74abea3e232770f1fb2862a19d1dfa13"
+    },
+    {
+      "filename": "FiraSans-Medium.ttf",
+      "size_bytes": 457248,
+      "sha256": "cbc1842cbed8c1d1146ba7c9db97d8f28c9bedfd25f41c5b0e1259ca48622328"
+    },
+    {
+      "filename": "FiraSans-MediumItalic.ttf",
+      "size_bytes": 472624,
+      "sha256": "d892b7a6e874d839bc7e712b1d57cf64bcf8013ae143c3eab09e0fd9a0604411"
+    },
+    {
+      "filename": "FiraSans-Regular.ttf",
+      "size_bytes": 456996,
+      "sha256": "c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23"
+    },
+    {
+      "filename": "FiraSans-SemiBold.ttf",
+      "size_bytes": 489028,
+      "sha256": "db0321f83eb3e9f527b8af384a1b3fefdc1039cf2b06fd39b3f61492bda9561c"
+    },
+    {
+      "filename": "FiraSans-SemiBoldItalic.ttf",
+      "size_bytes": 506544,
+      "sha256": "97dc5696fe0aabcabf7e041527e0ca39215661cb8174cd1a92c01d9fe224c73d"
+    },
+    {
+      "filename": "FiraSansCondensed-Bold.ttf",
+      "size_bytes": 489176,
+      "sha256": "b9371052e58ec5b709153dd0fffc60b5205b4d3435cf957c2522705b31b0dbcc"
+    },
+    {
+      "filename": "FiraSansCondensed-BoldItalic.ttf",
+      "size_bytes": 514400,
+      "sha256": "aebe32d2d821890e0d66443ca2dc59b237ff34a575048696a96516d857ae0da6"
+    },
+    {
+      "filename": "FiraSansCondensed-ExtraBold.ttf",
+      "size_bytes": 498104,
+      "sha256": "d1e5181a65e04970ef17b83fa518277658217081a032c7f60b7ac0f101347cf2"
+    },
+    {
+      "filename": "FiraSansCondensed-ExtraBoldItalic.ttf",
+      "size_bytes": 536372,
+      "sha256": "071e6c37e90a3ba2fb53ede9f88fd77d024770503665697187013397002b0c66"
+    },
+    {
+      "filename": "FiraSansCondensed-Italic.ttf",
+      "size_bytes": 471720,
+      "sha256": "57f3b2cfbb07698b9699e613369d33e06b61b827586b63341deaa6c573d264e2"
+    },
+    {
+      "filename": "FiraSansCondensed-Medium.ttf",
+      "size_bytes": 456428,
+      "sha256": "6385967fe921a6ee837221cde461e695e77f8931a3ca4bc82c7c1c1a5fe47f86"
+    },
+    {
+      "filename": "FiraSansCondensed-MediumItalic.ttf",
+      "size_bytes": 471860,
+      "sha256": "d7de5f62e405f9587f614fde8fb5ae8dfb0511f37b27bec3f8067e9adbc665cd"
+    },
+    {
+      "filename": "FiraSansCondensed-Regular.ttf",
+      "size_bytes": 459804,
+      "sha256": "c67609f14fc9d328442bfffcc31988b0f76e5575cf460fcc1f3dd8e4912fe257"
+    },
+    {
+      "filename": "FiraSansCondensed-SemiBold.ttf",
+      "size_bytes": 488728,
+      "sha256": "5a9586bc549d557c415a6a3dc88658b1453d1df661edf811954ebd55776c01cd"
+    },
+    {
+      "filename": "FiraSansCondensed-SemiBoldItalic.ttf",
+      "size_bytes": 488688,
+      "sha256": "c4f1d1373f1ce1f5219bdc6ff9bf964698ce0bdc9d2f66e0df53741f3f4c0be9"
+    },
+    {
       "filename": "FontAwesome7-Brands.ttf",
       "size_bytes": 219052,
-      "sha256": "9ad9548c116857f34af66a3da70291063a9ba722ec79725740d27cab1c4ddc49"
+      "sha256": "34aedcdac36c12d8e70202cb82f2ae54006e87322046ef060add97588b74c8b3"
     },
     {
       "filename": "FontAwesome7-Regular.ttf",
       "size_bytes": 84448,
-      "sha256": "27b945b3ae1a73f0c38f8b7e41d236d9f664bebca26081d15e0906ce8f149007"
+      "sha256": "3e59525c742b590fe3838dad577a3193f108b1af1136c7ea13b24cffa142f1b4"
     },
     {
       "filename": "FontAwesome7-Solid.ttf",
       "size_bytes": 404204,
-      "sha256": "21bfb88e29549913c72f377cce8860fd50e31f11604948a0f754cc1c6b1a5129"
+      "sha256": "8c31d66cacc36cd3c67c4fcaeecac816a1f84841ec9bc627252fa577e5abc2e8"
     },
     {
       "filename": "IBMPlexMath-Regular.ttf",
@@ -243,6 +439,106 @@
       "sha256": "c43c8d399ca4cfb616c8b47e5888146ffa262de23f38db981807b5e324745e83"
     },
     {
+      "filename": "InterTight-Bold.ttf",
+      "size_bytes": 310472,
+      "sha256": "4a61dcbec61fbc14d458604d860dfb0bc872f288728583b165ade64666882748"
+    },
+    {
+      "filename": "InterTight-BoldItalic.ttf",
+      "size_bytes": 316956,
+      "sha256": "59c4df63f267de9f6b5b3a0d7dd08468f7a43cd19e43d0fe1329c0cbe9653225"
+    },
+    {
+      "filename": "InterTight-ExtraBold.ttf",
+      "size_bytes": 311360,
+      "sha256": "fb34649d06404f746f65e497e84f0f46c6263eae2a437f12536b60dc461323dd"
+    },
+    {
+      "filename": "InterTight-ExtraBoldItalic.ttf",
+      "size_bytes": 317676,
+      "sha256": "055ee5d7e0e0a729941d1e1fd7f5d476f6e33cbfa9757dff2744956903b15aed"
+    },
+    {
+      "filename": "InterTight-Italic.ttf",
+      "size_bytes": 312552,
+      "sha256": "752f0d61c24ec35c5d4b74287c7a0e8d24ae6b73493b4086ffad4bb9827865f7"
+    },
+    {
+      "filename": "InterTight-Medium.ttf",
+      "size_bytes": 309124,
+      "sha256": "509663c4008745cdf057602cfecdcc2056d6acc6d0a01897a187c59ed3cabf34"
+    },
+    {
+      "filename": "InterTight-MediumItalic.ttf",
+      "size_bytes": 315664,
+      "sha256": "dd681f410485c3ced22f6a1697529809623fbc6795b908cd0a3a4fe5c785c527"
+    },
+    {
+      "filename": "InterTight-Regular.ttf",
+      "size_bytes": 305928,
+      "sha256": "ebc11600ab4c8d5b3b8061cfe0a633f34bf5b898e440a6dd5d4872f0ddb5a207"
+    },
+    {
+      "filename": "InterTight-SemiBold.ttf",
+      "size_bytes": 309832,
+      "sha256": "ed063e1684a3dad73953bf605525b94f4bd8656cbf4193e4e43d8c0692b8337b"
+    },
+    {
+      "filename": "InterTight-SemiBoldItalic.ttf",
+      "size_bytes": 316368,
+      "sha256": "ae82ec98d9fb2a1d3c45628a90a557ba7922be2b35a3880899a90afbdd721baf"
+    },
+    {
+      "filename": "JetBrainsMono-Bold.ttf",
+      "size_bytes": 115108,
+      "sha256": "509be9f24e5de95eb9d212be0aaef83421b0a94fd5fcc749d39b4aa46fdab5f3"
+    },
+    {
+      "filename": "JetBrainsMono-BoldItalic.ttf",
+      "size_bytes": 117912,
+      "sha256": "6faaa2fa9d55bf418ce8544df82120f88765d37877609804162125a2cddd4ad0"
+    },
+    {
+      "filename": "JetBrainsMono-ExtraBold.ttf",
+      "size_bytes": 115096,
+      "sha256": "cae07233fdc66e6936592303e61c5a47561444d98a0c0d86b2c2d3cdb0a77efb"
+    },
+    {
+      "filename": "JetBrainsMono-ExtraBoldItalic.ttf",
+      "size_bytes": 117900,
+      "sha256": "0a4445c69ddc4c45b94b1ae61857ce23874dce6b371d98407ebc0c5c7d565fdd"
+    },
+    {
+      "filename": "JetBrainsMono-Italic.ttf",
+      "size_bytes": 117964,
+      "sha256": "13522f47783e261c441ea2ae87348b42e2ce20cdc28c4379c8d666b45980e223"
+    },
+    {
+      "filename": "JetBrainsMono-Medium.ttf",
+      "size_bytes": 115172,
+      "sha256": "9605711dc7b930600b9ad40d6e720c06da3cdcc9729458689a6d1ff4678ab3ee"
+    },
+    {
+      "filename": "JetBrainsMono-MediumItalic.ttf",
+      "size_bytes": 117960,
+      "sha256": "21a8c2f2755503f1cc94c54b84d75bddb9339685861b24f942841af127c77745"
+    },
+    {
+      "filename": "JetBrainsMono-Regular.ttf",
+      "size_bytes": 115152,
+      "sha256": "f8b20126aa8a0e99f9367df610bc48257baddd694a9d98fa54d8c0e24a0a09cb"
+    },
+    {
+      "filename": "JetBrainsMono-SemiBold.ttf",
+      "size_bytes": 115084,
+      "sha256": "e0c0a07bb8427d28c531424d075cfb33253eb2ab64aefa5750fd6c6d13e54d46"
+    },
+    {
+      "filename": "JetBrainsMono-SemiBoldItalic.ttf",
+      "size_bytes": 117868,
+      "sha256": "b910af79d8fef6a84de01ba0f81457544b56d386b1811c9babc141b915db24aa"
+    },
+    {
       "filename": "Lucide-Regular.ttf",
       "size_bytes": 979580,
       "sha256": "23730b56d04bc009e9ecf6a0598ef9d82a3ba4ba055d4d9115976e4a385eff7e"
@@ -319,8 +615,8 @@
     },
     {
       "filename": "NotoSansMath-Regular.ttf",
-      "size_bytes": 63076,
-      "sha256": "9c34a065b220a07473d90c7c7fed5b8545ceb923bf741a5196337429aa4c04ca"
+      "size_bytes": 1015396,
+      "sha256": "3f495fe933c06786e4d5f6d86b8ee70b6753a68ee3b9d87528726de0f6e2c47d"
     },
     {
       "filename": "NotoSansMono-Black.ttf",
@@ -405,182 +701,182 @@
     {
       "filename": "Terminus-Bold-10.ttf",
       "size_bytes": 102416,
-      "sha256": "b128cca884a62c0c6ba27c7e0b0537f51cf4fb6ead61c38576960c1e41b28036"
+      "sha256": "a45f2c8e2b3bff79a6b0278f5909a7fe0a4d60a495983b166dabde7883af72d1"
     },
     {
       "filename": "Terminus-Bold-12.ttf",
       "size_bytes": 102416,
-      "sha256": "1ad04ece926af5aede34d429709c312059fcc1c315f0319c195723bb4b44acd1"
+      "sha256": "c5ac9ad2d9045de5b039156b4d3acd9baa4623d18a82f584a03c434acdf50e80"
     },
     {
       "filename": "Terminus-Bold-14.ttf",
       "size_bytes": 100708,
-      "sha256": "c43e0feae468e35699b43dacfe0ec44795a13248fa7a7901e4eb403d83c394dc"
+      "sha256": "850a9a3a473b9ba8ebc5363502665e0ea015eb4d76783f2c39d651d7eeb71f57"
     },
     {
       "filename": "Terminus-Bold-16.ttf",
       "size_bytes": 101508,
-      "sha256": "490c47a3b774328d350f2a5ba0870fd7016145d86da16b982d6cd4a597b6755e"
+      "sha256": "d7136fd8548f4cf4b0175eeacd1f6a57aa91c5915db51cbf66237c1441f2e569"
     },
     {
       "filename": "Terminus-Bold-18.ttf",
       "size_bytes": 107848,
-      "sha256": "11b6cd80ff18002543d20c88d5bcda066d204024b9b04ff9b31dd16c399cd310"
+      "sha256": "7d88324db1afef3117f231fc4a5ab49bd513ca72b2190894e541b1a2a1740346"
     },
     {
       "filename": "Terminus-Bold-20.ttf",
       "size_bytes": 108560,
-      "sha256": "85131e6decf7675d543dcfc4d6a97254806e5e9bae9d2faeb47475ce66c9f7a2"
+      "sha256": "f34a71845e0e4302c1d79950dd4047e57b19c898224f995816693e207f0e5ef4"
     },
     {
       "filename": "Terminus-Bold-22.ttf",
       "size_bytes": 120368,
-      "sha256": "2a23bf8488c87011d1467b8e71381986537758f46dd4bafcedc5f287b43984c1"
+      "sha256": "62ce2b9067634b0df98c466fb86a43fa2c8d1f11f3132d7a6a8f6af2240c4394"
     },
     {
       "filename": "Terminus-Bold-24.ttf",
       "size_bytes": 124232,
-      "sha256": "a7425043a9352cf01e1b358100da53d361e22000dace053f120af0a620d38f4c"
+      "sha256": "5fddeb2dedbb2a1af78021f3d48731bf56673c1f2c65ce6f2dc729307a33345d"
     },
     {
       "filename": "Terminus-Bold-26.ttf",
       "size_bytes": 124232,
-      "sha256": "7558d2987f71235cbd7e48b8398e4a791036493e08d270b4d948dc2294909161"
+      "sha256": "fa04eb7154c333f2107031a9546013ee3a070680227ac8594d3f8be819185e7e"
     },
     {
       "filename": "Terminus-Bold-28.ttf",
       "size_bytes": 131360,
-      "sha256": "5e6cfc5977ae014bc03c2561dfbe0e278aa05fa2f39f6184a6adb41b3e5fc201"
+      "sha256": "41e33da71a24ac8d7c5a4932ff11b46d977e479c1c63c5972193fcca1291fd5d"
     },
     {
       "filename": "Terminus-Bold-30.ttf",
       "size_bytes": 131360,
-      "sha256": "c5f1722f7bc38e3a5acd0a2aaf37553b9d1a02f2c8f31ea9730fdbf9c9d7de4c"
+      "sha256": "8a60091e5a9604b4df6dcb74edd59e7f09708009f4c7afab8da0760a7bc28fd3"
     },
     {
       "filename": "Terminus-Bold-32.ttf",
       "size_bytes": 137156,
-      "sha256": "a1049bfdd1b56a5f6bf65f29df35ac38d1aeabdd44412de60a7e5e1707a3ee0d"
+      "sha256": "9eb1ca438990c57d83cd975d2e8c904350ba160a889fa998763f89c396d9f2d9"
     },
     {
       "filename": "Terminus-Bold-34.ttf",
       "size_bytes": 137156,
-      "sha256": "4109722fdd976fff12d888ead9ea7b67576befa23007a5110cd19d5ba4907de0"
+      "sha256": "1e65adc8bcd2985975d594ef62d1cb9e6980dca48e0f1cafe41393b67f1db2c4"
     },
     {
       "filename": "Terminus-Bold-36.ttf",
       "size_bytes": 117644,
-      "sha256": "d1e0780f2075e55785534bfd0912c0cfbcb15bc2b1a9cc12ab58c82d2d574e28"
+      "sha256": "18624bf7c56c3569ff826d94b2040612edb67107fa2af796e85b14b3f9f6bc94"
     },
     {
       "filename": "Terminus-Bold-38.ttf",
       "size_bytes": 117644,
-      "sha256": "e3a50c66e16b77676b729ead52f578d806131a1529cd65fbec3df48f34344f33"
+      "sha256": "4db1842f5e43ae3a0e103498a9434b15c0c7ff888eed74daba7b43b6ded74871"
     },
     {
       "filename": "Terminus-Bold-40.ttf",
       "size_bytes": 118492,
-      "sha256": "e41e82ee553f4a1bb5de3ce0f2492514d793a87449f759cf2a27661205af16c2"
+      "sha256": "74291dcad88a085059b19a22ef5ce67e99d8c6b1dfb483ace33c10c7be3d3bd9"
     },
     {
       "filename": "Terminus-Bold.ttf",
       "size_bytes": 101508,
-      "sha256": "490c47a3b774328d350f2a5ba0870fd7016145d86da16b982d6cd4a597b6755e"
+      "sha256": "d7136fd8548f4cf4b0175eeacd1f6a57aa91c5915db51cbf66237c1441f2e569"
     },
     {
       "filename": "Terminus-Normal-10.ttf",
       "size_bytes": 102440,
-      "sha256": "e15c8247a7c26666691306286e913530b67cd1ae5c2fca9a5ae9d5f3982ae2f7"
+      "sha256": "6a90494f2262697dcdd6d1ab1ff00231244268e2cefc6211968ac9e2c926209d"
     },
     {
       "filename": "Terminus-Normal-12.ttf",
       "size_bytes": 102440,
-      "sha256": "a1be61678919bba57ce7d7a0b35fe01e395d624b2d617ecac6f08c0516aca280"
+      "sha256": "98360cae1bd7498d6d7e66149d10d6b1e64a4fc244781b2982db55f2cb17a16c"
     },
     {
       "filename": "Terminus-Normal-14.ttf",
       "size_bytes": 110052,
-      "sha256": "ed71dc619c124d809b3512d08dcde92ff15a95af2ca700bd92330879e212c83b"
+      "sha256": "4740a23d68f88b1d529e0ea87646972e1151d0c5ff5041a9de37ac5ca39bac74"
     },
     {
       "filename": "Terminus-Normal-16.ttf",
       "size_bytes": 110900,
-      "sha256": "cd2bb8ea9686084ee2bd40bd2bf9565d810ac8b5f7b2629b7b0993701feefc03"
+      "sha256": "16d68b2150fa524955890bf8ead0fc1a549cf84ec53bc0cdbf48a0db775bb7e5"
     },
     {
       "filename": "Terminus-Normal-18.ttf",
       "size_bytes": 117836,
-      "sha256": "678b7c8fbdfd16bfcd0c398a6722ce430d525ee9761f1db914b9774565e22966"
+      "sha256": "217316a9704f086e5be09dd14b40a7c635a80170ef7ca54b8726986654236548"
     },
     {
       "filename": "Terminus-Normal-20.ttf",
       "size_bytes": 118564,
-      "sha256": "84559223c325699ad23b0a2a421f038a92badca1ea91523d8b9b15aefa1c7a0e"
+      "sha256": "83ac8cba51491fa1fbc1c176d7e95e6ef236ee4d4efe46119640c27d5dec6ff2"
     },
     {
       "filename": "Terminus-Normal-22.ttf",
       "size_bytes": 135384,
-      "sha256": "b26fa8d3f33b92226f1ac1ce5f8bebd261fec07649127b88f454b96a294f4db1"
+      "sha256": "db82e4676b3347905534893ec05d6329190a7caf89c54dea08da1c4f0cbeb409"
     },
     {
       "filename": "Terminus-Normal-24.ttf",
       "size_bytes": 140204,
-      "sha256": "19118ca1168a7d9c56f710449b563d548f01d1e467bbc258dd248f8f76df1e49"
+      "sha256": "55eec0339aa8c9faf387969cc5d02247394ca6b12f21526b961ceb52de7cff82"
     },
     {
       "filename": "Terminus-Normal-26.ttf",
       "size_bytes": 140204,
-      "sha256": "033a6f043af7e3cfbd3600bdad127b6ec20d0558fc49a4dacab62f9eadde0f53"
+      "sha256": "941f92cd625e8d419590060911f74be757b0ca4d5f7bdccc0dfe4b4a686fb563"
     },
     {
       "filename": "Terminus-Normal-28.ttf",
       "size_bytes": 133116,
-      "sha256": "5f4ffca4e37a0c34fab332dc1cd967d957d7eeb44dd0613d927d9264a9a3f2f8"
+      "sha256": "a3269c080d6b221ba71074620c993713d097a83f1ac659449278c6a77687122b"
     },
     {
       "filename": "Terminus-Normal-30.ttf",
       "size_bytes": 133116,
-      "sha256": "f0c213e4fa8ed65b1f57784666542bbafd588fc48ca362fcdd5e9bbaa9e64416"
+      "sha256": "b57b3329951d9114b7294ee0595d2ea2598a975989cd8beabfcd922265057bb6"
     },
     {
       "filename": "Terminus-Normal-32.ttf",
       "size_bytes": 137660,
-      "sha256": "74c651e4acf449b1d181a7c244764312d4295cd7d44fda35f5c4544b145eddde"
+      "sha256": "6d7a2226bc55b966dc84dcd302e29be4600db3f6796828a6352fff37dda090dc"
     },
     {
       "filename": "Terminus-Normal-34.ttf",
       "size_bytes": 137660,
-      "sha256": "782c8bb6cafa87bed916505af941c41e34ebda404eeda2c1b7025dd3f7caf8ca"
+      "sha256": "09129d1c4eb7fc253505295a933d27a1f6ec86f15c7cf821925d8976e7634b7c"
     },
     {
       "filename": "Terminus-Normal-36.ttf",
       "size_bytes": 124836,
-      "sha256": "683a84a9077053aec6a23a382b88143b36af3ce8f6258c14cc65614945ce6075"
+      "sha256": "a1236a968468dd6b79d441669b06b3dcc91d552bc4059ffc00e509453ebef435"
     },
     {
       "filename": "Terminus-Normal-38.ttf",
       "size_bytes": 124836,
-      "sha256": "439a606b1620745ffbcd49c816311c0f953a2aae04f74f05c4b915036767f6f7"
+      "sha256": "c340215be2bbd108566ccceb0cf8f10d02fad3d2381e9c31169b0a7480cf298c"
     },
     {
       "filename": "Terminus-Normal-40.ttf",
       "size_bytes": 125532,
-      "sha256": "92f3b4088e3c41f8a2d3c4fc9498b66c957a12c0d3523aea036e8478184ec782"
+      "sha256": "8dca3f1012139d061844b36a26f6c55ce5ad946a3f902b38577f212b290d4f92"
     },
     {
       "filename": "Terminus-Regular.ttf",
       "size_bytes": 110900,
-      "sha256": "cd2bb8ea9686084ee2bd40bd2bf9565d810ac8b5f7b2629b7b0993701feefc03"
+      "sha256": "16d68b2150fa524955890bf8ead0fc1a549cf84ec53bc0cdbf48a0db775bb7e5"
     },
     {
       "filename": "Terminus-VGA-14.ttf",
       "size_bytes": 100752,
-      "sha256": "da39263d6d2694f64a4ef9cbf24b71ebb7dceb6d3f15c718f9cbc1cb4a2e8d9b"
+      "sha256": "a3f34beef946ea83f81d26f0dd21024d7bf745bf57c1252ed622ce5076dbb87e"
     },
     {
       "filename": "Terminus-VGA-16.ttf",
       "size_bytes": 101544,
-      "sha256": "47cbca548467be8df39ca12342d70944ce16be124e07d7bf9df3528f2d04d9bb"
+      "sha256": "964d6e25f2ced111378d3f295ee8c78467234fb8de29f7fffd4e04d0ea9c9fff"
     }
   ]
 }

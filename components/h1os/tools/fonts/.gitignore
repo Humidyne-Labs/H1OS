@@ -1,0 +1,5 @@
+# Will track after deflating directory
+licenses/
+
+# Original font archival backup
+*.zip

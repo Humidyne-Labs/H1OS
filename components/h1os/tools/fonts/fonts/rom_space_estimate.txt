@@ -2,34 +2,49 @@
 HUMIDYNE LABS / HUMIDITRON `epd-font` v1.0.23 — APPROXIMATE FLASH ROM (.rodata) & DISK SIZE REPORT
 ========================================================================================================================
   Project                      : A 1-bit EPD font generator and asset pipeline for embedded displays
-  Scheme ID                    : h1os_epd_v1_full
+  Scheme ID                    : h1os_v2_full
   Hardware Scheme ID           : esp32s3-N8R8 (esp32s3-N8R8-hw_scheme.json)
   Target Chip Name (chip_name) : ESP32-S3-N8R8 (Espressif Systems)
   Flash Partition Budget       : 3 MBytes (3,145,728 bytes / 3072.00 KB / 3.00 MBytes)
   Target Display Panel         : Waveshare 1.54in V2 Monochrome EPD (SSD1681) (200x200 px, usable=188 px, 1-BPP LV_COLOR_FORMAT_I1)
   Target Display DPI           : 188.2 DPI (1 typographic pt = 1/72 inch = 2.613 px @ 188.2 DPI)
-  Total Compiled Strikes       : 108 strikes
-  Expected MCU Flash (.rodata) :      320,137 bytes  (  312.63 KB  /   0.305 MBytes)
-  Host .c + .h Source Disk Size:    3,207,610 bytes  ( 3132.43 KB  /   3.059 MBytes)
-  Compressed Strike Vault Size :      349,420 bytes  (  341.23 KB)
+  Total Compiled Strikes       : 88 strikes
+  Expected MCU Flash (.rodata) :      463,334 bytes  (  452.47 KB  /   0.442 MBytes)
+  Host .c + .h Source Disk Size:    3,659,043 bytes  ( 3573.28 KB  /   3.490 MBytes)
+  Compressed Strike Vault Size :      538,057 bytes  (  525.45 KB)
 ========================================================================================================================
 
 1. TARGET HARDWARE FLASH PARTITION UTILIZATION (ESP32-S3-N8R8 — SINGLE 3 MBYTE PARTITION SPEC)
 ------------------------------------------------------------------------------------------------------------------------
   Partition Identifier & Label                 |   Budget Bytes | Used (.rodata) |   Remaining Free | Utilization | Status
 ------------------------------------------------------------------------------------------------------------------------
-  esp32s3-N8R8 (3 MBytes / ESP32-S3-N8R8)      |    3,145,728 B |      320,137 B |      +2,759.4 KB |      10.18% | FITS
+  esp32s3-N8R8 (3 MBytes / ESP32-S3-N8R8)      |    3,145,728 B |      463,334 B |      +2,619.5 KB |      14.73% | FITS
 ------------------------------------------------------------------------------------------------------------------------
 
 2. APPROXIMATE ROM SPACE PER FONT FILE PAIR (NORMAL + BOLD BY FAMILY AND SIZE VS. 3 MBYTE PARTITION)
 ------------------------------------------------------------------------------------------------------------------------
   Family           |   Size |    Normal Strike (.rodata) |      Bold Strike (.rodata) |     Pair Total (Norm+Bold) | % of 3 MByte
 ------------------------------------------------------------------------------------------------------------------------
-  cond             |   14px |         1,849 B (  1.81 KB) |         1,944 B (  1.90 KB) |         3,793 B (  3.70 KB) |     0.1206%
-  cond             |   16px |         2,102 B (  2.05 KB) |         2,220 B (  2.17 KB) |         4,322 B (  4.22 KB) |     0.1374%
-  cond             |   18px |         2,315 B (  2.26 KB) |         2,484 B (  2.43 KB) |         4,799 B (  4.69 KB) |     0.1526%
-  cond             |   20px |         2,579 B (  2.52 KB) |         2,753 B (  2.69 KB) |         5,332 B (  5.21 KB) |     0.1695%
-  cond             |   24px |         3,230 B (  3.15 KB) |         3,474 B (  3.39 KB) |         6,704 B (  6.55 KB) |     0.2131%
+  bitter           |   16px |         5,332 B (  5.21 KB) |             0 B (  0.00 KB) |         5,332 B (  5.21 KB) |     0.1695%
+  bitter           |   18px |         6,582 B (  6.43 KB) |         6,105 B (  5.96 KB) |        12,687 B ( 12.39 KB) |     0.4033%
+  bitter           |   20px |         6,209 B (  6.06 KB) |         6,733 B (  6.58 KB) |        12,942 B ( 12.64 KB) |     0.4114%
+  bitter           |   24px |             0 B (  0.00 KB) |         7,715 B (  7.53 KB) |         7,715 B (  7.53 KB) |     0.2453%
+  fira_code        |   16px |         2,404 B (  2.35 KB) |         2,492 B (  2.43 KB) |         4,896 B (  4.78 KB) |     0.1556%
+  fira_code        |   18px |         2,721 B (  2.66 KB) |         2,855 B (  2.79 KB) |         5,576 B (  5.45 KB) |     0.1773%
+  fira_code        |   20px |         3,058 B (  2.99 KB) |         3,226 B (  3.15 KB) |         6,284 B (  6.14 KB) |     0.1998%
+  fira_code        |   24px |             0 B (  0.00 KB) |         4,078 B (  3.98 KB) |         4,078 B (  3.98 KB) |     0.1296%
+  fira_cond        |   14px |         6,085 B (  5.94 KB) |             0 B (  0.00 KB) |         6,085 B (  5.94 KB) |     0.1934%
+  fira_cond        |   16px |         7,570 B (  7.39 KB) |         7,584 B (  7.41 KB) |        15,154 B ( 14.80 KB) |     0.4817%
+  fira_cond        |   18px |         7,607 B (  7.43 KB) |         8,352 B (  8.16 KB) |        15,959 B ( 15.58 KB) |     0.5073%
+  fira_cond        |   20px |         8,237 B (  8.04 KB) |         9,140 B (  8.93 KB) |        17,377 B ( 16.97 KB) |     0.5524%
+  fira_cond        |   24px |             0 B (  0.00 KB) |         9,885 B (  9.65 KB) |         9,885 B (  9.65 KB) |     0.3142%
+  fira_sans        |   14px |         5,806 B (  5.67 KB) |         6,332 B (  6.18 KB) |        12,138 B ( 11.85 KB) |     0.3859%
+  fira_sans        |   16px |         7,077 B (  6.91 KB) |         7,154 B (  6.99 KB) |        14,231 B ( 13.90 KB) |     0.4524%
+  fira_sans        |   18px |         7,165 B (  7.00 KB) |         7,124 B (  6.96 KB) |        14,289 B ( 13.95 KB) |     0.4542%
+  fira_sans        |   20px |         8,287 B (  8.09 KB) |         8,143 B (  7.95 KB) |        16,430 B ( 16.04 KB) |     0.5223%
+  fira_sans        |   24px |        10,280 B ( 10.04 KB) |        11,036 B ( 10.78 KB) |        21,316 B ( 20.82 KB) |     0.6776%
+  fira_sans        |   28px |             0 B (  0.00 KB) |        12,009 B ( 11.73 KB) |        12,009 B ( 11.73 KB) |     0.3818%
+  fira_sans        |   32px |             0 B (  0.00 KB) |        14,598 B ( 14.26 KB) |        14,598 B ( 14.26 KB) |     0.4641%
   icon_fa7         |   12px |         2,320 B (  2.27 KB) |             0 B (  0.00 KB) |         2,320 B (  2.27 KB) |     0.0738%
   icon_fa7         |   14px |         2,878 B (  2.81 KB) |             0 B (  0.00 KB) |         2,878 B (  2.81 KB) |     0.0915%
   icon_fa7         |   16px |         3,303 B (  3.23 KB) |             0 B (  0.00 KB) |         3,303 B (  3.23 KB) |     0.1050%
@@ -49,141 +64,110 @@ HUMIDYNE LABS / HUMIDITRON `epd-font` v1.0.23 — APPROXIMATE FLASH ROM (.rodata
   icon_tabler      |   16px |         1,992 B (  1.95 KB) |         4,456 B (  4.35 KB) |         6,448 B (  6.30 KB) |     0.2050%
   icon_tabler      |   20px |         2,712 B (  2.65 KB) |         6,032 B (  5.89 KB) |         8,744 B (  8.54 KB) |     0.2780%
   icon_tabler      |   24px |         3,561 B (  3.48 KB) |             0 B (  0.00 KB) |         3,561 B (  3.48 KB) |     0.1132%
-  math             |   14px |         2,197 B (  2.15 KB) |             0 B (  0.00 KB) |         2,197 B (  2.15 KB) |     0.0698%
-  math             |   16px |         2,511 B (  2.45 KB) |             0 B (  0.00 KB) |         2,511 B (  2.45 KB) |     0.0798%
-  math             |   20px |         3,155 B (  3.08 KB) |             0 B (  0.00 KB) |         3,155 B (  3.08 KB) |     0.1003%
-  math             |   24px |         4,038 B (  3.94 KB) |             0 B (  0.00 KB) |         4,038 B (  3.94 KB) |     0.1284%
-  mono             |   12px |         1,659 B (  1.62 KB) |         1,721 B (  1.68 KB) |         3,380 B (  3.30 KB) |     0.1074%
-  mono             |   14px |         1,927 B (  1.88 KB) |         2,005 B (  1.96 KB) |         3,932 B (  3.84 KB) |     0.1250%
-  mono             |   16px |         2,137 B (  2.09 KB) |         2,241 B (  2.19 KB) |         4,378 B (  4.28 KB) |     0.1392%
-  mono             |   18px |         2,454 B (  2.40 KB) |         2,595 B (  2.53 KB) |         5,049 B (  4.93 KB) |     0.1605%
-  mono             |   20px |         2,717 B (  2.65 KB) |         2,901 B (  2.83 KB) |         5,618 B (  5.49 KB) |     0.1786%
-  mono             |   24px |         3,447 B (  3.37 KB) |         3,683 B (  3.60 KB) |         7,130 B (  6.96 KB) |     0.2267%
-  mono             |   32px |         5,200 B (  5.08 KB) |         5,667 B (  5.53 KB) |        10,867 B ( 10.61 KB) |     0.3455%
-  noto_sans        |   14px |         1,953 B (  1.91 KB) |         2,036 B (  1.99 KB) |         3,989 B (  3.90 KB) |     0.1268%
-  noto_sans        |   16px |         2,206 B (  2.15 KB) |         2,357 B (  2.30 KB) |         4,563 B (  4.46 KB) |     0.1451%
-  noto_sans        |   20px |         2,755 B (  2.69 KB) |         2,953 B (  2.88 KB) |         5,708 B (  5.57 KB) |     0.1815%
-  sans             |   12px |         1,757 B (  1.72 KB) |         1,832 B (  1.79 KB) |         3,589 B (  3.50 KB) |     0.1141%
-  sans             |   14px |         1,930 B (  1.88 KB) |         2,030 B (  1.98 KB) |         3,960 B (  3.87 KB) |     0.1259%
-  sans             |   16px |         2,127 B (  2.08 KB) |         2,274 B (  2.22 KB) |         4,401 B (  4.30 KB) |     0.1399%
-  sans             |   18px |         2,456 B (  2.40 KB) |         2,627 B (  2.57 KB) |         5,083 B (  4.96 KB) |     0.1616%
-  sans             |   20px |         2,735 B (  2.67 KB) |         2,967 B (  2.90 KB) |         5,702 B (  5.57 KB) |     0.1813%
-  sans             |   24px |         3,459 B (  3.38 KB) |         3,766 B (  3.68 KB) |         7,225 B (  7.06 KB) |     0.2297%
-  sans             |   32px |         5,197 B (  5.08 KB) |         5,769 B (  5.63 KB) |        10,966 B ( 10.71 KB) |     0.3486%
-  serif            |   16px |         2,309 B (  2.25 KB) |         2,464 B (  2.41 KB) |         4,773 B (  4.66 KB) |     0.1517%
-  serif            |   18px |         2,586 B (  2.53 KB) |         2,761 B (  2.70 KB) |         5,347 B (  5.22 KB) |     0.1700%
-  serif            |   20px |         2,917 B (  2.85 KB) |         3,139 B (  3.07 KB) |         6,056 B (  5.91 KB) |     0.1925%
-  serif            |   24px |         3,715 B (  3.63 KB) |         4,003 B (  3.91 KB) |         7,718 B (  7.54 KB) |     0.2453%
-  terminus         |   12px |         1,747 B (  1.71 KB) |         1,747 B (  1.71 KB) |         3,494 B (  3.41 KB) |     0.1111%
-  terminus         |   14px |         2,012 B (  1.96 KB) |         2,123 B (  2.07 KB) |         4,135 B (  4.04 KB) |     0.1314%
-  terminus         |   16px |         2,022 B (  1.97 KB) |         2,133 B (  2.08 KB) |         4,155 B (  4.06 KB) |     0.1321%
-  terminus         |   20px |         2,365 B (  2.31 KB) |         2,498 B (  2.44 KB) |         4,863 B (  4.75 KB) |     0.1546%
+  inter_tight      |   16px |         5,348 B (  5.22 KB) |         5,491 B (  5.36 KB) |        10,839 B ( 10.58 KB) |     0.3446%
+  inter_tight      |   18px |         5,732 B (  5.60 KB) |         5,961 B (  5.82 KB) |        11,693 B ( 11.42 KB) |     0.3717%
+  inter_tight      |   20px |         6,666 B (  6.51 KB) |         6,533 B (  6.38 KB) |        13,199 B ( 12.89 KB) |     0.4196%
+  inter_tight      |   24px |             0 B (  0.00 KB) |         7,872 B (  7.69 KB) |         7,872 B (  7.69 KB) |     0.2502%
+  inter_tight      |   32px |             0 B (  0.00 KB) |        10,569 B ( 10.32 KB) |        10,569 B ( 10.32 KB) |     0.3360%
+  jetbrains_mono   |   14px |         2,131 B (  2.08 KB) |         2,190 B (  2.14 KB) |         4,321 B (  4.22 KB) |     0.1374%
+  jetbrains_mono   |   16px |         2,447 B (  2.39 KB) |         2,488 B (  2.43 KB) |         4,935 B (  4.82 KB) |     0.1569%
+  jetbrains_mono   |   18px |         2,725 B (  2.66 KB) |         2,832 B (  2.77 KB) |         5,557 B (  5.43 KB) |     0.1767%
+  jetbrains_mono   |   20px |         3,044 B (  2.97 KB) |         3,238 B (  3.16 KB) |         6,282 B (  6.13 KB) |     0.1997%
+  jetbrains_mono   |   24px |         3,881 B (  3.79 KB) |         3,999 B (  3.91 KB) |         7,880 B (  7.70 KB) |     0.2505%
+  jetbrains_mono   |   28px |             0 B (  0.00 KB) |         4,992 B (  4.88 KB) |         4,992 B (  4.88 KB) |     0.1587%
+  jetbrains_mono   |   32px |             0 B (  0.00 KB) |         6,183 B (  6.04 KB) |         6,183 B (  6.04 KB) |     0.1966%
+  plex_math        |   16px |         2,800 B (  2.73 KB) |             0 B (  0.00 KB) |         2,800 B (  2.73 KB) |     0.0890%
+  plex_math        |   20px |         3,677 B (  3.59 KB) |             0 B (  0.00 KB) |         3,677 B (  3.59 KB) |     0.1169%
+  terminus         |   14px |             0 B (  0.00 KB) |         2,123 B (  2.07 KB) |         2,123 B (  2.07 KB) |     0.0675%
+  terminus         |   16px |             0 B (  0.00 KB) |         2,133 B (  2.08 KB) |         2,133 B (  2.08 KB) |     0.0678%
+  terminus         |   20px |             0 B (  0.00 KB) |         2,498 B (  2.44 KB) |         2,498 B (  2.44 KB) |     0.0794%
 
 3. SUBTOTALS BY FONT / ICON FAMILY
 ------------------------------------------------------------------------------------------------------------------------
   Family             | Strikes | Total Glyphs |    MCU Flash (.rodata) |      Host .c Disk Size | % of Build
 ------------------------------------------------------------------------------------------------------------------------
-  sans               |      20 |        2,380 |     56,402 B (  55.1 KB) |    577,458 B ( 563.9 KB) |     17.62%
-  noto_sans          |       8 |          952 |     18,559 B (  18.1 KB) |    204,886 B ( 200.1 KB) |      5.80%
-  mono               |      19 |        2,261 |     51,876 B (  50.7 KB) |    537,741 B ( 525.1 KB) |     16.20%
-  cond               |      14 |        1,666 |     34,122 B (  33.3 KB) |    369,425 B ( 360.8 KB) |     10.66%
-  serif              |      12 |        1,428 |     35,994 B (  35.2 KB) |    361,570 B ( 353.1 KB) |     11.24%
-  math               |       4 |          524 |     11,901 B (  11.6 KB) |    122,796 B ( 119.9 KB) |      3.72%
-  terminus           |       8 |        1,048 |     16,647 B (  16.3 KB) |    197,669 B ( 193.0 KB) |      5.20%
-  icon_fa7           |       7 |          609 |     33,634 B (  32.8 KB) |    274,160 B ( 267.7 KB) |     10.51%
-  icon_lucide        |       4 |          324 |     12,584 B (  12.3 KB) |    111,682 B ( 109.1 KB) |      3.93%
-  icon_phosphor      |       6 |          774 |     27,933 B (  27.3 KB) |    245,298 B ( 239.5 KB) |      8.73%
-  icon_tabler        |       6 |          582 |     20,485 B (  20.0 KB) |    185,689 B ( 181.3 KB) |      6.40%
+  fira_sans          |      14 |        1,834 |    118,479 B ( 115.7 KB) |    795,830 B ( 777.2 KB) |     25.57%
+  inter_tight        |       9 |        1,179 |     59,655 B (  58.3 KB) |    442,864 B ( 432.5 KB) |     12.88%
+  fira_cond          |       8 |        1,048 |     64,460 B (  62.9 KB) |    431,065 B ( 421.0 KB) |     13.91%
+  jetbrains_mono     |      13 |        1,703 |     42,705 B (  41.7 KB) |    425,274 B ( 415.3 KB) |      9.22%
+  fira_code          |       7 |          917 |     20,834 B (  20.3 KB) |    214,996 B ( 210.0 KB) |      4.50%
+  bitter             |       7 |          840 |     45,066 B (  44.0 KB) |    320,659 B ( 313.1 KB) |      9.73%
+  plex_math          |       2 |          286 |      6,477 B (   6.3 KB) |     66,455 B (  64.9 KB) |      1.40%
+  terminus           |       5 |          655 |     11,022 B (  10.8 KB) |    127,594 B ( 124.6 KB) |      2.38%
+  icon_fa7           |       7 |          609 |     33,634 B (  32.8 KB) |    274,160 B ( 267.7 KB) |      7.26%
+  icon_lucide        |       4 |          324 |     12,584 B (  12.3 KB) |    111,682 B ( 109.1 KB) |      2.72%
+  icon_phosphor      |       6 |          774 |     27,933 B (  27.3 KB) |    245,298 B ( 239.5 KB) |      6.03%
+  icon_tabler        |       6 |          582 |     20,485 B (  20.0 KB) |    185,689 B ( 181.3 KB) |      4.42%
 
 4. PER-STRIKE DETAILED FLASH (.rodata) & DISK FOOTPRINT TABLE
 ------------------------------------------------------------------------------------------------------------------------
   Strike Symbol Name                   | Em(px) |  pt@96 | pt@DPI | LineHt | Glyphs |  Kern |  MCU Flash (.rodata) |  Host .c Disk Size
 ------------------------------------------------------------------------------------------------------------------------
-  humid1_font_plex_sans_normal_12      |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,757 B (  1.72 KB) |   21,824 B ( 21.3 KB)
-  humid1_font_plex_sans_normal_14      |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     1,930 B (  1.88 KB) |   22,996 B ( 22.5 KB)
-  humid1_font_plex_sans_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,127 B (  2.08 KB) |   24,305 B ( 23.7 KB)
-  humid1_font_plex_sans_normal_18      |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,456 B (  2.40 KB) |   26,529 B ( 25.9 KB)
-  humid1_font_plex_sans_normal_20      |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,735 B (  2.67 KB) |   28,393 B ( 27.7 KB)
-  humid1_font_plex_sans_normal_24      |   24px | 18.0pt |  9.2pt |   32px |    119 |     0 |     3,459 B (  3.38 KB) |   33,171 B ( 32.4 KB)
-  humid1_font_plex_sans_normal_32      |   32px | 24.0pt | 12.2pt |   42px |    119 |     0 |     5,197 B (  5.08 KB) |   44,318 B ( 43.3 KB)
-  humid1_font_plex_sans_bold_12        |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,832 B (  1.79 KB) |   22,308 B ( 21.8 KB)
-  humid1_font_plex_sans_bold_14        |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     2,030 B (  1.98 KB) |   23,619 B ( 23.1 KB)
-  humid1_font_plex_sans_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,274 B (  2.22 KB) |   25,320 B ( 24.7 KB)
-  humid1_font_plex_sans_bold_18        |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,627 B (  2.57 KB) |   27,650 B ( 27.0 KB)
-  humid1_font_plex_sans_bold_20        |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,967 B (  2.90 KB) |   29,919 B ( 29.2 KB)
-  humid1_font_plex_sans_bold_24        |   24px | 18.0pt |  9.2pt |   32px |    119 |     0 |     3,766 B (  3.68 KB) |   35,113 B ( 34.3 KB)
-  humid1_font_plex_sans_bold_32        |   32px | 24.0pt | 12.2pt |   42px |    119 |     0 |     5,769 B (  5.63 KB) |   48,048 B ( 46.9 KB)
-  humid1_font_plex_sans_italic_12      |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,849 B (  1.81 KB) |   22,405 B ( 21.9 KB)
-  humid1_font_plex_sans_italic_14      |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     2,023 B (  1.98 KB) |   23,593 B ( 23.0 KB)
-  humid1_font_plex_sans_italic_16      |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,259 B (  2.21 KB) |   25,247 B ( 24.7 KB)
-  humid1_font_plex_sans_italic_18      |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,629 B (  2.57 KB) |   27,710 B ( 27.1 KB)
-  humid1_font_plex_sans_italic_20      |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,950 B (  2.88 KB) |   29,834 B ( 29.1 KB)
-  humid1_font_plex_sans_italic_24      |   24px | 18.0pt |  9.2pt |   32px |    119 |     0 |     3,766 B (  3.68 KB) |   35,156 B ( 34.3 KB)
-  humid1_font_noto_sans_normal_14      |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     1,953 B (  1.91 KB) |   23,162 B ( 22.6 KB)
-  humid1_font_noto_sans_normal_16      |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,206 B (  2.15 KB) |   24,859 B ( 24.3 KB)
-  humid1_font_noto_sans_normal_20      |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,755 B (  2.69 KB) |   28,554 B ( 27.9 KB)
-  humid1_font_noto_sans_bold_14        |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     2,036 B (  1.99 KB) |   23,683 B ( 23.1 KB)
-  humid1_font_noto_sans_bold_16        |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,357 B (  2.30 KB) |   25,852 B ( 25.2 KB)
-  humid1_font_noto_sans_bold_20        |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,953 B (  2.88 KB) |   29,854 B ( 29.2 KB)
-  humid1_font_noto_sans_italic_14      |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     2,002 B (  1.96 KB) |   23,478 B ( 22.9 KB)
-  humid1_font_noto_sans_italic_16      |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,297 B (  2.24 KB) |   25,444 B ( 24.8 KB)
-  humid1_font_plex_mono_normal_12      |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,659 B (  1.62 KB) |   21,255 B ( 20.8 KB)
-  humid1_font_plex_mono_normal_14      |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     1,927 B (  1.88 KB) |   22,989 B ( 22.5 KB)
-  humid1_font_plex_mono_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,137 B (  2.09 KB) |   24,330 B ( 23.8 KB)
-  humid1_font_plex_mono_normal_18      |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,454 B (  2.40 KB) |   26,533 B ( 25.9 KB)
-  humid1_font_plex_mono_normal_20      |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,717 B (  2.65 KB) |   28,363 B ( 27.7 KB)
-  humid1_font_plex_mono_normal_24      |   24px | 18.0pt |  9.2pt |   32px |    119 |     0 |     3,447 B (  3.37 KB) |   33,142 B ( 32.4 KB)
-  humid1_font_plex_mono_normal_32      |   32px | 24.0pt | 12.2pt |   42px |    119 |     0 |     5,200 B (  5.08 KB) |   44,369 B ( 43.3 KB)
-  humid1_font_plex_mono_bold_12        |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,721 B (  1.68 KB) |   21,608 B ( 21.1 KB)
-  humid1_font_plex_mono_bold_14        |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     2,005 B (  1.96 KB) |   23,445 B ( 22.9 KB)
-  humid1_font_plex_mono_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,241 B (  2.19 KB) |   25,066 B ( 24.5 KB)
-  humid1_font_plex_mono_bold_18        |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,595 B (  2.53 KB) |   27,453 B ( 26.8 KB)
-  humid1_font_plex_mono_bold_20        |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,901 B (  2.83 KB) |   29,553 B ( 28.9 KB)
-  humid1_font_plex_mono_bold_24        |   24px | 18.0pt |  9.2pt |   32px |    119 |     0 |     3,683 B (  3.60 KB) |   34,630 B ( 33.8 KB)
-  humid1_font_plex_mono_bold_32        |   32px | 24.0pt | 12.2pt |   42px |    119 |     0 |     5,667 B (  5.53 KB) |   47,380 B ( 46.3 KB)
-  humid1_font_plex_mono_italic_12      |   12px |  9.0pt |  4.6pt |   17px |    119 |     0 |     1,727 B (  1.69 KB) |   21,668 B ( 21.2 KB)
-  humid1_font_plex_mono_italic_14      |   14px | 10.5pt |  5.4pt |   19px |    119 |     0 |     2,002 B (  1.96 KB) |   23,454 B ( 22.9 KB)
-  humid1_font_plex_mono_italic_16      |   16px | 12.0pt |  6.1pt |   22px |    119 |     0 |     2,239 B (  2.19 KB) |   25,092 B ( 24.5 KB)
-  humid1_font_plex_mono_italic_18      |   18px | 13.5pt |  6.9pt |   24px |    119 |     0 |     2,622 B (  2.56 KB) |   27,654 B ( 27.0 KB)
-  humid1_font_plex_mono_italic_20      |   20px | 15.0pt |  7.7pt |   27px |    119 |     0 |     2,932 B (  2.86 KB) |   29,757 B ( 29.1 KB)
-  humid1_font_plex_cond_normal_14      |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     1,849 B (  1.81 KB) |   22,497 B ( 22.0 KB)
-  humid1_font_plex_cond_normal_16      |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,102 B (  2.05 KB) |   24,109 B ( 23.5 KB)
-  humid1_font_plex_cond_normal_18      |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,315 B (  2.26 KB) |   25,611 B ( 25.0 KB)
-  humid1_font_plex_cond_normal_20      |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,579 B (  2.52 KB) |   27,366 B ( 26.7 KB)
-  humid1_font_plex_cond_normal_24      |   24px | 18.0pt |  9.2pt |   34px |    119 |     0 |     3,230 B (  3.15 KB) |   31,670 B ( 30.9 KB)
-  humid1_font_plex_cond_bold_14        |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     1,944 B (  1.90 KB) |   23,079 B ( 22.5 KB)
-  humid1_font_plex_cond_bold_16        |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,220 B (  2.17 KB) |   24,905 B ( 24.3 KB)
-  humid1_font_plex_cond_bold_18        |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,484 B (  2.43 KB) |   26,730 B ( 26.1 KB)
-  humid1_font_plex_cond_bold_20        |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,753 B (  2.69 KB) |   28,500 B ( 27.8 KB)
-  humid1_font_plex_cond_bold_24        |   24px | 18.0pt |  9.2pt |   34px |    119 |     0 |     3,474 B (  3.39 KB) |   33,235 B ( 32.5 KB)
-  humid1_font_plex_cond_italic_14      |   14px | 10.5pt |  5.4pt |   20px |    119 |     0 |     1,914 B (  1.87 KB) |   22,890 B ( 22.4 KB)
-  humid1_font_plex_cond_italic_16      |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,167 B (  2.12 KB) |   24,544 B ( 24.0 KB)
-  humid1_font_plex_cond_italic_18      |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,405 B (  2.35 KB) |   26,224 B ( 25.6 KB)
-  humid1_font_plex_cond_italic_20      |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,686 B (  2.62 KB) |   28,065 B ( 27.4 KB)
-  humid1_font_plex_serif_normal_16     |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,309 B (  2.25 KB) |   25,566 B ( 25.0 KB)
-  humid1_font_plex_serif_normal_18     |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,586 B (  2.53 KB) |   27,427 B ( 26.8 KB)
-  humid1_font_plex_serif_normal_20     |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     2,917 B (  2.85 KB) |   29,617 B ( 28.9 KB)
-  humid1_font_plex_serif_normal_24     |   24px | 18.0pt |  9.2pt |   34px |    119 |     0 |     3,715 B (  3.63 KB) |   34,804 B ( 34.0 KB)
-  humid1_font_plex_serif_bold_16       |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,464 B (  2.41 KB) |   26,586 B ( 26.0 KB)
-  humid1_font_plex_serif_bold_18       |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,761 B (  2.70 KB) |   28,551 B ( 27.9 KB)
-  humid1_font_plex_serif_bold_20       |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     3,139 B (  3.07 KB) |   31,078 B ( 30.3 KB)
-  humid1_font_plex_serif_bold_24       |   24px | 18.0pt |  9.2pt |   34px |    119 |     0 |     4,003 B (  3.91 KB) |   36,672 B ( 35.8 KB)
-  humid1_font_plex_serif_italic_16     |   16px | 12.0pt |  6.1pt |   23px |    119 |     0 |     2,410 B (  2.35 KB) |   26,284 B ( 25.7 KB)
-  humid1_font_plex_serif_italic_18     |   18px | 13.5pt |  6.9pt |   26px |    119 |     0 |     2,716 B (  2.65 KB) |   28,286 B ( 27.6 KB)
-  humid1_font_plex_serif_italic_20     |   20px | 15.0pt |  7.7pt |   28px |    119 |     0 |     3,064 B (  2.99 KB) |   30,578 B ( 29.9 KB)
-  humid1_font_plex_serif_italic_24     |   24px | 18.0pt |  9.2pt |   34px |    119 |     0 |     3,910 B (  3.82 KB) |   36,121 B ( 35.3 KB)
-  humid1_font_plex_math_regular_14     |   14px | 10.5pt |  5.4pt |   21px |    131 |     0 |     2,197 B (  2.15 KB) |   25,514 B ( 24.9 KB)
-  humid1_font_plex_math_regular_16     |   16px | 12.0pt |  6.1pt |   25px |    131 |     0 |     2,511 B (  2.45 KB) |   27,600 B ( 27.0 KB)
-  humid1_font_plex_math_regular_20     |   20px | 15.0pt |  7.7pt |   31px |    131 |     0 |     3,155 B (  3.08 KB) |   31,930 B ( 31.2 KB)
-  humid1_font_plex_math_regular_24     |   24px | 18.0pt |  9.2pt |   37px |    131 |     0 |     4,038 B (  3.94 KB) |   37,752 B ( 36.9 KB)
-  humid1_font_terminus_normal_12       |   12px |  9.0pt |  4.6pt |   12px |    131 |     0 |     1,747 B (  1.71 KB) |   22,436 B ( 21.9 KB)
-  humid1_font_terminus_normal_14       |   14px | 10.5pt |  5.4pt |   14px |    131 |     0 |     2,012 B (  1.96 KB) |   24,304 B ( 23.7 KB)
-  humid1_font_terminus_normal_16       |   16px | 12.0pt |  6.1pt |   16px |    131 |     0 |     2,022 B (  1.97 KB) |   24,380 B ( 23.8 KB)
-  humid1_font_terminus_normal_20       |   20px | 15.0pt |  7.7pt |   20px |    131 |     0 |     2,365 B (  2.31 KB) |   26,521 B ( 25.9 KB)
-  humid1_font_terminus_bold_12         |   12px |  9.0pt |  4.6pt |   12px |    131 |     0 |     1,747 B (  1.71 KB) |   22,440 B ( 21.9 KB)
-  humid1_font_terminus_bold_14         |   14px | 10.5pt |  5.4pt |   14px |    131 |     0 |     2,123 B (  2.07 KB) |   24,976 B ( 24.4 KB)
-  humid1_font_terminus_bold_16         |   16px | 12.0pt |  6.1pt |   16px |    131 |     0 |     2,133 B (  2.08 KB) |   25,052 B ( 24.5 KB)
-  humid1_font_terminus_bold_20         |   20px | 15.0pt |  7.7pt |   20px |    131 |     0 |     2,498 B (  2.44 KB) |   27,560 B ( 26.9 KB)
+  humid1_font_fira_sans_normal_14      |   14px | 10.5pt |  5.4pt |   18px |    131 | 1,209 |     5,806 B (  5.67 KB) |   42,067 B ( 41.1 KB)
+  humid1_font_fira_sans_normal_16      |   16px | 12.0pt |  6.1pt |   20px |    131 | 1,545 |     7,077 B (  6.91 KB) |   48,546 B ( 47.4 KB)
+  humid1_font_fira_sans_normal_18      |   18px | 13.5pt |  6.9pt |   22px |    131 | 1,462 |     7,165 B (  7.00 KB) |   49,827 B ( 48.7 KB)
+  humid1_font_fira_sans_normal_20      |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,729 |     8,287 B (  8.09 KB) |   55,781 B ( 54.5 KB)
+  humid1_font_fira_sans_normal_24      |   24px | 18.0pt |  9.2pt |   30px |    131 | 2,125 |    10,280 B ( 10.04 KB) |   66,476 B ( 64.9 KB)
+  humid1_font_fira_sans_bold_14        |   14px | 10.5pt |  5.4pt |   18px |    131 | 1,346 |     6,332 B (  6.18 KB) |   44,621 B ( 43.6 KB)
+  humid1_font_fira_sans_bold_16        |   16px | 12.0pt |  6.1pt |   20px |    131 | 1,520 |     7,154 B (  6.99 KB) |   49,256 B ( 48.1 KB)
+  humid1_font_fira_sans_bold_18        |   18px | 13.5pt |  6.9pt |   22px |    131 | 1,391 |     7,124 B (  6.96 KB) |   49,831 B ( 48.7 KB)
+  humid1_font_fira_sans_bold_20        |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,624 |     8,143 B (  7.95 KB) |   55,489 B ( 54.2 KB)
+  humid1_font_fira_sans_bold_24        |   24px | 18.0pt |  9.2pt |   30px |    131 | 2,311 |    11,036 B ( 10.78 KB) |   70,236 B ( 68.6 KB)
+  humid1_font_fira_sans_bold_28        |   28px | 21.0pt | 10.7pt |   35px |    131 | 2,234 |    12,009 B ( 11.73 KB) |   76,952 B ( 75.1 KB)
+  humid1_font_fira_sans_bold_32        |   32px | 24.0pt | 12.2pt |   39px |    131 | 2,688 |    14,598 B ( 14.26 KB) |   91,438 B ( 89.3 KB)
+  humid1_font_fira_sans_italic_16      |   16px | 12.0pt |  6.1pt |   20px |    131 | 1,299 |     6,413 B (  6.26 KB) |   45,660 B ( 44.6 KB)
+  humid1_font_fira_sans_italic_18      |   18px | 13.5pt |  6.9pt |   22px |    131 | 1,390 |     7,055 B (  6.89 KB) |   49,650 B ( 48.5 KB)
+  humid1_font_inter_tight_normal_16    |   16px | 12.0pt |  6.1pt |   20px |    131 |   943 |     5,348 B (  5.22 KB) |   41,145 B ( 40.2 KB)
+  humid1_font_inter_tight_normal_18    |   18px | 13.5pt |  6.9pt |   23px |    131 |   961 |     5,732 B (  5.60 KB) |   43,849 B ( 42.8 KB)
+  humid1_font_inter_tight_normal_20    |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,147 |     6,666 B (  6.51 KB) |   48,903 B ( 47.8 KB)
+  humid1_font_inter_tight_bold_16      |   16px | 12.0pt |  6.1pt |   20px |    131 |   930 |     5,491 B (  5.36 KB) |   42,207 B ( 41.2 KB)
+  humid1_font_inter_tight_bold_18      |   18px | 13.5pt |  6.9pt |   23px |    131 |   964 |     5,961 B (  5.82 KB) |   45,281 B ( 44.2 KB)
+  humid1_font_inter_tight_bold_20      |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,001 |     6,533 B (  6.38 KB) |   48,777 B ( 47.6 KB)
+  humid1_font_inter_tight_bold_24      |   24px | 18.0pt |  9.2pt |   30px |    131 | 1,139 |     7,872 B (  7.69 KB) |   56,673 B ( 55.3 KB)
+  humid1_font_inter_tight_bold_32      |   32px | 24.0pt | 12.2pt |   39px |    131 | 1,198 |    10,569 B ( 10.32 KB) |   73,909 B ( 72.2 KB)
+  humid1_font_inter_tight_italic_16    |   16px | 12.0pt |  6.1pt |   20px |    131 |   947 |     5,483 B (  5.35 KB) |   42,120 B ( 41.1 KB)
+  humid1_font_fira_cond_normal_14      |   14px | 10.5pt |  5.4pt |   18px |    131 | 1,321 |     6,085 B (  5.94 KB) |   43,409 B ( 42.4 KB)
+  humid1_font_fira_cond_normal_16      |   16px | 12.0pt |  6.1pt |   20px |    131 | 1,738 |     7,570 B (  7.39 KB) |   50,592 B ( 49.4 KB)
+  humid1_font_fira_cond_normal_18      |   18px | 13.5pt |  6.9pt |   22px |    131 | 1,648 |     7,607 B (  7.43 KB) |   51,568 B ( 50.4 KB)
+  humid1_font_fira_cond_normal_20      |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,762 |     8,237 B (  8.04 KB) |   55,088 B ( 53.8 KB)
+  humid1_font_fira_cond_bold_16        |   16px | 12.0pt |  6.1pt |   20px |    131 | 1,696 |     7,584 B (  7.41 KB) |   50,913 B ( 49.7 KB)
+  humid1_font_fira_cond_bold_18        |   18px | 13.5pt |  6.9pt |   22px |    131 | 1,842 |     8,352 B (  8.16 KB) |   55,262 B ( 54.0 KB)
+  humid1_font_fira_cond_bold_20        |   20px | 15.0pt |  7.7pt |   25px |    131 | 1,997 |     9,140 B (  8.93 KB) |   59,712 B ( 58.3 KB)
+  humid1_font_fira_cond_bold_24        |   24px | 18.0pt |  9.2pt |   30px |    131 | 2,006 |     9,885 B (  9.65 KB) |   64,521 B ( 63.0 KB)
+  humid1_font_jetbrains_mono_normal_14 |   14px | 10.5pt |  5.4pt |   20px |    131 |     0 |     2,131 B (  2.08 KB) |   25,094 B ( 24.5 KB)
+  humid1_font_jetbrains_mono_normal_16 |   16px | 12.0pt |  6.1pt |   22px |    131 |     0 |     2,447 B (  2.39 KB) |   27,095 B ( 26.5 KB)
+  humid1_font_jetbrains_mono_normal_18 |   18px | 13.5pt |  6.9pt |   25px |    131 |     0 |     2,725 B (  2.66 KB) |   29,134 B ( 28.5 KB)
+  humid1_font_jetbrains_mono_normal_20 |   20px | 15.0pt |  7.7pt |   27px |    131 |     0 |     3,044 B (  2.97 KB) |   31,262 B ( 30.5 KB)
+  humid1_font_jetbrains_mono_normal_24 |   24px | 18.0pt |  9.2pt |   33px |    131 |     0 |     3,881 B (  3.79 KB) |   36,761 B ( 35.9 KB)
+  humid1_font_jetbrains_mono_bold_14   |   14px | 10.5pt |  5.4pt |   20px |    131 |     0 |     2,190 B (  2.14 KB) |   25,445 B ( 24.8 KB)
+  humid1_font_jetbrains_mono_bold_16   |   16px | 12.0pt |  6.1pt |   22px |    131 |     0 |     2,488 B (  2.43 KB) |   27,347 B ( 26.7 KB)
+  humid1_font_jetbrains_mono_bold_18   |   18px | 13.5pt |  6.9pt |   25px |    131 |     0 |     2,832 B (  2.77 KB) |   29,802 B ( 29.1 KB)
+  humid1_font_jetbrains_mono_bold_20   |   20px | 15.0pt |  7.7pt |   27px |    131 |     0 |     3,238 B (  3.16 KB) |   32,561 B ( 31.8 KB)
+  humid1_font_jetbrains_mono_bold_24   |   24px | 18.0pt |  9.2pt |   33px |    131 |     0 |     3,999 B (  3.91 KB) |   37,503 B ( 36.6 KB)
+  humid1_font_jetbrains_mono_bold_28   |   28px | 21.0pt | 10.7pt |   38px |    131 |     0 |     4,992 B (  4.88 KB) |   43,901 B ( 42.9 KB)
+  humid1_font_jetbrains_mono_bold_32   |   32px | 24.0pt | 12.2pt |   43px |    131 |     0 |     6,183 B (  6.04 KB) |   51,510 B ( 50.3 KB)
+  humid1_font_jetbrains_mono_italic_16 |   16px | 12.0pt |  6.1pt |   22px |    131 |     0 |     2,555 B (  2.50 KB) |   27,859 B ( 27.2 KB)
+  humid1_font_fira_code_normal_16      |   16px | 12.0pt |  6.1pt |   22px |    131 |     0 |     2,404 B (  2.35 KB) |   26,817 B ( 26.2 KB)
+  humid1_font_fira_code_normal_18      |   18px | 13.5pt |  6.9pt |   24px |    131 |     0 |     2,721 B (  2.66 KB) |   29,050 B ( 28.4 KB)
+  humid1_font_fira_code_normal_20      |   20px | 15.0pt |  7.7pt |   27px |    131 |     0 |     3,058 B (  2.99 KB) |   31,337 B ( 30.6 KB)
+  humid1_font_fira_code_bold_16        |   16px | 12.0pt |  6.1pt |   22px |    131 |     0 |     2,492 B (  2.43 KB) |   27,422 B ( 26.8 KB)
+  humid1_font_fira_code_bold_18        |   18px | 13.5pt |  6.9pt |   24px |    131 |     0 |     2,855 B (  2.79 KB) |   29,945 B ( 29.2 KB)
+  humid1_font_fira_code_bold_20        |   20px | 15.0pt |  7.7pt |   27px |    131 |     0 |     3,226 B (  3.15 KB) |   32,448 B ( 31.7 KB)
+  humid1_font_fira_code_bold_24        |   24px | 18.0pt |  9.2pt |   32px |    131 |     0 |     4,078 B (  3.98 KB) |   37,977 B ( 37.1 KB)
+  humid1_font_bitter_normal_16         |   16px | 12.0pt |  6.1pt |   20px |    120 | 1,024 |     5,332 B (  5.21 KB) |   39,296 B ( 38.4 KB)
+  humid1_font_bitter_normal_18         |   18px | 13.5pt |  6.9pt |   22px |    120 | 1,322 |     6,582 B (  6.43 KB) |   45,826 B ( 44.8 KB)
+  humid1_font_bitter_normal_20         |   20px | 15.0pt |  7.7pt |   25px |    120 | 1,093 |     6,209 B (  6.06 KB) |   44,911 B ( 43.9 KB)
+  humid1_font_bitter_bold_18           |   18px | 13.5pt |  6.9pt |   22px |    120 | 1,085 |     6,105 B (  5.96 KB) |   44,076 B ( 43.0 KB)
+  humid1_font_bitter_bold_20           |   20px | 15.0pt |  7.7pt |   25px |    120 | 1,181 |     6,733 B (  6.58 KB) |   47,587 B ( 46.5 KB)
+  humid1_font_bitter_bold_24           |   24px | 18.0pt |  9.2pt |   30px |    120 | 1,219 |     7,715 B (  7.53 KB) |   53,775 B ( 52.5 KB)
+  humid1_font_bitter_italic_18         |   18px | 13.5pt |  6.9pt |   22px |    120 | 1,244 |     6,390 B (  6.24 KB) |   45,188 B ( 44.1 KB)
+  humid1_font_plex_math_regular_16     |   16px | 12.0pt |  6.1pt |   22px |    143 |     0 |     2,800 B (  2.73 KB) |   30,289 B ( 29.6 KB)
+  humid1_font_plex_math_regular_20     |   20px | 15.0pt |  7.7pt |   27px |    143 |     0 |     3,677 B (  3.59 KB) |   36,166 B ( 35.3 KB)
+  humid1_font_terminus_bold_14         |   14px | 10.5pt |  5.4pt |   14px |    131 |     0 |     2,123 B (  2.07 KB) |   24,958 B ( 24.4 KB)
+  humid1_font_terminus_bold_16         |   16px | 12.0pt |  6.1pt |   16px |    131 |     0 |     2,133 B (  2.08 KB) |   25,034 B ( 24.4 KB)
+  humid1_font_terminus_bold_20         |   20px | 15.0pt |  7.7pt |   20px |    131 |     0 |     2,498 B (  2.44 KB) |   27,542 B ( 26.9 KB)
+  humid1_font_terminus_vga_14          |   14px | 10.5pt |  5.4pt |   14px |    131 |     0 |     2,129 B (  2.08 KB) |   24,992 B ( 24.4 KB)
+  humid1_font_terminus_vga_16          |   16px | 12.0pt |  6.1pt |   16px |    131 |     0 |     2,139 B (  2.09 KB) |   25,068 B ( 24.5 KB)
   humid1_icon_fa7_solid_12             |   12px |  9.0pt |  4.6pt |   14px |     87 |     0 |     2,320 B (  2.27 KB) |   23,180 B ( 22.6 KB)
   humid1_icon_fa7_solid_14             |   14px | 10.5pt |  5.4pt |   17px |     87 |     0 |     2,878 B (  2.81 KB) |   26,775 B ( 26.1 KB)
   humid1_icon_fa7_solid_16             |   16px | 12.0pt |  6.1pt |   18px |     87 |     0 |     3,303 B (  3.23 KB) |   29,531 B ( 28.8 KB)

@@ -81,10 +81,10 @@ idf_component_register(
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
 if(TARGET ${lvgl_lib})
-    target_compile_definitions(${lvgl_lib} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
+#    target_compile_definitions(${lvgl_lib} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
     target_include_directories(${lvgl_lib} PUBLIC "${H1OS_DISTRO_FONT_DIR}")
 endif()
-target_compile_definitions(${COMPONENT_LIB} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
+#target_compile_definitions(${COMPONENT_LIB} PUBLIC "LV_FONT_DEFAULT=&humid1_font_plex_sans_normal_14")
 
 # -----------------------------------------------------------------------------
 # ULP CoProc

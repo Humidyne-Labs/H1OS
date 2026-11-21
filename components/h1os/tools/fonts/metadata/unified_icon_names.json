@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.22",
+  "schema_version": "1.0.23",
   "description": "Master codepoint <-> semantic icon name registry across Font Awesome 7.3.1, Lucide, Phosphor, and Tabler.",
   "counts": {
     "icon_fa7": 2349,

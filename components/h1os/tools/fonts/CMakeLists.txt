@@ -7,7 +7,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-set(EPD_FONT_SCHEME "${CMAKE_CURRENT_LIST_DIR}/schemes/h1os_full.scheme.json" CACHE FILEPATH "Declarative epd-font scheme JSON")
+set(EPD_FONT_SCHEME "${CMAKE_CURRENT_LIST_DIR}/schemes/h1os_v2_full.scheme.json" CACHE FILEPATH "Declarative epd-font scheme JSON")
 set(EPD_FONT_VAULT  "${CMAKE_CURRENT_LIST_DIR}/humid1_epd_vault.json.gz" CACHE FILEPATH "Pre-rasterized epd-font Strike Vault")
 option(EPD_FONT_USE_PREGENERATED "Compile pre-generated fonts/*.c without invoking Python vault emitter" OFF)
 

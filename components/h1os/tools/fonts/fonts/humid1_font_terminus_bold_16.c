@@ -3,7 +3,7 @@
  * Size: 16 px @ 188.15 DPI (1-bit Monochrome Embedded Display)
  * Bpp: 1 (Uncompressed Bilevel Monochrome)
  * Conversion Pipeline: exact-mono (epd-font v1.0.23)
- * LVGL Fallback Pointer: &humid1_font_terminus_normal_16 (LVGL >= 9.6.0 Ready)
+ * LVGL Fallback Pointer: &humid1_icon_fa7_solid_16 (LVGL >= 9.6.0 Ready)
  * License: MIT AND OFL-1.1
  ******************************************************************************/
 
@@ -27,7 +27,7 @@
 
 #if HUMID1_FONT_TERMINUS_BOLD_16
 
-extern const lv_font_t humid1_font_terminus_normal_16;
+extern const lv_font_t humid1_icon_fa7_solid_16;
 
 /*-----------------
  *    BITMAPS
@@ -495,7 +495,7 @@ const lv_font_t humid1_font_terminus_bold_16 = {
 #endif
     .dsc = &font_dsc,
 #if LVGL_VERSION_MAJOR >= 9
-    .fallback = &humid1_font_terminus_normal_16,
+    .fallback = &humid1_icon_fa7_solid_16,
 #endif
     .user_data = NULL,
 };

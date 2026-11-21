@@ -1,5 +1,5 @@
 {
-  "catalog_version": "1.0.22",
+  "catalog_version": "1.0.23",
   "description": "Humiditron / humid1 Text & Technical Font Catalog (IBM Plex wght 100..800 + 24 Terminus Strikes)",
   "families": {
     "sans": [
@@ -61,9 +61,50 @@
       "IBMPlexSerif-BoldItalic.ttf",
       "IBMPlexSerif-ExtraBoldItalic.ttf"
     ],
-    "math": [
-      "NotoSansMath-Regular.ttf",
-      "IBMPlexMath-Regular.ttf"
+    "inter_tight": [
+      "InterTight-Regular.ttf",
+      "InterTight-Medium.ttf",
+      "InterTight-SemiBold.ttf",
+      "InterTight-Bold.ttf",
+      "InterTight-ExtraBold.ttf",
+      "InterTight-Italic.ttf",
+      "InterTight-MediumItalic.ttf",
+      "InterTight-SemiBoldItalic.ttf",
+      "InterTight-BoldItalic.ttf",
+      "InterTight-ExtraBoldItalic.ttf"
+    ],
+    "jetbrains_mono": [
+      "JetBrainsMono-Regular.ttf",
+      "JetBrainsMono-Medium.ttf",
+      "JetBrainsMono-SemiBold.ttf",
+      "JetBrainsMono-Bold.ttf",
+      "JetBrainsMono-ExtraBold.ttf",
+      "JetBrainsMono-Italic.ttf",
+      "JetBrainsMono-MediumItalic.ttf",
+      "JetBrainsMono-SemiBoldItalic.ttf",
+      "JetBrainsMono-BoldItalic.ttf",
+      "JetBrainsMono-ExtraBoldItalic.ttf"
+    ],
+    "fira_code": [
+      "FiraCode-Regular.ttf",
+      "FiraCode-Medium.ttf",
+      "FiraCode-SemiBold.ttf",
+      "FiraCode-Bold.ttf",
+      "FiraMono-Regular.ttf",
+      "FiraMono-Medium.ttf",
+      "FiraMono-Bold.ttf"
+    ],
+    "bitter": [
+      "Bitter-Regular.ttf",
+      "Bitter-Medium.ttf",
+      "Bitter-SemiBold.ttf",
+      "Bitter-Bold.ttf",
+      "Bitter-ExtraBold.ttf",
+      "Bitter-Italic.ttf",
+      "Bitter-MediumItalic.ttf",
+      "Bitter-SemiBoldItalic.ttf",
+      "Bitter-BoldItalic.ttf",
+      "Bitter-ExtraBoldItalic.ttf"
     ],
     "noto_sans": [
       "NotoSans-Regular.ttf",
@@ -96,6 +137,34 @@
     ],
     "noto_math": [
       "NotoSansMath-Regular.ttf"
+    ],
+    "math": [
+      "NotoSansMath-Regular.ttf",
+      "IBMPlexMath-Regular.ttf"
+    ],
+    "fira_sans": [
+      "FiraSans-Regular.ttf",
+      "FiraSans-Medium.ttf",
+      "FiraSans-SemiBold.ttf",
+      "FiraSans-Bold.ttf",
+      "FiraSans-ExtraBold.ttf",
+      "FiraSans-Italic.ttf",
+      "FiraSans-MediumItalic.ttf",
+      "FiraSans-SemiBoldItalic.ttf",
+      "FiraSans-BoldItalic.ttf",
+      "FiraSans-ExtraBoldItalic.ttf"
+    ],
+    "fira_cond": [
+      "FiraSansCondensed-Regular.ttf",
+      "FiraSansCondensed-Medium.ttf",
+      "FiraSansCondensed-SemiBold.ttf",
+      "FiraSansCondensed-Bold.ttf",
+      "FiraSansCondensed-ExtraBold.ttf",
+      "FiraSansCondensed-Italic.ttf",
+      "FiraSansCondensed-MediumItalic.ttf",
+      "FiraSansCondensed-SemiBoldItalic.ttf",
+      "FiraSansCondensed-BoldItalic.ttf",
+      "FiraSansCondensed-ExtraBoldItalic.ttf"
     ],
     "terminus": [
       "Terminus-Normal-10.ttf",
